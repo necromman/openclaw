@@ -36,7 +36,6 @@ import type { createEmbeddedRunLaneController } from "./lane-controller.js";
 import type { PreparedNativeSessionRuntime } from "./model-setup.js";
 import type { RunEmbeddedAgentParams } from "./params.js";
 import { prepareEmbeddedAttemptPromptExecution } from "./prompt-image-preparation.js";
-import { resolveSkillWorkshopAttemptParams } from "./skill-workshop-attempt-params.js";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptTrajectoryRecorder } from "./types.js";
 
 type InternalRunParams = RunEmbeddedAgentInternalParams & {
@@ -469,7 +468,15 @@ export async function dispatchEmbeddedRunAttempt(input: {
     streamParams: params.streamParams,
     modelRun: params.modelRun,
     disableTrajectory: params.disableTrajectory,
-    ...resolveSkillWorkshopAttemptParams(params),
+    skillWorkshopAutonomousCapture: params.skillWorkshopAutonomousCapture,
+    skillWorkshopUpdateProposals: params.skillWorkshopUpdateProposals,
+    skillWorkshopProposalOnly: params.skillWorkshopProposalOnly,
+    skillWorkshopProposalEnv: params.skillWorkshopProposalEnv,
+    skillWorkshopOrigin: params.skillWorkshopOrigin,
+    skillWorkshopProposalMutationBudget: params.skillWorkshopProposalMutationBudget,
+    skillWorkshopProposalReviewCompletion: params.skillWorkshopProposalReviewCompletion,
+    skillWorkshopProposalRevision: params.skillWorkshopProposalRevision,
+    skillLibraryAuthoring: params.skillLibraryAuthoring,
     promptMode: params.promptMode,
     ownerNumbers: params.ownerNumbers,
     enforceFinalTag: params.enforceFinalTag,
