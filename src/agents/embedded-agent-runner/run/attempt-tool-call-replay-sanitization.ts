@@ -491,9 +491,6 @@ export function wrapStreamFnSanitizeMalformedToolCalls(
       nextMessages = stripTrailingAssistantPrefillTurns(nextMessages);
       strippedTrailingAssistantPrefill ||= nextMessages !== beforeStrip;
     }
-    if (nextMessages === messages) {
-      return baseFn(model, context, options);
-    }
     if (
       sanitized.droppedAssistantMessages > 0 ||
       transcriptPolicy?.validateAnthropicTurns ||
@@ -507,6 +504,10 @@ export function wrapStreamFnSanitizeMalformedToolCalls(
           mergeConsecutiveUserTurns: shouldMergeConsecutiveUserTurns(transcriptPolicy, modelApi),
         });
       }
+    }
+    // The current prompt can create adjacent users after history validation.
+    if (nextMessages === messages) {
+      return baseFn(model, context, options);
     }
     const nextContext: typeof context = {
       ...context,

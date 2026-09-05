@@ -25,10 +25,12 @@ type ControllerInput = Parameters<typeof createEmbeddedRunFailoverRetryControlle
 function createController(
   advanceAuthProfile: ControllerInput["advanceAuthProfile"],
   fallbackConfigured = false,
+  abortSignal?: AbortSignal,
 ) {
   return createEmbeddedRunFailoverRetryController({
     runParams: {
       runId: "run:failover-retry-controller-test",
+      abortSignal,
     } as ControllerInput["runParams"],
     provider: "openai",
     modelId: "gpt-5.6-luna",
@@ -57,6 +59,131 @@ describe("createEmbeddedRunFailoverRetryController", () => {
     mocks.warn.mockClear();
     rateLimitContext.logFallbackDecision.mockClear();
   });
+
+  it("retries rate limits for ten attempts with capped backoff and transient status", async () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const events: Array<Record<string, unknown>> = [];
+    const onRetry = (status: Record<string, unknown>) => {
+      events.push(status);
+    };
+    try {
+      const controller = createController(vi.fn(async () => false));
+      controller.setTransientRetryBudget(0);
+      for (let attempt = 2; attempt <= 10; attempt++) {
+        await expect(
+          controller.maybeRetryTransient({ reason: "rate_limit", onRetry }),
+        ).resolves.toBe(true);
+        expect(events.at(-1)).toEqual({
+          reason: "rate_limit",
+          attempt: attempt - 1,
+          maxRetries: 9,
+          delayMs: expect.any(Number),
+        });
+      }
+      await expect(controller.maybeRetryTransient({ reason: "rate_limit" })).resolves.toBe(false);
+      expect(mocks.sleepWithAbort.mock.calls.map(([delay]) => delay)).toEqual([
+        1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000, 30000,
+      ]);
+      expect(events).toHaveLength(9);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it("counts earlier transient failures toward the ten-attempt rate-limit ceiling", async () => {
+    const controller = createController(vi.fn(async () => false));
+    for (let retry = 0; retry < 3; retry++) {
+      await expect(controller.maybeRetryTransient({ reason: "server_error" })).resolves.toBe(true);
+    }
+    for (let retry = 3; retry < 9; retry++) {
+      await expect(controller.maybeRetryTransient({ reason: "rate_limit" })).resolves.toBe(true);
+    }
+    await expect(controller.maybeRetryTransient({ reason: "rate_limit" })).resolves.toBe(false);
+    await expect(controller.maybeRetryTransient({ reason: "server_error" })).resolves.toBe(false);
+    expect(controller.transientRetryCount).toBe(9);
+    expect(mocks.sleepWithAbort).toHaveBeenCalledTimes(9);
+  });
+
+  it.each([3, 12])(
+    "does not add a %i non-rate budget after exhausting rate-limit attempts",
+    async (budget) => {
+      const controller = createController(vi.fn(async () => false));
+      controller.setTransientRetryBudget(budget);
+      for (let retry = 0; retry < 9; retry++) {
+        await expect(controller.maybeRetryTransient({ reason: "rate_limit" })).resolves.toBe(true);
+      }
+      await expect(controller.maybeRetryTransient({ reason: "server_error" })).resolves.toBe(false);
+      expect(controller.transientRetryCount).toBe(9);
+    },
+  );
+
+  it("retains the non-rate retry window after a long rate-limit wait", async () => {
+    let nowMs = 1_000_000;
+    const dateNow = vi.spyOn(Date, "now").mockImplementation(() => nowMs);
+    try {
+      const controller = createController(vi.fn(async () => false));
+      await expect(
+        controller.maybeRetryTransient({ reason: "rate_limit", retryAfterMs: 120000 }),
+      ).resolves.toBe(true);
+      nowMs += 120000;
+      await expect(controller.maybeRetryTransient({ reason: "server_error" })).resolves.toBe(false);
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
+  it("honors a rate-limit retry floor beyond the non-rate-limit time window", async () => {
+    const controller = createController(vi.fn(async () => false));
+    await expect(
+      controller.maybeRetryTransient({ reason: "rate_limit", retryAfterMs: 120000 }),
+    ).resolves.toBe(true);
+    expect(mocks.sleepWithAbort).toHaveBeenCalledWith(120000, undefined);
+  });
+
+  it.each([false, true])(
+    "honors a floor beyond the native timer limit (abort=%s)",
+    async (abort) => {
+      const { sleepWithAbort } = await vi.importActual<typeof import("../../../infra/backoff.js")>(
+        "../../../infra/backoff.js",
+      );
+      vi.useFakeTimers();
+      mocks.sleepWithAbort.mockImplementation(sleepWithAbort);
+      const cancellation = new AbortController();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const retryAfterMs = 30 * dayMs;
+      try {
+        const controller = createController(
+          vi.fn(async () => false),
+          false,
+          cancellation.signal,
+        );
+        let retried = false;
+        const retry = controller
+          .maybeRetryTransient({ reason: "rate_limit", retryAfterMs })
+          .then((result) => {
+            retried = result;
+            return result;
+          });
+        if (abort) {
+          const rejected = expect(retry).rejects.toMatchObject({ name: "AbortError" });
+          await vi.advanceTimersByTimeAsync(dayMs + 1);
+          cancellation.abort();
+          await rejected;
+          expect(controller.transientRetryCount).toBe(0);
+          expect(vi.getTimerCount()).toBe(0);
+        } else {
+          await vi.advanceTimersByTimeAsync(retryAfterMs - 1);
+          expect(retried).toBe(false);
+          await vi.advanceTimersByTimeAsync(1);
+          await expect(retry).resolves.toBe(true);
+          expect(controller.transientRetryCount).toBe(1);
+        }
+      } finally {
+        vi.useRealTimers();
+        mocks.sleepWithAbort.mockImplementation(async () => {});
+      }
+    },
+  );
 
   it("records the truncation when the window ends a budget that still has attempts", async () => {
     let nowMs = 1_000_000;
@@ -191,12 +318,12 @@ describe("createEmbeddedRunFailoverRetryController", () => {
     ["HTTP 429 Too Many Requests: requests per minute exceeded", true],
     ["429 RESOURCE_EXHAUSTED: tokens per minute limit exceeded", true],
     ["Quota exceeded for quota metric 'Generate requests per minute'", true],
-    ["429 insufficient_quota: You exceeded your current quota", false],
-    ["Provider API error (429): Quota exceeded [code=quota_exceeded]", false],
-    ["429 usage limit reached for this billing period", false],
-    ["429 rate_limit_exceeded; Retry-After: 3600", false],
+    ["429 insufficient_quota: You exceeded your current quota", true],
+    ["Provider API error (429): Quota exceeded [code=quota_exceeded]", true],
+    ["429 usage limit reached for this billing period", true],
+    ["429 rate_limit_exceeded; Retry-After: 3600", true],
   ] as const)(
-    "budgets transient rate limits without retrying long quota limits: %s",
+    "budgets classified rate limits regardless of window wording: %s",
     async (message, expected) => {
       const controller = createController(vi.fn(async () => false));
       await expect(controller.maybeRetryTransient({ reason: "rate_limit", message })).resolves.toBe(
@@ -224,7 +351,7 @@ describe("createEmbeddedRunFailoverRetryController", () => {
     }
   });
 
-  it("honors a short Retry-After HTTP date and skips one beyond the retry window", async () => {
+  it("honors Retry-After HTTP dates beyond the ordinary transient window", async () => {
     const nowMs = Date.parse("2026-06-11T00:00:00.000Z");
     const clock = vi.spyOn(Date, "now").mockReturnValue(nowMs);
     try {
@@ -240,9 +367,12 @@ describe("createEmbeddedRunFailoverRetryController", () => {
           reason: "rate_limit",
           message: "429 rate_limit_exceeded; Retry-After: Thu, 11 Jun 2026 01:05:00 GMT",
         }),
-      ).resolves.toBe(false);
-      expect(mocks.sleepWithAbort.mock.calls).toEqual([[30_000, undefined]]);
-      expect(controller.transientRetryCount).toBe(1);
+      ).resolves.toBe(true);
+      expect(mocks.sleepWithAbort.mock.calls).toEqual([
+        [30_000, undefined],
+        [65 * 60_000, undefined],
+      ]);
+      expect(controller.transientRetryCount).toBe(2);
     } finally {
       clock.mockRestore();
     }
