@@ -468,10 +468,6 @@ export class OpenClawApp extends OpenClawLightDomElement {
     if (!context || !runtime) {
       return renderConnectingSplash();
     }
-    const gatewaySnapshot = context.gateway.snapshot;
-    const gatewayConnected = gatewaySnapshot.phase === "connected";
-    const gatewayStartupStatus =
-      gatewaySnapshot.phase === "starting" ? "서버 연결을 준비하고 있습니다." : undefined;
     const gatewayUrlConfirmation = this.pendingGatewayUrl
       ? html`
           <openclaw-gateway-url-confirmation
@@ -489,6 +485,16 @@ export class OpenClawApp extends OpenClawLightDomElement {
           ></openclaw-gateway-url-confirmation>
         `
       : nothing;
+    return html`<openclaw-tooltip-provider>
+      ${this.renderDocument(context, runtime)} ${gatewayUrlConfirmation}
+    </openclaw-tooltip-provider>`;
+  }
+
+  private renderDocument(context: ApplicationContext<RouteId>, runtime: ApplicationRuntime) {
+    const gatewaySnapshot = context.gateway.snapshot;
+    const gatewayConnected = gatewaySnapshot.phase === "connected";
+    const gatewayStartupStatus =
+      gatewaySnapshot.phase === "starting" ? "서버 연결을 준비하고 있습니다." : undefined;
     if (runtime.focusLocation?.status === "unsupported") {
       return html`<main class="connect-splash" role="alert">
         <div class="stack">
@@ -584,17 +590,15 @@ export class OpenClawApp extends OpenClawLightDomElement {
         (gatewaySnapshot.phase === "connecting" && !this.loginGatePinned));
     if (initialConnectPending) {
       return html`
-        <openclaw-tooltip-provider>
-          ${
-            this.ixAuth.session?.user?.impersonatedBy ||
-            this.ixAuth.session?.impersonationRestoreAvailable
-              ? html`<openclaw-impersonation-banner
-                  .basePath=${context.basePath}
-                ></openclaw-impersonation-banner>`
-              : nothing
-          }
-          ${renderConnectingSplash(gatewayStartupStatus)} ${gatewayUrlConfirmation}
-        </openclaw-tooltip-provider>
+        ${
+          this.ixAuth.session?.user?.impersonatedBy ||
+          this.ixAuth.session?.impersonationRestoreAvailable
+            ? html`<openclaw-impersonation-banner
+                .basePath=${context.basePath}
+              ></openclaw-impersonation-banner>`
+            : nothing
+        }
+        ${renderConnectingSplash(gatewayStartupStatus)}
       `;
     }
     // A tab whose account session ended must reach the sign-in screen even though the
@@ -638,100 +642,81 @@ export class OpenClawApp extends OpenClawLightDomElement {
       if (!loadState) {
         this.loginGateLoader.preload(LOGIN_GATE_ELEMENT, { reportError: true });
       }
-      return html`<openclaw-tooltip-provider>
-        ${
-          loadState?.status === "error"
-            ? renderLazyViewError({
-                error: loadState.error,
-                stale: loadState.stale,
-                onRetry: () => this.loginGateLoader.retry(),
-              })
-            : renderConnectingSplash()
-        }
-        ${gatewayUrlConfirmation}
-      </openclaw-tooltip-provider>`;
+      return loadState?.status === "error"
+        ? renderLazyViewError({
+            error: loadState.error,
+            stale: loadState.stale,
+            onRetry: () => this.loginGateLoader.retry(),
+          })
+        : renderConnectingSplash();
     }
     if (showLoginGate) {
       return html`
-        <openclaw-tooltip-provider>
-          <openclaw-login-gate
-            .props=${{
-              resourceBasePath: context.resourceBasePath,
-              connected: gatewayConnected,
-              lastError: gatewaySnapshot.lastError,
-              lastErrorCode: gatewaySnapshot.lastErrorCode,
-              lastErrorAuthReason: gatewaySnapshot.lastErrorAuthReason,
-              hasToken: Boolean(this.loginToken.trim()),
-              hasPassword: Boolean(this.loginPassword.trim()),
-              gatewayUrl: this.loginGatewayUrl,
-              token: this.loginToken,
-              password: this.loginPassword,
-              showGatewayToken: this.loginShowGatewayToken,
-              showGatewayPassword: this.loginShowGatewayPassword,
-              onGatewayUrlChange: (value: string) => {
-                this.updateLoginGatewayUrl(value);
-              },
-              onTokenChange: (value: string) => {
-                this.loginToken = value;
-              },
-              onPasswordChange: (value: string) => {
-                this.loginPassword = value;
-              },
-              onToggleGatewayToken: () => {
-                this.loginShowGatewayToken = !this.loginShowGatewayToken;
-              },
-              onToggleGatewayPassword: () => {
-                this.loginShowGatewayPassword = !this.loginShowGatewayPassword;
-              },
-              onConnect: () => {
-                this.loginGatePinned = true;
-                context.gateway.connect({
-                  gatewayUrl: this.loginGatewayUrl,
-                  token: this.loginToken,
-                  password: this.loginPassword,
-                });
-              },
-            }}
-          ></openclaw-login-gate>
-          ${gatewayUrlConfirmation}
-        </openclaw-tooltip-provider>
+        <openclaw-login-gate
+          .props=${{
+            resourceBasePath: context.resourceBasePath,
+            connected: gatewayConnected,
+            lastError: gatewaySnapshot.lastError,
+            lastErrorCode: gatewaySnapshot.lastErrorCode,
+            lastErrorAuthReason: gatewaySnapshot.lastErrorAuthReason,
+            hasToken: Boolean(this.loginToken.trim()),
+            hasPassword: Boolean(this.loginPassword.trim()),
+            gatewayUrl: this.loginGatewayUrl,
+            token: this.loginToken,
+            password: this.loginPassword,
+            showGatewayToken: this.loginShowGatewayToken,
+            showGatewayPassword: this.loginShowGatewayPassword,
+            onGatewayUrlChange: (value: string) => {
+              this.updateLoginGatewayUrl(value);
+            },
+            onTokenChange: (value: string) => {
+              this.loginToken = value;
+            },
+            onPasswordChange: (value: string) => {
+              this.loginPassword = value;
+            },
+            onToggleGatewayToken: () => {
+              this.loginShowGatewayToken = !this.loginShowGatewayToken;
+            },
+            onToggleGatewayPassword: () => {
+              this.loginShowGatewayPassword = !this.loginShowGatewayPassword;
+            },
+            onConnect: () => {
+              this.loginGatePinned = true;
+              context.gateway.connect({
+                gatewayUrl: this.loginGatewayUrl,
+                token: this.loginToken,
+                password: this.loginPassword,
+              });
+            },
+          }}
+        ></openclaw-login-gate>
       `;
     }
     if (runtime.documentMode?.kind === "approval") {
-      return html`
-        <openclaw-tooltip-provider>
-          ${this.pendingGatewayUrl ? gatewayUrlConfirmation : this.renderApprovalDocument(runtime)}
-        </openclaw-tooltip-provider>
-      `;
+      return this.pendingGatewayUrl ? nothing : this.renderApprovalDocument(runtime);
     }
     if (runtime.documentMode?.kind === "question") {
-      return html`
-        <openclaw-tooltip-provider>
-          ${gatewayUrlConfirmation} ${this.renderQuestionDocument(runtime)}
-        </openclaw-tooltip-provider>
-      `;
+      return this.renderQuestionDocument(runtime);
     }
     return html`
-      <openclaw-tooltip-provider>
-        <openclaw-github-link-hovercard-provider
+      <openclaw-github-link-hovercard-provider
+        .client=${gatewaySnapshot.client}
+        .agentId=${
+          context.agentSelection.state.selectedId ?? gatewaySnapshot.assistantAgentId ?? undefined
+        }
+      >
+        <openclaw-session-progress-hovercard-provider
           .client=${gatewaySnapshot.client}
-          .agentId=${
-            context.agentSelection.state.selectedId ?? gatewaySnapshot.assistantAgentId ?? undefined
-          }
+          .context=${context}
+          .gateway=${context.gateway}
         >
-          <openclaw-session-progress-hovercard-provider
-            .client=${gatewaySnapshot.client}
-            .context=${context}
-            .gateway=${context.gateway}
-          >
-            ${gatewayUrlConfirmation}
-            <openclaw-app-shell
-              .runtime=${runtime}
-              .onboarding=${this.onboarding}
-            ></openclaw-app-shell>
-          </openclaw-session-progress-hovercard-provider>
-        </openclaw-github-link-hovercard-provider>
-      </openclaw-tooltip-provider>
+          <openclaw-app-shell
+            .runtime=${runtime}
+            .onboarding=${this.onboarding}
+          ></openclaw-app-shell>
+        </openclaw-session-progress-hovercard-provider>
+      </openclaw-github-link-hovercard-provider>
     `;
   }
 }
