@@ -1,4 +1,5 @@
 // Wizard i18n helpers resolve translated onboarding copy by locale.
+import { BRAND_PLACEHOLDERS } from "../../brand.js";
 import { en } from "./locales/en.js";
 import { zh_CN } from "./locales/zh-CN.js";
 import { zh_TW } from "./locales/zh-TW.js";
@@ -67,11 +68,13 @@ function readKey(map: WizardTranslationMap, key: string): string | undefined {
 }
 
 function interpolate(value: string, params?: WizardI18nParams): string {
-  if (!params) {
-    return value;
-  }
+  // Brand placeholders are always available so wizard copy can say {brand}
+  // without every call site passing it. Explicit params win.
+  const resolved: WizardI18nParams = params
+    ? { ...BRAND_PLACEHOLDERS, ...params }
+    : BRAND_PLACEHOLDERS;
   return value.replace(/\{([A-Za-z0-9_]+)\}/g, (match, key) => {
-    const param = params[key];
+    const param = resolved[key];
     return param === undefined || param === null ? match : String(param);
   });
 }

@@ -1,4 +1,5 @@
 // Control UI i18n module implements translate behavior.
+import { BRAND_PLACEHOLDERS } from "../../brand.ts";
 import { getSafeLocalStorage } from "../../local-storage.ts";
 import { en } from "../locales/en.ts";
 import {
@@ -263,13 +264,14 @@ class I18nManager {
       return key;
     }
 
-    if (params) {
-      // ?? not ||: an empty-string param is a provided value (render empty),
-      // while a missing param keeps the visible {placeholder} for debugging.
-      return value.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
-    }
-
-    return value;
+    // Brand placeholders are always available so any catalog string can say
+    // {brand} without every call site passing it. Explicit params win.
+    const resolved: Readonly<Record<string, string>> = params
+      ? { ...BRAND_PLACEHOLDERS, ...params }
+      : BRAND_PLACEHOLDERS;
+    // ?? not ||: an empty-string param is a provided value (render empty),
+    // while a missing param keeps the visible {placeholder} for debugging.
+    return value.replace(/\{(\w+)\}/g, (_, k) => resolved[k] ?? `{${k}}`);
   }
 }
 
