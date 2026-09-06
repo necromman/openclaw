@@ -257,6 +257,16 @@ function mapRelayFailureToResponse(res: ServerResponse, failure: IxAuthRelayFail
     });
     return;
   }
+  // The identity server runs its own per-IP limiter and answers 429 before its account
+  // lockout can trigger. Flattening that into "invalid credentials" would tell a person
+  // their password is wrong when it is not, and hide why retrying keeps failing.
+  if (failure.status === 429 || failure.code === "RATE_LIMITED") {
+    sendJson(res, 429, {
+      error: "rate_limited",
+      message: "Too many attempts. Wait a moment and try again.",
+    });
+    return;
+  }
   // Everything else, including a wrong password and an unknown account, is uniform.
   sendJson(res, 401, IX_AUTH_INVALID_CREDENTIALS);
 }
