@@ -209,6 +209,85 @@ i18n 문자열은 `{brand}`·`{brandShort}`·`{brandSkillHub}`·`{brandCloud}` �
 - pill 목록에는 **업스트림에서 `--radius-full` 을 읽던 셀렉터만** 넣는다. `rg -n -A6 "<셀렉터> \{" ui/src/styles` 로 먼저 확인하고 추가한다.
 - 탭 인디케이터·언더라인·`hr`·`[role="separator"]`·`progress` 같은 **선 성격 요소는 `border-radius: 0` 으로 명시**한다. 단 여기에도 0 임을 확인한 셀렉터만 넣는다. `.settings-segmented` 처럼 원래 `--radius-md` 를 읽던 것은 토큰 캡이 줄이도록 두고 각지게 만들지 않는다.
 
+### 5-A-3. 라우트·탭별 full width 적용표 (1440px 실측)
+
+측정법: 각 라우트에서 `main.content` 의 **콘텐츠 박스 폭**(패딩 제외) 대비 페이지 컨테이너 폭. 90% 미만이면 어딘가 캡이 남아 있다는 뜻이다.
+
+```js
+// 브라우저 콘솔
+const inner = (el) => {
+  const c = getComputedStyle(el);
+  return el.getBoundingClientRect().width - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight);
+};
+const page = document.querySelector(
+  ".settings-page, .content--skill-workshop, .sw-today, .config-lead",
+);
+Math.round(
+  (page.getBoundingClientRect().width / inner(document.querySelector("main.content"))) * 100,
+);
+```
+
+| 라우트 / 탭                          | 경로                        | 폭 비율              | 비고                                                  |
+| ------------------------------------ | --------------------------- | -------------------- | ----------------------------------------------------- |
+| 홈(채팅)                             | `/chat/*`                   | 100% (**제외 대상**) | 대화 지문은 `--chat-thread-max-width` 로 읽기 폭 유지 |
+| 대시보드                             | `/dashboards`               | 100%                 |                                                       |
+| 자동화 (전체·활성·일시중지·실행기록) | `/automations`              | 100%                 | 탭 4개가 같은 페이지 컨테이너 공유                    |
+| 세션 목록                            | `/sessions`                 | 100%                 |                                                       |
+| 활동                                 | `/activity`                 | 100%                 |                                                       |
+| 사용량                               | `/usage`                    | 99%                  |                                                       |
+| 작업                                 | `/tasks`                    | 99%                  |                                                       |
+| 플러그인 설치됨·둘러보기             | `/settings/plugins`         | 99%                  |                                                       |
+| 플러그인 Skills                      | `/skills`                   | 99%                  |                                                       |
+| 플러그인 워크숍 (보드·오늘)          | `/skills/workshop`          | 100%                 | **이번에 수정**: 1120px·720px 캡 해제                 |
+| 설정 > 정보                          | `/settings/about`           | 99%                  |                                                       |
+| 설정 > 프로필                        | `/settings/profile`         | 99%                  |                                                       |
+| 설정 > 화면 설정                     | `/settings/appearance`      | 95%                  | 폼 자체 폭, 캡 없음                                   |
+| 설정 > 알림                          | `/settings/notifications`   | 96%                  |                                                       |
+| 설정 > Gateway                       | `/settings/connection`      | 99%                  |                                                       |
+| 설정 > 채널                          | `/settings/channels`        | 99%                  |                                                       |
+| 설정 > 커뮤니케이션                  | `/settings/communications`  | 95%                  |                                                       |
+| 설정 > 음성 대화                     | `/settings/talk`            | 99%                  |                                                       |
+| 설정 > 에이전트                      | `/settings/agents`          | 99%                  |                                                       |
+| 설정 > AI 에이전트                   | `/settings/ai-agents`       | 95%                  |                                                       |
+| 설정 > 실험실                        | `/settings/labs`            | 99%                  |                                                       |
+| 설정 > 모델                          | `/settings/model-providers` | 99%                  |                                                       |
+| 설정 > MCP                           | `/settings/mcp`             | 99%                  |                                                       |
+| 설정 > 메모리 (개요·기억·꿈·설정)    | `/settings/memory`          | 99%                  | 탭 4개 모두 같은 컨테이너                             |
+| 설정 > 자동화                        | `/settings/automation`      | 95%                  |                                                       |
+| 설정 > 개인정보·보안                 | `/settings/security`        | 100%                 |                                                       |
+| 설정 > 비밀정보                      | `/settings/secrets`         | 100%                 |                                                       |
+| 설정 > 승인                          | `/settings/approvals`       | 99%                  |                                                       |
+| 설정 > 기기                          | `/settings/devices`         | 99%                  |                                                       |
+| 설정 > 기기 상세                     | `/settings/device`          | 100%                 |                                                       |
+| 설정 > 클라우드 워커                 | `/settings/cloud-workers`   | 100%                 |                                                       |
+| 설정 > 인프라                        | `/settings/infrastructure`  | 95%                  |                                                       |
+| 설정 > 고급                          | `/settings/advanced`        | 95%                  |                                                       |
+| 설정 > 업데이트                      | `/settings/updates`         | 99%                  |                                                       |
+| 설정 > 워크트리                      | `/settings/worktrees`       | 100%                 |                                                       |
+| 디버그                               | `/debug`                    | 99%                  |                                                       |
+| 연결 화면(로그인 게이트)             | 미인증 `/`                  | 카드 중앙 정렬 유지  | 폼 카드라 **의도적 예외**                             |
+| 앱 다운로드                          | `/apps`                     | 해당 없음            | 5-B 로 숨김                                           |
+
+90% 미만은 없다. `.settings-page` 를 안 쓰고 자체 중앙 칼럼을 두던 컨테이너 5개(`.content--skill-workshop`·`.sw-today`·`.config-lead`·`.config-content-callout`·플러그인 허브 헤더)를 `--page-max-width` 로 넘겨 해결했다.
+
+### 5-A-4. 폼 컨트롤 높이
+
+업스트림은 `--settings-control-height` 를 **네이티브** `input.settings-input` / `select.settings-select` 에만 건다. Web Awesome `<wa-select>` 는 커스텀 엘리먼트라 그 규칙에 안 걸려 38px 로 남았고, 32px 입력과 나란히 놓이면 중심이 3px 어긋났다(자동화 "주기" 행). `fork-style.css` 가 `wa-select.settings-select` 와 그 `::part(combobox)` 에 같은 토큰을 주고 인라인 컨트롤 그룹을 `align-items: center` 로 맞춘다. 새 폼에서 입력과 셀렉트를 나란히 놓을 때 높이를 따로 지정하지 마라.
+
+---
+
+## 5-B. 숨긴 기능
+
+`src/brand.ts` 의 `BRAND_FEATURES` 가 "코드는 두되 노출만 막는" 스위치다. 기능을 지우지 않으므로 업스트림 리베이스가 그대로 붙고, 값을 `true` 로 되돌리면 전부 복구된다.
+
+| 플래그     | 기본값  | 숨기는 것                                                                                                                                                | 되살리는 법                          |
+| ---------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `appsPage` | `false` | 소유자 메뉴의 "앱 다운로드" 행, 기기 페어링 대화상자의 "앱 받기" 버튼, 커맨드 팔레트의 앱 카드 항목, `/apps` 라우트(직접 접근하면 `/chat` 으로 redirect) | `src/brand.ts` 에서 `appsPage: true` |
+
+진입점을 새로 막을 때는 **라우터 loader 에 redirect 한 줄 + 메뉴 조건 렌더**만 쓴다. 라우트 테이블에서 페이지를 빼면 업스트림이 그 배열을 건드릴 때마다 충돌한다. `/apps` redirect 는 `loaderDeps` 가 있어야 로더가 도는 점에 주의한다(`ui/src/pages/apps/route.ts`).
+
+---
+
 ---
 
 ## 6. 빌드 환경 구축 (재현 명령)
