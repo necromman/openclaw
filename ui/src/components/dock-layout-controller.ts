@@ -319,7 +319,7 @@ export const dockPanelStyles = css`
     justify-content: center;
     padding: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: 5px;
     background: transparent;
     box-shadow: none;
     color: var(--rail-header-action-color, var(--muted, #8a919e));

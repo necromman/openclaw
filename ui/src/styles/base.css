@@ -387,7 +387,7 @@
   .card.card,
   .settings-group.settings-group,
   .option-card__choice.option-card__choice {
-    border-radius: calc(14px * var(--openclaw-corner-radius-scale));
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale));
     corner-shape: superellipse(1.5);
   }
 
@@ -402,12 +402,12 @@
   .btn.btn,
   .settings-input.settings-input,
   .field.field :is(input, textarea, select) {
-    border-radius: calc(10px * var(--openclaw-corner-radius-scale));
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale));
     corner-shape: superellipse(1.5);
   }
 
   .code-block-wrapper.code-block-wrapper {
-    border-radius: calc(14px * var(--openclaw-corner-radius-scale));
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale));
     corner-shape: superellipse(1.5);
   }
 
@@ -416,7 +416,7 @@
      superellipse flattens a fully rounded end. */
   .option-card.option-card,
   .agent-chat__input.agent-chat__input {
-    border-radius: calc(20px * var(--openclaw-corner-radius-scale));
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale));
     corner-shape: superellipse(1.5);
   }
 
@@ -438,12 +438,12 @@
      their home rule (components.css); only the --radius-xl portion scales,
      matching that intent. */
   .md-preview-dialog__panel.md-preview-dialog__panel {
-    border-radius: calc(20px * var(--openclaw-corner-radius-scale) + 6px);
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale) + 5px);
     corner-shape: superellipse(1.5);
   }
 
   .md-preview-dialog__reader.md-preview-dialog__reader {
-    border-radius: calc(20px * var(--openclaw-corner-radius-scale) + 2px);
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale) + 2px);
     corner-shape: superellipse(1.5);
   }
 
@@ -453,7 +453,7 @@
   .slash-menu.slash-menu,
   .chat-reply-context-menu.chat-reply-context-menu,
   .chat-selection-popup.chat-selection-popup {
-    border-radius: calc(10px * var(--openclaw-corner-radius-scale));
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale));
     corner-shape: superellipse(1.5);
   }
 
@@ -464,7 +464,7 @@
   .slash-menu-item.slash-menu-item,
   .chat-reply-context-menu.chat-reply-context-menu button,
   .chat-selection-popup.chat-selection-popup button {
-    border-radius: calc(10px * var(--openclaw-corner-radius-scale) - 4px);
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale) - 4px);
     corner-shape: superellipse(1.5);
   }
 
@@ -497,7 +497,7 @@
   wa-popover::part(body),
   wa-select::part(listbox),
   wa-select::part(combobox) {
-    border-radius: calc(10px * var(--openclaw-corner-radius-scale)) !important;
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale)) !important;
     corner-shape: superellipse(1.5);
   }
 }

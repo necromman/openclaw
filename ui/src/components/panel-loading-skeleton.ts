@@ -138,13 +138,13 @@ class PanelLoadingSkeleton extends OpenClawLitElement {
 
     .viewport {
       min-height: 220px;
-      border-radius: 8px;
+      border-radius: 5px;
     }
 
     .address {
       height: 28px;
       flex: 1;
-      border-radius: 7px;
+      border-radius: 5px;
     }
 
     .button {
@@ -157,7 +157,7 @@ class PanelLoadingSkeleton extends OpenClawLitElement {
       min-height: 58px;
       padding: 10px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 5px;
     }
 
     .summary {
@@ -186,7 +186,7 @@ class PanelLoadingSkeleton extends OpenClawLitElement {
       padding: 12px;
       min-height: 220px;
       align-content: start;
-      border-radius: 8px;
+      border-radius: 5px;
       background: color-mix(in srgb, var(--bg) 76%, transparent);
     }
 
@@ -195,7 +195,7 @@ class PanelLoadingSkeleton extends OpenClawLitElement {
       min-height: 58px;
       padding: 12px;
       align-items: flex-start;
-      border-radius: 12px;
+      border-radius: 5px;
       background: color-mix(in srgb, var(--bg-muted) 76%, transparent);
     }
 
@@ -208,7 +208,7 @@ class PanelLoadingSkeleton extends OpenClawLitElement {
       min-height: 280px;
       padding: 18px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 5px;
     }
 
     @keyframes shimmer {

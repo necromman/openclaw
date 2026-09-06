@@ -34,7 +34,7 @@ export const terminalPanelUploadStyles = css`
     box-sizing: border-box;
     padding: 9px 10px 10px;
     border: 1px solid var(--border, #262b34);
-    border-radius: 7px;
+    border-radius: 5px;
     background: color-mix(in srgb, var(--bg, #0e1015) 94%, var(--text, #d7dae0));
     box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
     color: var(--text, #d7dae0);

@@ -69,7 +69,7 @@ class OpenClawMermaid extends OpenClawLitElement {
       min-width: 0;
       margin: 12px 0;
       border: 1px solid var(--border);
-      border-radius: var(--radius-md, 10px);
+      border-radius: var(--radius-md, 5px);
       overflow: hidden;
       background: var(--card);
       color: var(--text);
@@ -92,7 +92,7 @@ class OpenClawMermaid extends OpenClawLitElement {
       height: 28px;
       padding: 0;
       border: 0;
-      border-radius: var(--radius-sm, 6px);
+      border-radius: var(--radius-sm, 5px);
       background: transparent;
       color: var(--muted);
       font: inherit;

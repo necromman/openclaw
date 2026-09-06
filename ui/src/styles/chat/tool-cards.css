@@ -548,7 +548,7 @@
   overflow: auto;
   max-height: min(520px, 60vh);
   border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
-  border-radius: calc(14px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   corner-shape: superellipse(1.5);
   background: transparent;
 }
@@ -1196,7 +1196,7 @@ openclaw-tooltip.chat-tasks-status__preview {
   --openclaw-tooltip-max-width: min(352px, calc(100vw - 24px));
   --openclaw-tooltip-background-color: var(--chat-composer-surface, var(--popover));
   --openclaw-tooltip-border-color: color-mix(in srgb, var(--text-strong) 11%, transparent);
-  --openclaw-tooltip-border-radius: calc(16px * var(--openclaw-corner-radius-scale));
+  --openclaw-tooltip-border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   --openclaw-tooltip-padding: 11px;
   --openclaw-tooltip-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 12px 32px rgb(0 0 0 / 14%);
 }

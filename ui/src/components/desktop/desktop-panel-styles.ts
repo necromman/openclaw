@@ -58,7 +58,7 @@ const desktopPanelStyles = css`
   }
   .desktop-button {
     border: 1px solid var(--border, #262b34);
-    border-radius: 6px;
+    border-radius: 5px;
     padding: 5px 10px;
     background: transparent;
     color: var(--text, #d7dae0);
@@ -126,7 +126,7 @@ const desktopPanelStyles = css`
   }
   .desktop-credentials__input {
     border: 1px solid var(--border, #262b34);
-    border-radius: 6px;
+    border-radius: 5px;
     padding: 7px 9px;
     background: var(--bg, #111318);
     color: var(--text, #d7dae0);
@@ -138,7 +138,7 @@ const desktopPanelStyles = css`
     gap: 10px;
     padding: 10px;
     border: 1px solid var(--border, #262b34);
-    border-radius: 8px;
+    border-radius: 5px;
   }
   .desktop-environment__details {
     display: flex;

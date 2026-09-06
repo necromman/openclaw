@@ -1183,7 +1183,7 @@ img.chat-avatar.chat-avatar--logo {
   position: fixed;
   background: var(--card);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md, 5px);
   padding: 12px;
   min-width: 200px;
   max-width: calc(100vw - 48px);

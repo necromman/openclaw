@@ -110,7 +110,7 @@
   padding: 40px 20px;
   text-align: center;
   border: 1px dashed color-mix(in oklab, var(--muted) 35%, transparent);
-  border-radius: 12px;
+  border-radius: 5px;
 }
 
 .logbook__empty-title {
@@ -125,7 +125,7 @@
 
 .logbook-card {
   border: 1px solid color-mix(in oklab, var(--muted) 18%, transparent);
-  border-radius: 10px;
+  border-radius: 5px;
   background: var(--card);
   overflow: hidden;
 }
@@ -232,7 +232,7 @@
 
 .logbook-card__keyframe {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 5px;
   border: 1px solid color-mix(in oklab, var(--muted) 20%, transparent);
 }
 
@@ -405,6 +405,6 @@
   font-size: 13px;
   line-height: 1.5;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 5px;
   background: color-mix(in oklab, var(--panel) 70%, transparent);
 }

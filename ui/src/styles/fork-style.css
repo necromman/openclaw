@@ -1,0 +1,82 @@
+/* Fork style layer.
+ *
+ * The one place this fork changes shared visual rules. It is imported last from
+ * ui/src/styles.css so upstream files stay untouched and a rebase keeps working.
+ * Two rules live here:
+ *
+ *   1. Detail pages use the full available width. Chat keeps its reading-width
+ *      column, because a chat transcript at 2000px is unreadable.
+ *   2. Corner radius is capped at 5px everywhere. True circles (avatars, status
+ *      dots, spinners, toggle knobs) keep --radius-full.
+ *
+ * Change --page-max-width or the --radius-* block below and every surface
+ * follows; do not hardcode a page width or a radius in a page stylesheet.
+ */
+
+:root {
+  /* Detail-page content width. `none` means "use the window".
+     Set a length here (e.g. 1440px) to reintroduce a cap. */
+  --page-max-width: none;
+
+  /* Radius scale. 5px is the hard ceiling this fork allows. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 5px;
+  --radius-xl: 5px;
+  --radius: 4px;
+
+  /* Circles only: avatars, status dots, spinners, toggle knobs. */
+  --radius-full: 9999px;
+
+  /* base.css draws a handful of corners as `fixed px * this scale` inside its
+     @supports (corner-shape) block (14px, 10px, 20px steps). 0.25 brings all
+     three under the 5px ceiling without touching that upstream block. */
+  --openclaw-corner-radius-scale: 0.25;
+
+  /* Pills and chips flatten with everything else (see the block below). */
+  --radius-pill: var(--radius-lg);
+}
+
+/* ── 1. Full-width detail pages ──
+ *
+ * The shared page container is .settings-page (see components/settings-ui.ts);
+ * every detail page renders through it, including Settings and all its
+ * subpages, Automations, Plugins, Sessions, Devices, Usage, Secrets and About.
+ * Vertical and horizontal padding is untouched, so the 24-32px gutters stay.
+ *
+ * !important is deliberate: these page stylesheets are imported per component
+ * and land after this file in the bundle, so equal-specificity overrides would
+ * lose. Keeping the cap in one custom property is still the point - only the
+ * value in :root above needs to change. */
+.settings-page,
+.settings-page--wide {
+  max-width: var(--page-max-width) !important;
+}
+
+.shell--settings .content-header,
+.shell--settings .settings-workspace,
+.shell--settings .content:has(.settings-page) .content-header,
+.shell--settings .content:has(.settings-page--wide) .content-header,
+.content:has(.settings-page) .content-header--settings,
+.content:has(.settings-page--wide) .content-header--settings {
+  max-width: var(--page-max-width) !important;
+}
+
+/* ── 2. Pills and chips flatten to the 5px ceiling ──
+ *
+ * These read --radius-full upstream because they were meant to be pills. Only
+ * genuinely circular elements (avatars, dots, rings, spinners, toggle knobs)
+ * keep the round token, and those are listed nowhere here on purpose: they are
+ * left alone. */
+.pill,
+.chip,
+.exec-approval-chip,
+.exec-approval-queue,
+.agent-select__badge,
+.agent-scope-control .agent-select__trigger,
+.agent-tools-group__preview > span,
+.person-activity-card__status > span,
+.hub-tab,
+.hub-tabs__tab {
+  border-radius: var(--radius-pill);
+}

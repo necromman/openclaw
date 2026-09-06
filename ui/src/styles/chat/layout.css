@@ -312,7 +312,7 @@ openclaw-chat-page {
    carry tone while the card keeps the composer's own surface and geometry. */
 :is(.chat-composer-neighbor-card, .session-suggestion, .chat-pr.chat-pr) {
   padding: 10px 12px;
-  border-radius: calc(16px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   corner-shape: superellipse(1.5);
 }
 
@@ -1465,7 +1465,7 @@ openclaw-chat-video-player {
   left: 14px;
   height: 18px;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 5px 5px;
   background: var(--task-suggestion-card-bg);
   box-shadow: 0 8px 18px color-mix(in srgb, var(--bg) 32%, transparent);
 }
@@ -1591,7 +1591,7 @@ openclaw-chat-video-player {
   padding: 14px 16px 17px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
-  border-radius: 16px;
+  border-radius: 5px;
   background: var(--task-suggestion-card-bg);
   user-select: text;
   box-shadow:
@@ -1654,7 +1654,7 @@ openclaw-chat-video-player {
 .task-suggestion__position {
   flex: 0 0 auto;
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: 5px;
   background: var(--task-suggestion-path-bg);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -1673,7 +1673,7 @@ openclaw-chat-video-player {
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: 5px;
   background: transparent;
   color: var(--muted);
   cursor: var(--cursor-action);
@@ -1806,7 +1806,7 @@ openclaw-chat-video-player {
   padding: 7px 10px 10px;
   overflow-x: auto;
   overflow-y: hidden;
-  border-radius: 9px 9px 0 0;
+  border-radius: 5px 5px 0 0;
   background: var(--task-suggestion-path-bg);
   scrollbar-width: none;
   white-space: nowrap;
@@ -1827,7 +1827,7 @@ openclaw-chat-video-player {
   margin-top: -5px;
   padding: 12px 13px;
   overflow: auto;
-  border-radius: 10px;
+  border-radius: 5px;
   background: var(--task-suggestion-prompt-bg);
 }
 
@@ -1845,7 +1845,7 @@ openclaw-chat-video-player {
   height: 34px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 11px;
+  border-radius: 5px;
   corner-shape: superellipse(1.5);
   background: var(--task-suggestion-action-bg);
   user-select: none;
@@ -1967,7 +1967,7 @@ openclaw-chat-video-player {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: calc(16px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   corner-shape: superellipse(1.5);
   background: var(--chat-composer-surface, var(--popover));
   outline: none;
@@ -2034,7 +2034,7 @@ openclaw-chat-video-player {
   overscroll-behavior: contain;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: calc(14px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   corner-shape: superellipse(1.5);
   background: var(--chat-composer-surface, var(--popover));
   box-shadow: var(--shadow-md);
@@ -2295,7 +2295,7 @@ button.chat-pr__diff {
   min-width: 200px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 5px;
   background: var(--panel);
   box-shadow: var(--shadow-md, 0 8px 24px rgb(0 0 0 / 0.18));
   color: var(--text);
@@ -2558,7 +2558,7 @@ button.chat-pr__diff {
    frame does not change shape when composition is unavailable. */
 .agent-chat__disabled-banner.agent-chat__disabled-banner--replacement.callout {
   border: 1px solid var(--chat-composer-hairline, var(--border));
-  border-radius: calc(20px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   corner-shape: superellipse(1.5);
   background: var(--chat-composer-surface, var(--popover));
   box-shadow: none;
@@ -2628,7 +2628,7 @@ button.chat-pr__diff {
   max-width: min(100%, 780px);
   padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-  border-radius: 8px;
+  border-radius: 5px;
   background: color-mix(in srgb, var(--bg) 82%, transparent);
 }
 

@@ -24,7 +24,7 @@ class KeyboardShortcutsDialog extends OpenClawLitElement {
       max-height: min(720px, calc(100dvh - 64px));
       flex-direction: column;
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 5px;
       background: var(--card);
       color: var(--text);
     }
@@ -50,7 +50,7 @@ class KeyboardShortcutsDialog extends OpenClawLitElement {
       height: 28px;
       place-items: center;
       border: 0;
-      border-radius: 6px;
+      border-radius: 5px;
       background: transparent;
       color: var(--muted);
       font-size: 20px;

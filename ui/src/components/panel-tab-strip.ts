@@ -479,7 +479,7 @@ export const panelTabStripStyles = css`
     height: 30px;
     padding: 0 34px 0 10px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 5px;
     color: var(--muted, #8a919e);
     white-space: nowrap;
     font-size: 12.5px;

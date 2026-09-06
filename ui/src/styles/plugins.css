@@ -313,7 +313,7 @@ h3.plugins-subheader {
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 5px;
   background: var(--bg-elevated);
 }
 

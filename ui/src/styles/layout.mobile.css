@@ -86,7 +86,7 @@ html:not(.openclaw-native-macos):not(.openclaw-native-nav):not(.openclaw-native-
   border-inline-end: none;
   overflow: hidden;
   overscroll-behavior: contain;
-  border-radius: 0 22px 22px 0;
+  border-radius: 0 5px 5px 0;
   box-shadow: 0 16px 48px color-mix(in srgb, black 30%, transparent);
   transform: translateX(-100%);
   opacity: 0;

@@ -178,7 +178,7 @@
   padding: 0;
   background: var(--chat-composer-surface);
   border: 1px solid var(--chat-composer-hairline);
-  border-radius: calc(20px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   /* Deliberately lighter than --shadow-sm: with the border and the luminance
      step already doing the separating, a heavier drop reads as a second frame. */
   box-shadow: 0 4px 16px rgb(0 0 0 / 5%);
@@ -1000,7 +1000,7 @@
 }
 
 .agent-chat__composer-errors--standalone {
-  border-radius: calc(20px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px * var(--openclaw-corner-radius-scale));
   overflow: hidden;
 }
 
@@ -2144,12 +2144,12 @@
 /* Standalone command menus stay compact in base.css. Inside the composer the
    command and skill sheets use the writing surface's exact outer geometry. */
 .agent-chat__input .slash-menu.slash-menu {
-  border-radius: 20px;
+  border-radius: 5px;
 }
 
 @supports (corner-shape: superellipse(1.5)) {
   .agent-chat__input .slash-menu.slash-menu {
-    border-radius: calc(20px * var(--openclaw-corner-radius-scale));
+    border-radius: calc(5px * var(--openclaw-corner-radius-scale));
     corner-shape: superellipse(1.5);
   }
 }
@@ -2445,7 +2445,7 @@
   width: 44px;
   height: 44px;
   padding: 12px;
-  border-radius: calc(12px + 7px * var(--openclaw-corner-radius-scale));
+  border-radius: calc(5px + 5px * var(--openclaw-corner-radius-scale));
   corner-shape: superellipse(1.5);
   border: none;
   background: color-mix(in srgb, var(--bg) 82%, transparent);

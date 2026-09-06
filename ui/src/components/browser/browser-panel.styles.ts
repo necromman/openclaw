@@ -49,7 +49,7 @@ export const browserPanelStyles = css`
     justify-content: center;
     padding: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: 5px;
     background: transparent;
     color: var(--muted, #8a919e);
   }
@@ -64,7 +64,7 @@ export const browserPanelStyles = css`
     height: 28px;
     padding: 0 12px;
     border: 1px solid transparent;
-    border-radius: 14px;
+    border-radius: 5px;
     background: color-mix(in srgb, var(--text, #d7dae0) 8%, transparent);
     color: var(--text, #d7dae0);
     font-size: 12.5px;
@@ -99,7 +99,7 @@ export const browserPanelStyles = css`
     color: var(--text, #d7dae0);
     font-size: 12px;
     font-family: inherit;
-    border-radius: 6px;
+    border-radius: 5px;
     padding: 3px 10px;
   }
   .bp-btn:hover {
@@ -156,7 +156,7 @@ export const browserPanelStyles = css`
     z-index: 3;
     max-width: 320px;
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: 5px;
     border: 1px solid var(--border, #262b34);
     background: var(--bg, #0e1015);
     box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.3));

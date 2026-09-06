@@ -3645,7 +3645,7 @@ td.data-table-key-col {
   display: flex;
   flex-direction: column;
   border: 1px solid color-mix(in srgb, var(--border-strong) 84%, white 8%);
-  border-radius: calc(var(--radius-xl) + 6px);
+  border-radius: calc(var(--radius-xl) + 5px);
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, black 6%), var(--panel));
   box-shadow:
     0 32px 96px rgba(0, 0, 0, 0.48),
@@ -3737,7 +3737,7 @@ td.data-table-key-col {
   width: 36px;
   height: 36px;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 5px;
   border-color: color-mix(in srgb, var(--border) 78%, white 10%);
   background: linear-gradient(
     180deg,
@@ -4808,7 +4808,7 @@ td.data-table-key-col {
   height: 44px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
-  border-radius: 14px;
+  border-radius: 5px;
   background: var(--accent-subtle);
   color: var(--accent);
 }
@@ -4954,7 +4954,7 @@ td.data-table-key-col {
   box-sizing: border-box;
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: 5px;
   background: var(--qr-bg);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
 }
@@ -5067,7 +5067,7 @@ td.data-table-key-col {
   height: 48px;
   place-items: center;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: 5px;
   background: var(--bg-elevated);
   color: var(--muted);
 }
@@ -5512,7 +5512,7 @@ td.data-table-key-col {
   min-height: 480px;
   width: 100%;
   border: none;
-  border-radius: 10px;
+  border-radius: 5px;
   background: var(--card);
 }
 

@@ -33,7 +33,7 @@ export const desktopDocumentStyles = css`
     margin: 0 auto;
     padding: 5px;
     border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
-    border-radius: 14px;
+    border-radius: 5px;
     background: color-mix(in srgb, var(--bg) 84%, transparent);
     box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
     backdrop-filter: blur(16px);
@@ -46,7 +46,7 @@ export const desktopDocumentStyles = css`
     justify-content: center;
     gap: 5px;
     border: 0;
-    border-radius: 10px;
+    border-radius: 5px;
     padding: 0 9px;
     background: transparent;
     color: var(--text);

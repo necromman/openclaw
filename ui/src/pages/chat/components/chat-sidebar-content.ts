@@ -334,7 +334,7 @@ function renderMarkdownSidebar(props: MarkdownSidebarProps) {
                                   class="chat-tool-card__preview-image"
                                   src=${content.src}
                                   alt=${title}
-                                  style="display:block;max-width:100%;height:auto;border-radius:8px;"
+                                  style="display:block;max-width:100%;height:auto;border-radius:5px;"
                                 />
                               </button>
                             </div>
