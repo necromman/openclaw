@@ -68,7 +68,7 @@ type ProviderControls = {
   embeddedBatchInputs: EmbeddingInput[][];
   providerRuntimeBatchCalls: string[][];
   providerRuntimeBatchGate: Promise<void> | null;
-  providerRuntimeBatchEntered: ((activeCalls: number) => void) | null;
+  providerRuntimeBatchEntered: ((activeCalls: number, texts: readonly string[]) => void) | null;
   providerRuntimeBatchErrors: unknown[];
   providerRuntimeBatchFailuresRemaining: number;
   providerRuntimeActiveBatchCalls: number;
@@ -131,7 +131,9 @@ const providerState = vi.hoisted(() => ({
   embeddedBatchInputs: [] as EmbeddingInput[][],
   providerRuntimeBatchCalls: [] as string[][],
   providerRuntimeBatchGate: null as Promise<void> | null,
-  providerRuntimeBatchEntered: null as ((activeCalls: number) => void) | null,
+  providerRuntimeBatchEntered: null as
+    | ((activeCalls: number, texts: readonly string[]) => void)
+    | null,
   providerRuntimeBatchErrors: [] as unknown[],
   providerRuntimeBatchFailuresRemaining: 0,
   providerRuntimeActiveBatchCalls: 0,
@@ -338,6 +340,7 @@ vi.mock("./embeddings.js", async (importOriginal) => {
                     try {
                       providerState.providerRuntimeBatchEntered?.(
                         providerState.providerRuntimeActiveBatchCalls,
+                        batch.chunks.map((chunk) => chunk.text),
                       );
                       await providerState.providerRuntimeBatchGate;
                       providerState.providerRuntimeBatchCalls.push(
