@@ -13,6 +13,7 @@ import {
   type IxAuthRequestMeta,
   type IxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-client.js";
+import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
 import {
   matchesIxAuthCsrfDigest,
   persistIxAuthLoginSession,
@@ -510,9 +511,11 @@ async function handleIxAuthSessionProbeRoute(params: {
   sendJson(params.res, 200, {
     authenticated: true,
     authMode: "ix-auth",
-    // The admin console link is only meaningful to someone who can use it, so it is
-    // withheld from everyone else rather than hidden in the browser.
-    adminConsoleUrl: principal.isSuperAdmin ? params.deps.settings.adminConsoleUrl : undefined,
+    // Withheld from the payload rather than hidden in the browser, so a non-administrator
+    // never receives the URL in the first place.
+    adminConsoleUrl: canOpenIxAuthAdminConsole(principal.gatewayRole)
+      ? params.deps.settings.adminConsoleUrl
+      : undefined,
     user: {
       profileId: principal.profileId,
       email: principal.claims.email,

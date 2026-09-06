@@ -21,6 +21,21 @@ export const IX_AUTH_DEFAULT_ROLE_MAP: Readonly<Record<string, string>> = Object
 export const IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES: readonly string[] = Object.freeze(["superadmin"]);
 
 /**
+ * Role names allowed to see the identity server's admin console link.
+ *
+ * Wider than the super-admin list on purpose. The console runs its own permission model
+ * (`ixauth:users:read` and friends) and re-checks every action, so surfacing the link to
+ * a department administrator cannot grant them anything the console would not already
+ * allow. Hiding it from them would only mean they ask someone for the URL.
+ */
+const IX_AUTH_ADMIN_CONSOLE_ROLES: readonly string[] = Object.freeze(["superadmin", "admin"]);
+
+/** True when this Gateway role should be offered the identity server's admin console. */
+export function canOpenIxAuthAdminConsole(gatewayRole: string | undefined): boolean {
+  return gatewayRole !== undefined && IX_AUTH_ADMIN_CONSOLE_ROLES.includes(gatewayRole);
+}
+
+/**
  * Precedence from most to least privileged.
  *
  * A user carrying several IX-Auth roles resolves to the most privileged mapped name.

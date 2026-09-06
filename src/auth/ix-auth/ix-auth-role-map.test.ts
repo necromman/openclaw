@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canOpenIxAuthAdminConsole,
   IX_AUTH_DEFAULT_ROLE_MAP,
   IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES,
   resolveIxAuthGatewayRole,
@@ -82,5 +83,18 @@ describe("resolveIxAuthGatewayRole", () => {
     expect(resolveIxAuthGatewayRole({ roles: ["CUSTOM", "MEMBER"], settings }).gatewayRole).toBe(
       "member",
     );
+  });
+});
+
+describe("canOpenIxAuthAdminConsole", () => {
+  it("offers the console to super admins and department administrators", () => {
+    expect(canOpenIxAuthAdminConsole("superadmin")).toBe(true);
+    expect(canOpenIxAuthAdminConsole("admin")).toBe(true);
+  });
+
+  it("withholds it from everyone else, including unmapped users", () => {
+    expect(canOpenIxAuthAdminConsole("moderator")).toBe(false);
+    expect(canOpenIxAuthAdminConsole("member")).toBe(false);
+    expect(canOpenIxAuthAdminConsole(undefined)).toBe(false);
   });
 });
