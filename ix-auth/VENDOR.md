@@ -53,6 +53,7 @@
 | `.oxfmtrc.jsonc` | `ignorePatterns` 에 `"ix-auth/"` | `oxfmt --check` 는 인자 없이 저장소 전체를 훑는다. 벤더 트리를 재포맷하면 원본 대비 diff 가 전부 깨진다 |
 | `.oxlintrc.json` | `ignorePatterns` 에 `"ix-auth/"` | 방어적 추가. oxlint 대상은 `src ui packages extensions scripts` 로 이미 한정돼 있다 |
 | `.gitignore` | `/ix-auth/**/build/` 등 4줄 | `ix-auth/.gitignore` 가 이미 덮지만, 루트에서 `git add -A` 할 때 70 MB Gradle 트리가 절대 스테이징되지 않도록 이중으로 건다 |
+| `scripts/check-duplicates.mts` | `intentionallyUnscannedPrefixes` 에 `"ix-auth/"` | `pnpm dup:check:coverage`(= `pnpm check` 의 한 레인)는 **추적 중인 모든** `.ts/.tsx/.js/.mjs/.cjs` 가 스캔 대상이거나 의도적 제외 목록에 있어야 통과한다. 벤더 트리의 SDK·데모 소스 18개가 여기 걸렸다. 중복은 원본이 풀 문제이지 이 저장소가 풀 문제가 아니다 |
 
 **확인했고 손댈 필요가 없던 것** (경로 글롭이 저장소 루트에 고정돼 있어 `ix-auth/` 하위를 잡지 않는다):
 
