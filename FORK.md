@@ -481,6 +481,28 @@ printf '%s' '<claude setup-token 값>' | ~/openclaw-local/bin/oc \
 
 `jq` 는 그 뒤 설치했다(`apt-get install -y jq`, jq-1.7). 새 환경을 만들 때는 **`pnpm test` 전에 `jq` 를 먼저 깔면 419건이 사라진다.**
 
+### 10-2c. jq 설치 후 tooling 레인 재실행 (분류 확정)
+
+`jq` 를 깔고 tooling 레인만 다시 돌렸다.
+
+| 실행 | tooling 레인 실패 |
+|------|------------------|
+| 최초 (`jq` 없음) | **419** |
+| 재실행 (`jq` 있음) | **103** (통과 15,608 / 파일 578 통과 · 13 실패) |
+
+남은 103건은 **또 다른 실패이고, 그나마 내 실행 방법이 만든 것이다.** 전부 같은 에러다.
+
+```
+Error: EACCES: permission denied, mkdtemp '/oc-default-empty-XXXXXX'
+  at makeTempDir test/helpers/temp-dir.ts:38
+```
+
+임시 디렉터리 루트가 `/tmp` 가 아니라 **파일시스템 루트 `/`** 로 잡혔다. 재실행을 `pnpm vitest run --config ...` 로 **직접** 돌리면서 저장소 공식 러너 `scripts/test-projects.mts` 가 세팅하는 temp/state 환경을 건너뛴 탓이다.
+
+근거는 명확하다. 문제의 `test/scripts/test-projects-empty-native.test.ts` 는 **공식 `pnpm test` 실행에서 38개 케이스 전부 통과했고 실패 0건**이었다. 즉 소스 문제가 아니라 호출 방식 문제다.
+
+**결론: `jq` 가 있고 공식 러너(`pnpm test`)로 돌리면 tooling 레인 실패는 사라진다.** 레인만 따로 검증할 때도 `pnpm vitest` 직접 호출 대신 `pnpm test` 를 쓰는 것이 맞다.
+
 ### 10-3. 모델 실동작
 
 CLI 경유 (`oc agent --json -m ...`):
