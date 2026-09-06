@@ -27,6 +27,7 @@ import { formatUiExternalText } from "../../lib/format-error.ts";
 import "../../styles/plugins.css";
 import {
   CLAWHUB_BROWSE_URL,
+  neutralizeCatalogCopy,
   resolvePluginInstallIdentity,
   type PluginCatalogItem,
   type PluginInstallRequest,
@@ -202,7 +203,7 @@ function matchesPlugin(plugin: PluginCatalogItem, query: string): boolean {
     plugin.name,
     plugin.id,
     plugin.packageName,
-    plugin.description,
+    neutralizeCatalogCopy(plugin.description),
     plugin.origin,
     plugin.category,
     ...(plugin.kind ?? []),
@@ -750,7 +751,7 @@ function renderPluginRow(
           onShowDetails: () => props.onShowDetails(plugin.id),
         })}
         <span class="settings-row__desc">
-          ${plugin.description || t("pluginsPage.optionalCapability")}
+          ${neutralizeCatalogCopy(plugin.description) || t("pluginsPage.optionalCapability")}
         </span>
         ${renderMetaLine([
           plugin.origin ? pluginOriginLabel(plugin.origin) : nothing,
@@ -1208,7 +1209,7 @@ function renderDetailOverlay(props: PluginsViewProps) {
             ${stateStatus(plugin)}
           </div>
           <p class="plugins-detail__description">
-            ${plugin.description || t("pluginsPage.optionalCapability")}
+            ${neutralizeCatalogCopy(plugin.description) || t("pluginsPage.optionalCapability")}
           </p>
           <div class="plugins-detail__actions">
             ${

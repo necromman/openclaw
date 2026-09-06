@@ -111,3 +111,25 @@ export async function runPluginConfigMutation<T>(
     refreshError: mutation.refresh.ok ? null : mutation.refresh.error,
   };
 }
+
+/**
+ * Strip the upstream product name from catalog copy.
+ *
+ * Plugin descriptions come from the published npm packages and from the
+ * Gateway's cached registry snapshot, so this fork cannot edit them at the
+ * source. Sanitize them where they are shown instead; ids, package names and
+ * versions are untouched.
+ */
+export function neutralizeCatalogCopy(text: string | null | undefined): string {
+  if (!text) {
+    return "";
+  }
+  const stripped = text
+    .replace(/^OpenClaw\s+/u, "")
+    .replace(/\bOpenClaw\s+(agents?)\b/giu, "$1")
+    .replace(/\bOpenClaw\b/gu, "the gateway");
+  // A description that lost its leading brand word may now start lowercase.
+  return /^[a-z][A-Z]/u.test(stripped)
+    ? stripped
+    : stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}

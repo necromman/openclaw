@@ -1,7 +1,7 @@
 {
   "id": "imessage",
   "name": "iMessage",
-  "description": "IMessage channel plugin using imsg on a signed-in Mac.",
+  "description": "iMessage channel plugin using imsg on a signed-in Mac.",
   "doctorContract": {
     "configRepair": true,
     "stateMigrations": true
