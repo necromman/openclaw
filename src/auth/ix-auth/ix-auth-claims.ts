@@ -122,6 +122,7 @@ export function parseIxAuthTokenClaims(params: {
   const groupClaim = settings.departmentClaim || IX_AUTH_DEFAULT_DEPARTMENT_CLAIM;
   const actor = payload.act;
   const actorRecord =
+    // SAFETY: the typeof guard on this line proves act is a non-null object.
     actor !== null && typeof actor === "object" ? (actor as Record<string, unknown>) : undefined;
 
   return {

@@ -87,6 +87,7 @@ async function readJsonResponse(response: Response): Promise<Record<string, unkn
   try {
     const parsed: unknown = await response.json();
     return parsed !== null && typeof parsed === "object"
+      // SAFETY: the preceding typeof guard proves parsed is a non-null object.
       ? (parsed as Record<string, unknown>)
       : {};
   } catch {
@@ -99,6 +100,7 @@ function readSessionUser(body: Record<string, unknown>): IxAuthSessionUser | und
   if (user === null || typeof user !== "object") {
     return undefined;
   }
+  // SAFETY: the null and typeof guard directly above proves user is an object.
   const record = user as Record<string, unknown>;
   const email = typeof record.email === "string" ? record.email : undefined;
   const profileId = typeof record.profileId === "string" ? record.profileId : undefined;

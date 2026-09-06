@@ -41,7 +41,9 @@ function importJwksKeys(document: unknown): Map<string, KeyObject> {
   const keys = new Map<string, KeyObject>();
   const list =
     document !== null && typeof document === "object"
-      ? (document as { keys?: unknown }).keys
+      ? // SAFETY: the preceding typeof guard proves document is a non-null object; keys
+        // is read as unknown and validated by the Array.isArray check below.
+        (document as { keys?: unknown }).keys
       : undefined;
   if (!Array.isArray(list)) {
     return keys;
@@ -50,6 +52,7 @@ function importJwksKeys(document: unknown): Map<string, KeyObject> {
     if (entry === null || typeof entry !== "object") {
       continue;
     }
+    // SAFETY: the null and typeof guard directly above proves entry is an object.
     const jwk = entry as Record<string, unknown>;
     const keyId = typeof jwk.kid === "string" ? jwk.kid : undefined;
     const algorithm = typeof jwk.alg === "string" ? jwk.alg : undefined;
@@ -60,6 +63,9 @@ function importJwksKeys(document: unknown): Map<string, KeyObject> {
       continue;
     }
     try {
+      // SAFETY: node:crypto types the jwk key as a concrete JsonWebKey, but a JWKS entry
+      // is untrusted input whose shape is validated by createPublicKey itself; a malformed
+      // key throws into the catch below rather than producing an unusable KeyObject.
       keys.set(keyId, createPublicKey({ key: jwk as never, format: "jwk" }));
     } catch {
       // A malformed key must not discard the sound keys beside it.
@@ -129,8 +135,8 @@ function verifySignedSegments(params: {
   signingInput: string;
   signature: Buffer;
 }): boolean {
-  const digest = params.algorithm === "ES256" ? "sha256" : "sha256";
-  const verifier = createVerify(digest);
+  // RS256 and ES256 both digest with SHA-256; only the signature encoding differs.
+  const verifier = createVerify("sha256");
   verifier.update(params.signingInput);
   verifier.end();
   if (params.algorithm === "ES256") {
@@ -159,6 +165,7 @@ export async function verifyIxAuthAccessToken(params: {
   if (segments.length !== 3) {
     return { ok: false, reason: "malformed_token" };
   }
+  // SAFETY: the length check above proves exactly three segments are present.
   const [encodedHeader, encodedPayload, encodedSignature] = segments as [string, string, string];
 
   let header: Record<string, unknown>;
@@ -203,6 +210,7 @@ export async function verifyIxAuthAccessToken(params: {
     if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
       return { ok: false, reason: "malformed_payload" };
     }
+    // SAFETY: the guard above rejected null, non-objects, and arrays.
     return { ok: true, payload: payload as Record<string, unknown> };
   } catch {
     return { ok: false, reason: "malformed_payload" };

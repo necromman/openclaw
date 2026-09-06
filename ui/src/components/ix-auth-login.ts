@@ -66,6 +66,7 @@ function renderIxAuthCredentialFields(props: IxAuthLoginProps) {
         placeholder=${t("ixAuth.emailPlaceholder")}
         ?disabled=${props.submitting}
         @input=${(e: Event) => {
+          // SAFETY: this listener is bound to the input element on this template line.
           props.onEmailChange((e.target as HTMLInputElement).value);
         }}
         @keydown=${submitOnEnter}
@@ -82,6 +83,7 @@ function renderIxAuthCredentialFields(props: IxAuthLoginProps) {
           .value=${props.password}
           ?disabled=${props.submitting}
           @input=${(e: Event) => {
+            // SAFETY: this listener is bound to the input element on this template line.
             props.onPasswordChange((e.target as HTMLInputElement).value);
           }}
           @keydown=${submitOnEnter}
@@ -119,6 +121,7 @@ function renderIxAuthMfaField(props: IxAuthLoginProps) {
         .value=${props.mfaCode}
         ?disabled=${props.submitting}
         @input=${(e: Event) => {
+          // SAFETY: this listener is bound to the input element on this template line.
           props.onMfaCodeChange((e.target as HTMLInputElement).value);
         }}
         @keydown=${(e: KeyboardEvent) => {

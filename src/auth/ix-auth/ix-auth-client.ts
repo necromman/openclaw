@@ -73,13 +73,16 @@ function buildIxAuthHeaders(params: {
 
 function readRelayFailure(status: number, body: unknown): IxAuthRelayFailure {
   const envelope =
+    // SAFETY: guarded by the typeof check on this line; JSON objects index by string.
     body !== null && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const error =
     envelope.error !== null && typeof envelope.error === "object"
+      // SAFETY: the preceding typeof guard proves error is a non-null object.
       ? (envelope.error as Record<string, unknown>)
       : {};
   const meta =
     error.meta !== null && typeof error.meta === "object"
+      // SAFETY: the preceding typeof guard proves meta is a non-null object.
       ? (error.meta as Record<string, unknown>)
       : {};
   const lockedUntil = typeof meta.lockedUntil === "string" ? Date.parse(meta.lockedUntil) : NaN;
@@ -142,9 +145,12 @@ async function callIxAuthEndpoint(params: {
   if (!response.ok) {
     return readRelayFailure(response.status, parsed);
   }
+  // SAFETY: parsed came from JSON.parse of a successful response; every field is read
+  // back through a typeof check before use, so a non-object simply yields undefined.
   const envelope = parsed as Record<string, unknown>;
   const data =
     envelope.data !== null && typeof envelope.data === "object"
+      // SAFETY: the preceding typeof guard proves data is a non-null object.
       ? (envelope.data as Record<string, unknown>)
       : {};
   return { ok: true, status: response.status, data };

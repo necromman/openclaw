@@ -217,6 +217,7 @@ async function readIxAuthJsonBody(
     sendJson(res, 400, { error: "invalid_body" });
     return undefined;
   }
+  // SAFETY: the guard above rejected null, non-objects, and arrays.
   return body.value as Record<string, unknown>;
 }
 
@@ -476,11 +477,13 @@ async function handleIxAuthSessionProbeRoute(params: {
 }): Promise<void> {
   const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
   const sessionToken = readRequestCookieValue(params.req, cookieName);
-  const unauthenticated = {
-    authenticated: false,
-    authMode: "ix-auth" as const,
-    adminConsoleUrl: undefined as string | undefined,
-  };
+  // Declared once so the unauthenticated body is byte-identical whether the cookie was
+  // absent, unknown, revoked, or expired. A caller must not be able to tell them apart.
+  const unauthenticated: {
+    authenticated: false;
+    authMode: "ix-auth";
+    adminConsoleUrl?: string;
+  } = { authenticated: false, authMode: "ix-auth" };
   if (!sessionToken) {
     sendJson(params.res, 200, unauthenticated);
     return;

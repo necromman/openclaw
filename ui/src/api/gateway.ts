@@ -495,6 +495,8 @@ export class GatewayBrowserClient {
     // The Gateway already withholds device tokens from identity-server sessions. This
     // second check keeps a bearer credential out of browser storage even if a future
     // server change or a hostile Gateway hands one over anyway: it would outlive sign-out.
+    // SAFETY: the protocol snapshot carries authMode as an optional string literal union;
+    // widening it to string here only narrows what this check can conclude.
     const helloSnapshot = hello?.snapshot as { authMode?: string } | undefined;
     const suppressesDeviceToken = helloSnapshot?.authMode === "ix-auth";
     if (hello?.auth?.deviceToken && plan.deviceIdentity && !suppressesDeviceToken) {
