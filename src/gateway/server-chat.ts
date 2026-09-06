@@ -1661,8 +1661,10 @@ export function createAgentEventHandler({
       }
     } else {
       const itemPhase = isItemEvent && typeof evt.data?.phase === "string" ? evt.data.phase : "";
+      // The runtime error frame drains this text before retry cleanup retires its group.
       if (
-        itemPhase === "start" &&
+        (itemPhase === "start" ||
+          (lifecyclePhase === "error" && evt.data.completionSource !== "reply-dispatch")) &&
         (isControlUiVisible || hasSessionMessageSubscribers) &&
         !isAborted
       ) {
@@ -1768,18 +1770,6 @@ export function createAgentEventHandler({
         if (evt.data.completionSource !== "reply-dispatch") {
           // Runtime retries isolate failed text; reply-dispatch retains its
           // post-hook payloads and abort state until its own completion settles.
-          if (sessionKey) {
-            flushBufferedChatDeltaIfNeeded(
-              sessionKey,
-              sessionAgentId,
-              clientRunId,
-              evt.runId,
-              evt.seq,
-              {
-                controlUiVisible: isControlUiVisible,
-              },
-            );
-          }
           chatRunState.clearRun(clientRunId);
         }
         scheduleTerminalLifecycleError(evt, { skipChatErrorFinal, restartRecoveryState });
