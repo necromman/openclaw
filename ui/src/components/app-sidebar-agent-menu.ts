@@ -15,6 +15,7 @@ import {
   KEYBOARD_SHORTCUT_COMBOS,
 } from "../lib/keyboard-shortcut-catalog.ts";
 import { openExternalUrlSafe } from "../lib/open-external-url.ts";
+import { COMMUNITY_DISCORD_URL } from "../lib/product-links.ts";
 import type { PresenceViewer } from "../lib/presence-users.ts";
 import { normalizeAgentId } from "../lib/sessions/session-key.ts";
 import {
@@ -44,13 +45,13 @@ const IDENTITY_MENU_LINKS: ReadonlyArray<{
     icon: "messageSquare",
     label: () => t("agentChip.getHelp"),
   },
-  { href: "https://discord.gg/clawd", icon: "users", label: () => t("agentChip.discord") },
+  { href: COMMUNITY_DISCORD_URL, icon: "users", label: () => t("agentChip.discord") },
   {
     href: "https://docs.openclaw.ai/releases",
     icon: "scrollText",
     label: () => t("agentChip.viewChangelog"),
   },
-];
+].filter((link) => link.href.length > 0);
 
 const AGENT_VALUE_PREFIX = "agent:";
 const COMMAND_VALUE_PREFIX = "command:";

@@ -5,6 +5,7 @@ import { inferControlUiPublicAssetPath } from "../../app/public-assets.ts";
 import { icons } from "../../components/icons.ts";
 import { t } from "../../i18n/index.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
+import { BRAND_LINKS } from "../../brand.ts";
 import { COMMUNITY_DISCORD_URL } from "../../lib/product-links.ts";
 import "../../styles/apps.css";
 import { brandIcons } from "../about/brand-icons.ts";
@@ -189,7 +190,7 @@ const APP_SECTIONS: readonly AppSection[] = [
           { kind: "internal", routeId: "plugins", label: () => t("appsPage.ctaOpenPlugins") },
           {
             kind: "external",
-            href: "https://clawhub.ai",
+            href: BRAND_LINKS.skillHub,
             label: () => t("appsPage.ctaBrowseClawHub"),
           },
         ],
@@ -206,7 +207,7 @@ const COMMUNITY_LINKS: ReadonlyArray<{ href: string; icon: TemplateResult; label
       label: () => t("appsPage.linkDiscord"),
     },
     { href: "https://docs.openclaw.ai", icon: icons.book, label: () => t("appsPage.linkDocs") },
-  ];
+  ].filter((link) => link.href.length > 0);
 
 function renderCta(cta: AppCardCta, index: number, props: AppsProps) {
   const className = index === 0 ? "apps-card__cta apps-card__cta--primary" : "apps-card__cta";

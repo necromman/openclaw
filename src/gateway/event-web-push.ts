@@ -3,6 +3,7 @@ import { normalizeOptionalString } from "@openclaw/normalization-core";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { buildControlUiSessionPath } from "@openclaw/session-url-contract";
 import type { WebPushNotificationCategory } from "../../packages/gateway-protocol/src/schema/push.js";
+import { BRAND_NAME } from "../brand.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   WEB_PUSH_USER_PREFERENCES_KEY,
@@ -65,7 +66,7 @@ function resolveEventWebPushNotification(
     const id = normalizeWebPushDisplayLabel(value.id) ?? "pending";
     return {
       category: "agent-question",
-      title: "OpenClaw needs an answer",
+      title: `${BRAND_NAME} needs an answer`,
       body: "An agent has a question for you.",
       tag: `openclaw-question-${id}`,
     };
@@ -78,7 +79,7 @@ function resolveEventWebPushNotification(
     const runId = normalizeWebPushDisplayLabel(value.runId) ?? "finished";
     return {
       category: "agent-finished",
-      title: "OpenClaw agent finished",
+      title: `${BRAND_NAME} agent finished`,
       body: "An agent completed its response.",
       tag: `openclaw-agent-finished-${runId}`,
     };
@@ -92,7 +93,7 @@ function resolveEventWebPushNotification(
     const taskTitle = normalizeWebPushDisplayLabel(task.title);
     return {
       category: "background-task-failed",
-      title: "OpenClaw background task failed",
+      title: `${BRAND_NAME} background task failed`,
       body: "A background task needs attention.",
       ...(taskTitle ? { identifiedBody: `${taskTitle} needs attention.` } : {}),
       tag: `openclaw-task-failed-${taskId}`,
@@ -104,7 +105,7 @@ function resolveEventWebPushNotification(
     const jobName = normalizeWebPushDisplayLabel(job?.name);
     return {
       category: "scheduled-task-failed",
-      title: "OpenClaw scheduled task failed",
+      title: `${BRAND_NAME} scheduled task failed`,
       body: "A scheduled task needs attention.",
       ...(jobName ? { identifiedBody: `${jobName} needs attention.` } : {}),
       tag: `openclaw-cron-failed-${jobId}`,
@@ -277,7 +278,7 @@ export function createEventWebPushDelivery(params: {
       deliver(
         {
           category: "human-mentioned",
-          title: "OpenClaw mention",
+          title: `${BRAND_NAME} mention`,
           body: "Someone mentioned you in a conversation.",
           identifiedBody: `${senderLabel} mentioned you${sessionTitle ? ` in ${sessionTitle}` : ""}.`,
           tag: `openclaw-mention-${id}`,

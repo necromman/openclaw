@@ -3,6 +3,7 @@
  *
  * Maps runtime/session surfaces to the fallback tool text and workflow hints that belong in prompts.
  */
+import { BRAND_NAME } from "../brand.js";
 import { isOpenClawMainPromptSurface } from "../plugins/agent-prompt-surface-kind.js";
 import type { AgentPromptSurfaceKind } from "../plugins/types.js";
 import { isAcpSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
@@ -10,10 +11,10 @@ import { isAcpSessionKey, isSubagentSessionKey } from "../routing/session-key.js
 /** Builds fallback tool guidance when a runtime cannot render the structured tool list. */
 export function buildOpenClawToolFallbackText(params: { surface: AgentPromptSurfaceKind }): string {
   if (isOpenClawMainPromptSurface(params.surface)) {
-    return "The active runtime provides the available OpenClaw tools directly. Use only exposed tools; names are case-sensitive.";
+    return `The active runtime provides the available ${BRAND_NAME} tools directly. Use only exposed tools; names are case-sensitive.`;
   }
 
-  return "No OpenClaw tool list is injected for this runtime prompt surface. Use only tools exposed directly by the active backend.";
+  return `No ${BRAND_NAME} tool list is injected for this runtime prompt surface. Use only tools exposed directly by the active backend.`;
 }
 
 /** Returns whether the main OpenClaw prompt should include workflow hints around the tool list. */

@@ -1,4 +1,5 @@
 // Shared Control UI plugin catalog Gateway contracts.
+import { BRAND_LINKS } from "../../brand.ts";
 import type {
   PluginCatalogEntry,
   PluginDeclaredSurface as ProtocolPluginDeclaredSurface,
@@ -49,7 +50,7 @@ export function resolvePluginInstallIdentity(
     : `clawhub:${request.packageName}`;
 }
 
-export const CLAWHUB_BROWSE_URL = "https://clawhub.ai/plugins";
+export const CLAWHUB_BROWSE_URL: string = BRAND_LINKS.skillHub;
 
 export function loadPluginCatalog(client: GatewayBrowserClient): Promise<PluginListResult> {
   return client.request<PluginListResult>("plugins.list", {});

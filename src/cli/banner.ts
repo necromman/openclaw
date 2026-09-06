@@ -7,10 +7,10 @@ import {
   type DecorativeEmojiOptions,
 } from "../../packages/terminal-core/src/decorative-emoji.js";
 import { isRich, theme } from "../../packages/terminal-core/src/theme.js";
+import { BRAND_BANNER_EMOJI, BRAND_NAME } from "../brand.js";
 import { resolveCommitHash } from "../infra/git-commit.js";
 import { hasRootVersionAlias } from "./argv.js";
 import { parseTaglineMode } from "./banner-config-lite.js";
-import { pickCliLobsterArt } from "./lobster-art.js";
 import { pickTagline, type TaglineMode, type TaglineOptions } from "./tagline.js";
 
 type BannerOptions = TaglineOptions & {
@@ -57,8 +57,8 @@ export function formatCliBannerLine(version: string, options: BannerOptions = {}
     emojiOptions,
   );
   const rich = options.richTty ?? isRich();
-  const title = decorativePrefix("🦞", "OpenClaw", emojiOptions);
-  const prefix = decorativeEmoji("🦞", emojiOptions);
+  const title = decorativePrefix(BRAND_BANNER_EMOJI, BRAND_NAME, emojiOptions);
+  const prefix = decorativeEmoji(BRAND_BANNER_EMOJI, emojiOptions);
   const indent = prefix ? `${prefix} ` : "";
   const columns = options.columns ?? process.stdout.columns ?? 120;
   const plainBaseLine = `${title} ${version} (${commitLabel})`;
@@ -103,9 +103,8 @@ function resolveLobsterArt(options: BannerOptions): string | null {
   if (!(options.richTty ?? isRich())) {
     return null;
   }
-  const now = options.now ? options.now() : new Date();
-  const art = pickCliLobsterArt(now, options.env ?? process.env);
-  return art ? theme.accentDim(art) : null;
+  // This fork ships no mascot art, so the seasonal banner art is always off.
+  return null;
 }
 
 /** Emit the CLI banner once for interactive, non-JSON, non-version invocations. */

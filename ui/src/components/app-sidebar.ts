@@ -9,6 +9,7 @@ import type { SessionObserverDigest } from "../../../packages/gateway-protocol/s
 import { isSessionRouteId, pathForRoute } from "../app-route-paths.ts";
 import { beginNativeWindowDragFromTopInset } from "../app/native-window-drag.ts";
 import { t } from "../i18n/index.ts";
+import { COMMUNITY_DISCORD_URL } from "../lib/product-links.ts";
 import "./session-menu.ts";
 import "./sidebar-agent-card.ts";
 import "./sidebar-attention.ts";
@@ -351,7 +352,12 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
   };
 
   private syncCommunityInviteState() {
-    if (this.context?.config.current.communityInvite !== true || !isCommunityInviteEligible()) {
+    // No community destination in this fork means no invite card at all.
+    if (
+      COMMUNITY_DISCORD_URL.length === 0 ||
+      this.context?.config.current.communityInvite !== true ||
+      !isCommunityInviteEligible()
+    ) {
       this.communityInvitePresentation = "unavailable";
     } else if (this.communityInvitePresentation !== "shown") {
       this.communityInvitePresentation = "pending";

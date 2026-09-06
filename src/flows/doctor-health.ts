@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import { intro as clackIntro, outro as clackOutro } from "@clack/prompts";
 import { stylePromptTitle } from "../../packages/terminal-core/src/prompt-style.js";
+import { BRAND_NAME } from "../brand.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import type { DoctorOptions } from "../commands/doctor-prompter.js";
 import { resolveStateDir } from "../config/paths.js";
@@ -57,7 +58,7 @@ export async function runDoctorHealthFlow(runtime?: RuntimeEnv, options: DoctorO
   // Config loading can initialize SQLite-backed state before integrity runs.
   // Preserve the entry fact so doctor can report that automatic initialization.
   const stateDirExistedAtStart = stateDirectoryExistsAtDoctorStart();
-  intro("OpenClaw doctor");
+  intro(`${BRAND_NAME} doctor`);
 
   const { createDoctorPrompter } = await import("../commands/doctor-prompter.js");
   const prompter = createDoctorPrompter({ runtime: effectiveRuntime, options });

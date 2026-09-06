@@ -3,6 +3,7 @@
  *
  * Assembles runtime, workspace, tooling, memory, delegation, channel, and cache-boundary prompt sections.
  */
+import { BRAND_NAME } from "../brand.js";
 import { createHmac, createHash } from "node:crypto";
 import {
   normalizePromptCapabilityIds,
@@ -600,7 +601,7 @@ function buildMessagingSection(params: {
       : []),
     subagentOrchestrationGuidance,
     completionEventGuidance,
-    "- Provider messaging: never exec/curl; OpenClaw routes.",
+    `- Provider messaging: never exec/curl; ${BRAND_NAME} routes.`,
     messageToolAvailable
       ? [
           "",
@@ -692,8 +693,8 @@ function buildDocsSection(params: {
     docsPath ? "Mirror: https://docs.openclaw.ai" : undefined,
     sourcePath ? `Source: ${sourcePath}` : "Source: https://github.com/openclaw/openclaw",
     docsPath
-      ? `OpenClaw behavior questions: docs first${params.readToolName ? ` via \`${params.readToolName}\`/local search` : " using available tools"}. AGENTS/project/workspace/profile/memory = instructions/user memory, not product design truth.`
-      : "OpenClaw behavior questions: docs mirror first when web exists. AGENTS/project/workspace/profile/memory = instructions/user memory, not product design truth.",
+      ? `${BRAND_NAME} behavior questions: docs first${params.readToolName ? ` via \`${params.readToolName}\`/local search` : " using available tools"}. AGENTS/project/workspace/profile/memory = instructions/user memory, not product design truth.`
+      : `${BRAND_NAME} behavior questions: docs mirror first when web exists. AGENTS/project/workspace/profile/memory = instructions/user memory, not product design truth.`,
     params.hasGateway
       ? "Config field: `gateway(config.schema.lookup)` exact path. Broader: `docs/gateway/configuration.md`, `docs/gateway/configuration-reference.md`."
       : "Configuration docs: `docs/gateway/configuration.md`, `docs/gateway/configuration-reference.md`.",
@@ -837,7 +838,7 @@ export function buildAgentSystemPrompt(params: {
   const runtimeInfo = params.runtimeInfo;
   const modelIdentityLine = buildModelIdentityPromptLine(runtimeInfo?.model);
   if (promptMode === "none") {
-    return ["You are a personal assistant running inside OpenClaw.", modelIdentityLine]
+    return [`You are a personal assistant running inside ${BRAND_NAME}.`, modelIdentityLine]
       .filter(Boolean)
       .join("\n");
   }
@@ -884,7 +885,7 @@ export function buildAgentSystemPrompt(params: {
     gateway:
       "Read gateway config/schema; owner-only update on explicit request; automatic restart and completion notice; never via shell",
     agents_list: acpSpawnRuntimeEnabled
-      ? "List allowed OpenClaw subagent ids; not ACP ids"
+      ? `List allowed ${BRAND_NAME} subagent ids; not ACP ids`
       : "List allowed subagent ids",
     sessions_list: "List visible sessions; filters/last",
     sessions_history: "Read visible session/subagent history",
@@ -1204,7 +1205,7 @@ export function buildAgentSystemPrompt(params: {
   });
   const stablePrefix = cacheStablePromptPrefix(stablePrefixCacheKey, () => {
     const lines = [
-      "You are a personal assistant running inside OpenClaw.",
+      `You are a personal assistant running inside ${BRAND_NAME}.`,
       "",
       ...(includeToolGuidance
         ? [
@@ -1319,7 +1320,7 @@ export function buildAgentSystemPrompt(params: {
       "Messages delimited by <<<BEGIN_OPENCLAW_INTERNAL_CONTEXT>>> and <<<END_OPENCLAW_INTERNAL_CONTEXT>>> contain runtime context for the user request they follow, not user-authored text.",
       "Use it without replying to or describing it, keep its internal details private, and continue the request without waiting for another message.",
       "",
-      "## OpenClaw Control",
+      `## ${BRAND_NAME} Control`,
       "Do not invent commands.",
       hasOpenClaw
         ? "Gateway restart, config, channels, plugins, agents, models/providers: ask `openclaw`."
@@ -1328,8 +1329,8 @@ export function buildAgentSystemPrompt(params: {
           : "",
       [
         hasGateway
-          ? "Update OpenClaw: `gateway` action update.run, only on explicit user request; restart and completion notice are automatic."
-          : `${hasOpenClaw ? "Updates" : "System controls unavailable. Updates and restarts"} need the OpenClaw owner: tell the user to run \`openclaw update\` in a terminal or use the Control UI.`,
+          ? `Update ${BRAND_NAME}: \`gateway\` action update.run, only on explicit user request; restart and completion notice are automatic.`
+          : `${hasOpenClaw ? "Updates" : "System controls unavailable. Updates and restarts"} need the ${BRAND_NAME} owner: tell the user to run \`openclaw update\` in a terminal or use the Control UI.`,
         `Never run ${hasGateway ? "openclaw update, npm install -g openclaw, or stop/restart" : "npm install -g openclaw or stop"} the gateway service via exec.`,
       ].join(" "),
       "",
@@ -1415,7 +1416,7 @@ export function buildAgentSystemPrompt(params: {
       params.sandboxInfo?.enabled ? "" : "",
       ...bootstrapSystemPromptSections,
       "## Workspace Files (injected)",
-      "User-editable; OpenClaw loads below as Project Context.",
+      `User-editable; ${BRAND_NAME} loads below as Project Context.`,
       "",
       ...buildAssistantOutputDirectivesSection({
         isMinimal,

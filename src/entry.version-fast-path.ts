@@ -1,4 +1,5 @@
 // Handles fast version output before the full CLI graph loads.
+import { BRAND_NAME } from "./brand.js";
 import { isRootVersionInvocation } from "./cli/argv.js";
 import { resolveCliContainerTarget } from "./cli/container-target.js";
 
@@ -55,7 +56,7 @@ export function tryHandleRootVersionFastPath(
   resolveVersion()
     .then(({ VERSION, resolveCommitHash }) => {
       const commit = resolveCommitHash({ moduleUrl: deps.moduleUrl ?? import.meta.url });
-      output(commit ? `OpenClaw ${VERSION} (${commit})` : `OpenClaw ${VERSION}`);
+      output(commit ? `${BRAND_NAME} ${VERSION} (${commit})` : `${BRAND_NAME} ${VERSION}`);
       exit(0);
     })
     .catch(onError);
