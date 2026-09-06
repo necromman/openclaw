@@ -121,6 +121,8 @@ UI  <openclaw-document-preview>               ui/src/components/file-preview/doc
 - **경로**: 워크스페이스 파일 접근은 전부 기존 `readWorkspaceFile()` (fs-safe root, 심링크·하드링크 거부, 루트 밖 탈출 차단)을 통과한다. 새 경로 해석 코드를 만들지 않았다.
 - **인증**: 새 HTTP 라우트가 없다. 문서 바이트는 이미 인증된 WebSocket RPC 로만 흐른다. 토큰이 URL 에 실리는 일이 없다.
 - **변환기**: 임시 디렉터리는 매 호출 `mkdtemp` 로 새로 만들고 `finally` 에서 재귀 삭제한다. 셸을 거치지 않고 인자 배열로 spawn 한다. 확장자 화이트리스트(`doc docx odt rtf xls xlsx ods csv ppt pptx odp`) 밖은 아예 실행하지 않는다. 타임아웃 60초, 출력 상한 40 MiB, 동시 실행 2개.
+  - 바이너리는 `SOFFICE_BIN` -> PATH 의 `soffice` -> `libreoffice` 순으로 찾는다. `SOFFICE_BIN` 을 주면 그 값만 신뢰하고 PATH 로 몰래 되돌아가지 않는다(잘못된 핀을 숨기지 않기 위해서다). 못 찾으면 60초 뒤 다시 탐지하므로, 나중에 LibreOffice 를 설치해도 게이트웨이를 재시작할 필요가 없다.
+  - **이름에 `OPENCLAW_` 접두사를 쓰지 않았다.** `scripts/check-env-var-count.mts` 가 `origin/main` 대비 `OPENCLAW_*` 이름 증가를 승인 없이 막는 래칫이고, 이 값은 서드파티 바이너리를 가리키므로 `EDITOR`·`BROWSER` 와 같은 계열로 두는 편이 맞다.
 - **HTML 폴백**: 모든 텍스트는 서버에서 `& < > " '` 를 이스케이프하고, 허용 태그 목록 밖은 만들지 않는다. 그 위에 `sandbox=""` iframe 이라 스크립트·폼·팝업·동일출처 접근이 전부 죽는다.
 - **blob iframe**: 우리 스크립트가 인증 채널로 받은 바이트로 직접 만든 blob 이다. PDF 는 브라우저 내장 뷰어(별도 프로세스)가 그리므로 문서 안의 JavaScript 가 Control UI DOM 에 닿지 않는다. `URL.revokeObjectURL` 로 교체·해제 시 반드시 회수한다.
 
