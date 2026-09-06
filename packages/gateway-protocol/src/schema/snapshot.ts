@@ -255,6 +255,7 @@ export const SnapshotSchema = closedObject({
       Type.Literal("token"),
       Type.Literal("password"),
       Type.Literal("trusted-proxy"),
+      Type.Literal("ix-auth"),
     ]),
   ),
   updateAvailable: Type.Optional(UpdateAvailableSchema),

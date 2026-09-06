@@ -492,7 +492,12 @@ export class GatewayBrowserClient {
       deviceId: plan.deviceIdentity.deviceId,
       role: plan.params.role ?? CONTROL_UI_OPERATOR_ROLE,
     };
-    if (hello?.auth?.deviceToken && plan.deviceIdentity) {
+    // The Gateway already withholds device tokens from identity-server sessions. This
+    // second check keeps a bearer credential out of browser storage even if a future
+    // server change or a hostile Gateway hands one over anyway: it would outlive sign-out.
+    const helloSnapshot = hello?.snapshot as { authMode?: string } | undefined;
+    const suppressesDeviceToken = helloSnapshot?.authMode === "ix-auth";
+    if (hello?.auth?.deviceToken && plan.deviceIdentity && !suppressesDeviceToken) {
       const role = hello.auth.role ?? plan.params.role ?? CONTROL_UI_OPERATOR_ROLE;
       const scopes =
         role === plan.params.role && hello.auth.deviceToken === plan.selectedAuth.storedToken

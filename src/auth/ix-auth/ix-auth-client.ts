@@ -264,7 +264,7 @@ export async function relayIxAuthLogout(params: {
   settings: IxAuthRuntimeSettings;
   refreshToken: string;
   meta: IxAuthRequestMeta;
-}): Promise<IxAuthRelayResult<Record<string, never>>> {
+}): Promise<{ ok: true } | IxAuthRelayFailure> {
   const result = await callIxAuthEndpoint({
     settings: params.settings,
     path: "auth/logout",

@@ -13,6 +13,8 @@ export const en: TranslationMap & {
     Record<"title" | "openWindow" | "unavailable" | "toggle" | "reconnect", string>;
   updates: TranslationMap;
   login: TranslationMap;
+  // Lazy en-ix-auth.ts assigns into this namespace.
+  ixAuth: TranslationMap;
 } = {
   pluginUi: {
     customize: "Customize UI",
@@ -4596,6 +4598,7 @@ export const en: TranslationMap & {
   login: {
     subtitle: "Gateway Dashboard",
   },
+  ixAuth: {},
   chat: {
     modelAccounts: {
       label: "Account for this chat",

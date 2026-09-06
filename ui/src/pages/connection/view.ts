@@ -11,8 +11,10 @@ import {
   renderSettingsStatus,
   renderSettingsValue,
 } from "../../components/settings-ui.ts";
+import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../../i18n/index.ts";
 import { formatRelativeTimestamp } from "../../lib/format.ts";
+import { renderIxAuthAccountSection } from "./ix-auth-account-section.ts";
 import { renderSystemSection } from "./system-section.ts";
 
 type ConnectionProps = {
@@ -28,6 +30,9 @@ type ConnectionProps = {
   showGatewayPassword: boolean;
   onConnectionChange: (patch: Partial<Pick<UiSettings, "gatewayUrl" | "token">>) => void;
   onPasswordChange: (next: string) => void;
+  /** Identity-server session, when the Gateway delegates identity. */
+  ixAuthSession?: IxAuthSessionState;
+  onIxAuthSignOut?: () => void;
   onSessionKeyChange: (next: string) => void;
   onToggleGatewayTokenVisibility: () => void;
   onToggleGatewayPasswordVisibility: () => void;
@@ -56,7 +61,7 @@ function renderSecretRow(params: {
 export function renderConnection(props: ConnectionProps) {
   const snapshot = props.hello?.snapshot as
     | {
-        authMode?: "none" | "token" | "password" | "trusted-proxy";
+        authMode?: "none" | "token" | "password" | "trusted-proxy" | "ix-auth";
       }
     | undefined;
   const tickIntervalMs = props.hello?.policy?.tickIntervalMs;
@@ -64,6 +69,10 @@ export function renderConnection(props: ConnectionProps) {
     ? `${(tickIntervalMs / 1000).toFixed(tickIntervalMs % 1000 === 0 ? 0 : 1)}s`
     : t("common.na");
   const isTrustedProxy = snapshot?.authMode === "trusted-proxy";
+  // In identity-server mode the shared token and password are not a person's to set:
+  // the Gateway rejects them, so showing the fields would only invite confusion.
+  const isIxAuth = snapshot?.authMode === "ix-auth" || props.ixAuthSession?.authMode === "ix-auth";
+  const hidesSharedSecretFields = isTrustedProxy || isIxAuth;
 
   const accessRows = html`
     ${renderSettingsRow({
@@ -82,7 +91,7 @@ export function renderConnection(props: ConnectionProps) {
       `,
     })}
     ${
-      isTrustedProxy
+      hidesSharedSecretFields
         ? ""
         : html`
             ${renderSecretRow({
@@ -124,9 +133,11 @@ export function renderConnection(props: ConnectionProps) {
       <div class="settings-row__text">
         <span class="settings-row__desc"
           >${
-            isTrustedProxy
-              ? t("connection.access.trustedProxy")
-              : t("connection.access.connectHint")
+            isIxAuth
+              ? t("ixAuth.subtitle")
+              : isTrustedProxy
+                ? t("connection.access.trustedProxy")
+                : t("connection.access.connectHint")
           }</span
         >
       </div>
@@ -171,6 +182,12 @@ export function renderConnection(props: ConnectionProps) {
   `;
 
   return renderSettingsPage([
+    props.ixAuthSession
+      ? renderIxAuthAccountSection({
+          session: props.ixAuthSession,
+          onSignOut: () => props.onIxAuthSignOut?.(),
+        })
+      : "",
     renderSettingsSection(
       { title: t("connection.access.title"), description: t("connection.access.subtitle") },
       accessRows,

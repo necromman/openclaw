@@ -329,3 +329,9 @@ export const LOGIN_GATE_ELEMENT = {
   label: t("login.subtitle"),
   loadModule: () => import("../components/login-gate.ts"),
 } satisfies OptionalCustomElement;
+
+export const IX_AUTH_LOGIN_ELEMENT = {
+  tagName: "openclaw-ix-auth-login",
+  label: t("login.subtitle"),
+  loadModule: () => import("../components/ix-auth-login.ts"),
+} satisfies OptionalCustomElement;
