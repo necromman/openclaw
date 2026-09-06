@@ -1,4 +1,5 @@
 // Control UI tests cover About artifact identity against a mocked Gateway.
+import { BRAND_NAME } from "../brand.ts";
 import { expect, it } from "vitest";
 import { installMockGateway } from "../test-helpers/control-ui-e2e.ts";
 import { createControlUiE2eSuite } from "./control-ui-e2e-suite.test-support.ts";
@@ -76,7 +77,7 @@ suite.define(() => {
         .toContain("separate from this Control UI build");
 
       const hero = page.locator(".about-hero");
-      await expect.poll(() => hero.locator(".about-hero__name").textContent()).toBe("OpenClaw");
+      await expect.poll(() => hero.locator(".about-hero__name").textContent()).toBe(BRAND_NAME);
       await expect
         .poll(() => hero.locator(".about-hero__version").textContent())
         .toBe("v2026.7.10");

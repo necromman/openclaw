@@ -1,5 +1,6 @@
 // @vitest-environment node
 // Control UI tests cover navigation behavior.
+import { BRAND_NAME } from "./brand.ts";
 import { describe, expect, it } from "vitest";
 import {
   SIDEBAR_NAV_ROUTES,
@@ -166,18 +167,18 @@ describe("settingsSearchTextMatches", () => {
 
 describe("formatDocumentTitle", () => {
   it("does not duplicate a context ending in the brand", () => {
-    expect(formatDocumentTitle({ context: "Ask OpenClaw" })).toBe("Ask OpenClaw");
-    expect(formatDocumentTitle({ context: "OpenClaw" })).toBe("OpenClaw");
+    expect(formatDocumentTitle({ context: `Ask ${BRAND_NAME}` })).toBe(`Ask ${BRAND_NAME}`);
+    expect(formatDocumentTitle({ context: BRAND_NAME })).toBe(BRAND_NAME);
   });
 
   it("names the disconnected gateway without implying internet loss", () => {
     expect(
       formatDocumentTitle({ context: "Usage", gatewayDisconnected: true, queuedCount: 0 }),
-    ).toBe("(Disconnected) Usage — OpenClaw");
+    ).toBe(`(Disconnected) Usage — ${BRAND_NAME}`);
   });
 
   it("ignores a queued count while online", () => {
-    expect(formatDocumentTitle({ context: "Usage", queuedCount: 3 })).toBe("Usage — OpenClaw");
+    expect(formatDocumentTitle({ context: `Usage`, queuedCount: 3 })).toBe(`Usage — ${BRAND_NAME}`);
   });
 });
 
@@ -197,7 +198,7 @@ describe("titleForRoute", () => {
       Object.fromEntries(ALL_ROUTES.map((routeId) => [routeId, titleForRoute(routeId)])),
     ).toEqual({
       chat: "Chat",
-      custodian: "OpenClaw",
+      custodian: `${BRAND_NAME}`,
       activity: "Activity",
       meetings: "Meetings",
       apps: "Apps",
