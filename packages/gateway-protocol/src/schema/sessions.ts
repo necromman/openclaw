@@ -226,6 +226,7 @@ export const SessionFileContentEncodingSchema = Type.Union([
 export const SessionFilePreviewKindSchema = Type.Union([
   Type.Literal("text"),
   Type.Literal("image"),
+  Type.Literal("document"),
   Type.Literal("unsupported"),
 ]);
 
@@ -233,6 +234,31 @@ const SessionFileHashSchema = Type.String({
   minLength: 64,
   maxLength: 64,
   pattern: "^[a-f0-9]{64}$",
+});
+
+/** Format of the bytes carried in a document preview payload. */
+export const SessionFileDocumentFormatSchema = Type.Union([
+  Type.Literal("pdf"),
+  Type.Literal("html"),
+]);
+
+/** Why a document preview could not be produced. */
+export const SessionFileDocumentErrorSchema = Type.Union([
+  Type.Literal("too-large"),
+  Type.Literal("converter-unavailable"),
+  Type.Literal("conversion-failed"),
+  Type.Literal("unsupported-format"),
+]);
+
+/** Describes a rendered document preview payload. */
+export const SessionFileDocumentPreviewSchema = closedObject({
+  format: SessionFileDocumentFormatSchema,
+  /** Lowercase extension of the workspace file itself, without the dot. */
+  sourceFormat: NonEmptyString,
+  converted: Type.Boolean(),
+  converter: Type.Optional(NonEmptyString),
+  /** Page count when known (PDF only). */
+  pageCount: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 /** One file path referenced by a session transcript. */
@@ -249,6 +275,8 @@ export const SessionFileEntrySchema = closedObject({
   mimeType: Type.Optional(NonEmptyString),
   contentEncoding: Type.Optional(SessionFileContentEncodingSchema),
   previewKind: Type.Optional(SessionFilePreviewKindSchema),
+  document: Type.Optional(SessionFileDocumentPreviewSchema),
+  documentError: Type.Optional(SessionFileDocumentErrorSchema),
 });
 
 /** One file or folder in the session-rooted browser. */
@@ -293,6 +321,10 @@ export const SessionsFilesGetParamsSchema = closedObject({
   sessionKey: NonEmptyString,
   path: NonEmptyString,
   agentId: Type.Optional(NonEmptyString),
+  /** Ask for a renderable document payload instead of the plain inline preview. */
+  documentPreview: Type.Optional(Type.Boolean()),
+  /** false forces the built-in text extraction path instead of the external converter. */
+  documentConvert: Type.Optional(Type.Boolean()),
 });
 
 /** Result for reading one session-referenced file. */
@@ -862,6 +894,9 @@ export type SessionsUsageParams = Static<typeof SessionsUsageParamsSchema>;
 export type SessionFileContentEncoding = Static<typeof SessionFileContentEncodingSchema>;
 export type SessionFileKind = Static<typeof SessionFileKindSchema>;
 export type SessionFilePreviewKind = Static<typeof SessionFilePreviewKindSchema>;
+export type SessionFileDocumentFormat = Static<typeof SessionFileDocumentFormatSchema>;
+export type SessionFileDocumentError = Static<typeof SessionFileDocumentErrorSchema>;
+export type SessionFileDocumentPreview = Static<typeof SessionFileDocumentPreviewSchema>;
 export type SessionFileRelevance = Static<typeof SessionFileRelevanceSchema>;
 export type SessionFileEntry = Static<typeof SessionFileEntrySchema>;
 export type SessionFileBrowserEntry = Static<typeof SessionFileBrowserEntrySchema>;

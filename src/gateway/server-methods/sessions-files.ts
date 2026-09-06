@@ -42,6 +42,7 @@ import {
   resolveOpenPathCommand,
   sanitizePathForLog,
 } from "./open-path.js";
+import { buildSessionFileDocumentPreview } from "./sessions-files-document.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 import { assertValidParams } from "./validation.js";
 import {
@@ -913,7 +914,23 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
       respondSessionFileNotFound(respond, params.path);
       return;
     }
-    if (typeof result.file.content !== "string" && result.file.previewKind !== "unsupported") {
+    if (params.documentPreview === true && result.root) {
+      // findSessionFile already ran the inline 256 KiB preview pass, so a large
+      // document is read twice here. The document lane overwrites those fields.
+      await buildSessionFileDocumentPreview({
+        browserPath: result.file.workspacePath ?? result.file.path,
+        convert: params.documentConvert,
+        entry: result.file,
+        root: result.root,
+      });
+    }
+    // A document preview always carries its payload inline, so it never trips
+    // the oversize guard that protects the plain text and image lanes.
+    if (
+      typeof result.file.content !== "string" &&
+      result.file.previewKind !== "unsupported" &&
+      result.file.previewKind !== "document"
+    ) {
       respondSessionFileTooLarge(respond, result.file, params.path);
       return;
     }
