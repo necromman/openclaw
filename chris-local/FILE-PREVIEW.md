@@ -10,12 +10,12 @@
 
 ## 1. 손대기 전 상태 (실측)
 
-| 형식 | 파일 패널에서 보이던 것 | 근거 |
-| --- | --- | --- |
-| `.ts` `.md` `.json` 등 텍스트 | CodeMirror 코드 뷰 | `ui/src/pages/chat/components/chat-session-workspace.ts:277-367` |
-| `png` `jpeg` `gif` `webp` `avif` | `<img>` (data URL) | 같은 파일 `:247-263`, 허용 목록 `:48-54` |
-| **그 외 전부 (`pdf` `docx` `xlsx` `pptx` `hwp`)** | **"This file is not previewable inline." 안내문** | 같은 파일 `:264-266`, 문구 생성 `:84-104` |
-| 채팅 메시지 첨부 카드 | 이름·크기·다운로드 버튼만 | `ui/src/pages/chat/components/chat-sidebar-content.ts:119-125` |
+| 형식                                              | 파일 패널에서 보이던 것                           | 근거                                                             |
+| ------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| `.ts` `.md` `.json` 등 텍스트                     | CodeMirror 코드 뷰                                | `ui/src/pages/chat/components/chat-session-workspace.ts:277-367` |
+| `png` `jpeg` `gif` `webp` `avif`                  | `<img>` (data URL)                                | 같은 파일 `:247-263`, 허용 목록 `:48-54`                         |
+| **그 외 전부 (`pdf` `docx` `xlsx` `pptx` `hwp`)** | **"This file is not previewable inline." 안내문** | 같은 파일 `:264-266`, 문구 생성 `:84-104`                        |
+| 채팅 메시지 첨부 카드                             | 이름·크기·다운로드 버튼만                         | `ui/src/pages/chat/components/chat-sidebar-content.ts:119-125`   |
 
 판정은 **게이트웨이가** 내린다. `src/gateway/server-methods/sessions-files.ts:420-445` 의 `applyInlineFilePreview()` 가 파일을 읽어 이미지 MIME 허용목록이면 `image`, UTF-8 로 디코딩되면 `text`, 아니면 `unsupported` 를 붙인다. docx 는 zip 바이너리라 무조건 `unsupported` 였다. **PDF 렌더러도, pdf.js 도, `<object>`/`<embed>` 도 저장소 어디에도 없었다.**
 
@@ -23,44 +23,44 @@
 
 **Control UI 안에서 문서를 그려 주는 플러그인은 없다.** ClawHub 실검색 결과다.
 
-| 검색 | 결과 | 성격 |
-| --- | --- | --- |
-| `plugins search pdf` | 20건 (`pdfapihub`, `pdf-to-jpg`, `pdf-extract-text`, ...) | 전부 **PDFAPIHub 외부 SaaS 호출**. API 키 필요, 문서를 외부로 전송 |
-| `plugins search docx` | 1건 `docx-to-pdf` | 같은 SaaS |
-| `plugins search document` | 13건 (`doc-to-pdf`, `scan-document`, ...) | 같은 SaaS + 메모리 플러그인 |
-| `skills search document` | 10건 (`document-reader`, `document-pro`, ...) | **에이전트가 읽는** 스킬. 화면 렌더링과 무관 |
-| 번들 `extensions/document-extract` | 있음 | `documentExtractors` 계약. PDF 텍스트/이미지를 **모델 입력용**으로 뽑는다. UI 미리보기용이 아니다 |
+| 검색                               | 결과                                                      | 성격                                                                                              |
+| ---------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `plugins search pdf`               | 20건 (`pdfapihub`, `pdf-to-jpg`, `pdf-extract-text`, ...) | 전부 **PDFAPIHub 외부 SaaS 호출**. API 키 필요, 문서를 외부로 전송                                |
+| `plugins search docx`              | 1건 `docx-to-pdf`                                         | 같은 SaaS                                                                                         |
+| `plugins search document`          | 13건 (`doc-to-pdf`, `scan-document`, ...)                 | 같은 SaaS + 메모리 플러그인                                                                       |
+| `skills search document`           | 10건 (`document-reader`, `document-pro`, ...)             | **에이전트가 읽는** 스킬. 화면 렌더링과 무관                                                      |
+| 번들 `extensions/document-extract` | 있음                                                      | `documentExtractors` 계약. PDF 텍스트/이미지를 **모델 입력용**으로 뽑는다. UI 미리보기용이 아니다 |
 
 즉 이 기능은 **직접 만들어야** 했다. 다만 `extensions/document-extract` 가 쓰는 `clawpdf` 와 루트 의존성 `jszip@3.10.1` 은 재사용 가능한 자산이었다.
 
 ## 3. 제약 조건 (여기서 선택지가 갈린다)
 
-| 제약 | 실측값 | 출처 |
-| --- | --- | --- |
-| CSP `frame-src` | `'self' http: https:` (blob: **없음**) | 라이브 응답 헤더, `src/gateway/control-ui-csp.ts:83-98` |
-| CSP `object-src` | `'none'` -> `<object>` `<embed>` **사용 불가** | 같은 곳 |
-| CSP `img-src` | `'self' data: blob:` | 같은 곳 |
-| 외부 CDN | `script-src 'self'` 뿐 -> **CDN 로드 불가**, 전부 번들 | 같은 곳 |
-| 파일 바이트 HTTP 경로 | `/__openclaw__/assistant-media` 는 `X-Frame-Options: DENY` + `frame-ancestors 'none'` -> **iframe 불가** | `src/gateway/control-ui.ts:206-217, 558` |
-| 인증 | 베어러 헤더 전용(쿠키 없음). `<img src>` 는 쿼리 `mediaTicket` 으로만 통과 | `src/gateway/http-auth-utils.ts:171-228` |
-| **UI 번들 상한** | **JS 자산 1개당 gzip 215 KiB** (전체 자산 대상, mermaid 만 예외) | `scripts/check-control-ui-performance.mts:47` |
-| 인라인 미리보기 상한 | 256 KiB (`WORKSPACE_PREVIEW_MAX_BYTES`) | `src/gateway/server-methods/workspace-fs.ts:17` |
+| 제약                  | 실측값                                                                                                   | 출처                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| CSP `frame-src`       | `'self' http: https:` (blob: **없음**)                                                                   | 라이브 응답 헤더, `src/gateway/control-ui-csp.ts:83-98` |
+| CSP `object-src`      | `'none'` -> `<object>` `<embed>` **사용 불가**                                                           | 같은 곳                                                 |
+| CSP `img-src`         | `'self' data: blob:`                                                                                     | 같은 곳                                                 |
+| 외부 CDN              | `script-src 'self'` 뿐 -> **CDN 로드 불가**, 전부 번들                                                   | 같은 곳                                                 |
+| 파일 바이트 HTTP 경로 | `/__openclaw__/assistant-media` 는 `X-Frame-Options: DENY` + `frame-ancestors 'none'` -> **iframe 불가** | `src/gateway/control-ui.ts:206-217, 558`                |
+| 인증                  | 베어러 헤더 전용(쿠키 없음). `<img src>` 는 쿼리 `mediaTicket` 으로만 통과                               | `src/gateway/http-auth-utils.ts:171-228`                |
+| **UI 번들 상한**      | **JS 자산 1개당 gzip 215 KiB** (전체 자산 대상, mermaid 만 예외)                                         | `scripts/check-control-ui-performance.mts:47`           |
+| 인라인 미리보기 상한  | 256 KiB (`WORKSPACE_PREVIEW_MAX_BYTES`)                                                                  | `src/gateway/server-methods/workspace-fs.ts:17`         |
 
 **215 KiB 상한이 결정타다.** SheetJS(xlsx) 커뮤니티판은 gzip 약 290 KiB 라 청크를 쪼개도 이 검사에서 빌드가 깨진다. pdf.js 도 같은 이유로 탈락한다.
 
 ## 4. 선택지 비교표
 
-| # | 방식 | CSP 적합 | 번들 증가 | 라이선스 | 한글 폰트 | 난이도 | 판정 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| a1 | **PDF: 브라우저 내장 뷰어 + blob iframe** | `frame-src` 에 `blob:` **한 단어 추가 필요** | **0** | - | 문서가 폰트를 임베드하므로 무관 | 낮음 | **채택** |
-| a2 | PDF: 게이트웨이 URL iframe | 새 HTTP 라우트 필요(기존 라우트는 `XFO: DENY`). 티켓 발급 머신 복제 200줄 | 0 | - | 무관 | 높음 | 기각(과설계) |
-| a3 | PDF: pdf.js 번들 | 적합 | **+290 KiB gz -> 상한 초과** | Apache-2.0 | 무관 | 중간 | **기각(상한)** |
-| b | docx: mammoth 클라이언트 | 적합(srcdoc sandbox) | +55 KiB gz | MIT | 브라우저 폰트 | 중간 | 조건부 기각(아래) |
-| c | xlsx: SheetJS 커뮤니티판 | 적합 | **+290 KiB gz -> 상한 초과** | Apache-2.0 | 브라우저 폰트 | 중간 | **기각(상한)** |
-| d | pptx: 클라이언트 렌더러 | - | - | - | - | 매우 높음 | 기각(쓸만한 구현 없음) |
-| e | **서버 통합 변환 LibreOffice -> PDF** | 적합(결과가 PDF 라 a1 로 합류) | **0** | **MPL-2.0** (배포 의무 없음, 별도 프로세스) | **호스트에 CJK 폰트 필요** | 중간 | **채택** |
-| e2 | **서버 내장 추출 OOXML -> 안전 HTML** (jszip, 신규 의존성 0) | 적합(srcdoc `sandbox=""`) | 0 | - | 뷰어 폰트 | 중간 | **채택(폴백)** |
-| f | OnlyOffice / Collabora 문서 서버 | 적합 | 0 | **AGPL-3.0** (납품 시 소스 공개 의무 검토 필요) | 이미지에 포함 | 높음(컨테이너 1대 추가) | 기각 |
+| #   | 방식                                                         | CSP 적합                                                                  | 번들 증가                    | 라이선스                                        | 한글 폰트                       | 난이도                  | 판정                   |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------- | ------------------------------- | ----------------------- | ---------------------- |
+| a1  | **PDF: 브라우저 내장 뷰어 + blob iframe**                    | `frame-src` 에 `blob:` **한 단어 추가 필요**                              | **0**                        | -                                               | 문서가 폰트를 임베드하므로 무관 | 낮음                    | **채택**               |
+| a2  | PDF: 게이트웨이 URL iframe                                   | 새 HTTP 라우트 필요(기존 라우트는 `XFO: DENY`). 티켓 발급 머신 복제 200줄 | 0                            | -                                               | 무관                            | 높음                    | 기각(과설계)           |
+| a3  | PDF: pdf.js 번들                                             | 적합                                                                      | **+290 KiB gz -> 상한 초과** | Apache-2.0                                      | 무관                            | 중간                    | **기각(상한)**         |
+| b   | docx: mammoth 클라이언트                                     | 적합(srcdoc sandbox)                                                      | +55 KiB gz                   | MIT                                             | 브라우저 폰트                   | 중간                    | 조건부 기각(아래)      |
+| c   | xlsx: SheetJS 커뮤니티판                                     | 적합                                                                      | **+290 KiB gz -> 상한 초과** | Apache-2.0                                      | 브라우저 폰트                   | 중간                    | **기각(상한)**         |
+| d   | pptx: 클라이언트 렌더러                                      | -                                                                         | -                            | -                                               | -                               | 매우 높음               | 기각(쓸만한 구현 없음) |
+| e   | **서버 통합 변환 LibreOffice -> PDF**                        | 적합(결과가 PDF 라 a1 로 합류)                                            | **0**                        | **MPL-2.0** (배포 의무 없음, 별도 프로세스)     | **호스트에 CJK 폰트 필요**      | 중간                    | **채택**               |
+| e2  | **서버 내장 추출 OOXML -> 안전 HTML** (jszip, 신규 의존성 0) | 적합(srcdoc `sandbox=""`)                                                 | 0                            | -                                               | 뷰어 폰트                       | 중간                    | **채택(폴백)**         |
+| f   | OnlyOffice / Collabora 문서 서버                             | 적합                                                                      | 0                            | **AGPL-3.0** (납품 시 소스 공개 의무 검토 필요) | 이미지에 포함                   | 높음(컨테이너 1대 추가) | 기각                   |
 
 ### 왜 mammoth·SheetJS 를 안 썼나 (지시와 다른 선택의 근거)
 
@@ -100,21 +100,21 @@ UI  <openclaw-document-preview>               ui/src/components/file-preview/doc
 
 ### 파일 목록
 
-| 파일 | 성격 | 역할 |
-| --- | --- | --- |
-| `src/gateway/document-convert.ts` | 신규 | soffice 탐지·변환·타임아웃·동시성 제한·결과 캐시 |
-| `src/gateway/document-extract-html.ts` | 신규 | jszip 으로 docx/xlsx -> 이스케이프된 HTML (의존성 0) |
-| `src/gateway/server-methods/sessions-files-document.ts` | 신규 | 위 둘을 묶어 `SessionFileEntry` 를 채우는 결정표 |
-| `packages/gateway-protocol/src/schema/sessions.ts` | 수정 | `previewKind: "document"` + `document` / `documentError` 필드 + 요청 플래그 2개 |
-| `src/gateway/server-methods/sessions-files.ts` | 수정 | `sessions.files.get` 에 분기 1개 (`documentPreview === true`) |
-| `src/gateway/control-ui-csp.ts` | 수정 | `frame-src` 에 `blob:` 한 단어 |
-| `ui/src/components/file-preview/document-preview-kinds.ts` | 신규 | 확장자 -> 미리보기 종류 (순수 함수) |
-| `ui/src/components/file-preview/document-preview.ts` | 신규 | Lit 엘리먼트 `<openclaw-document-preview>` |
-| `ui/src/pages/chat/components/chat-sidebar-content-types.ts` | 수정 | `SidebarContent` 에 `document` 변형 추가 |
-| `ui/src/pages/chat/components/chat-sidebar-content.ts` | 수정 | `case "document"` 분기 |
-| `ui/src/pages/chat/components/chat-session-workspace.ts` | 수정 | 문서 확장자면 `documentPreview: true` 로 요청하고 결과를 라우팅 |
-| `ui/src/lib/sessions/session-requests.ts` | 수정 | 요청 옵션에 플래그 전달 |
-| `ui/src/i18n/locales/en.ts` | 수정 | `documentPreview.*` 문구 (영어만; 나머지 로케일은 자동 폴백) |
+| 파일                                                         | 성격 | 역할                                                                            |
+| ------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------- |
+| `src/gateway/document-convert.ts`                            | 신규 | soffice 탐지·변환·타임아웃·동시성 제한·결과 캐시                                |
+| `src/gateway/document-extract-html.ts`                       | 신규 | jszip 으로 docx/xlsx -> 이스케이프된 HTML (의존성 0)                            |
+| `src/gateway/server-methods/sessions-files-document.ts`      | 신규 | 위 둘을 묶어 `SessionFileEntry` 를 채우는 결정표                                |
+| `packages/gateway-protocol/src/schema/sessions.ts`           | 수정 | `previewKind: "document"` + `document` / `documentError` 필드 + 요청 플래그 2개 |
+| `src/gateway/server-methods/sessions-files.ts`               | 수정 | `sessions.files.get` 에 분기 1개 (`documentPreview === true`)                   |
+| `src/gateway/control-ui-csp.ts`                              | 수정 | `frame-src` 에 `blob:` 한 단어                                                  |
+| `ui/src/components/file-preview/document-preview-kinds.ts`   | 신규 | 확장자 -> 미리보기 종류 (순수 함수)                                             |
+| `ui/src/components/file-preview/document-preview.ts`         | 신규 | Lit 엘리먼트 `<openclaw-document-preview>`                                      |
+| `ui/src/pages/chat/components/chat-sidebar-content-types.ts` | 수정 | `SidebarContent` 에 `document` 변형 추가                                        |
+| `ui/src/pages/chat/components/chat-sidebar-content.ts`       | 수정 | `case "document"` 분기                                                          |
+| `ui/src/pages/chat/components/chat-session-workspace.ts`     | 수정 | 문서 확장자면 `documentPreview: true` 로 요청하고 결과를 라우팅                 |
+| `ui/src/lib/sessions/session-requests.ts`                    | 수정 | 요청 옵션에 플래그 전달                                                         |
+| `ui/src/i18n/locales/en.ts`                                  | 수정 | `documentPreview.*` 문구 (영어만; 나머지 로케일은 자동 폴백)                    |
 
 ### 보안 경계
 
@@ -128,19 +128,20 @@ UI  <openclaw-document-preview>               ui/src/components/file-preview/doc
 
 ### 제한
 
-| 제한 | 값 | 이유 |
-| --- | --- | --- |
-| 미리보기 최대 파일 크기 | 20 MiB | base64 로 WS 를 타므로 실제 전송량은 약 1.34배 |
-| 변환 타임아웃 | 60초 | LibreOffice 가 드물게 멈춘다 |
-| HTML 폴백 시트 상한 | 12 시트 / 시트당 300행 / 행당 40열 | 잘리면 안내 문구가 붙는다 |
-| hwp / hwpx | **미지원** | 이번 범위 밖. "변환 후 미리보기 예정" 안내만 |
-| 이미지가 든 docx 의 HTML 폴백 | 이미지 생략 | 폴백은 텍스트·표 구조만 살린다. 정확한 그림은 LibreOffice 경로에서 |
+| 제한                          | 값                                 | 이유                                                               |
+| ----------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
+| 미리보기 최대 파일 크기       | 20 MiB                             | base64 로 WS 를 타므로 실제 전송량은 약 1.34배                     |
+| 변환 타임아웃                 | 60초                               | LibreOffice 가 드물게 멈춘다                                       |
+| HTML 폴백 시트 상한           | 12 시트 / 시트당 300행 / 행당 40열 | 잘리면 안내 문구가 붙는다                                          |
+| hwp / hwpx                    | **미지원**                         | 이번 범위 밖. "변환 후 미리보기 예정" 안내만                       |
+| 이미지가 든 docx 의 HTML 폴백 | 이미지 생략                        | 폴백은 텍스트·표 구조만 살린다. 정확한 그림은 LibreOffice 경로에서 |
 
 ### 되돌리기
 
 ```bash
 git revert <병합 커밋>          # 기능 전체
 ```
+
 부분 비활성화가 필요하면 `documentPreviewKindForPath()` 가 항상 `null` 을 반환하게 만들면 UI 는 즉시 원래의 "미리보기 불가" 안내로 돌아간다. 게이트웨이 쪽은 요청이 안 오면 아무 일도 하지 않는다.
 
 ---
@@ -168,14 +169,14 @@ soffice --version                     # 변환기 존재 확인
 
 실측 결과 (2026-09-06):
 
-| 항목 | 값 |
-| --- | --- |
-| 한글 지원 폰트 face | **42개** (Noto Sans/Serif CJK KR·JP·SC·HK, NanumGothic, NanumMyeongjo, NanumBarunGothic, NanumSquare, NanumGothicCoding) |
-| LibreOffice | **24.2.7.2** (`/usr/bin/soffice`) |
-| 디스크 증가 | `/usr` 7.2G -> 7.7G (**약 +500 MB**). 내역: LibreOffice 313M, Noto CJK 89M, Nanum 33M |
-| docx -> PDF 변환 시간 | **0.68초** (3.2 KB 한글 docx) |
-| pptx -> PDF | 0.54초 / xlsx -> PDF 0.48초 |
-| 변환 PDF 임베드 폰트 | `NotoSansCJKsc-Regular`, `NotoSansCJKsc-Bold` (+DejaVu) -> **한글 정상 임베드** |
+| 항목                  | 값                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 한글 지원 폰트 face   | **42개** (Noto Sans/Serif CJK KR·JP·SC·HK, NanumGothic, NanumMyeongjo, NanumBarunGothic, NanumSquare, NanumGothicCoding) |
+| LibreOffice           | **24.2.7.2** (`/usr/bin/soffice`)                                                                                        |
+| 디스크 증가           | `/usr` 7.2G -> 7.7G (**약 +500 MB**). 내역: LibreOffice 313M, Noto CJK 89M, Nanum 33M                                    |
+| docx -> PDF 변환 시간 | **0.68초** (3.2 KB 한글 docx)                                                                                            |
+| pptx -> PDF           | 0.54초 / xlsx -> PDF 0.48초                                                                                              |
+| 변환 PDF 임베드 폰트  | `NotoSansCJKsc-Regular`, `NotoSansCJKsc-Bold` (+DejaVu) -> **한글 정상 임베드**                                          |
 
 > Noto Sans CJK 는 한 폰트의 지역 변형이라 `sc` 로 잡혀도 한글 글리프는 동일하다. 한자 자형까지 한국식으로 맞추려면 fontconfig 에서 `:lang=ko` 우선순위를 `KR` 로 고정하면 된다(현재는 기본값 그대로 둠).
 
@@ -191,12 +192,12 @@ docker build \
 
 이미지 크기 증가는 런타임 베이스(`node:24-bookworm-slim`)에 같은 패키지를 넣어 **실측**했다 (전체 이미지 빌드는 시간이 오래 걸려 대신 런타임 레이어만 측정).
 
-| 항목 | 값 |
-| --- | --- |
-| 설치 전 루트 파일시스템 | 239,220 KB (약 234 MiB) |
-| 설치 후 (apt 캐시 정리 뒤) | 834,064 KB (약 815 MiB) |
-| **증가** | **+594,844 KB = 약 +581 MiB** |
-| 컨테이너 안 LibreOffice | 7.4.7.2 (bookworm), 한글 폰트 face 42개 |
+| 항목                       | 값                                      |
+| -------------------------- | --------------------------------------- |
+| 설치 전 루트 파일시스템    | 239,220 KB (약 234 MiB)                 |
+| 설치 후 (apt 캐시 정리 뒤) | 834,064 KB (약 815 MiB)                 |
+| **증가**                   | **+594,844 KB = 약 +581 MiB**           |
+| 컨테이너 안 LibreOffice    | 7.4.7.2 (bookworm), 한글 폰트 face 42개 |
 
 폰트만 필요하고 변환기는 필요 없다면 `fonts-noto-cjk` 만 넣는다 (증가폭이 크게 줄어든다). 그 경우 문서 미리보기는 HTML 폴백 경로로만 동작한다.
 
@@ -215,10 +216,10 @@ docker build \
 
 존재하지 않는 폰트 이름(`NoSuchKoreanFont-XYZ`)을 지정한 HTML 과, 실제 이름(`Noto Sans CJK KR`)을 지정한 HTML 을 같은 조건으로 변환해 임베드 폰트를 비교했다.
 
-| 지정한 font-family | `fc-match` 결과 | 변환 종료코드 | PDF 임베드 폰트 |
-| --- | --- | --- | --- |
-| `NoSuchKoreanFont-XYZ` (없는 이름) | `DejaVu Sans` (**한글 글리프 없음**) | **0 (성공)** | `NotoSansCJKsc-Regular/Bold` + `DejaVuSans` |
-| `Noto Sans CJK KR` (실제 이름) | `Noto Sans CJK KR` | 0 | `NotoSansCJKkr-Regular/Bold` |
+| 지정한 font-family                 | `fc-match` 결과                      | 변환 종료코드 | PDF 임베드 폰트                             |
+| ---------------------------------- | ------------------------------------ | ------------- | ------------------------------------------- |
+| `NoSuchKoreanFont-XYZ` (없는 이름) | `DejaVu Sans` (**한글 글리프 없음**) | **0 (성공)**  | `NotoSansCJKsc-Regular/Bold` + `DejaVuSans` |
+| `Noto Sans CJK KR` (실제 이름)     | `Noto Sans CJK KR`                   | 0             | `NotoSansCJKkr-Regular/Bold`                |
 
 **핵심**: 폰트 이름이 틀려도 **오류가 나지 않는다.** LibreOffice 가 자체 폴백으로 CJK 폰트를 찾아 끼워 넣기 때문에 종료코드는 0 이고 문서도 읽힌다. 다만 지역 변형이 `kr` 이 아니라 `sc` 로 밀리고, **호스트에 CJK 폰트가 아예 없으면 같은 종료코드 0 으로 두부만 찍힌 PDF 가 나온다.** 그래서 "오류가 안 났으니 됐다" 는 판정이 성립하지 않고, **임베드 폰트 목록 확인이 유일한 신뢰 신호**다. 규칙 3·4번이 이 실측 때문에 존재한다.
 
@@ -236,17 +237,17 @@ docker build \
 
 ## 7. 검증 결과 (2026-09-06)
 
-| 항목 | 결과 |
-| --- | --- |
-| `pnpm check` 사전 점검 18종 | **전부 통과** (충돌 마커·max-lines 래칫·SAFETY 주석·패키지 락 가드 등) |
-| `pnpm check` typecheck | 이 브랜치가 만든 오류 **0**. 별건으로 `ui/src/pages/apps/route.ts` 의 반환 타입 오류가 있었고 브랜딩 담당이 `35be7a8c7dc` 로 고쳤다 |
-| 신규 유닛 테스트 | `document-extract-html.test.ts` 6건, `document-convert.test.ts` 4건, `document-preview-kinds.test.ts`·`document-preview.test.ts` 포함 **전부 통과** |
-| 기존 회귀 | `sessions-files.test.ts`·`sessions-files.preview.test.ts`·`control-ui-csp.test.ts` **71건 통과** |
-| `pnpm build` + `pnpm ui:build` | **성공** |
-| **번들 증가** | **사실상 0.** 시작 JS 341.0 KiB gzip (기준선 350,377 B 보다 **1,241 B 적다**). 최대 JS 청크 211.0 KiB / 상한 215.0 KiB, 최대 CSS 44,169 B / 상한 53,400 B |
-| 신규 npm 의존성 | **0개** |
-| CSP 위반 콘솔 오류 | **0건** (남은 404 는 다른 세션의 link-favicon 조회로 이 기능과 무관) |
-| 형식별 실측 | PDF·docx·xlsx·pptx 4종 + 에이전트 생성 한글 PDF 1종, **전부 한글 정상** |
+| 항목                           | 결과                                                                                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check` 사전 점검 18종    | **전부 통과** (충돌 마커·max-lines 래칫·SAFETY 주석·패키지 락 가드 등)                                                                                    |
+| `pnpm check` typecheck         | 이 브랜치가 만든 오류 **0**. 별건으로 `ui/src/pages/apps/route.ts` 의 반환 타입 오류가 있었고 브랜딩 담당이 `35be7a8c7dc` 로 고쳤다                       |
+| 신규 유닛 테스트               | `document-extract-html.test.ts` 6건, `document-convert.test.ts` 4건, `document-preview-kinds.test.ts`·`document-preview.test.ts` 포함 **전부 통과**       |
+| 기존 회귀                      | `sessions-files.test.ts`·`sessions-files.preview.test.ts`·`control-ui-csp.test.ts` **71건 통과**                                                          |
+| `pnpm build` + `pnpm ui:build` | **성공**                                                                                                                                                  |
+| **번들 증가**                  | **사실상 0.** 시작 JS 341.0 KiB gzip (기준선 350,377 B 보다 **1,241 B 적다**). 최대 JS 청크 211.0 KiB / 상한 215.0 KiB, 최대 CSS 44,169 B / 상한 53,400 B |
+| 신규 npm 의존성                | **0개**                                                                                                                                                   |
+| CSP 위반 콘솔 오류             | **0건** (남은 404 는 다른 세션의 link-favicon 조회로 이 기능과 무관)                                                                                      |
+| 형식별 실측                    | PDF·docx·xlsx·pptx 4종 + 에이전트 생성 한글 PDF 1종, **전부 한글 정상**                                                                                   |
 
 스크린샷: `D:\PROJECT\chris-server\analysis\2026-09-06-openclaw-2\preview-01-pdf.png` ~ `preview-05-korean-pdf.png`
 
