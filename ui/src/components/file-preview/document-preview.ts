@@ -10,7 +10,9 @@ import { renderPanelLoadingSkeleton } from "../panel-loading-skeleton.ts";
  * so a hostile or truncated payload renders the unavailable state instead of
  * throwing through the Lit render pass.
  */
-export function base64ToBytes(value: string): Uint8Array {
+// The ArrayBuffer type argument is load-bearing: a bare Uint8Array widens to
+// ArrayBufferLike, which includes SharedArrayBuffer and is not a valid BlobPart.
+export function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
   if (!value) {
     return new Uint8Array(0);
   }
