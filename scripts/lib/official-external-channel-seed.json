@@ -2,7 +2,7 @@
   "entries": [
     {
       "name": "@wecom/wecom-openclaw-plugin",
-      "description": "OpenClaw WeCom channel plugin by the Tencent WeCom team.",
+      "description": "WeCom channel plugin by the Tencent WeCom team.",
       "source": "external",
       "kind": "channel",
       "openclaw": {
@@ -43,7 +43,7 @@
     },
     {
       "name": "openclaw-plugin-yuanbao",
-      "description": "OpenClaw Yuanbao channel plugin by the Tencent Yuanbao team.",
+      "description": "Yuanbao channel plugin by the Tencent Yuanbao team.",
       "source": "external",
       "kind": "channel",
       "openclaw": {
@@ -84,7 +84,7 @@
     },
     {
       "name": "@tencent-connect/openclaw-qqbot",
-      "description": "OpenClaw QQ Bot channel plugin by the Tencent Connect team.",
+      "description": "QQ Bot channel plugin by the Tencent Connect team.",
       "source": "external",
       "kind": "channel",
       "openclaw": {
@@ -128,7 +128,7 @@
           "docsInventory": {
             "package": {
               "name": "@tencent-connect/openclaw-qqbot",
-              "description": "OpenClaw QQ Bot channel plugin by the Tencent Connect team.",
+              "description": "QQ Bot channel plugin by the Tencent Connect team.",
               "openclaw": {
                 "install": {
                   "npmSpec": "@tencent-connect/openclaw-qqbot",
@@ -142,7 +142,7 @@
             },
             "manifest": {
               "id": "qqbot",
-              "description": "OpenClaw QQ Bot channel plugin for group and direct-message workflows.",
+              "description": "QQ Bot channel plugin for group and direct-message workflows.",
               "channels": ["qqbot"],
               "contracts": {
                 "tools": []
@@ -250,7 +250,7 @@
     },
     {
       "name": "@tencent-weixin/openclaw-weixin",
-      "description": "OpenClaw Weixin channel plugin by the Tencent Weixin team.",
+      "description": "Weixin channel plugin by the Tencent Weixin team.",
       "source": "external",
       "kind": "channel",
       "openclaw": {
@@ -289,7 +289,7 @@
     },
     {
       "name": "@zalo-platforms/openclaw-zaloclawbot",
-      "description": "OpenClaw Zalo ClawBot channel plugin by the Zalo Platforms team.",
+      "description": "Zalo ClawBot channel plugin by the Zalo Platforms team.",
       "source": "external",
       "kind": "channel",
       "openclaw": {
