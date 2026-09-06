@@ -1,7 +1,7 @@
 {
   "id": "irc",
   "name": "IRC",
-  "description": "OpenClaw IRC channel plugin.",
+  "description": "IRC channel plugin.",
   "doctorContract": {
     "configRepair": true
   },

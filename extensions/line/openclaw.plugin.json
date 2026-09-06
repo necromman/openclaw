@@ -4,7 +4,7 @@
     "stateMigrations": true
   },
   "name": "LINE",
-  "description": "OpenClaw LINE channel plugin for LINE Bot API chats.",
+  "description": "LINE channel plugin for LINE Bot API chats.",
   "activation": {
     "onStartup": false
   },

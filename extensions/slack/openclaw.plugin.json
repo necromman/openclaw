@@ -4,7 +4,7 @@
     "configRepair": true
   },
   "name": "Slack",
-  "description": "OpenClaw Slack channel plugin for channels, DMs, commands, and app events.",
+  "description": "Slack channel plugin for channels, DMs, commands, and app events.",
   "skills": [
     "./skills"
   ],

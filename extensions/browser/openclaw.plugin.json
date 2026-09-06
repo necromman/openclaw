@@ -3,7 +3,7 @@
   "cliCommands": [
     {
       "name": "browser",
-      "description": "Manage OpenClaw's dedicated browser (Chrome/Chromium)",
+      "description": "Manage the gateway's dedicated browser (Chrome/Chromium)",
       "hasSubcommands": true
     }
   ],

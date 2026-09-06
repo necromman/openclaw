@@ -5,7 +5,7 @@
     "stateMigrations": true
   },
   "name": "Microsoft Teams",
-  "description": "OpenClaw Microsoft Teams channel plugin for bot conversations.",
+  "description": "Microsoft Teams channel plugin for bot conversations.",
   "activation": {
     "onStartup": false
   },

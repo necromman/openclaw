@@ -2,7 +2,7 @@
   "id": "zalo",
   "doctorContract": {},
   "name": "Zalo",
-  "description": "OpenClaw Zalo channel plugin for bot and webhook chats.",
+  "description": "Zalo channel plugin for bot and webhook chats.",
   "activation": {
     "onStartup": false
   },

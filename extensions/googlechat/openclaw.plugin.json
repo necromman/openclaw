@@ -4,7 +4,7 @@
     "configRepair": true
   },
   "name": "Google Chat",
-  "description": "OpenClaw Google Chat channel plugin for spaces and direct messages.",
+  "description": "Google Chat channel plugin for spaces and direct messages.",
   "activation": {
     "onStartup": false
   },

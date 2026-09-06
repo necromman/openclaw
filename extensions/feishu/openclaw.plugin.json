@@ -4,7 +4,7 @@
     "configRepair": true
   },
   "name": "Feishu/Lark",
-  "description": "OpenClaw Feishu/Lark channel plugin for chats and workplace tools (community maintained by @m1heng).",
+  "description": "Feishu/Lark channel plugin for chats and workplace tools (community maintained by @m1heng).",
   "activation": {
     "onStartup": false
   },

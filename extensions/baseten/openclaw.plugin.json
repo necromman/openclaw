@@ -1,7 +1,7 @@
 {
   "id": "baseten",
   "name": "Baseten",
-  "description": "OpenClaw Baseten provider plugin.",
+  "description": "Baseten provider plugin.",
   "activation": {
     "onStartup": false
   },

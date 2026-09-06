@@ -5,7 +5,7 @@
     "stateMigrations": true
   },
   "name": "Discord",
-  "description": "OpenClaw Discord channel plugin for channels, DMs, commands, and app events.",
+  "description": "Discord channel plugin for channels, DMs, commands, and app events.",
   "skills": [
     "./skills"
   ],

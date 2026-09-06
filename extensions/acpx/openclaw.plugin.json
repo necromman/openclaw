@@ -21,7 +21,7 @@
   },
   "enabledByDefault": true,
   "name": "ACPX Runtime",
-  "description": "OpenClaw ACP runtime backend with plugin-owned session and transport management.",
+  "description": "ACP runtime backend with plugin-owned session and transport management.",
   "skills": ["./skills"],
   "configSchema": {
     "type": "object",

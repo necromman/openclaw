@@ -4,7 +4,7 @@
     "stateMigrations": true
   },
   "name": "Nostr",
-  "description": "OpenClaw Nostr channel plugin for NIP-04 encrypted direct messages.",
+  "description": "Nostr channel plugin for NIP-04 encrypted direct messages.",
   "activation": {
     "onStartup": false
   },

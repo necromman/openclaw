@@ -1,7 +1,7 @@
 {
   "id": "signal",
   "name": "Signal",
-  "description": "OpenClaw Signal channel plugin.",
+  "description": "Signal channel plugin.",
   "doctorContract": {
     "configRepair": true
   },

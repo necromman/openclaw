@@ -1,7 +1,7 @@
 {
   "id": "telegram",
   "name": "Telegram",
-  "description": "OpenClaw Telegram channel plugin.",
+  "description": "Telegram channel plugin.",
   "doctorContract": {
     "configRepair": true,
     "stateMigrations": true

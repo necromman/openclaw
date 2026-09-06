@@ -1,7 +1,7 @@
 {
   "id": "sms",
   "name": "SMS",
-  "description": "Twilio SMS/MMS channel plugin for OpenClaw messages.",
+  "description": "Twilio SMS/MMS channel plugin for the gateway messages.",
   "activation": {
     "onStartup": false
   },

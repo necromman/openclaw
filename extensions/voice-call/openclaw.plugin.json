@@ -5,7 +5,7 @@
     "stateMigrations": true
   },
   "name": "Voice Call",
-  "description": "OpenClaw voice-call plugin for Twilio, Telnyx, and Plivo phone calls.",
+  "description": "Voice-call plugin for Twilio, Telnyx, and Plivo phone calls.",
   "cliCommands": [
     {
       "name": "voicecall",

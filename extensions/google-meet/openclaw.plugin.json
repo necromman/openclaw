@@ -4,7 +4,7 @@
     "configRepair": true
   },
   "name": "Google Meet",
-  "description": "OpenClaw Google Meet participant plugin for joining calls through Chrome or Twilio transports.",
+  "description": "Google Meet participant plugin for joining calls through Chrome or Twilio transports.",
   "cliCommands": [
     {
       "name": "googlemeet",

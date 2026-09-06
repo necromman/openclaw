@@ -5,7 +5,7 @@
     "stateMigrations": true
   },
   "name": "WhatsApp",
-  "description": "OpenClaw WhatsApp channel plugin for WhatsApp Web chats.",
+  "description": "WhatsApp channel plugin for WhatsApp Web chats.",
   "skills": ["./skills"],
   "activation": {
     "onStartup": false

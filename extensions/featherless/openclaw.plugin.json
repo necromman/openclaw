@@ -1,7 +1,7 @@
 {
   "id": "featherless",
   "name": "Featherless AI",
-  "description": "OpenClaw Featherless AI provider plugin.",
+  "description": "Featherless AI provider plugin.",
   "activation": {
     "onStartup": false
   },

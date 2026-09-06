@@ -1,7 +1,7 @@
 {
   "id": "buzz",
   "name": "Buzz",
-  "description": "Connect OpenClaw agents to Buzz rooms.",
+  "description": "Connect agents to Buzz rooms.",
   "activation": {
     "onStartup": false
   },
