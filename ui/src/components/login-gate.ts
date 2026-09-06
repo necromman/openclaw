@@ -456,7 +456,7 @@ function renderLoginGate(props: LoginGateProps) {
                 @input=${(e: Event) => {
                   props.onTokenChange((e.target as HTMLInputElement).value);
                 }}
-                placeholder="OPENCLAW_GATEWAY_TOKEN (${t("login.passwordPlaceholder")})"
+                placeholder=${`${t("connection.access.token")} (${t("login.passwordPlaceholder")})`}
                 @keydown=${(e: KeyboardEvent) => {
                   if (e.key === "Enter") {
                     props.onConnect();
