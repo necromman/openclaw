@@ -21,6 +21,7 @@ import type { PluginLogger } from "./types.js";
 /** Builds the registry record shape shared by plugin loading, status, and diagnostics. */
 export function createPluginRecord(params: {
   id: string;
+  nativeSessionCatalog?: PluginRecord["nativeSessionCatalog"];
   name?: string;
   description?: string;
   packageVersion?: string;
@@ -50,6 +51,7 @@ export function createPluginRecord(params: {
 }): PluginRecord {
   return {
     id: params.id,
+    nativeSessionCatalog: params.nativeSessionCatalog,
     name: params.name ?? params.id,
     description: params.description,
     packageVersion: params.packageVersion,

@@ -6,6 +6,8 @@ import { listAgentEntries, resolveAmbientOwnerAgentId } from "../agents/agent-sc
 import { loadAuthProfileStoreForRuntime } from "../agents/auth-profiles/store.js";
 import { resolveCliBackendConfig } from "../agents/cli-backends.js";
 import type { FailoverReason } from "../agents/failover/signal.js";
+import { resolveCliRuntimeExecutionProvider } from "../agents/model-runtime-aliases.js";
+import { resolveModelRuntimePolicy } from "../agents/model-runtime-policy.js";
 import {
   buildModelAliasIndex,
   legacyModelKey,
@@ -16,7 +18,9 @@ import {
 import { resolveProviderIdForAuth } from "../agents/provider-auth-aliases.js";
 import { buildAgentRuntimeAuthPlan } from "../agents/runtime-plan/auth.js";
 import { GEMINI_CLI_DEFAULT_MODEL_REF } from "../commands/onboard-inference.js";
+import { createMergePatch } from "../config/merge-patch.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { PluginInstallRecord } from "../config/types.plugins.js";
 import type { ProviderAuthResult } from "../plugins/types.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import {
@@ -28,6 +32,8 @@ import {
 
 export type SetupInferenceTestPlan = {
   runner: "cli" | "embedded";
+  /** Runtime selected by the provider's prepared model metadata. */
+  selectedAgentRuntimeId?: string;
   provider: string;
   model: string;
   modelRef: string;
@@ -389,7 +395,7 @@ function findSelectedProviderConfigKey(
  * inference route's config into the probe; OpenClaw owns every other setup
  * surface after intelligence exists.
  */
-export function projectManualInferenceConfig(params: {
+function projectManualInferenceConfig(params: {
   baseConfig: OpenClawConfig;
   preparedConfig: OpenClawConfig;
   selectedProfile?: ProviderAuthResult["profiles"][number];
@@ -466,4 +472,83 @@ export function canonicalizeSetupModelRef(params: {
     aliasIndex,
   });
   return resolved ? `${resolved.ref.provider}/${resolved.ref.model}` : params.raw;
+}
+
+export function buildPreparedProviderTestPlan(params: {
+  cfg: OpenClawConfig;
+  sourceCfg: OpenClawConfig;
+  preparedConfig: OpenClawConfig;
+  profiles: ProviderAuthResult["profiles"];
+  selectedProfileId?: string;
+  modelRef: string;
+  pluginId?: string;
+  routeAgentId: string;
+  agentDir: string;
+  pendingPluginInstalls?: Record<string, PluginInstallRecord>;
+}): SetupInferenceTestPlan {
+  const ref = parseRef(params.modelRef);
+  const projection = {
+    baseConfig: params.cfg,
+    preparedConfig: params.preparedConfig,
+    modelRef: params.modelRef,
+    providerId: ref.provider,
+    pluginId: params.pluginId,
+    agentId: params.routeAgentId,
+  };
+  const prepared = params.selectedProfileId
+    ? prepareManualAuthForActivation({
+        ...projection,
+        profiles: params.profiles,
+        selectedProfileId: params.selectedProfileId,
+      })
+    : {
+        config: projectManualInferenceConfig(projection),
+        profiles: [],
+        selectedProfileId: undefined,
+      };
+  if (params.pendingPluginInstalls) {
+    prepared.config = {
+      ...prepared.config,
+      plugins: {
+        ...prepared.config.plugins,
+        installs: { ...params.cfg.plugins?.installs, ...params.pendingPluginInstalls },
+      },
+    };
+  }
+  const selectedAgentRuntimeId =
+    resolveModelRuntimePolicy({
+      config: prepared.config,
+      provider: ref.provider,
+      modelId: ref.model,
+      agentId: params.routeAgentId,
+    }).policy?.id ?? "openclaw";
+  const cliProvider = resolveCliRuntimeExecutionProvider({
+    cfg: prepared.config,
+    provider: ref.provider,
+    modelId: ref.model,
+    agentId: params.routeAgentId,
+    authProfileId: prepared.selectedProfileId,
+  });
+  return {
+    runner: cliProvider ? "cli" : "embedded",
+    ...ref,
+    ...(cliProvider
+      ? { provider: cliProvider }
+      : { agentHarnessRuntimeOverride: selectedAgentRuntimeId }),
+    selectedAgentRuntimeId,
+    modelRef: params.modelRef,
+    agentDir: params.agentDir,
+    config: prepared.config,
+    agentId: "openclaw",
+    routeAgentId: params.routeAgentId,
+    ...(prepared.selectedProfileId ? { authProfileId: prepared.selectedProfileId } : {}),
+    persistModelRef: params.modelRef,
+    manualAuth: {
+      profiles: prepared.profiles,
+      runtimeConfigBase: params.cfg,
+      sourceConfigBase: params.sourceCfg,
+      configPatch: createMergePatch(params.cfg, prepared.config),
+      ...(params.pluginId ? { pluginId: params.pluginId } : {}),
+    },
+  };
 }

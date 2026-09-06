@@ -35,6 +35,7 @@ import {
 } from "./manifest-install-owner.js";
 import type { PluginManifestRecord, PluginManifestRegistry } from "./manifest-registry.js";
 import type { PluginDiagnostic } from "./manifest-types.js";
+import { shippedNativeSessionCatalogs } from "./native-session-catalog-config.js";
 import type { PluginOrigin } from "./plugin-origin.types.js";
 import type { PluginRecord, PluginRegistry } from "./registry.js";
 import {
@@ -309,6 +310,9 @@ export function createManifestPluginRecord(params: {
   const { candidate, manifestRecord } = params;
   return createPluginRecord({
     id: manifestRecord.id,
+    nativeSessionCatalog:
+      manifestRecord.setup?.nativeSessionCatalog ??
+      shippedNativeSessionCatalogs.find(({ pluginId }) => pluginId === manifestRecord.id),
     name: manifestRecord.name ?? manifestRecord.id,
     description: manifestRecord.description,
     packageVersion: manifestRecord.packageVersion,
