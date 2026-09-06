@@ -1,5 +1,6 @@
 import { sliceUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import { UPDATE_RUN_PHASES } from "../../packages/gateway-protocol/src/update-run-vocabulary.js";
+import { BRAND_NAME } from "../brand.js";
 import { formatDurationPrecise } from "./format-time/format-duration.ts";
 import type { RestartSentinelPayload } from "./restart-sentinel-store.js";
 import { summarizeUpdateStepFailure, type UpdateRunRecord } from "./update-run-record.js";
@@ -37,7 +38,7 @@ export function renderUpdateRunNotice(
   const target = run.after.version ?? run.target.version;
   const to = target ? bounded(target, 120) : undefined;
   if (kind === "ack") {
-    return `⬆️ Updating OpenClaw ${from ?? "the current version"} → ${to ?? "the latest release"}. You'll get a message here before the gateway restarts and when verification finishes.`;
+    return `⬆️ Updating ${BRAND_NAME} ${from ?? "the current version"} → ${to ?? "the latest release"}. You'll get a message here before the gateway restarts and when verification finishes.`;
   }
   if (kind === "activating") {
     return `⏳ Restarting the gateway now${from && to ? ` (v${from} → v${to})` : ""}…`;
@@ -102,20 +103,20 @@ export function renderUpdateRunReport(
   switch (run.status) {
     case "succeeded":
       headline = after
-        ? `✅ OpenClaw updated to ${after}${before ? ` (from ${before})` : ""}.`
-        : "✅ OpenClaw updated.";
+        ? `✅ ${BRAND_NAME} updated to ${after}${before ? ` (from ${before})` : ""}.`
+        : `✅ ${BRAND_NAME} updated.`;
       break;
     case "failed":
-      headline = `⚠️ OpenClaw update failed: ${reason}.${running ? ` The gateway is running ${running}.` : ""}`;
+      headline = `⚠️ ${BRAND_NAME} update failed: ${reason}.${running ? ` The gateway is running ${running}.` : ""}`;
       break;
     case "skipped":
-      headline = `ℹ️ OpenClaw update skipped: ${reason}.`;
+      headline = `ℹ️ ${BRAND_NAME} update skipped: ${reason}.`;
       break;
     case "rolled-back":
-      headline = `↩️ OpenClaw update rolled back to ${after ?? running ?? before ?? "the previous version"}: ${reason}.`;
+      headline = `↩️ ${BRAND_NAME} update rolled back to ${after ?? running ?? before ?? "the previous version"}: ${reason}.`;
       break;
     case "running":
-      headline = `⬆️ OpenClaw update in progress: ${run.phase}.`;
+      headline = `⬆️ ${BRAND_NAME} update in progress: ${run.phase}.`;
       break;
   }
   headline = bounded(headline, 500);

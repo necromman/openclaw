@@ -1,5 +1,6 @@
 import type { TalkClientToolCallResult } from "../../../../packages/gateway-protocol/src/schema/channels.js";
 import { REALTIME_VOICE_AGENT_CONSULT_TOOL_NAME } from "../../../../src/talk/agent-consult-tool.js";
+import { BRAND_NAME } from "../../brand.ts";
 import {
   buildRealtimeVoiceAgentCancelProviderResult,
   buildRealtimeVoiceAgentControlSpeechMessage,
@@ -280,7 +281,7 @@ function getTerminalAgentWaitError(result: AgentWaitResult | undefined): Error |
   }
   const message = result.error?.trim();
   if (result.status === "error") {
-    return new Error(message || "OpenClaw tool call failed");
+    return new Error(message || `${BRAND_NAME} tool call failed`);
   }
   if (result.status !== "timeout" || result.pendingError) {
     return undefined;
@@ -300,7 +301,7 @@ function getTerminalAgentWaitError(result: AgentWaitResult | undefined): Error |
     timeoutPhase === "post_turn" ||
     result.providerStarted === true;
   if (hasTerminalTimeoutMetadata) {
-    return new Error(message || "OpenClaw tool call timed out");
+    return new Error(message || `${BRAND_NAME} tool call timed out`);
   }
   return undefined;
 }
@@ -314,17 +315,17 @@ function waitForChatResult(params: {
 }): Promise<string> {
   return new Promise((resolve, reject) => {
     if (params.signal?.aborted) {
-      reject(new DOMException("OpenClaw tool call aborted", "AbortError"));
+      reject(new DOMException(`${BRAND_NAME} tool call aborted`, "AbortError"));
       return;
     }
     const timer = window.setTimeout(() => {
-      settleReject(new Error("OpenClaw tool call timed out"));
+      settleReject(new Error(`${BRAND_NAME} tool call timed out`));
     }, params.timeoutMs);
     let settled = false;
     let emptyFinalWaitStarted = false;
     let emptyFinalFallbackTimer: number | undefined;
     const onAbort = () => {
-      settleReject(new DOMException("OpenClaw tool call aborted", "AbortError"));
+      settleReject(new DOMException(`${BRAND_NAME} tool call aborted`, "AbortError"));
     };
     params.signal?.addEventListener("abort", onAbort, { once: true });
     let unsubscribe: () => void = () => undefined;
@@ -367,7 +368,7 @@ function waitForChatResult(params: {
             return;
           }
           emptyFinalFallbackTimer = window.setTimeout(() => {
-            settleResolve("OpenClaw finished with no text.");
+            settleResolve(`${BRAND_NAME} finished with no text.`);
           }, EMPTY_FINAL_FALLBACK_GRACE_MS);
         })
         .catch((error: unknown) => {
@@ -392,10 +393,10 @@ function waitForChatResult(params: {
         waitForEmptyFinalFallback();
       } else if (payload.state === "aborted") {
         settleReject(
-          new DOMException(payload.errorMessage ?? "OpenClaw tool call aborted", "AbortError"),
+          new DOMException(payload.errorMessage ?? `${BRAND_NAME} tool call aborted`, "AbortError"),
         );
       } else if (payload.state === "error") {
-        settleReject(new Error(payload.errorMessage ?? "OpenClaw tool call failed"));
+        settleReject(new Error(payload.errorMessage ?? `${BRAND_NAME} tool call failed`));
       }
     });
     function cleanup() {
