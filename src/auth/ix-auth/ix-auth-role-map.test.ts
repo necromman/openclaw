@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+import {
+  IX_AUTH_DEFAULT_ROLE_MAP,
+  IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES,
+  resolveIxAuthGatewayRole,
+} from "./ix-auth-role-map.js";
+
+const DEFAULT_SETTINGS = {
+  roleMap: { ...IX_AUTH_DEFAULT_ROLE_MAP },
+  superAdminRoles: [...IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES],
+};
+
+describe("resolveIxAuthGatewayRole", () => {
+  it("maps each default identity role onto its gateway role", () => {
+    for (const [code, expected] of Object.entries(IX_AUTH_DEFAULT_ROLE_MAP)) {
+      expect(resolveIxAuthGatewayRole({ roles: [code], settings: DEFAULT_SETTINGS }).gatewayRole).toBe(
+        expected,
+      );
+    }
+  });
+
+  it("takes the most privileged role when a user carries several", () => {
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["MEMBER", "ADMIN"], settings: DEFAULT_SETTINGS })
+        .gatewayRole,
+    ).toBe("admin");
+    expect(
+      resolveIxAuthGatewayRole({
+        roles: ["MEMBER", "MODERATOR", "SUPERADMIN"],
+        settings: DEFAULT_SETTINGS,
+      }).gatewayRole,
+    ).toBe("superadmin");
+  });
+
+  it("returns no role when nothing maps, so the caller falls back to the default role", () => {
+    const result = resolveIxAuthGatewayRole({ roles: ["PM", "SALES"], settings: DEFAULT_SETTINGS });
+    expect(result.gatewayRole).toBeUndefined();
+    expect(result.isSuperAdmin).toBe(false);
+  });
+
+  it("returns no role for a user with no identity roles at all", () => {
+    expect(resolveIxAuthGatewayRole({ roles: [], settings: DEFAULT_SETTINGS }).gatewayRole).toBeUndefined();
+  });
+
+  it("marks super admins only when the mapped name is listed as one", () => {
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["SUPERADMIN"], settings: DEFAULT_SETTINGS }).isSuperAdmin,
+    ).toBe(true);
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["ADMIN"], settings: DEFAULT_SETTINGS }).isSuperAdmin,
+    ).toBe(false);
+  });
+
+  it("refuses to grant super admin through a role map typo alone", () => {
+    // Someone maps a stray identity code onto the superadmin role name but does not add
+    // it to superAdminRoles. The mapping must not be enough by itself.
+    const settings = {
+      roleMap: { ...IX_AUTH_DEFAULT_ROLE_MAP, INTERN: "superadmin" },
+      superAdminRoles: ["never-assigned-role"],
+    };
+    const result = resolveIxAuthGatewayRole({ roles: ["INTERN"], settings });
+    expect(result.gatewayRole).toBe("superadmin");
+    expect(result.isSuperAdmin).toBe(false);
+  });
+
+  it("honours a custom role map that overrides the defaults", () => {
+    const settings = {
+      roleMap: { OWNER: "superadmin", STAFF: "member" },
+      superAdminRoles: ["superadmin"],
+    };
+    expect(resolveIxAuthGatewayRole({ roles: ["OWNER"], settings }).isSuperAdmin).toBe(true);
+    expect(resolveIxAuthGatewayRole({ roles: ["STAFF"], settings }).gatewayRole).toBe("member");
+    // Default codes are no longer present in the custom map.
+    expect(resolveIxAuthGatewayRole({ roles: ["ADMIN"], settings }).gatewayRole).toBeUndefined();
+  });
+
+  it("ranks an unrecognized mapped name below every known one", () => {
+    const settings = {
+      roleMap: { CUSTOM: "auditor", MEMBER: "member" },
+      superAdminRoles: ["superadmin"],
+    };
+    expect(resolveIxAuthGatewayRole({ roles: ["CUSTOM", "MEMBER"], settings }).gatewayRole).toBe(
+      "member",
+    );
+  });
+});
