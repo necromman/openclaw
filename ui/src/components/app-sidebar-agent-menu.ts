@@ -34,11 +34,9 @@ import {
 
 // External rows of the footer identity menu. Docs-first: public docs pages over
 // raw GitHub, matching the ClawSweeper docs-link policy for user-facing copy.
-const IDENTITY_MENU_LINKS: ReadonlyArray<{
-  href: string;
-  icon: IconName;
-  label: () => string;
-}> = [
+type IdentityMenuLink = { href: string; icon: IconName; label: () => string };
+
+const ALL_IDENTITY_MENU_LINKS: ReadonlyArray<IdentityMenuLink> = [
   { href: "https://docs.openclaw.ai", icon: "book", label: () => t("common.docs") },
   {
     href: "https://docs.openclaw.ai/help",
@@ -51,7 +49,12 @@ const IDENTITY_MENU_LINKS: ReadonlyArray<{
     icon: "scrollText",
     label: () => t("agentChip.viewChangelog"),
   },
-].filter((link) => link.href.length > 0);
+];
+
+// Destinations this fork does not have (empty in src/brand.ts) are not rendered.
+const IDENTITY_MENU_LINKS: ReadonlyArray<IdentityMenuLink> = ALL_IDENTITY_MENU_LINKS.filter(
+  (link) => link.href.length > 0,
+);
 
 const AGENT_VALUE_PREFIX = "agent:";
 const COMMAND_VALUE_PREFIX = "command:";
