@@ -2,8 +2,7 @@
 
 작성 2026-09-06 (KST, 일요일). 기준 커밋 = 이 문서를 담은 커밋.
 
-목적: 사용자에게 보이는 업스트림 제품명·마스코트 흔적을 전부 찾아 없애고,
-무엇을 왜 남겼는지 근거를 남긴다. 기능은 하나도 제거하지 않았다.
+목적: 사용자에게 보이는 업스트림 제품명·마스코트 흔적을 전부 찾아 없애고, 무엇을 왜 남겼는지 근거를 남긴다. 기능은 하나도 제거하지 않았다.
 
 정본 상수 = `src/brand.ts`. Control UI 는 `ui/src/brand.ts` 가 그대로 재수출한다.
 
@@ -119,8 +118,7 @@ rg -i "openclaw" dist/control-ui --glob '!*.map' -c
 ### 3-2. 라이선스 고지 (MIT 조건)
 
 - `LICENSE`, `THIRD_PARTY_NOTICES.md`, 소스 파일 상단 저작권 주석: **원문 그대로**.
-- About 페이지 하단 `aboutPage.license` = "© 2026 OpenClaw Foundation - MIT License." 도 **그대로 남긴다.**
-  브랜드가 바뀌어도 업스트림 저작권 귀속은 사실이고, 이걸 지우는 것이 화이트라벨의 목적이 아니다.
+- About 페이지 하단 `aboutPage.license` = "© 2026 OpenClaw Foundation - MIT License." 도 **그대로 남긴다.** 브랜드가 바뀌어도 업스트림 저작권 귀속은 사실이고, 이걸 지우는 것이 화이트라벨의 목적이 아니다.
 - 설치 마법사의 "by the OpenClaw Foundation (a non-profit)" 문장도 같은 이유로 유지.
 
 ### 3-3. 업스트림 문서
@@ -163,16 +161,40 @@ Control UI·CLI 를 먼저 끝냈고 네이티브 앱 리소스는 위치만 기
 
 ## 6. 검증
 
-- `pnpm ui:i18n:verify` 통과 (키 6,358 / 폴백 기준선 갱신 불필요)
+- `pnpm ui:i18n:verify` 통과 (키 6,358)
 - `pnpm build` 통과 (Control UI 번들 예산 한도 내)
 - `pnpm check` 통과 (typecheck prod/scripts/test-root, lint, format)
-- WSL `~/openclaw` 자동 배포 후 `http://127.0.0.1:18789/` 실측: 탭 타이틀 "Chris Agent",
-  About 히어로 = 중립 마크 + "Chris Agent", 사이드바 아이콘 = 중립 마크,
-  화면상 "OpenClaw" 문자열 0건, 빨간 마스코트 0건.
-- 스크린샷: `chris-server/analysis/2026-09-06-openclaw-2/brand-*.png`, `layout-*.png`
+- WSL `~/openclaw` 자동 배포 후 `http://127.0.0.1:18789/` 실측
+- 스크린샷: `chris-server/analysis/2026-09-06-openclaw-2/`
 
-빌드 산출물에 남은 `openclaw` 는 전부 위 3-1 의 식별자다:
+### 6-1. 화면 실측 (DOM 텍스트 + 속성 스캔)
+
+| 화면 | 탭 제목 | "OpenClaw" 표시 문자열 | 빨간 마스코트 |
+|------|---------|------------------------|----------------|
+| 연결/로그인 (`brand-03-connect.png`) | Chris Agent Control | 0 (환경변수명 `OPENCLAW_GATEWAY_TOKEN` 과 `openclaw` CLI 명령 제외) | 없음 |
+| 홈/채팅 (`brand-01-home.png`) | main - Chris Agent | 0 | 없음 |
+| 설정 > 정보 (`brand-02-about.png`) | 정보 - Chris Agent | 1 = MIT 라이선스 고지 (의도) | 없음 |
+| 플러그인 (`layout-02-plugins-1440.png`) | 플러그인 - Chris Agent | 0 (`@openclaw/*` 패키지명 제외) | 없음 |
+
+파비콘은 `/favicon.svg` = 중립 마크. 사이드바 커스토디언 아이콘, 어시스턴트 아바타, About 히어로 모두 같은 마크다.
+
+### 6-2. 빌드 산출물 잔존 문자열 분류
+
+`dist/control-ui` 에서 `OpenClaw`(대문자 표기) 165건. 전부 식별자·법적 고지·개발자 콘솔이다.
+
+| 분류 | 건수 | 예 |
+|------|------|-----|
+| i18n **키** 이름 | 49 | `askOpenClaw`, `openInOpenClaw` (값은 `{brand}`) |
+| 코드 식별자 | 92 | `includeInOpenClawGroup`, `icon:"lobster"`, 도구 그룹 `group:openclaw` |
+| MIT 라이선스 고지 | 19 | 로케일별 "© 2026 OpenClaw Foundation - MIT ..." |
+| 중립화 정규식 원문 | 3 | `neutralizeCatalogCopy()` 안의 `/OpenClaw/` 패턴 |
+| 개발자 콘솔 경고 | 2 | `console.warn("OpenClaw service worker registration failed.")` |
 
 ```bash
-rg -i "openclaw" dist/control-ui --glob '!*.map' -c
+cd dist/control-ui
+grep -roh "OpenClaw" --include="*.js" --include="*.html" --include="*.webmanifest" . | wc -l
 ```
+
+### 6-3. 원격 카탈로그는 표시 시점에 중립화
+
+공식 플러그인 카탈로그 설명은 npm 레지스트리에서 받아 `state/openclaw.sqlite` 의 `official_external_plugin_catalog_snapshots` 에 캐시된다. 포크가 원본을 못 고치므로 `ui/src/lib/plugins/index.ts` 의 `neutralizeCatalogCopy()` 가 렌더 직전에 제품명을 걷어낸다. 로컬 매니페스트(`extensions/*/openclaw.plugin.json` 50건, `package.json` 149건)도 함께 고쳤다.
