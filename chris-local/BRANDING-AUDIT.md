@@ -71,6 +71,7 @@ rg -i "openclaw" dist/control-ui --glob '!*.map' -c
 | `ui/public/favicon.svg`                                             | 애니메이션 로브스터 (SMIL) | 중립 기하 마크 (둥근 판 + 링 + "C" 아크), 인라인 SVG                                   |
 | `ui/public/favicon-32.png` · `favicon.ico` · `apple-touch-icon.png` | 로브스터 래스터            | 같은 마크를 Pillow 로 래스터 (16/32/48/64/128 멀티 ICO)                                |
 | `ui/src/components/icons-tools.ts` `lobster` 아이콘                 | 빨간 로브스터              | 같은 마크. **키 이름은 식별자라 유지** (네비게이션·커맨드 팔레트·프로필 히어로가 참조) |
+| `ui/src/components/icons-tools.ts` `claw` 아이콘 | 주황색 로브스터 집게(채팅 "응답 대기 중" 인디케이터·턴 요약·설정 저장 표시) | 옅은 링 + 진한 호 = 중립 스피너. 키 `claw` 와 애니메이션 클래스 `claw-icon__jaw` 는 식별자라 유지, 회전 기준점만 `fork-style.css` 에서 아이콘 중심으로 재지정 |
 | About 히어로                                                        | 크림슨 Clawd 렌더          | `renderBrandMark()`                                                                    |
 | 어시스턴트 아바타                                                   | `favicon.svg` 참조         | 자동으로 새 마크 (`custodian-surface.ts` 는 무수정)                                    |
 
