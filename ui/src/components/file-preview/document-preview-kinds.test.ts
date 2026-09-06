@@ -30,8 +30,9 @@ describe("documentPreviewKindForPath", () => {
 
   it("classifies the basename of both separator styles", () => {
     expect(documentPreviewKindForPath("docs/reports/q3.pdf")).toBe("pdf");
-    expect(documentPreviewKindForPath("C:\Users\chris\Desktop\q3.docx")).toBe("word");
-    expect(documentPreviewKindForPath("C:\pdf\notes.txt")).toBeNull();
+    expect(documentPreviewKindForPath("C:\\Users\\chris\\Desktop\\q3.docx")).toBe("word");
+    // A directory named "pdf" must not decide the kind; only the basename does.
+    expect(documentPreviewKindForPath("C:\\pdf\\notes.txt")).toBeNull();
     expect(documentPreviewKindForPath("pdf/notes")).toBeNull();
   });
 
@@ -62,7 +63,7 @@ describe("isDocumentPreviewPath", () => {
 describe("isHangulDocumentPath", () => {
   it("matches only hwp and hwpx", () => {
     expect(isHangulDocumentPath("memo.hwp")).toBe(true);
-    expect(isHangulDocumentPath("C:\docs\memo.HWPX")).toBe(true);
+    expect(isHangulDocumentPath("C:\\docs\\memo.HWPX")).toBe(true);
     expect(isHangulDocumentPath("report.pdf")).toBe(false);
     expect(isHangulDocumentPath(".hwp")).toBe(false);
     expect(isHangulDocumentPath("hwp")).toBe(false);
