@@ -188,9 +188,22 @@ public enum SessionFileKind: String, Codable, Sendable {
     case read = "read"
 }
 
+public enum SessionFileDocumentFormat: String, Codable, Sendable {
+    case pdf = "pdf"
+    case html = "html"
+}
+
+public enum SessionFileDocumentError: String, Codable, Sendable {
+    case tooLarge = "too-large"
+    case converterUnavailable = "converter-unavailable"
+    case conversionFailed = "conversion-failed"
+    case unsupportedFormat = "unsupported-format"
+}
+
 public enum SessionFilePreviewKind: String, Codable, Sendable {
     case text = "text"
     case image = "image"
+    case document = "document"
     case unsupported = "unsupported"
 }
 
@@ -9444,6 +9457,8 @@ public struct SessionFileEntry: Codable, Sendable {
     public let mimetype: String?
     public let contentencoding: AnyCodable?
     public let previewkind: SessionFilePreviewKind?
+    public let document: SessionFileDocumentPreview?
+    public let documenterror: SessionFileDocumentError?
 
     public init(
         path: String,
@@ -9457,7 +9472,9 @@ public struct SessionFileEntry: Codable, Sendable {
         hash: String? = nil,
         mimetype: String? = nil,
         contentencoding: AnyCodable? = nil,
-        previewkind: SessionFilePreviewKind? = nil)
+        previewkind: SessionFilePreviewKind? = nil,
+        document: SessionFileDocumentPreview? = nil,
+        documenterror: SessionFileDocumentError? = nil)
     {
         self.path = path
         self.workspacepath = workspacepath
@@ -9471,6 +9488,8 @@ public struct SessionFileEntry: Codable, Sendable {
         self.mimetype = mimetype
         self.contentencoding = contentencoding
         self.previewkind = previewkind
+        self.document = document
+        self.documenterror = documenterror
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -9486,6 +9505,38 @@ public struct SessionFileEntry: Codable, Sendable {
         case mimetype = "mimeType"
         case contentencoding = "contentEncoding"
         case previewkind = "previewKind"
+        case document
+        case documenterror = "documentError"
+    }
+}
+
+public struct SessionFileDocumentPreview: Codable, Sendable {
+    public let format: SessionFileDocumentFormat
+    public let sourceformat: String
+    public let converted: Bool
+    public let converter: String?
+    public let pagecount: Int?
+
+    public init(
+        format: SessionFileDocumentFormat,
+        sourceformat: String,
+        converted: Bool,
+        converter: String? = nil,
+        pagecount: Int? = nil)
+    {
+        self.format = format
+        self.sourceformat = sourceformat
+        self.converted = converted
+        self.converter = converter
+        self.pagecount = pagecount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case format
+        case sourceformat = "sourceFormat"
+        case converted
+        case converter
+        case pagecount = "pageCount"
     }
 }
 
@@ -9549,21 +9600,29 @@ public struct SessionsFilesGetParams: Codable, Sendable {
     public let sessionkey: String
     public let path: String
     public let agentid: String?
+    public let documentpreview: Bool?
+    public let documentconvert: Bool?
 
     public init(
         sessionkey: String,
         path: String,
-        agentid: String? = nil)
+        agentid: String? = nil,
+        documentpreview: Bool? = nil,
+        documentconvert: Bool? = nil)
     {
         self.sessionkey = sessionkey
         self.path = path
         self.agentid = agentid
+        self.documentpreview = documentpreview
+        self.documentconvert = documentconvert
     }
 
     private enum CodingKeys: String, CodingKey {
         case sessionkey = "sessionKey"
         case path
         case agentid = "agentId"
+        case documentpreview = "documentPreview"
+        case documentconvert = "documentConvert"
     }
 }
 
