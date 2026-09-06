@@ -1,0 +1,1275 @@
+# OpenClaw 포크 자체 내장 로그인·사용자 디렉터리·역할·부서·감사 구현 계획
+
+> 대상 포크: `D:\PROJECT\openclaw` (브랜치 `chris/main`), 검증 기준 커밋 **`a61f3756494`** (= 조사 시점 `chris/main` HEAD, Codex 가 인용한 `a61f375649423deb23ef373b21d75a42d70636a0` 과 동일). WSL 빌드본 `~/openclaw`.\
+> 납품 대상: 주식회사 진바이오테크(한 회사, 여러 부서). 외부 IdP 없이 포크 안에 구현한다(Authentik 미사용 확정).
+>
+> 작성일: 2026-09-06 (KST, 일요일) / 작성: 인증·권한 아키텍트 레인
+>
+> 입력 1: `analysis/2026-09-06-openclaw-2/codex-auth-design-gpt6astra.md` (Codex gpt-6-astra 설계 초안)\
+> 입력 2: [openclaw-multiuser-rbac-assessment.md](openclaw-multiuser-rbac-assessment.md) (공식 문서·소스 기반 납품 가능성 판정)\
+> 관련: [openclaw-fork.md](openclaw-fork.md), 포크 정본 `FORK.md`
+>
+> **이 문서는 계획서다. 구현은 포함하지 않는다.** "현재" 서술은 커밋 `a61f3756494` 소스를 직접 열어 확인한 것이고, "제안"은 아직 존재하지 않는 설계다.
+>
+> **줄 번호 유효성:** 작성 시점 원격 `origin/chris/main` HEAD 는 `ecbc48c9d1e` 다. `git diff --name-only a61f3756494 ecbc48c9d1e` 로 이 문서가 인용한 65개 파일을 대조한 결과 **변경된 파일이 0개**이므로 아래 모든 `파일:줄` 좌표는 현재 원격 HEAD 에서도 그대로 유효하다.
+
+## 요구사항 (재확인)
+
+| 번호 | 요구 |
+|------|------|
+| 1 | 가입(이메일 인증) 후 관리자 승인, 승인되면 어느 PC 에서든 로그인만으로 진입 (기기 페어링·기기 토큰 요구 금지) |
+| 2 | 역할 4단계: superadmin / admin / moderator / member |
+| 3 | 부서 분리 (부서별 지식·세션·에이전트) |
+| 4 | 감사 로그 (사람 신원·로그인·설정 변경·세션 열람 포함) |
+
+---
+
+## 1. 두 입력의 합치·상충과 소스 검증
+
+### 1.0 Codex 주장 검증 총괄
+
+Codex 초안이 인용한 `파일:줄` 주장 **113건**을 커밋 `a61f3756494` 에서 전수 대조했다. 인용된 기존 파일은 **전부 실재**했다.
+
+| 판정 | 건수 | 내용 |
+|------|------|------|
+| 정확 일치 | 107 | 인용 줄이 주장한 구성물(함수 선언·타입·상수·테이블)을 정확히 가리킨다 |
+| 근사 일치 | 4 | 같은 함수·핸들러 본문 안이지만 선언 줄이 아니다 |
+| 불일치 | 2 | 다른 구성물을 가리킨다 |
+| 누락 (Codex 가 못 본 재사용 자산) | 3 | 1.0.3 참조 |
+
+Codex 가 "제안 신규 파일"로 적은 24개 경로는 전부 실재하지 않음을 확인했다(정상). 예외로 상위 디렉터리 `ui/src/features/` 는 이미 존재한다(하위 `github-connections/` 1개). 따라서 `ui/src/features/builtin-auth/` 는 유효한 신규 하위 폴더다.
+
+#### 1.0.1 불일치 2건 (반드시 교체할 좌표)
+
+| Codex 주장 | 실제 (a61f3756494) | 조치 |
+|---|---|---|
+| `ui/src/app/app-root.ts:553` = "HTTP 세션 bootstrap·계정 로그인 gate" 훅 | `:553` 은 렌더 템플릿의 닫는 조각이다. 로그인 게이트 판정은 **`ui/src/app/app-root.ts:578`** `const showLoginGate = !gatewayConnected && !shellOwnsRecovery;` 이고 지연 로더는 `:579-592` (`this.loginGateLoader.preload(LOGIN_GATE_ELEMENT, ...)`), 상태 필드는 `:70` `loginGatePinned`, `:88` `loginGateLoader` | 훅 지점을 **`:578`** 로 교체 |
+| `src/gateway/server/ws-connection/connect-device-pairing.ts:104` 인근 = "내장 principal 인정·페어링 분기" | `:104` 는 `setHandshakeState("failed")` 를 부르는 실패 헬퍼다. 실제 페어링 진입점은 **`:60`** `export async function authorizeGatewayConnectDevice(`, 승인 계획 결정은 **`:194`** `const plan = await resolvePairingApprovalPlan(pairingPlanParams);` | 훅 지점을 **`:60`(진입)·`:194`(승인 계획)** 로 교체 |
+
+#### 1.0.2 근사 일치 4건 (같은 블록 내부, 선언 줄로 정정)
+
+| Codex 인용 | 실제 선언 줄 |
+|---|---|
+| `src/gateway/server-methods/audit.ts:116` (`audit.list`) | `:105` `"audit.list": ({ params, respond }) => {` |
+| `src/gateway/server-methods/audit.ts:165` (`audit.activity.list`) | `:144` `"audit.activity.list": ({ params, respond }) => {` |
+| `src/gateway/server-methods/audit.ts:222` (`audit.run.inspect`) | `:196` `"audit.run.inspect": ({ params, respond }) => {` |
+| `src/audit/audit-identity.ts:147` ("domain-separated HMAC") | 주석 `:142`, 실제 `createHmac` 은 `:154` 와 `:181`, 반환 형식 `hmac-sha256:v1:<keyId>:<digest>` 는 `:167`·`:192` |
+
+부수적으로 `src/audit/audit-event-types.ts:6` 은 `AUDIT_EVENT_SCHEMA_VERSION` 줄이고 종류 3개 선언은 `:8` `type AuditEventKind = "agent_run" | "tool_action" | "message";` 다(2줄 차이, 근사에 포함하지 않음).
+
+#### 1.0.3 Codex 가 놓친 재사용 자산 3건 (이 계획에서 채택)
+
+| 자산 | 좌표 | 왜 중요한가 |
+|---|---|---|
+| **쿠키 인프라가 이미 있다** | `src/gateway/control-ui-plugin-auth-cookie.ts` (307줄). 쿠키 헤더 파서 `readCookieHeaderValues()` `:45`, HMAC 서명 `signPayload()` `:34`, 상수시간 비교 `safeEqual()` `:39`, 쿠키 이름 충돌 주석 `:16-18` | Codex 는 쿠키 파싱·서명을 전부 신규로 잡았다. 이 파일에서 **파서·속성 정규화·상수시간 비교를 공용 모듈로 승격**하면 신규 코드가 줄고 이미 검토된 함정(쿠키는 호스트 스코프이지 포트 스코프가 아니다)을 그대로 상속한다 |
+| **비인증 HTTP 라우트 선례** | `src/gateway/device-pairing-join-http.ts`, 등록은 `src/gateway/server-http.ts:459-470` (`parseDevicePairingJoinRequestPath` + `clientIp: ingressAttribution.rateLimit.subject.key` + `rateLimiter: joinRateLimiter`) | `/auth/*` 는 로그인 전이라 인증 없이 열려야 한다. 이 라우트가 **레이트리밋·IP 귀속을 붙인 비인증 라우트의 기존 형태**다. 새로 발명하지 않는다 |
+| **HTTP 스테이지가 2종이다** | `src/gateway/server-http.ts:409` `const addRequestStage = (enabled, stage, admitted = false) => {`, `:418` `const addAdmittedStage = (enabled, stage) => addRequestStage(enabled, stage, true);` | `addAdmittedStage` 는 `runWithGatewayHttpWorkAdmission` 을 거친다. `/auth/login` 같은 로그인 전 라우트는 **`addRequestStage`(비 admitted)** 로 등록해야 한다. Codex 의 "`server-http.ts:245`·`:483` 이전에 처리" 는 방향은 맞지만 이 이원 구조를 명시하지 않았다 |
+
+### 1.1 항목별 합치·상충 표
+
+#### (A) 신원 주입 지점: trusted-proxy 경로 재사용 vs 새 auth.mode
+
+| 구분 | 내용 |
+|---|---|
+| **Codex 안** | 새 `gateway.auth.mode: "builtin-users"` 를 만든다. trusted-proxy 경로를 가짜 헤더로 재사용하지 않는다. 검증 **이후**의 프로필·역할 처리만 공유한다 |
+| **조사 결과** | 모드는 `none/token/password/trusted-proxy` 4개뿐이고 사람 구분이 되는 것은 trusted-proxy 뿐이다. 그래서 외부 IdP 전제에서는 trusted-proxy 가 유일 선택지였다 |
+| **소스 검증 결과** | 유니온 타입 `src/config/types.gateway.ts:178` `export type GatewayAuthMode = "none" \| "token" \| "password" \| "trusted-proxy";` (일치). zod 유니온은 `src/config/zod-schema.gateway.ts:119-126` 의 4개 `z.literal` (Codex 인용 `:130` 은 `identityScopes` 줄이고 같은 auth strictObject 안이므로 "인근"은 맞다). `authorizeTrustedProxy()` 는 `src/gateway/auth.ts:198` 이고 소켓 원격주소·필수헤더·userHeader·allowUsers 를 검증한다(일치). **device-less 허용 분기가 이미 존재**한다: `src/gateway/server/ws-connection/connect-policy.ts:84` `if (params.isControlUi && params.trustedProxyAuthOk) { return { kind: "allow" }; }`, 그 위 `:36` `isTrustedProxyControlUiOperatorAuth`, `:58` `shouldClearUnboundScopesForMissingDeviceIdentity` |
+| **채택** | **Codex 안 채택.** 새 모드 `builtin-users` 를 추가한다(타입 `types.gateway.ts:178` 1곳, zod `zod-schema.gateway.ts:119-126` 1곳). 단 조사가 찾아낸 사실을 활용해 **device-less 허용은 새 경로를 파지 않고 `connect-policy.ts:84` 분기에 `builtinUserAuthOk` 를 OR 로 추가**한다. trusted-proxy 는 그대로 남겨 외부 IdP 를 원하는 다른 납품에 쓴다((F) 공존) |
+
+#### (B) 세션 방식: 쿠키 vs JWT, WS 핸드셰이크 검증
+
+| 구분 | 내용 |
+|---|---|
+| **Codex 안** | 서버 저장형 불투명 랜덤 세션 ID + SQLite. `__Host-openclaw-session`, `Path=/; Secure; HttpOnly; SameSite=Lax`, DB 에는 digest 만. 유휴 30분·절대 12시간. WS Upgrade 에서 쿠키·Origin 검증, `connect` 처리에서 재확인, 이 경로에서는 기기 토큰 발급 금지 |
+| **조사 결과** | "세션 쿠키·JWT 는 없다. 게이트웨이는 매 HTTP 요청·매 WS 업그레이드마다 헤더를 다시 읽는다" |
+| **소스 검증 결과** | 브라우저 WS 는 `ui/src/api/gateway-browser-socket.ts:11` `const socket = new WebSocket(url);` 으로 쿠키·토큰 검증 없이 뜬다(일치). Upgrade 훅은 `src/gateway/server-http-upgrades.ts:224` `httpServer.on("upgrade", (req, socket, head) => {` 이며 `req` 를 그대로 받으므로 **쿠키 헤더 접근이 가능**(일치). 기기 토큰 발급은 `src/gateway/server/ws-connection/connect-device-tokens.ts:36` `const issuedDeviceGrant = !trustedProxyAuthOk && device && hasApprovedDeviceBaseline ? await ensureDeviceToken({` 로 **이미 `!trustedProxyAuthOk` 가드가 있다**. UI 저장은 `ui/src/api/gateway.ts:501` `storeDeviceAuthToken({` (일치). 브라우저 기본 요청 스코프에 `operator.admin` 이 들어 있는 것도 사실: `ui/src/api/gateway.ts:104-105` `const CONTROL_UI_OPERATOR_SCOPES = [ "operator.admin", "operator.read", ...` |
+| **채택** | **Codex 안 채택 + 최소 수정 발견 반영.** JWT 는 쓰지 않는다(정지·역할 변경 즉시 반영이 요구라 폐기 가능한 서버 세션이 맞다). 기기 토큰 차단은 새 코드가 아니라 `connect-device-tokens.ts:36` 조건을 `!trustedProxyAuthOk && !builtinUserAuthOk` 로 넓히는 한 줄이다. 쿠키 파서는 1.0.3 대로 `control-ui-plugin-auth-cookie.ts` 에서 승격한다 |
+
+#### (C) 역할 매핑: gateway.roles 재사용 여부
+
+| 구분 | 내용 |
+|---|---|
+| **Codex 안** | 새 RBAC 엔진을 만들지 않고 `gateway.roles.definitions` 를 쓴다. 4역할은 **사용자 역할 이름**이지 게이트웨이 프로토콜의 `operator/node` 구분이 아니다. `operator.admin` 은 부서 관리자에게 주면 안 된다. member 는 `sessions.others: "view"` + 명시적 `session_members` |
+| **조사 결과** | 같은 결론(2.4 표). 다만 **일반 사용자에게 `sessions.others: "none"`** 을 권했고, admin 에게 `agents:"*"` 와 `operator.pairing` 을 줬다 |
+| **소스 검증 결과** | 역할 타입 `src/config/types.gateway.ts:545` `export type GatewayOperatorRoleDefinition = {` (일치, 4축 `sessions.others`/`sandbox`/`agents`/`scopes`). 강제는 `src/gateway/operator-role-policy.ts:164` `authorizeGatewaySessionCreation` (일치). `gateway-owner` 우회는 `src/gateway/operator-role-policy.ts:76` `if (!cfg.gateway?.roles || profileId === GATEWAY_OWNER_PROFILE_ID) { return undefined; }` (조사와 일치), 소유자 판정은 `src/gateway/gateway-owner-profile.ts:10-13` (일치). `operator.admin` 전역 우회는 `src/gateway/server-methods.ts:102` `if (scopes.includes(ADMIN_SCOPE)) { return null; }` 및 `src/gateway/session-sharing-policy.ts:148` `if (isGatewayAdmin(params.client)) { return "admin"; }` (일치). 스코프 상수 8종은 `src/gateway/operator-scopes.ts:3-5` 부터(일치). **`sessions.others: "none"` 의 실제 순서는 Codex 가 옳다**: `src/gateway/session-sharing-policy.ts:175-177` `if (sessionCap === "none") { return "viewer"; }` 가 명시적 멤버 조회 `:178-190` `isSessionMember(...)` **보다 먼저** 실행된다 |
+| **채택** | **Codex 안 채택.** member 는 `sessions.others: "view"`. 조사의 `"none"` 권고는 소스 순서상 명시적 초대 협업을 죽이므로 **채택하지 않는다**. admin 에게서 `operator.pairing` 을 뺀다(기기·노드 페어링은 superadmin 전용). `operator.admin` 은 superadmin 에게만 준다. 역할 배정 정본은 계속 `user_profiles.role` (`src/state/user-profiles-schema.ts:18` `role TEXT,`) 이며 저장·무효화 소유자는 `src/gateway/server-methods/users.ts:271-273` `setUserProfileRole` -> `invalidateOperatorRolePolicy` -> `context.disconnectClientsForUserProfile?.()` 를 그대로 쓴다 |
+
+#### (D) 부서 모델: 에이전트 바인딩 vs 게이트웨이 셀
+
+| 구분 | 내용 |
+|---|---|
+| **Codex 안** | 1차는 **불변 `agentId -> departmentId`** 로 세션 부서를 결정. `department_members`(사용자 1인 1부서)·`department_agents` 신규 테이블. 부서 이동은 새 에이전트 생성 + 명시적 이관. per-agent DB 는 1차에서 변경하지 않는다 |
+| **조사 결과** | 3안 비교. (a) 부서별 에이전트 + 역할 allowlist 권고(상호 신뢰 전제), (b) 부서별 게이트웨이 셀 = 계약상 기밀 요건이면 필수, (c) 스코프만 = 단독 불가. 업스트림이 "one Gateway is one trust boundary", "not a hostile multi-tenant security boundary" 를 명시 |
+| **소스 검증 결과** | 세션 부서를 붙일 자리: `src/state/openclaw-agent-schema.sql:1-3` 이 `session_nodes.entry_json is the canonical logical-session record` 라고 계약을 못박는다(일치). `session_members` 는 **에이전트별 DB** `src/state/openclaw-agent-schema.sql:256` (일치), `session_participants` 는 `:79` 이며 권한이 아니다(일치). 소유자 판정은 컬럼 `owner_actor_id`(`:28` 인근)가 아니라 `createdActor` 비교다: `src/gateway/session-sharing-policy.ts:161` `if (creatorMatches(params.target.entry.createdActor)) { return "owner"; }` (Codex 지적 정확). 라우팅 `bindings` 는 사람 바인딩이 아니다: `src/routing/bindings.ts:16` `export function listBindings(cfg: OpenClawConfig): AgentRouteBinding[]` 은 채널 컨텍스트로만 매칭한다(조사와 일치). 도구 가시성 값은 `src/config/types.tools.ts:228` `export type SessionsToolsVisibility = "self" \| "tree" \| "agent" \| "all";` 이고 기본값 해석은 `src/plugin-sdk/session-visibility.ts:104-105` 가 `defaulting invalid or missing values to all`, 샌드박스 보정은 `:115` `resolveEffectiveSessionToolsVisibility` 다(일치). 에이전트 목록에 호출자 필터가 없는 것도 사실: `src/gateway/server-methods/agents.ts:806` `"agents.list": async ({ params, respond, context, client }) => {` |
+| **채택** | **Codex 의 DB 부서 모델을 1차로 채택**하되 조사의 (a) 를 물리 계층으로 겹친다. 부서마다 별도 에이전트(자체 `workspace`·`agentDir`·`skills`·`tools`·`sandbox`)를 두고, 그 위에 `department_agents` 로 **서버측 인가 경계**를 만든다. 설정만으로는 목록·이벤트·검색이 새므로 두 층이 다 필요하다. **부서 간 기밀이 계약 문구에 들어가면 (b) 게이트웨이 셀 분리로 승격**한다(6.2 결정 항목 D2) |
+
+#### (E) 감사 원장 확장 방식
+
+| 구분 | 내용 |
+|---|---|
+| **Codex 안** | 기존 `audit_events.kind` 에 `security` 를 넣지 않는다. 보조 테이블 `audit_security_events` 를 기존 `src/audit/` 소유자 아래 추가하고, 실행·도구 사건에는 연결 테이블 `audit_event_user_context` 로 사람·부서를 붙인다. 계정 변경은 상태 변경과 감사 append 를 같은 동기 트랜잭션에 묶는다 |
+| **조사 결과** | 원장은 3종 7액션, 30일·10만행 하드코딩, 큐 포화 시 유실, 로그인·세션 열람·설정 변경 미기록, 변조 방지 없음. "not a lossless compliance archive". 외부 SIEM 이 정본이어야 한다 |
+| **소스 검증 결과** | 종류 3개: `src/audit/audit-event-types.ts:8`. 리더가 다른 값을 오류로 처리하는 것은 사실: `src/audit/audit-event-store.ts:475` `if (row.kind !== "message") { corruptAuditRow(row, "invalid kind"); }`. 구형 목록이 message 만 제외하는 것도 사실: `:697-699` `} else if (filters.includeMessages !== true) { query = query.where("kind", "!=", "message"); }`. 보존 상수 `:51` `AUDIT_EVENT_RETENTION_MS = 30 * 24 * 60 * 60_000`, `:52` `const AUDIT_EVENT_MAX_ROWS = 100_000;` (일치). 큐 상한 `src/audit/audit-event-writer.ts:34` `const MAX_PENDING_AUDIT_EVENTS = 4_096;` (일치). **`audit_events` 테이블에는 `metadata_json` 도 해시 체인 컬럼도 없다**: `src/state/openclaw-state-schema.sql:151-182` 전체 컬럼 대조 확인. 인증 사건은 진단 버스로만 나간다: `src/gateway/server/ws-connection/connect-auth-security.ts:18` `export function emitGatewayAuthSecurityEvent(params: {` -> `src/infra/diagnostic-events.ts:1563` `export function emitTrustedSecurityEvent(event: DiagnosticSecurityEventInput) {` (일치). 설정 감사 저장소는 별개다: `src/config/io.audit.ts:150` `export const CONFIG_AUDIT_SCOPE = "config-audit";`, `:151` `export const CONFIG_AUDIT_MAX_ENTRIES = 50_000;` (일치). 제어면 감사의 actor 가 사람 ID 가 아닌 것도 사실: `src/gateway/control-plane-audit.ts:17-19` `actor: normalizeControlPlaneIdentityPart(client?.connect?.client?.id, "unknown-actor")`. 동기 트랜잭션 소유자는 `src/state/openclaw-state-db.ts:689` `export function runOpenClawStateWriteTransaction<T>(` (Codex 인용 `:687` 은 그 doc 주석 줄) |
+| **채택** | **Codex 안 채택 + 두 가지 보강.** (1) 요구인 **감사 무결성 해시 체인**이 Codex 초안에 없으므로 `prev_hash`/`entry_hash` 컬럼으로 추가한다(2.4). (2) 조사의 "외부 SIEM 이 장기 정본" 을 유지한다. 내장 보안 원장은 90일 조회·근거용이고 그 이상은 OTEL 내보내기다. 계약서 문구도 그렇게 쓴다 |
+
+#### (F) 기존 모드와의 공존·전환
+
+| 구분 | 내용 |
+|---|---|
+| **Codex 안** | 공존 = 같은 배포가 여러 모드를 지원한다는 뜻이지, 내장 로그인 실패 시 공유 토큰으로 받아주는 fallback 이 아니다. 모드 변경은 재시작 + 관련 세션 폐기 |
+| **조사 결과** | `gateway.auth.token` 과 trusted-proxy 는 동시 설정 금지(기동 시 예외). `gateway.auth.password` 는 루프백 직접 호출용 폴백으로 살아 있다 |
+| **소스 검증 결과** | 상호배타 검증은 `src/gateway/auth.ts:175-186` 영역이고 `:183` 이 `trustedProxy.userHeader` 빈 값 예외를 던진다(일치). 루프백 password 폴백은 `src/gateway/auth.ts:493` `if (localDirect && auth.password && connectAuth?.password) {` (일치). 모드 결정은 `src/gateway/auth-resolve.ts:63-65` `const mode = authOverride?.mode ?? authConfig.mode ?? (password ? "password" : token ? "token" : "token");` (일치) |
+| **채택** | **Codex 안 채택.** `builtin-users` 는 `token` 과 상호배타로 만들고 같은 `auth.ts:175-186` 검증에 한 항을 더한다. **루프백 password 폴백은 그대로 살린다** - `openclaw users bootstrap` 과 복구 CLI 가 이 경로를 쓴다. 브라우저 로그인 실패가 토큰 입력 화면으로 떨어지는 fallback 은 금지한다(현재 그 화면은 `ui/src/components/login-gate.ts:411` `function renderLoginGate(props: LoginGateProps) {` 가 그린다) |
+---
+
+## 2. 확정 아키텍처
+
+### 2.1 컴포넌트 다이어그램
+
+```text
+                          브라우저 (사내 어느 PC 든)
+                                    |
+                       HTTPS (TLS 종단: Traefik 또는 nginx)
+                                    |
+  +---------------------------------v----------------------------------------+
+  |                        OpenClaw Gateway (포크 빌드)                        |
+  |                                                                          |
+  |  [HTTP 라인]                             [WS 라인]                        |
+  |  server-http.ts:409 addRequestStage      server-http-upgrades.ts:224      |
+  |    (로그인 전 = 비 admitted)               httpServer.on("upgrade")         |
+  |         |                                        |                       |
+  |         v                                        v                       |
+  |  +--------------------+                 +----------------------+         |
+  |  | builtin-user-http  |  /auth/*        | 쿠키 + Origin 검증     |        |
+  |  |  register / verify |                 |  (Upgrade 단계)       |        |
+  |  |  login / logout    |                 +----------+-----------+         |
+  |  |  reset / session   |                            |                     |
+  |  +---------+----------+                            |                     |
+  |            |                                       |                     |
+  |            +----------------+   +------------------+                     |
+  |                             v   v                                        |
+  |                    +------------------------+                            |
+  |                    | builtin-user-principal |  BuiltinUserPrincipal      |
+  |                    |  (서버 전용 컨텍스트)     |  요청 body/헤더로 생성 금지  |
+  |                    +-----------+------------+                            |
+  |                                |                                         |
+  |         +----------------------+---------------------+                   |
+  |         v                      v                     v                   |
+  |  +-------------+      +-----------------+    +------------------+        |
+  |  | user_profiles|     | department-     |    | gateway.roles    |        |
+  |  |  (기존 정본)  |     | access          |    |  definitions     |        |
+  |  |  role 컬럼    |     |  (신규 경계)      |    | (기존 상한 정책)  |        |
+  |  +------+-------+      +--------+--------+    +---------+--------+        |
+  |         |                       |                       |                |
+  |         +-----------+-----------+-----------+-----------+                |
+  |                     v                       v                            |
+  |            +------------------+   +--------------------------+           |
+  |            | server-methods   |   | session-sharing(-policy) |           |
+  |            |  pre-dispatch    |   |  visibility / members    |           |
+  |            |  :258 / :525     |   |  :471 / :544 / :175      |           |
+  |            +--------+---------+   +-------------+------------+           |
+  |                     |                           |                        |
+  |                     +-------------+-------------+                        |
+  |                                   v                                      |
+  |                    +----------------------------------+                  |
+  |                    | 감사 서브시스템 src/audit/          |                  |
+  |                    |  audit_events (기존, 무변경)        |                  |
+  |                    |  audit_security_events (신규)      |                  |
+  |                    |  audit_event_user_context (신규)   |                  |
+  |                    +----------------+-----------------+                   |
+  |                                     |                                     |
+  +-------------------------------------|-------------------------------------+
+                                        |
+        +-------------------------------+---------------------------+
+        v                               v                           v
+  +-----------+                  +-------------+            +---------------+
+  | 공유 SQLite |                 | SMTP outbox |            | OTEL / SIEM    |
+  | openclaw   |                 |  worker     |            | (장기 보존 정본) |
+  | .sqlite    |                 | (Nodemailer)|            +---------------+
+  +-----------+                  +------+------+
+                                        |
+                                        v
+                                 사내 메일 서버 (STARTTLS)
+```
+
+부서별 물리 계층은 위 그림의 아래에 겹친다. 부서마다 별도 에이전트를 두고 그 에이전트의 `workspace`·`agentDir`·`skills`·`tools`·`sandbox` 를 분리한다. 서버측 인가(`department-access`)가 1차 경계이고, 에이전트 분리는 2차 물리 경계다.
+
+### 2.2 요청 흐름
+
+#### 2.2.1 가입 -> 이메일 인증 -> 승인 -> 로그인
+
+```text
+[1] POST /auth/register  {email, password, displayName, requestedDepartmentId}
+      - IP·이메일 레이트리밋 먼저(빈도 제한 통과 후에만 Argon2id 실행)
+      - Argon2id 해시를 트랜잭션 밖에서 계산
+      - 트랜잭션: builtin_user_accounts(status='pending_email') insert
+                 + builtin_auth_challenges(purpose='verify_email') insert
+                 + builtin_mail_outbox insert
+                 + audit_security_events('auth.register.submitted')
+      - 응답은 계정 존재 여부와 무관하게 항상 202 + 동일 문구 (이메일 열거 방지)
+
+[2] SMTP worker (별도 루프)
+      - lease 획득 -> Nodemailer 전송 -> status='sent'
+      - 링크는 gateway.auth.builtin.publicOrigin 으로만 생성 (Host 헤더 사용 금지)
+
+[3] GET /auth/verify-email?token=...
+      - 토큰을 소비하지 않는다 (메일 보안 스캐너 프리페치 방어)
+      - 확인 화면만 렌더, history.replaceState 로 주소창에서 토큰 제거
+[4] POST /auth/verify-email  {token}
+      - 트랜잭션: challenge consume(단일 사용) + status='pending_email' -> 'pending_approval'
+                 + audit_security_events('auth.email.verified')
+      - 로그인 세션은 발급하지 않는다
+
+[5] 관리자 승인  RPC directory.users.approve {accountId, departmentId, role}
+      - 호출자 역할·대상 부서·승격 상한(자기 역할 이하만) 검사
+      - 트랜잭션: status -> 'active'
+                 + department_members upsert
+                 + user_profiles.role = role (setUserProfileRole 소유자 재사용)
+                 + audit_security_events('directory.user.approved')
+      - 커밋 후: invalidateOperatorRolePolicy(profileId)
+
+[6] POST /auth/login  {email, password, totp?}
+      - 레이트리밋(IP/계정/이메일 분리) -> 계정 조회
+      - 계정이 없어도 더미 해시 검증 수행 (타이밍·열거 방지)
+      - status='active' AND email_verified_at IS NOT NULL 확인
+      - Argon2id verify, 필요 시 파라미터 재해시
+      - TOTP 등록자면 mfa 단계 challenge 발급, 정식 쿠키는 미발급
+      - 성공: 새 세션 ID 생성(세션 고정 방지: 기존 프리로그인 값 폐기)
+              builtin_login_sessions insert(digest 만)
+              Set-Cookie: __Host-openclaw-session=...
+              + audit_security_events('auth.login.succeeded')
+      - 실패: audit_security_events('auth.login.failed', actor_profile_id=NULL,
+              claimed_email 은 metadata 에 해시로만)
+```
+
+#### 2.2.2 쿠키 세션 -> HTTP/WS 인가
+
+```text
+[HTTP]
+  요청 -> readCookieHeaderValues() (control-ui-plugin-auth-cookie.ts:45 승격본)
+       -> builtin_login_sessions 조회 (token_digest, revoked_at IS NULL,
+          idle_expires_at > now, absolute_expires_at > now)
+       -> builtin_user_accounts.status='active' AND auth_version 일치
+       -> BuiltinUserPrincipal 생성 (서버 전용 컨텍스트에만 보관)
+       -> 프로필 확정: account.profile_id 직접 사용
+          (ensureProfileForEmail 자동 생성 경로를 타지 않는다)
+       -> gateway.roles 로 스코프 상한 적용
+       -> department-access 로 자원 부서 검사
+       -> 변경 요청이면 CSRF: Origin 검증 + 세션 결합 CSRF 토큰 헤더
+
+[WS Upgrade]  server-http-upgrades.ts:224
+       -> Origin 정확 일치 검사 (gateway.controlUi.allowedOrigins, 와일드카드 금지)
+       -> 위와 같은 쿠키 세션 검증
+       -> builtinUserAuthOk = true 를 핸드셰이크 컨텍스트에 실음
+[WS connect]  connect-auth.ts / connect-policy.ts:84
+       -> isControlUi && (trustedProxyAuthOk || builtinUserAuthOk) => allow (device 면제)
+       -> connect-device-tokens.ts:36 조건에 && !builtinUserAuthOk 추가 (토큰 미발급)
+       -> connect-user-profile.ts:18 에서 account -> profile 직접 연결
+       -> connect-session.ts:231 resolveEffectiveConnectionScopes 로
+          서버 부여 스코프 ∩ 역할 상한
+       -> 브라우저 자기 선언 스코프(ui/src/api/gateway.ts:104 의 operator.admin 포함 목록)는
+          권한 근거로 쓰지 않는다
+
+[연결 후 재검증]
+       -> server-methods.ts:258 pre-dispatch 에서 세션·계정·access revision 확인
+       -> server-methods.ts:525 commit guard 에서 부작용 직전 재확인
+       -> 역할·부서 변경 시 operator-role-policy.ts:60 invalidate + 연결 종료
+       -> 세션 만료 시 열린 WS 종료
+```
+
+#### 2.2.3 역할·부서 강제 순서
+
+```text
+허용 = 활성 계정 AND 유효 로그인 세션
+       AND 현재 역할의 기능 권한(gateway.roles + 신규 directory.* 계약)
+       AND 대상 자원의 부서 접근 권한
+       AND 기존 세션 공유·에이전트 allowlist·sandbox 정책
+```
+
+부서 거부는 기존 creator/member/shared 판정보다 **먼저** 적용한다. 명시적 세션 초대도 부서 경계를 넘지 못한다. superadmin 예외는 브라우저가 보낸 문자열이 아니라 `profileId` 의 현재 역할로 판단한다.
+
+### 2.3 역할 정의 (확정)
+
+`gateway.roles.definitions` 에 그대로 넣는 값이다. 스코프는 `operator.` 접두사를 생략했다.
+
+| 역할 | `scopes` | `sessions.others` | `agents` | `sandbox` | 범위 |
+|---|---|---|---|---|---|
+| `superadmin` | `admin` | `write` | `*` | `inherit` | 전 부서 + 게이트웨이 관리 |
+| `admin` | `read,write,approvals,questions` | `write` | 자기 부서 에이전트 목록 | `required` | 자기 부서 운영 |
+| `moderator` | `read,write,approvals,questions` | `suggest` | 자기 부서 에이전트 목록 | `required` | 부서 세션 검토·승인 |
+| `member` | `read,write,questions` | `view` | 자기 부서 에이전트 목록 | `required` | 본인 작업 + 명시적 협업 |
+
+`gateway.roles.default` 는 `"member"` 로 둔다(zod 가 `definitions` 에 없는 default 를 거부한다, `src/config/zod-schema.gateway.ts:157-172` refine).
+
+`operator.pairing`·`operator.talk`·`operator.talk.secrets` 는 superadmin 외에는 주지 않는다. `operator.admin` 은 `src/gateway/server-methods.ts:102` 에서 모든 메서드 스코프 검사를 무조건 통과시키고 `src/gateway/session-sharing-policy.ts:148` 에서 모든 세션의 role 을 `admin` 으로 만들기 때문에, 부서 admin 에게 주면 부서 경계 자체가 사라진다.
+
+부서 admin 이 필요한 관리 동작은 `operator.admin` 을 요구하는 기존 메서드(`config.patch` `src/gateway/methods/core-descriptors.ts:71`, `users.setRole` `:153`, `skills.install` `:217`, `cron.add` `:330`)를 그대로 쓰게 하지 않고, **좁은 신규 계약**(`directory.users.approve`, `directory.users.setRole`, `departments.*`)으로 감싼다. 신규 메서드를 `operator.write` 로 분류하더라도 그 스코프만으로 허용하지 않고 역할·대상 부서·승격 상한을 별도 검사한다.
+
+### 2.4 데이터 모델 (SQLite DDL 초안)
+
+공유 상태 DB `~/.openclaw/state/openclaw.sqlite` 의 정본 `src/state/openclaw-state-schema.sql` 에 추가하고, first-use ensure 는 `src/state/openclaw-state-db-schema-additive.ts` 가 같은 SQL 문자열을 잘라 쓰는 기존 패턴(`SECRET_STORE_SCHEMA_START`/`_END` 방식, 같은 파일 `:25-35`)을 따른다.
+
+요구된 논리 테이블과 실제 이름의 대응은 다음과 같다. `openclaw_` 접두 없이 `builtin_` 을 쓰는 이유는 기존 `user_profiles`·`audit_events` 와 충돌하지 않으면서 업스트림 병합 시 신규 블록을 한눈에 식별하기 위해서다.
+
+| 요구된 이름 | 실제 테이블 | 비고 |
+|---|---|---|
+| users | `builtin_user_accounts` | 표시 이름·아바타는 기존 `user_profiles` 가 계속 소유 |
+| roles | (테이블 없음) `gateway.roles.definitions` + `user_profiles.role` | 새 RBAC 엔진을 만들지 않는다 |
+| departments | `departments` | |
+| memberships | `department_members`, `department_agents` | 1차는 사용자 1인 1부서 |
+| sessions | `builtin_login_sessions` | 로그인 세션. 대화 세션과 무관 |
+| email_verifications / password_resets | `builtin_auth_challenges` (purpose 로 구분) | mfa_login 도 같은 테이블 |
+| totp_secrets | `builtin_totp_credentials`, `builtin_totp_recovery_codes` | |
+| invitations | `builtin_invitations` | Codex 초안에 없었다. 가입 폼을 공개하지 않는 운영 모드용 |
+| audit_events | `audit_events`(기존, 무변경) + `audit_security_events`(신규) + `audit_event_user_context`(신규) | |
+| (추가) | `builtin_auth_rate_limits`, `builtin_mail_outbox`, `builtin_auth_state` | |
+
+```sql
+-- src/state/openclaw-state-schema.sql 에 추가.
+-- 기존 user_profiles (src/state/user-profiles-schema.ts:12 의 feature-local SQL) 가
+-- 먼저 ensure 되어야 한다. 이 블록은 그 테이블을 재생성하지 않고 참조만 한다.
+
+CREATE TABLE IF NOT EXISTS builtin_auth_state (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  bootstrap_completed_at INTEGER,
+  policy_revision INTEGER NOT NULL DEFAULT 1,
+  audit_chain_head BLOB
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS departments (
+  id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('active', 'disabled')),
+  revision INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS builtin_user_accounts (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL UNIQUE REFERENCES user_profiles(id),
+  email_normalized TEXT NOT NULL UNIQUE,
+  email_display TEXT NOT NULL,
+  password_phc TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (
+    status IN ('pending_email', 'pending_approval', 'active', 'rejected', 'suspended')
+  ),
+  email_verified_at INTEGER,
+  requested_department_id TEXT REFERENCES departments(id),
+  approved_by_profile_id TEXT REFERENCES user_profiles(id),
+  approved_at INTEGER,
+  auth_version INTEGER NOT NULL DEFAULT 1,
+  failed_login_count INTEGER NOT NULL DEFAULT 0,
+  last_login_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_builtin_accounts_status
+  ON builtin_user_accounts(status, created_at DESC);
+
+-- 1차 제품 계약: 프로필 1개당 부서 1개.
+-- superadmin 은 membership 행 없이 전역으로 동작할 수 있다.
+CREATE TABLE IF NOT EXISTS department_members (
+  profile_id TEXT PRIMARY KEY REFERENCES user_profiles(id),
+  department_id TEXT NOT NULL REFERENCES departments(id),
+  assigned_by_profile_id TEXT NOT NULL REFERENCES user_profiles(id),
+  assigned_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_department_members_department
+  ON department_members(department_id, profile_id);
+
+-- agent_id 는 설정의 정본 에이전트 레지스트리로 검증한다.
+-- SQL 상 agents 테이블이 없으므로 외래키를 걸지 않는다.
+CREATE TABLE IF NOT EXISTS department_agents (
+  agent_id TEXT PRIMARY KEY,
+  department_id TEXT NOT NULL REFERENCES departments(id),
+  assigned_by_profile_id TEXT NOT NULL REFERENCES user_profiles(id),
+  assigned_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_department_agents_department
+  ON department_agents(department_id, agent_id);
+
+CREATE TABLE IF NOT EXISTS builtin_login_sessions (
+  id TEXT PRIMARY KEY,
+  token_digest BLOB NOT NULL UNIQUE,
+  csrf_digest BLOB NOT NULL,
+  account_id TEXT NOT NULL REFERENCES builtin_user_accounts(id),
+  auth_version INTEGER NOT NULL,
+  authenticated_at INTEGER NOT NULL,
+  mfa_verified_at INTEGER,
+  last_seen_at INTEGER NOT NULL,
+  idle_expires_at INTEGER NOT NULL,
+  absolute_expires_at INTEGER NOT NULL,
+  user_agent_digest BLOB,
+  revoked_at INTEGER,
+  revoke_reason TEXT
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_builtin_sessions_account
+  ON builtin_login_sessions(account_id, revoked_at);
+
+CREATE INDEX IF NOT EXISTS idx_builtin_sessions_expiry
+  ON builtin_login_sessions(absolute_expires_at);
+
+CREATE TABLE IF NOT EXISTS builtin_auth_challenges (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES builtin_user_accounts(id),
+  purpose TEXT NOT NULL CHECK (
+    purpose IN ('verify_email', 'reset_password', 'mfa_login')
+  ),
+  token_digest BLOB NOT NULL UNIQUE,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  max_attempts INTEGER NOT NULL CHECK (max_attempts > 0),
+  expires_at INTEGER NOT NULL,
+  consumed_at INTEGER,
+  created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_builtin_challenges_account
+  ON builtin_auth_challenges(account_id, purpose, expires_at);
+
+CREATE TABLE IF NOT EXISTS builtin_totp_credentials (
+  account_id TEXT PRIMARY KEY REFERENCES builtin_user_accounts(id),
+  secret_ciphertext BLOB NOT NULL,
+  key_id TEXT NOT NULL,
+  enabled_at INTEGER,
+  last_used_step INTEGER
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS builtin_totp_recovery_codes (
+  account_id TEXT NOT NULL REFERENCES builtin_user_accounts(id),
+  code_digest BLOB NOT NULL,
+  consumed_at INTEGER,
+  PRIMARY KEY (account_id, code_digest)
+) STRICT;
+
+-- 가입 폼을 공개하지 않는 운영 모드용 초대장.
+CREATE TABLE IF NOT EXISTS builtin_invitations (
+  id TEXT PRIMARY KEY,
+  token_digest BLOB NOT NULL UNIQUE,
+  email_normalized TEXT NOT NULL,
+  department_id TEXT NOT NULL REFERENCES departments(id),
+  role TEXT NOT NULL,
+  invited_by_profile_id TEXT NOT NULL REFERENCES user_profiles(id),
+  expires_at INTEGER NOT NULL,
+  consumed_at INTEGER,
+  consumed_account_id TEXT REFERENCES builtin_user_accounts(id),
+  revoked_at INTEGER,
+  created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_builtin_invitations_email
+  ON builtin_invitations(email_normalized, expires_at);
+
+-- 재시작을 견디는 계정·이메일 단위 제한.
+-- 네트워크·프리인증 예산은 기존 프로세스 소유 컨트롤로 남긴다.
+CREATE TABLE IF NOT EXISTS builtin_auth_rate_limits (
+  scope TEXT NOT NULL,
+  subject_digest BLOB NOT NULL,
+  window_started_at INTEGER NOT NULL,
+  failures INTEGER NOT NULL CHECK (failures >= 0),
+  blocked_until INTEGER,
+  expires_at INTEGER NOT NULL,
+  PRIMARY KEY (scope, subject_digest)
+) STRICT;
+
+-- 지속 SMTP 의도. 링크가 비밀을 담으므로 payload 는 암호화한다.
+CREATE TABLE IF NOT EXISTS builtin_mail_outbox (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES builtin_user_accounts(id),
+  challenge_id TEXT REFERENCES builtin_auth_challenges(id),
+  template_id TEXT NOT NULL,
+  payload_ciphertext BLOB NOT NULL,
+  key_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at INTEGER NOT NULL,
+  lease_until INTEGER,
+  expires_at INTEGER NOT NULL,
+  last_error TEXT,
+  created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_builtin_mail_due
+  ON builtin_mail_outbox(status, next_attempt_at);
+
+-- 기존 감사 서브시스템의 새 사건 계열.
+-- 계정이 삭제돼도 과거 actor/resource ID 는 의도적으로 남는다.
+-- prev_hash/entry_hash 가 append-only 해시 체인이다 (기존 audit_events 에는 없다).
+CREATE TABLE IF NOT EXISTS audit_security_events (
+  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL UNIQUE,
+  source_id TEXT NOT NULL UNIQUE,
+  occurred_at INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK (
+    outcome IN ('started', 'succeeded', 'failed', 'denied', 'unknown')
+  ),
+  actor_profile_id TEXT,
+  actor_department_id TEXT,
+  resource_department_id TEXT,
+  target_type TEXT,
+  target_id TEXT,
+  request_id TEXT,
+  login_session_id TEXT,
+  run_id TEXT,
+  client_ip_ciphertext BLOB,
+  client_ip_key_id TEXT,
+  reason_code TEXT,
+  metadata_json TEXT NOT NULL
+    CHECK (length(CAST(metadata_json AS BLOB)) <= 4096),
+  prev_hash BLOB NOT NULL,
+  entry_hash BLOB NOT NULL UNIQUE,
+  chain_key_id TEXT NOT NULL,
+  retain_until INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_audit_security_time
+  ON audit_security_events(occurred_at DESC, sequence DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_security_actor
+  ON audit_security_events(actor_profile_id, occurred_at DESC, sequence DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_security_department
+  ON audit_security_events(resource_department_id, occurred_at DESC, sequence DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_security_retention
+  ON audit_security_events(retain_until);
+
+-- 기존 run/tool 감사 행에 대한 선택적 정확 생산자 결합.
+-- session key 나 run_id 만으로 과거 신원을 재구성하지 않는다.
+CREATE TABLE IF NOT EXISTS audit_event_user_context (
+  event_id TEXT PRIMARY KEY
+    REFERENCES audit_events(event_id) ON DELETE CASCADE,
+  actor_profile_id TEXT,
+  actor_department_id TEXT,
+  resource_department_id TEXT,
+  request_id TEXT,
+  login_session_id TEXT,
+  client_ip_ciphertext BLOB,
+  client_ip_key_id TEXT
+) STRICT;
+```
+
+추가 계약:
+
+- 역할을 `builtin_user_accounts` 에 중복 저장하지 않는다. 정본은 `user_profiles.role` (`src/state/user-profiles-schema.ts:18`) 이다.
+- `entry_hash = HMAC(chain_key, prev_hash || 정규화된 사건 필드)` 로 계산한다. 체인 키는 DB 파일만으로 복구되지 않도록 SecretRef 또는 OS 비밀 저장소에서 공급한다. `builtin_auth_state.audit_chain_head` 가 마지막 `entry_hash` 를 들고 있어 재시작 후에도 이어붙인다.
+- TOTP secret·IP·메일 payload 암호화 키도 같은 원칙이다.
+- 짧은 이메일 코드는 단순 SHA digest 가 아니라 서버 키 기반 digest + 시도 제한을 쓴다.
+- SMTP worker 는 lease 후 전송하므로 재시작 시 중복 발송이 가능하다. 동일 challenge 재발송은 허용하되 소비는 단일 사용으로 보장한다.
+- `metadata_json` 은 크기뿐 아니라 허용 필드·값 타입을 코드에서 검증한다.
+- 런타임 질의는 기존 동기 Kysely 경로를 쓰고 raw SQL 은 DDL·마이그레이션에 제한한다.
+- 1차 버전에서는 per-agent SQL(`src/state/openclaw-agent-schema.sql`)을 변경하지 않는다. 에이전트 부서 이동을 허용할 때 별도 설계를 붙인다.
+- 신규 테이블만 추가하므로 `docs/reference/database-schemas.md:121` 의 "New tables qualify because older builds ignore them" 조건에 해당해 스키마 버전 상향 없이 갈 수 있다. 다만 같은 문서 `:125` 가 "Matching numeric versions are necessary but not sufficient" 라고 못박으므로, **구버전 open/use -> 신버전 reopen 실측 전에는 호환을 확정하지 않는다.**
+
+### 2.5 보안 체크리스트
+
+| 항목 | 요구 |
+|---|---|
+| **비밀번호 저장** | Argon2id, PHC 문자열로 알고리즘·파라미터·salt·hash 저장. 시작 후보 `m=64 MiB, t=3, p=1` 을 배포 하드웨어에서 로그인 지연·동시 메모리로 실측해 확정(OWASP 최소 권고는 `19 MiB, t=2, p=1`). 성공 로그인에서 구형 비용 파라미터 재해시. 해시 동시 실행 수와 대기열 제한. 해시 라이브러리 로딩 실패 시 약한 알고리즘으로 자동 전환 금지 |
+| **CSRF** | 쿠키 기반 변경 요청에 Origin 검증 + 세션 결합 CSRF 토큰(`builtin_login_sessions.csrf_digest`). 로그인 CSRF 도 포함. `SameSite=Lax` 는 보조이지 단독 방어가 아니다 |
+| **세션 고정** | 로그인·MFA 완료·비밀번호 재설정·중요 권한 변경 때 세션 ID 회전 또는 폐기. 프리로그인 값은 무효화 |
+| **무차별 대입** | IP·계정·이메일·MFA·메일 발송 예산을 분리한다. `builtin_auth_rate_limits` 가 재시작을 견딘다. 레이트리밋 판정을 Argon2id 실행 **앞**에 둔다 |
+| **이메일 열거 방지** | 가입·재설정 응답 본문·상태 코드·응답 시간을 통일한다. 존재하지 않는 계정도 더미 해시 검증을 수행한다. 미확인 주체를 사용자로 감사 기록하지 않는다(`actor_profile_id` 는 NULL, 주장 이메일은 metadata 에 해시로만) |
+| **쿠키 속성** | `__Host-openclaw-session`, `Path=/; Secure; HttpOnly; SameSite=Lax`, `Domain` 미지정, 256비트 이상 랜덤, DB 에는 digest 만. 같은 호스트의 여러 Gateway 를 경로로 분리하지 않고 별도 호스트명을 쓴다(`control-ui-plugin-auth-cookie.ts:16-18` 의 기존 경고와 같은 이유) |
+| **세션 만료** | 유휴 30분, 절대 12시간. 서버가 최종 판정한다. IP 변경만으로 강제 폐기하지 않고 감사·이상징후 판단에 쓴다 |
+| **WS 오리진 검증** | Upgrade 요청의 Origin 을 `gateway.controlUi.allowedOrigins` 와 정확히 대조한다. `*` 나 Host 헤더 추론 금지. 쿠키 존재만으로 승인하지 않는다 |
+| **기기 토큰 우회 차단** | 내장 사람 세션에서 기기 토큰을 발급하지 않는다(`connect-device-tokens.ts:36`), UI 저장도 막는다(`ui/src/api/gateway.ts:501`). 발급하면 로그아웃을 우회하는 자격증명이 남는다 |
+| **자기 선언 스코프 불신** | 브라우저가 보내는 `CONTROL_UI_OPERATOR_SCOPES`(`ui/src/api/gateway.ts:104`, `operator.admin` 포함)를 권한 근거로 쓰지 않는다. 서버가 부여한 스코프만 유효 |
+| **권한 상승 차단** | admin 의 `operator.admin` 부여 금지, 자기 승격 금지, 마지막 활성 superadmin 의 정지·강등·삭제 거부 |
+| **프로필 병합 우회 차단** | `users.linkEmail`(`src/gateway/server-methods/users.ts:216`)·merge 경로로 계정·역할·부서가 합쳐지지 않도록 내장 계정이 붙은 프로필에 추가 검사를 건다 |
+| **감사 무결성** | `audit_security_events` 는 `prev_hash`/`entry_hash` 해시 체인. 계정 승인·정지·역할 변경·세션 폐기는 상태 변경과 감사 append 를 **같은 동기 SQLite 트랜잭션**(`src/state/openclaw-state-db.ts:689`)에 묶는다. 해시·SMTP·파일 I/O 는 트랜잭션 전에 수행한다. 감사 기록이 불가능하면 그 변경을 실패시킨다 |
+| **로그 비밀 배제** | Cookie·Authorization·검증 링크·코드·비밀번호·해시·TOTP secret·파일 본문을 일반 로그·감사 metadata 에 남기지 않는다 |
+| **메일** | 링크는 `gateway.auth.builtin.publicOrigin` 으로만 생성(Host 헤더 사용 금지). STARTTLS 필수 또는 implicit TLS 명시, 인증서 검증 무시 금지, 제목·발신자·주소의 CRLF 검증, 첨부·임의 URL fetch 금지. DB 트랜잭션 안에서 SMTP 를 기다리지 않는다 |
+| **부서 누출** | 목록뿐 아니라 get/search/export/event/media/tool 경계를 전부 검증한다. 특히 `src/gateway/session-sharing.ts:473`(`canReceiveSessionEvent`)·`:546`(`createSessionListEntryFilter`) 두 곳이 같은 술어를 공유하므로 둘 다 부서 필터를 통과해야 한다 |
+| **파일 경계** | 실제 경로·symlink·archive traversal·업로드 크기·파일명 처리와 sandbox mount 를 검증한다. 세션 바이트 읽기 헬퍼 `src/gateway/http-auth-utils.ts:376` `authorizeControlUiSessionOwnerReadRequestOrReply` 는 현재 read 스코프 + admin 을 요구하므로, 부서 member 에게 파일을 주려고 admin 을 부여하지 말고 자원별 세션·부서 권한 검사로 바꾼다 |
+| **캐시** | 로그아웃·계정 교체·부서 변경 후 UI 캐시와 서버 구독에 이전 데이터가 남지 않게 한다 |
+| **롤백** | 새 부서 정책을 모르는 구버전이 같은 DB 에 넓은 권한으로 붙지 못하게 한다. `builtin-users` 설정이 있는 상태에서 구버전 기동을 거절시키고, 롤백은 네트워크 격리·백업·명시적 모드 전환 절차로 수행한다 |
+---
+
+## 3. 파일 단위 구현 계획
+
+### 3.0 업스트림 동기화 영향 최소화 원칙
+
+1. **신규 파일 위주.** 정책·저장·흐름은 전부 새 파일에 넣는다.
+2. **기존 파일은 훅 지점만.** 이상적으로 한 파일당 1~3줄(분기 추가·조건 확장·라우트 등록). 로직 본문을 기존 파일에 쓰지 않는다.
+3. **잦게 바뀌는 파일 조심.** `src/gateway/auth.ts`·`connect-*`·`operator-role-policy.ts` 는 업스트림 변경이 잦다(조사 7.5-8). 이 파일들에서는 **함수 호출 한 줄 삽입**만 하고 구현은 새 파일에 둔다.
+4. **플러그인 경계.** 플러그인에는 core deep import 를 추가하지 않고 필요한 감사·principal 기능을 SDK 또는 주입된 runtime 계약으로 제공한다.
+5. **델타 문서화.** 포크 정본 `FORK.md` 에 이 변경 묶음을 한 장으로 기록하고, 리베이스마다 경계 회귀 시험을 돌린다.
+
+### 3.1 신규 파일 (총 34개, 예상 약 8,400줄)
+
+#### 서버 인증·계정 (`src/auth/builtin-users/`)
+
+| 경로 | 역할 | 예상 줄수 |
+|---|---|---|
+| `src/auth/builtin-users/service.ts` | 가입·검증·승인·로그인·재설정의 정본 흐름 | 520 |
+| `src/auth/builtin-users/password.ts` | Argon2id 해시·검증·재해시·해시 작업 예산 | 180 |
+| `src/auth/builtin-users/sessions.ts` | 쿠키 세션 발급·검증·회전·폐기 | 320 |
+| `src/auth/builtin-users/csrf.ts` | 세션 결합 CSRF 토큰 발급·검증 | 110 |
+| `src/auth/builtin-users/totp.ts` | TOTP 등록·확인·복구 코드 | 260 |
+| `src/auth/builtin-users/mail.ts` | SMTP transport·개발 콘솔·outbox 소비 워커 | 300 |
+| `src/auth/builtin-users/mail-templates.ts` | 검증·재설정·승인 알림 본문(i18n 키 참조) | 180 |
+| `src/auth/builtin-users/rate-limit.ts` | 계정·이메일·IP 분리 제한 | 200 |
+| `src/auth/builtin-users/bootstrap.ts` | 첫 superadmin 부트스트랩 트랜잭션 | 160 |
+| `src/auth/builtin-users/types.ts` | `BuiltinUserPrincipal` 등 닫힌 계약 | 120 |
+
+`BuiltinUserPrincipal` 계약(Codex 초안 채택, `csrfToken` 추가):
+
+```ts
+type BuiltinUserPrincipal = {
+  kind: "builtin-user";
+  accountId: string;
+  profileId: string;
+  loginSessionId: string;
+  authVersion: number;
+  authenticatedAt: number;
+  mfaVerifiedAt?: number;
+  departmentId?: string;
+};
+```
+
+이 객체는 로그인 세션 저장소의 검증 결과로만 만든다. 요청 body, WebSocket `connect` 파라미터, `x-forwarded-user`, `x-openclaw-scopes` 로 만들지 않는다.
+
+#### 저장소 (`src/state/`)
+
+| 경로 | 역할 | 예상 줄수 |
+|---|---|---|
+| `src/state/builtin-user-accounts.ts` | 계정·challenge·초대장 저장 | 420 |
+| `src/state/builtin-user-sessions.ts` | 로그인 세션 저장 | 260 |
+| `src/state/builtin-user-mail.ts` | outbox 저장·lease | 190 |
+| `src/state/builtin-auth-rate-limits.ts` | 지속 레이트리밋 저장 | 140 |
+| `src/state/departments.ts` | 부서·구성원·에이전트 귀속 저장 | 330 |
+| `src/state/builtin-auth-schema.ts` | 위 테이블 DDL 문자열(정본 SQL 참조 슬라이스) | 90 |
+
+#### 게이트웨이 통합 (`src/gateway/`)
+
+| 경로 | 역할 | 예상 줄수 |
+|---|---|---|
+| `src/gateway/builtin-user-http.ts` | `/auth/*` HTTP 라우트 핸들러 | 480 |
+| `src/gateway/builtin-user-http-paths.ts` | 경로 파서(`parseBuiltinAuthRequestPath`), `device-pairing-join-http` 선례 형태 | 90 |
+| `src/gateway/builtin-user-principal.ts` | 검증된 principal 을 HTTP/WS 요청 컨텍스트에 연결 | 240 |
+| `src/gateway/cookie-header.ts` | `control-ui-plugin-auth-cookie.ts:45` 의 파서·속성 정규화·상수시간 비교 승격본 | 130 |
+| `src/gateway/department-access.ts` | 부서 자원 권한 판정·재검증(모든 경계가 이 한 곳을 부른다) | 460 |
+| `src/gateway/department-session-filter.ts` | 세션 목록·이벤트·검색용 부서 술어 | 210 |
+| `src/gateway/server-methods/directory.ts` | 사용자 승인·거절·정지·역할 변경 RPC | 400 |
+| `src/gateway/server-methods/departments.ts` | 부서 CRUD·구성원·에이전트 귀속 RPC | 340 |
+
+#### 감사 (`src/audit/`)
+
+| 경로 | 역할 | 예상 줄수 |
+|---|---|---|
+| `src/audit/security-audit-events.ts` | 닫힌 보안 사건 계약(action·outcome·metadata 스키마) | 220 |
+| `src/audit/security-audit-store.ts` | 트랜잭션 append·해시 체인·보존 | 380 |
+| `src/audit/security-audit-query.ts` | 부서 제한 조회·통합 cursor 페이지네이션 | 260 |
+| `src/audit/security-audit-chain.ts` | 체인 키 관리·검증(`verify` 커맨드용) | 150 |
+
+#### 프로토콜·CLI
+
+| 경로 | 역할 | 예상 줄수 |
+|---|---|---|
+| `packages/gateway-protocol/src/schema/builtin-users.ts` | `directory.*`·`departments.*`·`audit.security.*` 요청·응답 계약 | 330 |
+| `src/cli/departments-cli.ts` | `openclaw departments ...` | 210 |
+| `src/cli/audit-security-cli.ts` | `openclaw audit security ...` | 160 |
+
+#### Control UI (`ui/src/`)
+
+| 경로 | 역할 | 예상 줄수 |
+|---|---|---|
+| `ui/src/features/builtin-auth/` (api·store·guard 3파일) | `/auth/*` 클라이언트, 세션 부트스트랩, 라우트 가드 | 380 |
+| `ui/src/pages/login/` (route·view 2파일) | 계정 로그인(이메일·비밀번호·TOTP) | 300 |
+| `ui/src/pages/register/` (route·view 2파일) | 가입 신청 + 초대 수락 | 280 |
+| `ui/src/pages/verify-email/` (route·view 2파일) | 이메일 검증 확인 화면(GET 표시, POST 소비) | 170 |
+| `ui/src/pages/reset-password/` (route·view 2파일) | 재설정 요청·완료 | 220 |
+| `ui/src/pages/account/` (route·view 2파일) | 비밀번호·TOTP·로그인 세션 목록·로그아웃 | 340 |
+| `ui/src/pages/users/` (route·view·table 3파일) | 신청·승인·역할·정지 관리 | 460 |
+| `ui/src/pages/departments/` (route·view 2파일) | 부서·구성원·에이전트 귀속 | 360 |
+| `ui/src/pages/audit/` (route·view·filters 3파일) | 감사 검색·내보내기 | 420 |
+| `ui/src/i18n/locales/en-builtin-auth.ts` | 신규 i18n 카탈로그(영어 정본) | 190 |
+
+### 3.2 수정할 기존 파일과 훅 지점 (총 28개 파일)
+
+> 줄 번호는 커밋 `a61f3756494` 기준이다. 1.0.1 에서 정정한 좌표를 반영했다.
+
+#### 설정·스키마
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/config/types.gateway.ts:178` | `GatewayAuthMode` 유니온에 `"builtin-users"` 추가 |
+| `src/config/types.gateway.ts:229` 인근 | `GatewayAuthConfig` 에 `builtin?: GatewayBuiltinAuthConfig` 필드와 그 타입 선언 추가 |
+| `src/config/zod-schema.gateway.ts:119-126` | mode 유니온에 `z.literal("builtin-users")` 추가 |
+| `src/config/zod-schema.gateway.ts:130` 인근 | auth strictObject 에 `builtin` strictObject 스키마 추가 |
+| `src/config/types.base.ts` `AuditConfig` | `security?: { enabled?: boolean; retentionDays?: number }` 추가 |
+| `src/config/zod-schema.root-shape.ts:120-126` | 위 키의 zod(현재 strictObject 라 미추가 시 오타 취급으로 거부됨) |
+
+#### 인증 파이프라인
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/gateway/auth-resolve.ts:18` | `ResolvedGatewayAuthMode` 에 `"builtin-users"` 추가 |
+| `src/gateway/auth-resolve.ts:63-65` | 모드 결정에서 `builtin-users` 가 token/password 자동 폴백을 상속하지 않게 분기 |
+| `src/gateway/auth.ts:38` 인근 | `GatewayAuthResult.method` 유니온에 `"builtin-user"` 추가 |
+| `src/gateway/auth.ts:175-186` | `builtin-users` 와 `gateway.auth.token` 동시 설정을 기동 시 거절 |
+| `src/gateway/auth.ts:433` `authorizeGatewayConnectCore` | 검증된 내장 principal 을 인증 결과로 승격하는 분기 1개 추가 |
+| `src/gateway/auth.ts:493` | 루프백 password 폴백을 그대로 유지(변경 없음, 회귀 시험 대상으로만 표시) |
+
+#### HTTP 라인
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/gateway/server-http.ts:409` 인근 | `/auth/*` 를 **`addRequestStage`(비 admitted)** 로 등록. `handleHooksRequest`(`:483`)보다 앞에 둬야 훅 base path 가 이 경로를 삼키지 않는다 |
+| `src/gateway/server-http.ts:459-470` 인근 | 레이트리미터·`ingressAttribution.rateLimit.subject.key` 를 `/auth/*` 핸들러에도 전달(device-pairing-join 과 동일 형태) |
+| `src/gateway/http-auth-user-profile.ts:36` | 내장 principal 이 있으면 `ensureProfileForEmail`(`:69`) 대신 `account.profile_id` 를 직접 사용 |
+| `src/gateway/http-auth-utils.ts:376` | 세션 소유자 read 인가에 `admin` 대신 `department-access` 판정을 허용하는 분기 |
+| `src/gateway/http-auth-utils.ts:640` `resolveTrustedHttpOperatorScopes` | 내장 모드에서 요청 유래 선언 스코프를 신뢰하지 않도록 분기 |
+| `src/gateway/control-ui-plugin-auth-cookie.ts:45` | 파서·정규화·상수시간 비교를 `src/gateway/cookie-header.ts` 로 옮기고 여기서는 import (동작 무변경 리팩터) |
+
+#### WS 라인
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/gateway/server-http-upgrades.ts:224` | Upgrade 에서 Origin 정확 검사 + 쿠키 세션 검증 후 principal 을 서버 전용 컨텍스트에 연결 |
+| `src/gateway/server/ws-connection/auth-context.ts:130` `resolveConnectAuthState` | 내장 사람 인증 후보를 인증 상태에 포함 |
+| `src/gateway/server/ws-connection/connect-auth.ts:133` | 공유 비밀·bootstrap·device token 판정과 나란히 `hasBuiltinSessionAuth` 추가 |
+| `src/gateway/server/ws-connection/connect-policy.ts:84` | `if (params.isControlUi && (params.trustedProxyAuthOk \|\| params.builtinUserAuthOk))` 로 device 면제 확장 |
+| `src/gateway/server/ws-connection/connect-device-pairing.ts:60` / `:194` | 내장 principal 이면 페어링 요청 자체를 만들지 않고 통과(진입 `:60`, 승인 계획 `:194`) |
+| `src/gateway/server/ws-connection/connect-device-tokens.ts:36` | 발급 조건을 `!trustedProxyAuthOk && !builtinUserAuthOk && device && ...` 로 확장 |
+| `src/gateway/server/ws-connection/connect-user-profile.ts:18` | 내장 principal 이면 account -> profile 직접 연결(자동 생성 경로 미사용) |
+| `src/gateway/server/ws-connection/connect-admission.ts:130` `resolveEffectiveConnectionScopes` | 내장 신원 스코프를 서버 부여 값으로 넣고 역할 상한을 적용 |
+| `src/gateway/server/ws-connection/connect-session.ts:231` | 서버 grant 와 역할 ceiling 결합 지점에 부서 컨텍스트 부착 |
+
+#### 인가·부서 경계
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/gateway/server-methods.ts:258` `authorizeGatewayRequestPreDispatch` | 세션·계정·access revision·부서 권한 fence 호출 1줄 추가 |
+| `src/gateway/server-methods.ts:525` | commit guard 에 부작용 직전 부서 재검사 추가 |
+| `src/gateway/operator-role-policy.ts:60` `invalidateOperatorRolePolicy` | 부서 변경도 같은 access revision 을 올리도록 호출부 확장 |
+| `src/gateway/server-methods/users.ts:271` | 역할 변경 시 보안 감사 append 와 승격 상한 검사를 같은 소유자에 추가 |
+| `src/gateway/server-methods/agents.ts:806` `agents.list` | 카탈로그 준비 **전에** 허용 에이전트 ID 를 먼저 선택(조사 2.6 의 "전 부서 에이전트가 다 보인다" 해소) |
+| `src/gateway/session-sharing.ts:473` `canReceiveSessionEvent` | 이벤트 팬아웃에 부서 술어 적용 |
+| `src/gateway/session-sharing.ts:546` `createSessionListEntryFilter` | 목록 필터에 부서 술어 적용 |
+| `src/gateway/session-sharing-policy.ts:148` | `isGatewayAdmin` 전역 통과 앞에 부서 경계 검사를 삽입(superadmin 만 통과) |
+| `src/gateway/session-sharing-policy.ts:328` `authorizeSessionSharingTarget` | 공유 대상 인가에 부서 경계 선행 |
+| `src/plugin-sdk/session-visibility.ts:115` `resolveEffectiveSessionToolsVisibility` | 도구 가시성 결정에 준비된 부서 접근 조건을 결합 |
+
+#### 감사
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/audit/audit-recorder.ts:25` `createAuditEventRecorder` | 보안 사건 생산자를 같은 소유자에 등록 |
+| `src/audit/audit-event-writer.ts:46` 인근 | 큐 수락과 영속 결과를 구분하는 반환 계약 추가(사용자 관리 사건은 동기 경로 사용) |
+| `src/gateway/server-methods/audit.ts:196` 뒤 | `audit.security.list`·`audit.security.export`·`audit.security.verify` 핸들러 등록 |
+| `src/gateway/control-plane-audit.ts:17` | actor 에 확인된 사람 profileId·부서 컨텍스트를 함께 싣기 |
+| `src/config/io.audit.ts:653` `openConfigAuditStore` | 설정 변경 기록에 사용자·부서 결합(보안 사건으로도 미러) |
+| `src/state/openclaw-state-schema.sql:182` 뒤 | 2.4 의 신규 테이블 DDL 블록 삽입 |
+| `src/state/openclaw-state-db-schema-additive.ts:25-35` 패턴 | 신규 테이블 first-use ensure 슬라이스 상수 추가 |
+
+#### CLI·UI
+
+| 파일:줄 | 수정 내용(한 줄) |
+|---|---|
+| `src/cli/users-cli.ts:42` | 기존 `users` 네임스페이스에 관리 서브커맨드 추가 |
+| `src/cli/program/register.subclis-core.ts:137` 인근 | `departments`·`audit security` 서브 CLI 등록 |
+| `ui/src/api/gateway.ts:389` `buildConnectPlan` | 내장 모드에서 기기 신원 생성·기기 토큰 경로를 건너뛰는 연결 계획 |
+| `ui/src/api/gateway.ts:501` `storeDeviceAuthToken` | 내장 모드에서는 저장하지 않음 |
+| `ui/src/app/app-root.ts:578` | `showLoginGate` 앞에 HTTP 세션 bootstrap(`GET /auth/session`)을 두고, 내장 모드면 계정 로그인 라우트로 보낸다 |
+| `ui/src/app-route-paths.ts:39` `APP_ROUTE_DEFINITIONS` | 신규 경로 8개 등록 |
+| `ui/src/app-routes.ts:88` `APP_ROUTE_TREE` | 신규 lazy page 8개 등록 |
+| `ui/src/app-navigation.ts:199` `SETTINGS_NAVIGATION_GROUPS` | users·departments·audit 그룹 추가 |
+| `ui/src/app-navigation.ts:238` `isSettingsNavigationRouteVisible` | 단일 `canAdmin` 불리언 대신 서버가 계산한 capability 로 판단 |
+| `ui/src/components/settings-sidebar.ts:104` | 같은 capability 계약으로 교체 |
+| `ui/src/components/login-gate.ts:411` `renderLoginGate` | 내장 모드에서는 Gateway URL·토큰 입력 대신 계정 로그인 화면으로 위임 |
+| `ui/src/pages/connection/view.ts:59` | `authMode` 유니온에 `"builtin-users"` 추가하고 연결 정보 문구 분기 |
+| `ui/src/pages/profile/profile-page.ts:107` | 아바타 인증 후보에 쿠키 경로 추가(현재는 공유 비밀 의존) |
+| `ui/src/i18n/locales/en.ts` 및 15개 로케일 | 신규 카탈로그 병합(영어 정본, 나머지는 폴백 후 순차 번역) |
+
+**합계: 신규 34개(약 8,400줄), 수정 28개 파일 / 훅 지점 52곳.**
+
+### 3.3 설정 스키마 추가 키
+
+```json5
+{
+  gateway: {
+    auth: {
+      mode: "builtin-users",
+      builtin: {
+        publicOrigin: "https://ai.jinbio.example",   // 검증·재설정 링크의 유일한 출처
+        registration: "open" ,                        // "open" | "invite-only" | "closed"
+        session: {
+          idleTimeoutMinutes: 30,
+          absoluteTimeoutHours: 12,
+          cookieName: "__Host-openclaw-session",       // 고정, 진단용 노출만
+        },
+        password: {
+          minLength: 12,
+          argon2: { memoryMiB: 64, timeCost: 3, parallelism: 1 },
+        },
+        mfa: { totp: "optional" },                     // "off" | "optional" | "required-admins"
+        rateLimit: {
+          loginPerAccountPerHour: 10,
+          loginPerIpPerHour: 60,
+          registerPerIpPerDay: 5,
+          mailPerAccountPerHour: 3,
+        },
+        challengeTtl: {
+          verifyEmailMinutes: 60,
+          resetPasswordMinutes: 15,
+          invitationDays: 7,
+        },
+        mail: {
+          transport: "smtp",                           // "console" 은 명시적 개발 모드 전용
+          from: "OpenClaw <no-reply@jinbio.example>",
+          smtp: {
+            host: "smtp.jinbio.example",
+            port: 587,
+            tls: "starttls-required",                  // "starttls-required" | "implicit"
+            username: "<SMTP_USER>",
+            password: "<SecretRef>",
+          },
+        },
+      },
+    },
+    roles: {
+      default: "member",
+      definitions: {
+        superadmin: { sessions: { others: "write" },   agents: "*",            scopes: ["operator.admin"] },
+        admin:      { sessions: { others: "write" },   agents: ["sales","rnd"], scopes: ["operator.read","operator.write","operator.approvals","operator.questions"], sandbox: "required" },
+        moderator:  { sessions: { others: "suggest" }, agents: ["sales","rnd"], scopes: ["operator.read","operator.write","operator.approvals","operator.questions"], sandbox: "required" },
+        member:     { sessions: { others: "view" },    agents: ["sales"],       scopes: ["operator.read","operator.write","operator.questions"], sandbox: "required" },
+      },
+    },
+  },
+  tools: {
+    sessions: { visibility: "self" },
+    agentToAgent: { enabled: false },
+  },
+  logging: {
+    audit: {
+      enabled: true,
+      executionIdentity: true,
+      messages: "direct",
+      security: { enabled: true, retentionDays: 90 },
+    },
+  },
+}
+```
+
+주의: `gateway.auth.builtin.*` 와 `logging.audit.security.*` 는 **제안 키**이고 현재 유효한 OpenClaw 설정이 아니다. `roles.definitions.<role>.agents` 의 배열 값은 부서가 늘 때마다 갱신해야 하며, 부서 정본은 DB(`department_agents`)이므로 설정과 DB 가 어긋나면 `doctor` 가 보고하게 한다.
+
+`registration: "invite-only"` 는 `builtin_invitations` 를 쓰고, 이 경우 `/auth/register` 는 초대 토큰 없이 400 을 낸다(응답은 여전히 이메일 열거를 막는 통일 형식).
+
+### 3.4 CLI 명령
+
+```text
+openclaw users bootstrap                                  # 첫 superadmin, TTY 비밀번호 입력
+openclaw users list [--status pending-approval|active|suspended] [--department <id>]
+openclaw users approve <account-id> --department <id> --role member
+openclaw users reject <account-id> [--reason <text>]
+openclaw users suspend <account-id> [--reason <text>]
+openclaw users reinstate <account-id>
+openclaw users set-role <account-id> <role>
+openclaw users revoke-sessions <account-id>
+openclaw users invite <email> --department <id> --role member
+openclaw users link-email <email> --to <profileId>        # 기존 명령 유지
+
+openclaw departments list
+openclaw departments create <slug> --name <display-name>
+openclaw departments disable <id>
+openclaw departments assign-user <profile-id> <department-id>
+openclaw departments assign-agent <agent-id> <department-id>
+
+openclaw audit security list --department <id> --after <time> [--action <name>] [--outcome <v>]
+openclaw audit security export --after <time> --before <time> [--out <path>]
+openclaw audit security verify [--from <sequence>]        # 해시 체인 검증
+```
+
+기존 `openclaw users` 는 `list`·`link-email` 두 개뿐이다(`src/cli/users-cli.ts:47`, `:62`). 등록은 `src/cli/program/register.subclis-core.ts:137` `[["users"], () => import("../users-cli.js"), "registerUsersCli"]` 를 그대로 따른다.
+
+원격 CLI 관리도 확인된 사람 신원을 써야 한다. 관리 호출을 공유 Gateway token 으로 자동 폴백시키지 않는다. 로컬 `bootstrap`·복구만 별도의 명시적 설치 소유자 경로(루프백 + `gateway.auth.password`)를 쓴다.
+
+### 3.5 Control UI 라우트·컴포넌트
+
+| 경로 | 화면 | 접근 |
+|---|---|---|
+| `/login` | 이메일·비밀번호·TOTP | 비로그인 |
+| `/register` | 가입 신청(또는 초대 수락) | 비로그인 |
+| `/verify-email` | 이메일 검증 확인 | 제한된 challenge |
+| `/reset-password` | 재설정 요청·완료 | 제한된 challenge |
+| `/settings/account` | 비밀번호·TOTP·로그인 세션 목록·전체 로그아웃 | 본인 |
+| `/settings/users` | 신청·승인·역할·정지 | superadmin(전체) / admin(자기 부서) |
+| `/settings/departments` | 부서·구성원·에이전트 귀속 | superadmin(전체) / admin(자기 부서 표시 정보) |
+| `/settings/audit` | 감사 검색·내보내기 | 역할·부서별 제한 |
+
+기존 `/settings/profile`(`ui/src/pages/profile/profile-page.ts:61`)은 표시 이름·아바타·개인 설정을 계속 소유한다. 로그인 보안 설정을 그 화면에 섞지 않는다.
+
+구현 규칙:
+
+- 현재의 "WS 실패 후 로그인 게이트 표시"(`ui/src/app/app-root.ts:578`) **앞에** HTTP 세션 bootstrap(`GET /auth/session`)을 둔다.
+- 내장 모드에서는 Gateway URL·토큰·기기 승인 UI 대신 계정 로그인 화면을 띄운다.
+- settings sidebar 의 단일 `canAdmin` 불리언(`ui/src/app-navigation.ts:238`, `ui/src/components/settings-sidebar.ts:104`)으로 네 역할을 처리하지 않는다. 서버가 계산한 capability 객체를 쓰되 실제 RPC 가 다시 권한을 검사한다.
+- 사용자·부서 변경은 서버 응답 확인 후 반영한다(낙관적 갱신 금지).
+- 로그아웃·계정 교체 시 이전 부서의 세션 목록·검색 결과·캐시를 지운다.
+- 깊은 링크 복귀는 같은 출처의 허용 경로만 받는다.
+- 관리자에게 사용자의 비밀번호·해시·MFA secret 을 표시하지 않는다.
+- 감사 화면은 기간·사용자·행위·결과·자원 부서·세션/run 으로 검색하고 cursor 페이지네이션을 쓴다. `ui/src/pages/logs/logs-page.ts:89` 의 `logs.tail` 문자열 검색을 재활용하지 않는다.
+
+### 3.6 i18n 키
+
+신규 카탈로그 `ui/src/i18n/locales/en-builtin-auth.ts` 를 만들고 `ui/src/i18n/locales/en.ts` 에 병합한다(기존 `en-login.ts`·`en-settings.ts` 와 같은 분할 방식). 나머지 15개 로케일은 영어 폴백 후 순차 번역한다.
+
+```text
+builtinAuth.login.title / .email / .password / .submit / .forgot / .totpPrompt
+builtinAuth.login.error.invalidCredentials      // 계정 유무를 구분하지 않는 단일 문구
+builtinAuth.login.error.pendingApproval / .suspended / .rateLimited
+builtinAuth.register.title / .displayName / .department / .submit / .submitted
+builtinAuth.register.error.closed / .inviteRequired / .passwordPolicy
+builtinAuth.verify.title / .confirm / .success / .expired / .alreadyUsed
+builtinAuth.reset.request / .requested / .newPassword / .success / .expired
+builtinAuth.account.password / .totpEnroll / .totpDisable / .recoveryCodes
+builtinAuth.account.sessions.title / .current / .revoke / .revokeAll
+builtinAuth.users.title / .status.pendingEmail / .pendingApproval / .active / .rejected / .suspended
+builtinAuth.users.action.approve / .reject / .suspend / .reinstate / .setRole / .invite
+builtinAuth.users.confirm.lastSuperadmin                // 마지막 superadmin 보호 안내
+builtinAuth.departments.title / .create / .members / .agents / .disable
+builtinAuth.audit.title / .filter.range / .filter.actor / .filter.action / .filter.outcome
+builtinAuth.audit.filter.department / .export / .verifyChain / .chainOk / .chainBroken
+builtinAuth.role.superadmin / .admin / .moderator / .member
+builtinAuth.mail.verifySubject / .verifyBody / .resetSubject / .resetBody / .approvedSubject
+```
+---
+
+## 4. 마일스톤
+
+전제: 서버 개발자 1명 + UI 개발자 1명 + 보안·QA 지원(파트타임). 1인 단독이면 아래 기간이 약 1.7배가 된다.
+
+### M0. 계약 확정 (1주, 선행 필수)
+
+| 항목 | 내용 |
+|---|---|
+| 산출물 | 권한 매트릭스 확정, 부서 모델 확정, 위협 모델, 6.2 결정 항목 전부 답 확정 |
+| 완료 기준 | superadmin 전역 우회 범위·프로필 병합 정책·롤백 정책이 문서로 서명됨 |
+| 검증 | 고객(진바이오테크) 확인 회신 1건, 계약 문구 초안 |
+
+### M1. 사용자 디렉터리 + 로그인 + 쿠키 세션 + WS 인가 (3주)
+
+| 항목 | 내용 |
+|---|---|
+| 범위 | 신규 SQL·저장소·Argon2id·쿠키 세션·CSRF·`/auth/login`·`/auth/logout`·`/auth/session`, WS Upgrade 쿠키·Origin 검증, device 면제, 기기 토큰 차단, `openclaw users bootstrap`, 로그인 화면 |
+| 완료 기준 | (1) 서로 다른 브라우저 프로필 2개에서 토큰·페어링 없이 로그인만으로 진입. (2) 로그아웃 후 같은 브라우저가 즉시 거절됨. (3) 기기 토큰이 발급되지 않음(DB·localStorage 양쪽 확인). (4) 기존 token/password/trusted-proxy 모드 회귀 0 |
+| 검증 방법 | `ui/src/e2e/device-token-reconnect.e2e.test.ts` 를 내장 모드 변형으로 확장. 실 게이트웨이에서 Chrome 프로필 2개 수동 왕복. `openclaw security audit` 실행 |
+| 요구 충족 | 요구 1의 "로그인만으로 진입" |
+
+### M2. 가입·이메일 인증·승인·비밀번호 재설정 + SMTP (2주)
+
+| 항목 | 내용 |
+|---|---|
+| 범위 | `/auth/register`·`/auth/verify-email`·`/auth/reset-password`, challenge 저장소, mail outbox + Nodemailer worker, 레이트리밋, `directory.users.approve/reject/suspend`, 초대장 |
+| 완료 기준 | (1) 실제 테스트 SMTP 로 검증 메일 왕복 성공. (2) GET 프리페치가 토큰을 소비하지 않음. (3) 같은 링크 동시 제출 시 1회만 소비. (4) 존재/미존재 이메일의 응답 본문·상태코드·응답시간이 구분 불가. (5) SMTP 장애 시 재시도 후 관리자에게 보이는 실패로 남음 |
+| 검증 방법 | 로컬 MailHog 또는 사내 SMTP 스테이징. 동시 제출 경쟁 테스트. 응답 시간 분포 측정 |
+| 요구 충족 | 요구 1의 "가입·이메일 인증·관리자 승인" |
+
+### M3. 역할·부서 매핑 + 관리자 UI (3주)
+
+| 항목 | 내용 |
+|---|---|
+| 범위 | `gateway.roles` 4역할 결선, `departments`·`department_members`·`department_agents`, `department-access` 경계, `agents.list` 필터, 세션 목록·이벤트·검색·공유·spawn·승인·자동화의 부서 필터, `/settings/users`·`/settings/departments` UI, `openclaw departments` CLI |
+| 완료 기준 | (1) 부서 A 사용자가 부서 B 의 세션 키·에이전트 ID 를 직접 알아도 list/get/write/export 전부 거절. (2) 부서 B 에이전트가 A 사용자 Control UI 목록에 보이지 않음. (3) 역할 강등 후 이미 열린 WS 가 끊기고 재접속에 새 역할 적용. (4) 정지 즉시 모든 세션 폐기 |
+| 검증 방법 | 부서 2개 + 사용자 4명(역할 4종) 시나리오 매트릭스. `src/gateway/server-methods/sessions-read-visibility.test.ts`·`session-catalog-visibility.test.ts` 확장 |
+| 요구 충족 | 요구 2, 요구 3 |
+| **병렬 가능** | M3 서버 부분과 M2 UI 부분은 병렬. M3 UI 는 M3 서버의 RPC 계약 확정 후 착수 |
+
+### M4. 감사 원장 확장 + 조회 UI + 보존 정책 (2주)
+
+| 항목 | 내용 |
+|---|---|
+| 범위 | `audit_security_events` + 해시 체인, `audit_event_user_context`, 트랜잭션 append, `audit.security.list/export/verify`, `/settings/audit` UI, 보존·용량 정책, OTEL 내보내기 결선 |
+| 완료 기준 | (1) 승인·역할 변경·정지 성공마다 같은 트랜잭션의 사건이 반드시 존재. (2) 해시 체인 검증 명령이 정상 통과하고, 임의 행 수정 후 정확히 그 지점부터 실패. (3) 세션 열람·설정 변경이 사람 신원과 함께 기록. (4) 기존 `audit.list` 응답 계약 무변경 |
+| 검증 방법 | `src/audit/audit-event-writer.test.ts`·`audit-event-store.message.test.ts` 확장. 체인 변조 시험. 30일 실행 후 보존 정리 확인은 시간 압축 테스트로 대체 |
+| 요구 충족 | 요구 4 |
+
+### M5. 2FA·강화·침투 점검·문서 (2주)
+
+| 항목 | 내용 |
+|---|---|
+| 범위 | TOTP 등록·확인·복구 코드, MFA 해제 재인증, 파일·미디어·업로드 경로의 쿠키 인가, sandbox·워크스페이스 격리 실측, 침투 점검, 운영 런북·인수인계 문서, `doctor` 점검 항목 |
+| 완료 기준 | (1) TOTP 코드 재사용 불가, 복구 코드 단일 사용. (2) 헤더 위조·자기 선언 스코프로 권한 상승 불가. (3) 아바타·파일·미디어·업로드가 WS 와 같은 사용자 권한을 따름. (4) 침투 점검 보고서에 미해결 High 0 |
+| 검증 방법 | 외부 또는 사내 2인 교차 침투 점검. 2.5 체크리스트 전 항목 서명 |
+
+### 4.1 총 기간과 병렬 구간
+
+| 구간 | 직렬 기간 | 병렬 적용 후 |
+|---|---|---|
+| M0 | 1주 | 1주 |
+| M1 | 3주 | 3주 |
+| M2 | 2주 | M1 의 마지막 1주와 겹칠 수 있음 (저장소·challenge 스키마가 M1 에서 이미 확정) |
+| M3 | 3주 | M3 서버는 M2 SMTP 작업과 병렬 가능 |
+| M4 | 2주 | M3 UI 와 병렬 가능 |
+| M5 | 2주 | 직렬 |
+
+- **직렬 합계 13주.**
+- **병렬 적용 시 10주** (M2 -1주, M3 -1주, M4 -1주 흡수).
+- **예비 2주** 를 더해 **총 12주 (약 3개월)** 로 잡는다.
+
+병렬 가능 구간을 명시하면 다음과 같다.
+
+```text
+주:   1    2    3    4    5    6    7    8    9   10   11   12
+서버 [M0][------ M1 ------][-- M2 --][----- M3 서버 -----][- M4 -][-- M5 --]
+UI   [M0][ M1 로그인화면  ][M2 가입화면][ M3 관리 UI ][M4 감사UI][-- M5 --]
+QA        (회귀 하네스 구축)      (부서 매트릭스 시나리오)   (침투 점검)
+```
+
+**함정:** 로그인 화면만 동작하는 M1 종료 시점(4주차)을 "다중 부서 운영 가능"으로 취급하면 안 된다. 부서 격리는 M3 이 끝나야 성립한다. 강한 OS 격리나 다중 부서 겸직까지 요구되면 일정이 더 늘어난다.
+
+---
+
+## 5. 테스트 전략·마이그레이션·부트스트랩·되돌리기
+
+### 5.1 테스트 전략
+
+#### 단위 테스트 (신규)
+
+| 대상 | 확인할 불변식 |
+|---|---|
+| `password.ts` | PHC 왕복, 파라미터 재해시, 존재하지 않는 계정의 더미 검증 소요시간 동등, 라이브러리 미로딩 시 실패(약한 폴백 없음) |
+| `sessions.ts` | 세션 ID 회전, digest 만 저장, 유휴·절대 만료 판정, `auth_version` 불일치 거절 |
+| `csrf.ts` | 세션 결합 토큰 검증, 다른 세션 토큰 거절 |
+| `rate-limit.ts` | 스코프별 독립 카운팅, 재시작 후 유지, 윈도우 경계 |
+| `totp.ts` | 같은 time step 재사용 거절, 복구 코드 단일 사용, 등록 전 활성화 거부 |
+| `security-audit-chain.ts` | 체인 계산 결정성, 임의 행 수정 시 그 지점부터 검증 실패 |
+| `department-access.ts` | 4역할 x 2부서 x 자원종류 매트릭스 |
+
+#### 통합 테스트 (기존 재사용 + 확장)
+
+재사용할 기존 테스트 파일(전부 실재 확인):
+
+- `src/gateway/operator-role-policy.test.ts`
+- `src/gateway/server-methods/users.test.ts`
+- `src/gateway/server-methods/sessions-read-visibility.test.ts`
+- `src/gateway/server-methods/session-catalog-visibility.test.ts`
+- `src/audit/audit-event-writer.test.ts`
+- `src/audit/audit-event-store.message.test.ts`
+- `src/state/openclaw-state-schema-compatibility.test.ts`
+- `src/gateway/auth.test.ts`
+- `src/gateway/server-http.device-pairing-join.test.ts` (비인증 라우트 등록 형태 참조)
+- `src/gateway/control-ui-plugin-assets.test.ts` (쿠키 왕복 형태 참조)
+- `src/cli/users-cli.test.ts`
+- `ui/src/api/gateway.node.test.ts`
+- `ui/src/app/gateway-store.auth.test.ts`
+- `ui/src/e2e/device-token-reconnect.e2e.test.ts`
+
+| 시험 | 확인할 불변식 |
+|---|---|
+| 가입 상태 전이 | `pending_email`·`pending_approval` 계정은 WS 와 어떤 자원에도 접근 불가 |
+| challenge 경쟁 | 같은 링크·코드를 동시 제출해도 한 번만 소비 |
+| 세션 고정 | 로그인·MFA 전후 세션 ID 변경, 이전 값 즉시 무효 |
+| 정지·강등 | 이미 열린 WS·구독·대기 중 변경 작업에도 새 권한 적용 |
+| 헤더 위조 | 임의 `x-forwarded-user`·`x-openclaw-scopes`·부서 헤더로 권한 상승 불가 |
+| 기기 우회 | 예전 device token 으로 내장 로그아웃 우회 불가 |
+| HTTP 형제 경로 | 아바타·파일·미디어·업로드도 WS 와 같은 사용자 권한 |
+| 부서 A/B | ID 를 직접 알아도 다른 부서 list/get/write/export 불가 |
+| 이벤트 | 목록에서 숨긴 데이터가 broadcast·suggestion 으로 새지 않음 |
+| 도구 실행 | 모델의 sessions 도구·spawn·memory·파일 접근도 부서 제한 |
+| 관리자 경계 | admin 은 전역 config·pairing·상위 역할 부여 불가 |
+| 감사 | 승인·역할 변경 성공마다 같은 트랜잭션의 사건 존재 |
+| 장애 | DB busy·disk full·SMTP 장애·재시작에 성공을 거짓 보고하지 않음 |
+| 호환 | 기존 token/password/trusted-proxy·node 페어링 회귀 없음 |
+| 마이그레이션 | 구버전 open/use 후 신버전 reopen, 명시적 롤백 검증 |
+
+#### E2E 시나리오 (실 게이트웨이 + 2부서 + 서로 다른 브라우저 프로필)
+
+| 번호 | 시나리오 |
+|---|---|
+| E1 | `openclaw users bootstrap` 으로 superadmin 생성 -> 로그인 -> 부서 2개 생성 -> 에이전트 귀속 |
+| E2 | 일반 사용자 가입 -> 검증 메일 수신 -> 링크 GET(미소비 확인) -> POST 검증 -> 승인 대기 상태 확인 |
+| E3 | superadmin 이 승인(부서 A, member) -> 사용자 로그인 -> 자기 부서 에이전트만 목록에 보임 |
+| E4 | 같은 사용자가 **다른 PC 의 다른 브라우저**로 로그인 -> 페어링 요구 없이 진입 |
+| E5 | 부서 A member 가 부서 B 세션 키로 `sessions.history` 호출 -> 서버 거절, 감사에 denied 기록 |
+| E6 | 부서 A moderator 가 자기 부서 세션에 제안 제출 -> 성공. 부서 B 세션에는 실패 |
+| E7 | 부서 A admin 이 `config.patch` 시도 -> 거절(전역 설정은 superadmin 전용) |
+| E8 | 부서 A admin 이 자기 부서 member 를 moderator 로 승격 -> 성공. superadmin 승격 시도 -> 거절 |
+| E9 | 비밀번호 재설정 요청 -> 메일 -> 새 비밀번호 -> 기존 모든 세션 폐기, 열린 WS 종료 확인 |
+| E10 | TOTP 등록 -> 로그아웃 -> 재로그인 시 코드 요구 -> 같은 코드 재사용 거절 |
+| E11 | 사용자 정지 -> 열려 있던 WS 즉시 종료, 다음 HTTP 요청 거절 |
+| E12 | 파일 업로드 -> 다운로드 URL 을 부서 B 사용자가 사용 -> 거절 |
+| E13 | 감사 조회: superadmin 은 전 부서, admin 은 자기 부서만, member 는 본인 로그인 이력만 |
+| E14 | `openclaw audit security verify` 통과 -> DB 에서 한 행 수정 -> 그 지점부터 실패 |
+| E15 | 기존 token 모드로 전환 후 재기동 -> 기존 동작 회귀 없음 -> 다시 `builtin-users` 로 복귀 |
+| E16 | SMTP 중단 상태에서 가입 -> outbox 재시도 -> 관리자 화면에 실패 노출 -> SMTP 복구 후 발송 |
+| E17 | 마지막 활성 superadmin 을 정지·강등·삭제 시도 -> 전부 거절 |
+
+### 5.2 마이그레이션·부트스트랩
+
+#### 첫 superadmin
+
+```text
+1. 게이트웨이 호스트에서 openclaw users bootstrap 실행
+2. 비밀번호는 TTY 입력 (명령줄 인자로 받지 않는다)
+3. 로컬 설치 소유자가 이메일과 최초 부서를 지정
+4. 한 트랜잭션에 저장: user_profiles 행 + builtin_user_accounts(status='active',
+   email_verified_at=now) + role='superadmin' + departments 첫 행
+   + builtin_auth_state.bootstrap_completed_at + audit_security_events
+5. bootstrap_completed_at 이 있으면 재실행 거절
+6. 마지막 활성 superadmin 의 정지·강등·삭제는 항상 거절
+```
+
+"사용자 수가 0이면 인터넷에서 첫 가입자를 관리자 처리" 하지 않는다. DB 유실이나 잘못된 정리로 관리자 탈취 창이 다시 열리기 때문이다.
+
+#### 기존 데이터 취급
+
+- 기존 `user_profiles` 행을 가입 승인된 계정으로 **자동 전환하지 않는다.**
+- 기존 이메일 연결(`user_profile_emails`)을 내장 비밀번호 로그인 증명으로 취급하지 않는다.
+- 기존 에이전트는 부서 배정 전까지 일반 사용자에게 숨긴다(`department_agents` 미등록 = 비노출).
+- 기존 세션은 에이전트의 승인된 부서 배정에 따라 노출 범위를 재확인한다.
+- 기존 프로필과 새 계정의 연결·병합은 명시적 관리자 절차로만 수행한다. 이메일이 같아도 자동 병합하지 않는다.
+- `openclaw doctor` 가 미배정 자원, 없는 역할 정의, 위험한 `tools.sessions.visibility: "all"`, 잘못된 메일 설정을 보고한다.
+- `doctor --fix` 는 부서를 추측하거나 기존 사용자에게 superadmin 을 부여하지 않는다.
+
+#### 기존 token 모드 공존·전환 스위치
+
+| 경로 | 동작 |
+|---|---|
+| `gateway.auth.mode: "token"` / `"password"` | 기존 의미 그대로. `gateway-owner` 프로필, 역할 우회 유지 |
+| `gateway.auth.mode: "trusted-proxy"` | 기존 프록시·자동 페어링 정책 유지(외부 IdP 납품용으로 남긴다) |
+| `gateway.auth.mode: "builtin-users"` 사람 브라우저 | 내장 쿠키 세션만 사용 |
+| 내장 모드의 기존 브라우저 device token | 사람 로그인 대체 수단으로 거절 |
+| node/worker 연결 | 기존 기계 신원·페어링 검증을 별도 경계로 유지 |
+| 내부 서비스 호출 | 명시적 내부 실행 권한 유지, 사람으로 위장시키지 않음 |
+| 루프백 `gateway.auth.password` | **유지.** `openclaw users bootstrap`·복구 CLI 전용 (`src/gateway/auth.ts:493`) |
+| 모드 변경 | 설정 변경 후 재시작 + 관련 세션 폐기 |
+
+전환 스위치는 설정 한 줄(`gateway.auth.mode`)이다. 내장 로그인 실패가 토큰 화면으로 떨어지는 fallback 은 **금지**한다.
+
+### 5.3 되돌리기
+
+| 단계 | 절차 |
+|---|---|
+| 1 | 롤백 전 `~/.openclaw/state/openclaw.sqlite` 와 `~/.openclaw/agents/` 전체 백업 |
+| 2 | 게이트웨이를 네트워크에서 격리(방화벽으로 인그레스 차단) |
+| 3 | `gateway.auth.mode` 를 `token` 또는 `trusted-proxy` 로 되돌리고 `gateway.auth.builtin` 블록 제거 |
+| 4 | `builtin_login_sessions` 전 행 폐기(`revoked_at` 설정), 열린 WS 강제 종료 |
+| 5 | 구버전 바이너리로 되돌릴 경우, **신규 테이블이 남아 있어도 구버전은 무시**한다(`docs/reference/database-schemas.md:121`). 다만 구버전은 부서 정책을 모르므로 **부서 격리가 사라진다**. 그래서 구버전 기동은 격리된 상태에서만 허용하고, 복귀 전 `department_agents` 대신 설정의 `roles.definitions.<role>.agents` allowlist 로 최소 경계를 다시 세운다 |
+| 6 | 롤백 사실과 사유를 `audit_security_events` 에 남기고(가능하면), 외부 SIEM 에 별도 기록 |
+
+**금지:** 신규 테이블 DROP. 감사 원장을 지우는 롤백은 하지 않는다. 부서 재배정으로 과거 사건을 재분류하지 않는다.
+---
+
+## 6. 리스크와 결정 필요 항목
+
+### 6.1 리스크
+
+| 번호 | 리스크 | 영향 | 대응 |
+|---|---|---|---|
+| R1 | **`operator.admin` 의 범위가 너무 넓다** | 부서 경계 전체 우회. `src/gateway/server-methods.ts:102` 가 모든 메서드 스코프 검사를 무조건 통과시키고 `src/gateway/session-sharing-policy.ts:148` 이 모든 세션 role 을 admin 으로 만든다 | superadmin 에만 부여. 부서 admin 용 좁은 `directory.*`·`departments.*` 계약을 따로 만든다. 내부 `system` actor 로 바꿔 우회하는 구현 금지 |
+| R2 | **단일 프로세스·단일 OS 사용자** | HTTP ACL 이 맞아도 파일·지식이 샌다. 전사 트랜스크립트가 같은 UID 아래 `~/.openclaw/agents/<agentId>/sessions/` 에 있다 | 부서별 sandbox·자격증명·mount 분리. 강한 적대적 격리가 요건이면 부서별 Gateway 또는 OS 경계로 승격(6.2 D2) |
+| R3 | **업스트림이 "one Gateway is one trust boundary" 를 문서에 못박았다** | 사고 시 그 문장이 그대로 인용된다. `docs/gateway/security/index.md:17-24`, `:36`, `docs/gateway/multi-tenant-hosting.md` | 우리 포크는 서버측 부서 인가를 추가하지만, **업스트림 보증이 아니라 포크의 자체 보증**임을 계약서에 명시. 부서 분리 수준을 문서로 정의 |
+| R4 | **기본값이 정반대다** | `tools.sessions.visibility` 기본 `all`(`src/plugin-sdk/session-visibility.ts:104-105`), `tools.agentToAgent.enabled` 기본 true. 설정 누락 = 전 부서 트랜스크립트 노출 | 배포 스크립트에 강제 검증. `doctor` 가 `all` 을 경고. 내장 모드에서는 코드가 `self` 로 하한을 걸고 상향은 명시 설정으로만 |
+| R5 | **프로필과 로그인 계정의 자동 병합** | 계정 탈취·권한 합산. 현재 `ensureProfileForEmail`(`src/state/user-profiles.ts:292`) 이 이메일로 프로필을 자동 생성하고 `users.linkEmail`(`src/gateway/server-methods/users.ts:216`) 이 연결한다 | 불변 account UUID -> 명시적 profile 연결. 이메일 변경은 로그인 식별자 변경이지 신원 교체가 아니다. 내장 계정이 붙은 프로필에는 merge/link 추가 검사 |
+| R6 | **쿠키 인증의 부분 적용** | WS 는 되는데 아바타·미디어·다운로드·업로드가 실패하거나 우회된다. 현재 아바타는 공유 비밀 의존(`ui/src/pages/profile/profile-page.ts:107-109` 주석) | 모든 HTTP·WS·capability 경로에 공통 principal 적용. E2E E12 로 검증 |
+| R7 | **기존 감사 큐가 best-effort 다** | 권한 변경은 성공, 감사는 유실. 큐 상한 4096(`src/audit/audit-event-writer.ts:34`), 포화 시 경고 후 폐기 | 사용자 관리 사건은 큐를 타지 않고 상태 변경과 같은 동기 트랜잭션(`src/state/openclaw-state-db.ts:689`)에서 append. 기록 불가면 변경 실패 |
+| R8 | **새 audit kind 직접 삽입은 구버전 조회를 깨뜨린다** | `src/audit/audit-event-store.ts:475` 가 세 종류 외를 `corruptAuditRow` 로 처리 | 보조 테이블 `audit_security_events` 로 확장. 기존 `audit.list` 응답 계약 무변경 |
+| R9 | **감사 보존이 짧고 하드코딩** | `AUDIT_EVENT_RETENTION_MS` 30일, `AUDIT_EVENT_MAX_ROWS` 100,000 (`src/audit/audit-event-store.ts:51-52`). 행 수 제한 때문에 30일보다 먼저 지워질 수 있다 | 신규 보안 사건은 기본 90일 + 설정 키. 그 이상은 OTEL 로 외부 SIEM. **계약서에 "외부 SIEM 이 장기 정본, 게이트웨이 원장은 보조" 명시** |
+| R10 | **SQLite 감사만으로 위변조 방지를 주장할 수 없다** | 호스트 관리자가 DB 를 직접 수정 가능 | 해시 체인(체인 키는 DB 밖) + DB 권한 + 백업 + 서명된 export. 그래도 "호스트 root 는 신뢰 대상" 임을 명시 |
+| R11 | **자체 계정 시스템의 유지보수 책임** | 복구·메일·MFA·보안 패치를 우리가 진다. 외부 IdP 를 안 쓰기로 한 대가 | crypto·SMTP 는 검증된 라이브러리(node-argon2, Nodemailer). Nodemailer 는 이미 전이 의존성으로 lockfile 에 있으나(`pnpm-lock.yaml:8103` `nodemailer@9.1.1:`) **직접 의존성으로 선언**해야 한다. node-argon2 는 네이티브 빌드라 Windows·Linux·컨테이너 설치 검증 후 확정 |
+| R12 | **업스트림 추종 비용** | `auth.ts`·`connect-*`·`operator-role-policy.ts`·`session-sharing*.ts` 는 변경이 잦다. 훅 52곳이 리베이스마다 충돌 후보 | principal·부서 정책·감사 소유자를 신규 파일에 집중시키고 훅은 호출 한 줄로 유지. 동기화마다 경계 회귀 시험 전량 실행. 유지보수 계약에 반영 |
+| R13 | **부서 이동·겸직이 나중에 요구될 수 있다** | 1차 모델은 `agentId -> departmentId` 불변, 사용자 1인 1부서 | 초기에는 새 에이전트 생성 + 명시적 이관으로 처리. 겸직 요구 시 `department_members` 를 다중 관계로 확장 + per-agent DB 에 세션 부서 바인딩 추가(별도 설계) |
+| R14 | **`node-argon2` 네이티브 의존성** | Windows 개발기·Linux 컨테이너·Alpine 에서 빌드 실패 가능 | M1 착수 전 3환경 설치 검증. 실패 시 `@node-rs/argon2`(Rust, prebuilt) 를 대안으로 평가. 순수 JS 폴백으로 자동 전환은 금지 |
+| R15 | **이메일 발송 인프라 부재** | 진바이오테크 사내 SMTP 릴레이·발신 도메인·SPF/DKIM 이 없으면 검증 메일이 스팸 처리되거나 아예 안 나간다 | 6.2 D1 에서 먼저 확정. 없으면 초대장(`registration: "invite-only"`) + 관리자 수동 계정 생성으로 M2 범위를 축소하는 대안을 준비 |
+
+### 6.2 결정 필요 항목 (고객·사내 확정 대기)
+
+| 번호 | 항목 | 선택지 | 기본 제안 | 결정 시한 |
+|---|---|---|---|---|
+| **D1** | **이메일 발송 인프라** | (a) 진바이오테크 사내 SMTP 릴레이 (b) 외부 발송 서비스 (c) 이메일 없이 초대장·관리자 생성만 | (a). 발신 도메인·SPF·DKIM·릴레이 허용 IP 를 함께 받는다. 확보 불가면 (c) 로 M2 축소 | M0 종료 전 (1주차) |
+| **D2** | **부서 간 기밀 수준 = 게이트웨이 셀 분리 여부** | (a) 단일 게이트웨이 + 서버측 부서 인가 (이 계획) (b) 부서별 게이트웨이 셀 + 통합 대시보드 신규 개발 | (a). 다만 **"부서 간 데이터 접근 금지"가 계약 문구에 들어가면 (b) 필수**. (b) 는 +3주와 통합 대시보드 신규 개발이 붙고 superadmin 전 부서 뷰가 사라진다 | M0 종료 전 (1주차) |
+| **D3** | **비밀번호 정책** | 최소 길이, 복잡도 요구, 만료 주기, 재사용 금지 이력 | 최소 12자, 복잡도 규칙 없음(NIST 권고), 만료 없음, 유출 목록 대조 없음. Argon2id `m=64MiB,t=3,p=1` 을 배포 하드웨어에서 실측 후 확정 | M1 착수 전 (2주차) |
+| **D4** | **세션 만료 정책** | 유휴·절대 타임아웃, 기억하기 옵션 | 유휴 30분 / 절대 12시간, "기억하기" 없음. 업무용이므로 짧게. 고객이 불편을 호소하면 유휴 8시간까지 완화 가능(절대는 유지) | M1 착수 전 (2주차) |
+| **D5** | **감사 보존기간과 정본 위치** | 내장 90일 / 외부 SIEM 무기한 / 둘 다 | 내장 90일 + OTEL 로 사내 SIEM. **"외부 SIEM 이 컴플라이언스 정본"을 계약서에 명시.** 사내 SIEM 이 없으면 별도 수집기 구축이 추가 범위 | M4 착수 전 (8주차) |
+| **D6** | **2FA 강제 범위** | off / optional / superadmin·admin 필수 / 전원 필수 | superadmin·admin 필수, 나머지 optional | M5 착수 전 (10주차) |
+| **D7** | **가입 개방 여부** | open(사내 누구나 신청) / invite-only / closed(관리자만 생성) | invite-only. 사내 시스템이므로 공개 가입 폼을 열 이유가 없고 열거·스팸 표면이 줄어든다 | M2 착수 전 (4주차) |
+| **D8** | **부서 목록·조직도 정본** | OpenClaw DB / 진바이오테크 인사 시스템 연동 | 1차는 OpenClaw DB 가 정본, 수동 관리. 인사 연동은 별도 범위 | M3 착수 전 (6주차) |
+
+### 6.3 계약서에 반드시 들어갈 문구 (초안)
+
+1. **부서 분리의 성격.** "부서 격리는 게이트웨이 서버측 인가 경계와 에이전트별 워크스페이스 분리로 구현한다. 단일 프로세스·단일 OS 사용자를 공유하므로, 호스트 root 권한이나 게이트웨이 프로세스 자체를 침해한 공격자에 대한 격리는 보장하지 않는다."
+2. **감사 정본.** "게이트웨이 내장 감사 원장은 90일 보조 기록이며, 컴플라이언스 정본은 외부 SIEM 이다. 게이트웨이 실행·도구 원장의 보존은 업스트림 하드코딩 값(30일 / 10만 행)을 따른다."
+3. **업스트림 추종.** "본 기능은 OpenClaw 업스트림에 존재하지 않는 포크 확장이다. 업스트림 릴리스마다 리베이스와 경계 회귀 시험이 필요하며 유지보수 계약에 포함한다."
+4. **잔여 리스크 수용.** "`openclaw security audit` 이 보고하는 인증 모드 관련 finding 은 의도된 구성이며 별도 수용 문서로 관리한다."
+
+---
+
+## 부록 A. 검증에 사용한 명령
+
+```bash
+cd /d/PROJECT/openclaw
+git log --oneline -1 chris/main            # a61f3756494 확인
+git merge-base --is-ancestor a61f375649423deb23ef373b21d75a42d70636a0 chris/main
+git show a61f375:<path> | sed -n '<line-2>,<line+2>p'   # 113건 전수 대조
+git ls-tree --name-only a61f375 <dir>                   # 신규 파일 부재 확인
+git grep -n "<pattern>" a61f375 -- src ui/src
+```
+
+포크 작업 디렉터리는 **읽기 전용**으로만 다뤘다. 조사 시점 Windows 체크아웃은 `chris/file-preview` 브랜치에 다른 에이전트의 미커밋 변경(`ui/src/components/file-preview/document-preview-kinds.test.ts`)이 있었으므로 브랜치 전환·체크아웃을 하지 않고 `git show <commit>:<path>` 로만 읽었다.
+
+## 부록 B. 이 계획이 인용한 포크 소스 좌표 요약
+
+| 주제 | 좌표 |
+|---|---|
+| 인증 모드 유니온 | `src/config/types.gateway.ts:178`, `src/config/zod-schema.gateway.ts:119-126` |
+| trusted-proxy 검증 | `src/gateway/auth.ts:198`, 상호배타 `:175-186`, 루프백 폴백 `:493` |
+| 인증 결과 타입 | `src/gateway/auth.ts:38`, 코어 `:433` |
+| 모드 결정 | `src/gateway/auth-resolve.ts:18`, `:63-65` |
+| HTTP 스테이지 | `src/gateway/server-http.ts:409`(`addRequestStage`), `:418`(`addAdmittedStage`), 훅 `:483` |
+| 비인증 라우트 선례 | `src/gateway/device-pairing-join-http.ts`, 등록 `src/gateway/server-http.ts:459-470` |
+| 쿠키 인프라 | `src/gateway/control-ui-plugin-auth-cookie.ts:16-18`, `:34`, `:39`, `:45` |
+| WS Upgrade | `src/gateway/server-http-upgrades.ts:224` |
+| WS 인증 상태 | `src/gateway/server/ws-connection/auth-context.ts:130`, `connect-auth.ts:133` |
+| device 면제 | `connect-policy.ts:36`, `:58`, `:84` |
+| 페어링 | `connect-device-pairing.ts:60`, `:194`, 자동승인 계획 `connect-pairing-approval-plan.ts:151` |
+| 기기 토큰 | `connect-device-tokens.ts:36`, UI 저장 `ui/src/api/gateway.ts:501` |
+| 프로필 연결 | `connect-user-profile.ts:18`, HTTP `src/gateway/http-auth-user-profile.ts:36`, `:69` |
+| 스코프 결합 | `connect-admission.ts:130`, `connect-session.ts:231` |
+| 프로필 스키마 | `src/state/user-profiles-schema.ts:12`, role 컬럼 `:18` |
+| 프로필 API | `src/state/user-profiles.ts:218`(`setUserProfileRole`), `:292`(`ensureProfileForEmail`), `:444`(`ensureGatewayOwnerProfile`) |
+| 역할 정의 | `src/config/types.gateway.ts:545` |
+| 역할 강제 | `src/gateway/operator-role-policy.ts:164`, 무효화 `:60`, owner 우회 `:76` |
+| owner 판정 | `src/gateway/gateway-owner-profile.ts:10-13` |
+| 스코프 상수 | `src/gateway/operator-scopes.ts:3-5` |
+| admin 전역 우회 | `src/gateway/server-methods.ts:102` |
+| pre-dispatch / commit guard | `src/gateway/server-methods.ts:258`, `:525` |
+| 역할 배정 RPC | `src/gateway/server-methods/users.ts:251`, 무효화·연결종료 `:271-273` |
+| 메서드 스코프 표 | `src/gateway/methods/core-descriptors.ts:71`, `:153`, `:217`, `:330` |
+| 에이전트 목록 | `src/gateway/server-methods/agents.ts:806` |
+| 세션 공유 판정 | `src/gateway/session-sharing-policy.ts:143`, admin `:148`, creator `:161`, none `:175-177`, member 조회 `:178-190`, 공유 인가 `:328` |
+| 세션 목록·이벤트 필터 | `src/gateway/session-sharing.ts:473`, `:546` |
+| 세션 저장 계약 | `src/state/openclaw-agent-schema.sql:1-3`, `session_participants:79`, `session_members:256` |
+| 도구 가시성 | `src/config/types.tools.ts:228`, 해석 `src/plugin-sdk/session-visibility.ts:104-105`, 샌드박스 보정 `:115`, 내부 정책 `session-visibility-internal.ts:113` |
+| 라우팅 바인딩 | `src/routing/bindings.ts:16` |
+| 감사 종류 | `src/audit/audit-event-types.ts:8` |
+| 감사 보존·리더 | `src/audit/audit-event-store.ts:51`, `:52`, `:475`, `:697-699` |
+| 감사 큐 | `src/audit/audit-event-writer.ts:34`, `:46` |
+| 감사 신원 HMAC | `src/audit/audit-identity.ts:142`, `:154`, `:167` |
+| 감사 설정 | `src/audit/audit-config.ts:13`, `:18`, `:23` |
+| 감사 RPC | `src/gateway/server-methods/audit.ts:105`, `:144`, `:196` |
+| 인증 진단 사건 | `connect-auth-security.ts:18`, `src/infra/diagnostic-events.ts:1563` |
+| 설정 감사 | `src/config/io.audit.ts:150`, `:151`, `:653` |
+| 제어면 감사 | `src/gateway/control-plane-audit.ts:17-19` |
+| 감사 테이블 | `src/state/openclaw-state-schema.sql:151-182` |
+| 트랜잭션 소유자 | `src/state/openclaw-state-db.ts:689` |
+| 스키마 additive | `src/state/openclaw-state-db-schema-additive.ts:25-35` |
+| 스키마 호환 문서 | `docs/reference/database-schemas.md:121`, `:125` |
+| HTTP 인가 헬퍼 | `src/gateway/http-auth-utils.ts:376`, `:640` |
+| UI 로그인 게이트 | `ui/src/app/app-root.ts:578`, 렌더 `ui/src/components/login-gate.ts:411` |
+| UI 연결 계획 | `ui/src/api/gateway.ts:104`, `:389`, `:501`, 소켓 `gateway-browser-socket.ts:11` |
+| UI 라우트 | `ui/src/app-route-paths.ts:39`, `ui/src/app-routes.ts:88`, `ui/src/pages/connection/route.ts:5` |
+| UI 내비게이션 | `ui/src/app-navigation.ts:199`, `:238`, `ui/src/components/settings-sidebar.ts:104` |
+| UI 프로필·로그 | `ui/src/pages/profile/profile-page.ts:61`, `:107-109`, `ui/src/pages/logs/logs-page.ts:89` |
+| CLI | `src/cli/users-cli.ts:42`, `:47`, `:62`, 등록 `src/cli/program/register.subclis-core.ts:137` |
+| 파일 전송 감사 | `extensions/file-transfer/src/shared/audit.ts:31`, `:83` |
+| 의존성 | `pnpm-lock.yaml:8103` (`nodemailer@9.1.1`, 현재 전이 의존성) |
