@@ -9,6 +9,11 @@
  *   2. Corner radius is capped at 5px everywhere. True circles (avatars, status
  *      dots, spinners, toggle knobs) keep --radius-full.
  *
+ * The cap only ever REDUCES. An element upstream draws square (border-radius: 0)
+ * must stay square: this file never introduces a radius where there was none.
+ * Tab indicators, underlines, dividers and progress bars are lines, not boxes,
+ * and are pinned to 0 below.
+ *
  * Change --page-max-width or the --radius-* block below and every surface
  * follows; do not hardcode a page width or a radius in a page stylesheet.
  */
@@ -71,12 +76,29 @@
 .pill,
 .chip,
 .exec-approval-chip,
-.exec-approval-queue,
 .agent-select__badge,
 .agent-scope-control .agent-select__trigger,
 .agent-tools-group__preview > span,
-.person-activity-card__status > span,
-.hub-tab,
-.hub-tabs__tab {
+.person-activity-card__status > span {
   border-radius: var(--radius-pill);
+}
+
+/* ── 3. Lines stay square ──
+ *
+ * A tab's active underline, a rule and a progress bar are lines. They draw at 0
+ * upstream, so nothing here may round them. wa-tab in particular used to be
+ * listed with the pills above, which rounded the ends of every hub tab's active
+ * indicator - that was the bug this block exists to prevent.
+ *
+ * Only selectors verified to be 0 upstream belong here. Anything that already
+ * carries a radius (.settings-segmented reads --radius-md, for instance) is left
+ * to the token cap, which reduces it instead of squaring it. */
+wa-tab.hub-tab,
+.hub-tabs__tab,
+hr,
+[role="separator"],
+progress,
+progress::-webkit-progress-bar,
+progress::-webkit-progress-value {
+  border-radius: 0;
 }
