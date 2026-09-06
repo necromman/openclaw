@@ -169,12 +169,12 @@ Control UI·CLI 를 먼저 끝냈고 네이티브 앱 리소스는 위치만 기
 
 ### 6-1. 화면 실측 (DOM 텍스트 + 속성 스캔)
 
-| 화면 | 탭 제목 | "OpenClaw" 표시 문자열 | 빨간 마스코트 |
-|------|---------|------------------------|----------------|
-| 연결/로그인 (`brand-03-connect.png`) | Chris Agent Control | 0 (환경변수명 `OPENCLAW_GATEWAY_TOKEN` 과 `openclaw` CLI 명령 제외) | 없음 |
-| 홈/채팅 (`brand-01-home.png`) | main - Chris Agent | 0 | 없음 |
-| 설정 > 정보 (`brand-02-about.png`) | 정보 - Chris Agent | 1 = MIT 라이선스 고지 (의도) | 없음 |
-| 플러그인 (`layout-02-plugins-1440.png`) | 플러그인 - Chris Agent | 0 (`@openclaw/*` 패키지명 제외) | 없음 |
+| 화면                                    | 탭 제목                | "OpenClaw" 표시 문자열                                              | 빨간 마스코트 |
+| --------------------------------------- | ---------------------- | ------------------------------------------------------------------- | ------------- |
+| 연결/로그인 (`brand-03-connect.png`)    | Chris Agent Control    | 0 (환경변수명 `OPENCLAW_GATEWAY_TOKEN` 과 `openclaw` CLI 명령 제외) | 없음          |
+| 홈/채팅 (`brand-01-home.png`)           | main - Chris Agent     | 0                                                                   | 없음          |
+| 설정 > 정보 (`brand-02-about.png`)      | 정보 - Chris Agent     | 1 = MIT 라이선스 고지 (의도)                                        | 없음          |
+| 플러그인 (`layout-02-plugins-1440.png`) | 플러그인 - Chris Agent | 0 (`@openclaw/*` 패키지명 제외)                                     | 없음          |
 
 파비콘은 `/favicon.svg` = 중립 마크. 사이드바 커스토디언 아이콘, 어시스턴트 아바타, About 히어로 모두 같은 마크다.
 
@@ -182,13 +182,13 @@ Control UI·CLI 를 먼저 끝냈고 네이티브 앱 리소스는 위치만 기
 
 `dist/control-ui` 에서 `OpenClaw`(대문자 표기) 165건. 전부 식별자·법적 고지·개발자 콘솔이다.
 
-| 분류 | 건수 | 예 |
-|------|------|-----|
-| i18n **키** 이름 | 49 | `askOpenClaw`, `openInOpenClaw` (값은 `{brand}`) |
-| 코드 식별자 | 92 | `includeInOpenClawGroup`, `icon:"lobster"`, 도구 그룹 `group:openclaw` |
-| MIT 라이선스 고지 | 19 | 로케일별 "© 2026 OpenClaw Foundation - MIT ..." |
-| 중립화 정규식 원문 | 3 | `neutralizeCatalogCopy()` 안의 `/OpenClaw/` 패턴 |
-| 개발자 콘솔 경고 | 2 | `console.warn("OpenClaw service worker registration failed.")` |
+| 분류               | 건수 | 예                                                                     |
+| ------------------ | ---- | ---------------------------------------------------------------------- |
+| i18n **키** 이름   | 49   | `askOpenClaw`, `openInOpenClaw` (값은 `{brand}`)                       |
+| 코드 식별자        | 92   | `includeInOpenClawGroup`, `icon:"lobster"`, 도구 그룹 `group:openclaw` |
+| MIT 라이선스 고지  | 19   | 로케일별 "© 2026 OpenClaw Foundation - MIT ..."                        |
+| 중립화 정규식 원문 | 3    | `neutralizeCatalogCopy()` 안의 `/OpenClaw/` 패턴                       |
+| 개발자 콘솔 경고   | 2    | `console.warn("OpenClaw service worker registration failed.")`         |
 
 ```bash
 cd dist/control-ui
