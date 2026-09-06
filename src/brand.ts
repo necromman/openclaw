@@ -58,6 +58,16 @@ export const BRAND_CLOUD_NAME = "Cloud";
  */
 export const BRAND_UPSTREAM_LICENSE_NOTICE = "© 2026 OpenClaw Foundation. MIT License.";
 
+/**
+ * Fork feature flags. These hide a surface without removing its code, so an
+ * upstream rebase keeps applying cleanly and flipping a value brings the
+ * surface back. Set a flag to true to restore it.
+ */
+export const BRAND_FEATURES = {
+  /** Companion "Get the apps" page and every link into it. */
+  appsPage: false,
+} as const;
+
 /** Values injected into every i18n interpolation so `{brand}` works anywhere. */
 export const BRAND_PLACEHOLDERS: Readonly<Record<string, string>> = Object.freeze({
   brand: BRAND_NAME,

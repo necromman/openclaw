@@ -14,6 +14,7 @@ import {
 } from "../app-navigation.ts";
 import type { RouteId } from "../app-route-paths.ts";
 import type { NativeDeviceSettingsCapability } from "../app/native-device-settings.ts";
+import { BRAND_FEATURES } from "../brand.ts";
 import { t } from "../i18n/index.ts";
 import type { PluginListResult } from "../lib/plugins/index.ts";
 import type { IconName } from "./icons.ts";
@@ -251,7 +252,9 @@ export function getStaticCommandPaletteCatalogItems(
       description: subtitleForRoute(routeId),
       searchText: routeId,
     }));
-  const apps = APP_CARDS.map((card) => ({
+  // Hidden in this fork (BRAND_FEATURES.appsPage): keep the catalog code but
+  // never offer a palette entry that navigates to a redirected route.
+  const apps = (BRAND_FEATURES.appsPage ? APP_CARDS : []).map((card) => ({
     id: `app-${card}`,
     label: t(`appsPage.cards.${card}.title`),
     icon: "layoutGrid" as const,

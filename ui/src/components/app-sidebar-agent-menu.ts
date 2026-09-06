@@ -7,6 +7,7 @@ import { titleForRoute, type NavigationRouteId } from "../app-navigation.ts";
 import { pathForAgentPanel } from "../app-route-paths.ts";
 import type { ApplicationNavigationOptions } from "../app/context.ts";
 import type { ThemeMode } from "../app/theme.ts";
+import { BRAND_FEATURES } from "../brand.ts";
 import { t } from "../i18n/index.ts";
 import { normalizeAgentLabel } from "../lib/agents/display.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../lib/external-link.ts";
@@ -537,10 +538,14 @@ export function renderSidebarIdentityMenu(params: SidebarIdentityMenuParams) {
         <span slot="icon" class="nav-item__icon" aria-hidden="true">${icons.smartphone}</span>
         <span class="sidebar-customize-menu__text">${t("devices.pairing.button")}</span>
       </wa-dropdown-item>
-      <wa-dropdown-item class="sidebar-customize-menu__item" value="command:apps">
-        <span slot="icon" class="nav-item__icon" aria-hidden="true">${icons.layoutGrid}</span>
-        <span class="sidebar-customize-menu__text">${t("agentChip.getApps")}</span>
-      </wa-dropdown-item>
+      ${
+        BRAND_FEATURES.appsPage
+          ? html`<wa-dropdown-item class="sidebar-customize-menu__item" value="command:apps">
+              <span slot="icon" class="nav-item__icon" aria-hidden="true">${icons.layoutGrid}</span>
+              <span class="sidebar-customize-menu__text">${t("agentChip.getApps")}</span>
+            </wa-dropdown-item>`
+          : nothing
+      }
       <wa-dropdown-item class="sidebar-customize-menu__item" value="command:debug-overlay">
         <span slot="icon" class="nav-item__icon" aria-hidden="true">${icons.activity}</span>
         <span class="sidebar-customize-menu__text">${t("debug.overlay.title")}</span>

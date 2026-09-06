@@ -1,5 +1,6 @@
 // Devices page renders the mobile device pairing setup dialog.
 import { html, nothing } from "lit";
+import { BRAND_FEATURES } from "../../brand.ts";
 import { handleCopyButton, renderCopyButton } from "../../components/copy-button.ts";
 import { icons } from "../../components/icons.ts";
 import "../../components/modal-dialog.ts";
@@ -85,7 +86,7 @@ export function renderDevicePairSetup(props: DevicePairSetupProps) {
             <h2>${title}</h2>
             <p>${description}</p>
             ${
-              lifecycle.phase !== "success" && !isNodeSetup
+              lifecycle.phase !== "success" && !isNodeSetup && BRAND_FEATURES.appsPage
                 ? html`<p class="device-pair-setup__get-apps">
                     ${t("devices.pairing.noApp")}
                     <button type="button" @click=${props.onGetApps}>
