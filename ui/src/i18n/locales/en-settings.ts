@@ -40,7 +40,7 @@ const enSettings = {
       idleTimeoutHelp: "Stop an unused worker after this positive Go duration.",
       idleTimeoutPlaceholder: "45m",
       setup: "Setup command",
-      setupHelp: "Optional idempotent shell command run before OpenClaw is installed.",
+      setupHelp: "Optional idempotent shell command run before {brand} is installed.",
       setupPlaceholder: "command -v node || install-node",
       desktop: "Desktop",
       desktopHelp:
@@ -139,7 +139,7 @@ const enSettings = {
       heading: "Connect a verified AI model",
       signedInNoModels:
         "You're signed in, but this account exposes no usable models. Choose another provider or account to continue.",
-      notConfigured: "Choose a provider and verify the model OpenClaw will use.",
+      notConfigured: "Choose a provider and verify the model {brand} will use.",
       noModels: "No models available",
       modelRequired: "Model required",
       chooseProvider: "Choose another provider",
@@ -178,7 +178,7 @@ const enSettings = {
       noModels: "Configure a provider before selecting default models.",
       thinkingHelpLabel: "About thinking defaults",
       thinkingHelp:
-        "Sets the default for new sessions when no session-specific thinking level is set. OpenClaw maps unsupported levels to the closest option supported by the selected model.",
+        "Sets the default for new sessions when no session-specific thinking level is set. {brand} maps unsupported levels to the closest option supported by the selected model.",
       thinkingDefaultHelp:
         "Uses the selected model's thinking policy instead of saving a global thinking override.",
       fastModeHelpLabel: "About fast mode defaults",
@@ -231,7 +231,7 @@ const enSettings = {
       installKind: "Install type",
       policyTitle: "Update policy",
       channel: "Release channel",
-      channelDescription: "Choose which OpenClaw release track this Gateway follows.",
+      channelDescription: "Choose which {brand} release track this Gateway follows.",
       checkForUpdates: "Check for updates",
       checkForUpdatesDescription: "Periodically check for new versions and show update notices.",
       automaticUpdates: "Automatic updates",
@@ -274,14 +274,14 @@ const enSettings = {
   },
   configPage: {
     deviceSettings: {
-      appOnly: "These settings are only available inside the OpenClaw Mac app.",
+      appOnly: "These settings are only available inside the {brand} Mac app.",
       loading: "Waiting for settings from the Mac app…",
       intro: "App behavior and capabilities on this Mac.",
       permissionsIntro: "macOS access for notifications, capture, voice, and device context.",
       app: "App",
       showDockIcon: "Show Dock icon",
       showDockIconHint:
-        "Keep OpenClaw visible in the Dock. When off, windows still show the Dock icon while open.",
+        "Keep {brand} visible in the Dock. When off, windows still show the Dock icon while open.",
       iconAnimations: "Icon animations",
       iconAnimationsHint: "Enable idle blinks and wiggles on the menu bar icon.",
       launchAtLogin: "Launch at login",
@@ -314,10 +314,10 @@ const enSettings = {
         "Copy cookies from a Chrome-family profile into an isolated managed profile.",
       importBrowserLogins: "Import browser logins…",
       cookieSync: "Cookie sync",
-      cookieSyncUnavailable: "Cookie sync requires remote mode with an external OpenClaw CLI.",
+      cookieSyncUnavailable: "Cookie sync requires remote mode with an external {brand} CLI.",
       cookieSyncEnabled: "Sync cookies to the remote computer",
       cookieSyncHint:
-        "Continuously copy this Mac's logged-in cookies for the domains below into the remote OpenClaw browser profile. Off by default.",
+        "Continuously copy this Mac's logged-in cookies for the domains below into the remote {brand} browser profile. Off by default.",
       domains: "Domains",
       domainsHint:
         "Cookies are only synced for these hostnames; an empty list means nothing is synced.",
@@ -374,7 +374,7 @@ const enSettings = {
       privacy: "Privacy",
       activePresence: "Active computer presence",
       activePresenceHint:
-        "Share this Mac's idle duration so OpenClaw can identify the Mac you used most recently and route node alerts. Never sends keys, pointer positions, app names, or window titles. Requires Accessibility.",
+        "Share this Mac's idle duration so {brand} can identify the Mac you used most recently and route node alerts. Never sends keys, pointer positions, app names, or window titles. Requires Accessibility.",
     },
     deviceTalk: {
       title: "This Mac",
@@ -462,7 +462,7 @@ const enSettings = {
     },
     themes: {
       claw: {
-        label: "Claw",
+        label: "Chroma",
         description: "Chroma family",
       },
       knot: {
@@ -542,8 +542,8 @@ const enSettings = {
       enable: "Enable notifications",
       openSystemSettings: "Open System Settings",
       blockedHint: "Allow notifications in this site's browser permissions.",
-      nativeBlockedHint: "Allow OpenClaw in macOS System Settings > Notifications.",
-      iosInstallRequired: "On iPhone or iPad, use Share > Add to Home Screen, then open OpenClaw.",
+      nativeBlockedHint: "Allow {brand} in macOS System Settings > Notifications.",
+      iosInstallRequired: "On iPhone or iPad, use Share > Add to Home Screen, then open {brand}.",
       accountDefaults: "Account defaults",
       installedApp: "This browser or app",
       deliverDevice: "Deliver to this browser or app",
@@ -581,7 +581,7 @@ const enSettings = {
         themeDefault: "Theme default",
         themeFace: "{theme} · {face}",
         system: "System",
-        previewCaption: "OpenClaw · A little clarity goes a long way",
+        previewCaption: "{brand} · A little clarity goes a long way",
         previewProse:
           "Good typography makes room for the conversation. Choose a face that feels comfortable to read.",
         previewCode: 'const greeting = "Hello, world!";',
@@ -605,7 +605,7 @@ const enSettings = {
       usingAccent: "Using {value}",
       accents: {
         default: "Theme default",
-        claw: "Claw red",
+        claw: "Red",
         coral: "Coral",
         amber: "Amber",
         mint: "Mint",

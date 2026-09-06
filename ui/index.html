@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <title>OpenClaw Control (Chris fork v2)</title>
+    <title>Control</title>
     <meta name="color-scheme" content="dark light" />
     <!-- These mirror the claw theme's --bg tokens for first paint; runtime theme application keeps them synchronized. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf9f7" />
@@ -364,22 +364,22 @@
       hidden
     >
       <div class="mount-fallback__panel" tabindex="-1">
-        <p class="mount-fallback__eyebrow">OpenClaw Control UI (Chris fork)</p>
+        <p class="mount-fallback__eyebrow">Control UI</p>
         <h1 id="openclaw-mount-fallback-title">Control UI did not start</h1>
         <p id="openclaw-mount-fallback-summary">
           The browser loaded the static page, but the app bundle did not start. The gateway may be
-          restarting, or this page may reference assets from a different OpenClaw version.
+          restarting, or this page may reference assets from a different app version.
         </p>
         <ul>
-          <li>OpenClaw will retry the current app bundle automatically.</li>
+          <li>The app bundle is retried automatically.</li>
           <li>If this persists, reload or try a clean browser profile.</li>
           <li>
             See
             <a
-              href="https://docs.openclaw.ai/web/control-ui#blank-control-ui-page"
+              href="https://github.com/necromman/openclaw/blob/chris/main/FORK.md"
               target="_blank"
               rel="noopener noreferrer"
-              >Control UI troubleshooting</a
+              >the fork notes</a
             >.
           </li>
         </ul>
@@ -452,7 +452,7 @@
             return;
           }
           setSummary(
-            "The gateway is not reachable yet. OpenClaw will keep retrying while it restarts.",
+            "The gateway is not reachable yet. Retrying while it restarts.",
           );
           scheduleRecovery();
         }

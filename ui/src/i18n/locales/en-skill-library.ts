@@ -84,8 +84,8 @@ const enSkillLibrary = {
     importHelp:
       "Import SKILL.md with supporting files, a local folder, or a ZIP into your private library. Text bundles open for review before saving; ZIP imports publish when you choose Import skill.",
     importWorkspace:
-      "Choose SKILL.md and supporting text files or a folder. Review the content, then save and apply a Workshop proposal to the selected agent workspace. Use ClawHub below for workspace installs.",
-    importClawHub:
+      "Choose SKILL.md and supporting text files or a folder. Review the content, then save and apply a Workshop proposal to the selected agent workspace. Use {brandSkillHub} below for workspace installs.",
+    import{brandSkillHub}:
       "Import {source} into your private library. This does not publish your files or install host dependencies.",
     chooseFiles: "SKILL.md, supporting files, or ZIP",
     chooseFolder: "Skill folder",

@@ -109,7 +109,7 @@ const enLogin = {
         stepDevUi:
           "If using pnpm ui:dev, rebuild or restart the dev UI against the current checkout.",
         stepRestart:
-          "Restart the Gateway after updating OpenClaw so it serves the current protocol.",
+          "Restart the Gateway after updating {brand} so it serves the current protocol.",
       },
       network: {
         title: "Could not connect",
