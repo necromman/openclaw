@@ -67,6 +67,17 @@
   max-width: var(--page-max-width) !important;
 }
 
+/* Pages that roll their own centred column instead of .settings-page. Found
+ * with: every rule in ui/src/styles that pairs a fixed max-width with an auto
+ * margin (see the audit table in FORK.md). Chat is deliberately absent. */
+.content--skill-workshop,
+.sw-today,
+.config-lead,
+.config-content-callout,
+.content-header.hub-page-header.plugins-hub-header {
+  max-width: var(--page-max-width) !important;
+}
+
 /* ── 2. Pills and chips flatten to the 5px ceiling ──
  *
  * These read --radius-full upstream because they were meant to be pills. Only
