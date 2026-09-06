@@ -1,13 +1,8 @@
-import { expectDefined } from "@openclaw/normalization-core";
 import { html, nothing, type TemplateResult } from "lit";
+import { BRAND_LINKS } from "../../brand.ts";
 import type { ControlUiBuildInfo } from "../../build-info.ts";
+import { renderBrandMark } from "../../components/brand-mark.ts";
 import { icons } from "../../components/icons.ts";
-import {
-  canonicalLobsterLook,
-  lobsterLookStyle,
-  renderLobsterSvg,
-} from "../../components/lobster-pet-look.ts";
-import { LOBSTER_PET_PALETTES } from "../../components/lobster-pet-palettes.ts";
 import {
   renderSettingsPage,
   renderSettingsRow,
@@ -18,7 +13,6 @@ import "../../components/tooltip.ts";
 import { i18n, t } from "../../i18n/index.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
 import { formatRelativeTimestamp } from "../../lib/format.ts";
-import { COMMUNITY_DISCORD_URL } from "../../lib/product-links.ts";
 import "../../styles/about.css";
 import { brandIcons } from "./brand-icons.ts";
 
@@ -35,32 +29,32 @@ type AboutProps = {
 
 const SHORT_COMMIT_LENGTH = 12;
 
-// Docs-first where a docs page exists; GitHub/Discord match the native
-// macOS/iOS About screens (AboutSettings.swift, SettingsProTabSections.swift).
+// Fork link table. Destinations come from src/brand.ts; an empty entry means
+// this fork has no such destination and the link is not rendered at all.
 const ABOUT_LINKS: ReadonlyArray<{ href: string; icon: TemplateResult; label: () => string }> = [
-  { href: "https://openclaw.ai", icon: icons.globe, label: () => t("aboutPage.linkWebsite") },
-  { href: "https://docs.openclaw.ai", icon: icons.book, label: () => t("aboutPage.linkDocs") },
+  { href: BRAND_LINKS.website, icon: icons.globe, label: () => t("aboutPage.linkWebsite") },
+  { href: BRAND_LINKS.docs, icon: icons.book, label: () => t("aboutPage.linkDocs") },
   {
-    href: "https://github.com/openclaw/openclaw",
+    href: BRAND_LINKS.github,
     icon: brandIcons.github,
     label: () => t("aboutPage.linkGitHub"),
   },
   {
-    href: COMMUNITY_DISCORD_URL,
+    href: BRAND_LINKS.discord,
     icon: brandIcons.discord,
     label: () => t("aboutPage.linkDiscord"),
   },
   {
-    href: "https://x.com/openclaw",
+    href: BRAND_LINKS.x,
     icon: brandIcons.x,
     label: () => t("aboutPage.linkX"),
   },
   {
-    href: "https://docs.openclaw.ai/releases",
+    href: BRAND_LINKS.changelog,
     icon: icons.scrollText,
     label: () => t("aboutPage.linkChangelog"),
   },
-];
+].filter((link) => link.href.length > 0);
 
 function formatControlUiBuildDate(
   value: string | null,
@@ -152,23 +146,18 @@ function renderCommit(props: AboutProps) {
   `;
 }
 
-// The same canonical crimson Clawd as the chat welcome hero, rendered big.
-// The poke button replays the claw wave; ambient motion lives in about.css.
+// Neutral fork brand mark. The poke button keeps the small wave animation that
+// about.css owns; only the artwork changed.
 function renderHero(props: AboutProps) {
-  const palette =
-    LOBSTER_PET_PALETTES.find((entry) => entry.id === "crimson") ??
-    expectDefined(LOBSTER_PET_PALETTES[0], "about lobster palette");
-  const look = canonicalLobsterLook(palette);
   return html`
     <section class="about-hero">
       <button
         type="button"
         class="about-hero__clawd ${props.clawdWaving ? "about-hero__clawd--wave" : ""}"
-        style=${lobsterLookStyle(look)}
         aria-label=${t("aboutPage.waveHello")}
         @click=${props.onPokeClawd}
       >
-        ${renderLobsterSvg(look)}
+        ${renderBrandMark({ size: 120 })}
       </button>
       <h2 class="about-hero__name">${t("aboutPage.productName")}</h2>
       <p class="about-hero__tagline">${t("aboutPage.tagline")}</p>

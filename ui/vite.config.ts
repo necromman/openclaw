@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 import { gzip } from "pako";
 import type { Plugin, UserConfig } from "vite";
+import { BRAND_NAME, BRAND_SHORT_NAME, BRAND_TAGLINE } from "../src/brand.ts";
 import {
   CONTROL_UI_ASSET_MANIFEST_FILENAME,
   CONTROL_UI_ASSET_MANIFEST_VERSION,
@@ -423,9 +424,15 @@ function controlUiBuildOutputPlugin(buildId: string, buildOutDir: string): Plugi
           /<script\b(?![^>]*\bdata-cfasync\s*=)/giu,
           '<script data-cfasync="false"',
         );
+        // The static <title> is a placeholder; the fork brand is stamped here so
+        // src/brand.ts stays the only place a product name is written.
+        const titled = marked.replace(
+          /<title>[^<]*<\/title>/iu,
+          `<title>${BRAND_NAME} Control</title>`,
+        );
         return cacheId
-          ? marked.replace(/<html\b/iu, `<html ${CONTROL_UI_BUILD_ID_ATTRIBUTE}="${cacheId}"`)
-          : marked;
+          ? titled.replace(/<html\b/iu, `<html ${CONTROL_UI_BUILD_ID_ATTRIBUTE}="${cacheId}"`)
+          : titled;
       },
     },
     writeBundle() {
@@ -454,10 +461,19 @@ function controlUiBuildOutputPlugin(buildId: string, buildOutDir: string): Plugi
           );
           fs.writeFileSync(filePath, versioned);
         } else {
-          const manifest = JSON.parse(assetSource) as { icons: Array<{ src: string }> };
+          const manifest = JSON.parse(assetSource) as {
+            icons: Array<{ src: string }>;
+            name: string;
+            short_name: string;
+            description: string;
+          };
           for (const icon of manifest.icons) {
             icon.src += `?v=${cacheId}`;
           }
+          // Fork brand is owned by src/brand.ts, never by the static manifest.
+          manifest.name = `${BRAND_NAME} Control`;
+          manifest.short_name = BRAND_SHORT_NAME;
+          manifest.description = BRAND_TAGLINE;
           fs.writeFileSync(filePath, `${JSON.stringify(manifest, null, 2)}\n`);
         }
       }

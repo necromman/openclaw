@@ -315,7 +315,8 @@ export function renderApplicationShell(host: ShellViewHost) {
       sidebarLiveActivity: uiSettings.sidebarLiveActivity !== false,
       pinnedAgentIds: navigationSnapshot.pinnedAgentIds,
       themeMode: context.theme.mode,
-      lobsterPetVisits: uiSettings.lobsterPetVisits !== false,
+      // This fork ships no mascot artwork, so roaming visits are opt-in.
+      lobsterPetVisits: uiSettings.lobsterPetVisits === true,
       lobsterPetSounds: uiSettings.lobsterPetSounds === true,
       gatewayVersion: config.serverVersion ?? gatewaySnapshot.hello?.server?.version ?? null,
       devGitBranch: config.devGitBranch,
