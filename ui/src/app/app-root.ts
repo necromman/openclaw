@@ -20,7 +20,6 @@ import {
 import {
   probeIxAuthSession,
   submitIxAuthLogin,
-  submitIxAuthLogout,
   submitIxAuthMfaCode,
   type IxAuthSessionState,
 } from "../features/ix-auth/ix-auth-session-api.ts";
@@ -298,13 +297,6 @@ export class OpenClawApp extends OpenClawLightDomElement {
       errorKey: result.errorKey,
       lockedUntilMs: result.lockedUntilMs,
     };
-  }
-
-  private async endIxAuthSession(basePath: string): Promise<void> {
-    await submitIxAuthLogout(basePath);
-    // Reloading discards every cached subscription and view built for the previous
-    // user rather than trying to prune them in place.
-    globalThis.location.assign(basePath || "/");
   }
 
   private resetLoginSensitivePresentation() {

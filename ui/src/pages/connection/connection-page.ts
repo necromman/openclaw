@@ -19,6 +19,11 @@ import {
   type UiSettings,
 } from "../../app/settings.ts";
 import { renderLearnMoreLink } from "../../components/settings-ui.ts";
+import {
+  probeIxAuthSession,
+  submitIxAuthLogout,
+  type IxAuthSessionState,
+} from "../../features/ix-auth/ix-auth-session-api.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import { isMissingOperatorReadScopeError } from "../../lib/gateway-errors.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
@@ -38,6 +43,9 @@ export class ConnectionPage extends OpenClawLightDomElement {
 
   @state() private settings: UiSettings = loadSettings();
   @state() private password = "";
+  // Probed here rather than threaded through the application context: the account block
+  // is the only consumer, and one extra same-origin GET is cheaper than shared state.
+  @state() private ixAuthSession: IxAuthSessionState | undefined;
   @state() private gatewayTokenVisible = false;
   @state() private gatewayPasswordVisible = false;
   @state() private systemInfo: SystemInfoResult | null = null;
@@ -82,6 +90,23 @@ export class ConnectionPage extends OpenClawLightDomElement {
       () => this.context?.channels,
       (channels, notify) => channels.subscribe(notify),
     );
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    void this.loadIxAuthSession();
+  }
+
+  private async loadIxAuthSession(): Promise<void> {
+    this.ixAuthSession = await probeIxAuthSession(this.context?.basePath ?? "");
+  }
+
+  private async signOutIxAuthSession(): Promise<void> {
+    const basePath = this.context?.basePath ?? "";
+    await submitIxAuthLogout(basePath);
+    // A full reload is deliberate: it discards every cached list, subscription, and
+    // view that was built for the signed-out user instead of pruning them piecemeal.
+    globalThis.location.assign(basePath || "/");
+  }
 
   override disconnectedCallback() {
     this.systemInfoPolling.stop();
@@ -288,6 +313,8 @@ export class ConnectionPage extends OpenClawLightDomElement {
       },
       onConnect: () => this.connect(),
       onRefresh: () => void this.context.channels.refresh(false),
+      ixAuthSession: this.ixAuthSession,
+      onIxAuthSignOut: () => void this.signOutIxAuthSession(),
     });
     return html`
       <section class="content-header">
