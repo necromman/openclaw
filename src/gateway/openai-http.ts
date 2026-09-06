@@ -595,7 +595,9 @@ function resolveActiveTurnContext(messagesUnknown: unknown): ActiveTurnContext {
 async function resolveImagesForRequest(
   activeTurnContext: Pick<ActiveTurnContext, "imageUrls">,
   limits: ResolvedOpenAiChatCompletionsLimits,
+  signal: AbortSignal,
 ): Promise<ImageContent[]> {
+  signal.throwIfAborted();
   if (activeTurnContext.imageUrls.kind === "invalid") {
     throw new Error("image_url part is missing a valid URL");
   }
@@ -620,7 +622,7 @@ async function resolveImagesForRequest(
       }
     }
 
-    const image = await extractImageContentFromSource(source, limits.images);
+    const image = await extractImageContentFromSource(source, limits.images, signal);
     totalBytes += estimateBase64DecodedBytes(image.data);
     if (totalBytes > limits.maxTotalImageBytes) {
       throw new Error(
@@ -864,6 +866,10 @@ export async function handleOpenAiHttpRequest(
   if (!handled) {
     return true;
   }
+  const abortController = new AbortController();
+  // The signal owns preparation; SSE installs presentation cleanup below.
+  let onDisconnect = () => {};
+  watchClientDisconnect(req, res, abortController, () => onDisconnect());
   const modelOverrideAuth = authorizeOpenAiCompatibleHttpModelOverride(req, handled.requestAuth);
   if (!modelOverrideAuth.allowed) {
     sendMissingScopeForbidden(res, modelOverrideAuth.missingScope);
@@ -1024,8 +1030,11 @@ export async function handleOpenAiHttpRequest(
   }
   let images: ImageContent[];
   try {
-    images = await resolveImagesForRequest(activeTurnContext, limits);
+    images = await resolveImagesForRequest(activeTurnContext, limits, abortController.signal);
   } catch (err) {
+    if (abortController.signal.aborted) {
+      return true;
+    }
     logWarn(`openai-compat: invalid image_url content: ${String(err)}`);
     sendInvalidRequest(res, "Invalid image_url content in `messages`.");
     return true;
@@ -1040,7 +1049,6 @@ export async function handleOpenAiHttpRequest(
   const created = Math.floor(Date.now() / 1000);
   const streamIdentity = { runId, model, created };
   const deps = createDefaultDeps();
-  const abortController = new AbortController();
   const mergedExtraSystemPrompt = [prompt.extraSystemPrompt, toolChoicePrompt]
     .filter((part): part is string => Boolean(part))
     .join("\n\n");
@@ -1068,7 +1076,6 @@ export async function handleOpenAiHttpRequest(
     : commandInput;
 
   if (!stream) {
-    const stopWatchingDisconnect = watchClientDisconnect(req, res, abortController);
     try {
       const result = await agentCommandFromGatewayIngress(
         gatewayCommandInput,
@@ -1166,8 +1173,6 @@ export async function handleOpenAiHttpRequest(
       sendJson(res, 500, {
         error: { message: "internal error", type: "api_error" },
       });
-    } finally {
-      stopWatchingDisconnect();
     }
     return true;
   }
@@ -1187,7 +1192,6 @@ export async function handleOpenAiHttpRequest(
   let observedTerminalLifecycle = false;
   let terminalStreamError: { message: string; type: string; code?: string } | undefined;
   let terminalLifecyclePhase: "end" | "error" = "end";
-  let stopWatchingDisconnect = () => {};
 
   const maybeFinalize = () => {
     if (closed || finalizeScheduled || !finalizeRequested) {
@@ -1211,7 +1215,6 @@ export async function handleOpenAiHttpRequest(
         return;
       }
       closed = true;
-      stopWatchingDisconnect();
       unsubscribe();
       if (!wroteStopChunk) {
         writeAssistantFinishChunk(res, { ...streamIdentity, finishReason: finalizeFinishReason });
@@ -1319,7 +1322,6 @@ export async function handleOpenAiHttpRequest(
       return;
     }
     closed = true;
-    stopWatchingDisconnect();
     unsubscribe();
     writeSse(res, { error });
     writeDone(res);
@@ -1338,11 +1340,11 @@ export async function handleOpenAiHttpRequest(
   res.once("finish", releaseStreamRootWork);
   res.once("close", releaseStreamRootWork);
 
-  stopWatchingDisconnect = watchClientDisconnect(req, res, abortController, () => {
+  onDisconnect = () => {
     closed = true;
     unsubscribe();
     releaseStreamRootWork();
-  });
+  };
 
   writeAssistantRoleChunk(res, streamIdentity);
 
