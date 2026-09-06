@@ -372,6 +372,36 @@ Windows 체크아웃에서 Control UI 제목에 `v2` 를 붙인 커밋 `14513fde
 - 그 직전 15:54:58 타이머 tick 은 SHA 가 안 움직여서 로그 한 줄 없이 조용히 빠졌다(설계대로).
 - 반영 확인: `curl -s http://127.0.0.1:18789/ | grep -oE '<title>[^<]*</title>'` -> `<title>OpenClaw Control (Chris fork v2)</title>`
 
+### 실제로 한 번 실패했고, 그 실패가 설계대로였다
+
+같은 날 다음 커밋(`56c103409ed5`)에서 `FAIL` 이 났다. 원인·복구를 그대로 남긴다.
+
+```
+16:03:02 KST  deploy start: 14513fdec725 -> 56c103409ed5 (origin/chris/main, mode=timer)
+16:03:03 KST  FAIL: git pull --ff-only rejected (local commits or diverged history). Gateway left running on 14513fdec725
+16:04:19 KST  deploy start: 14513fdec725 -> 56c103409ed5 (origin/chris/main, mode=now)
+16:05:32 KST  OK: deployed 56c103409ed5, Gateway restarted and answering HTTP 200
+```
+
+원인은 **파일 실행권한 드리프트**였다. 설치 스크립트가 `chmod +x chris-local/*.sh` 를 하는데 git 에는 `100644` 로 들어가 있어서, pull 할 때마다 워크트리가 `mode change 100644 => 100755` 로 더러워졌다. 그 상태에서 같은 파일의 모드를 바꾸는 커밋이 들어오자 `--ff-only` 가 거부했다.
+
+**중요한 건 이때 게이트웨이가 멀쩡히 이전 빌드로 계속 돌았다는 것이다.** 설계 의도대로 조용히 머지하지도, 반쯤 반영하지도 않았다.
+
+복구:
+
+```bash
+# 1. 무엇이 더러운지 본다
+wsl -d Ubuntu -- bash -lc 'cd ~/openclaw && git status --porcelain'
+
+# 2. 내 변경이 아니라 드리프트면 버린다 (내 변경이면 먼저 포크에 올린다)
+wsl -d Ubuntu -- bash -lc 'cd ~/openclaw && git checkout -- chris-local/'
+
+# 3. 타이머를 안 기다리고 즉시 재시도
+wsl -d Ubuntu -- bash -lc '~/openclaw/chris-local/auto-deploy.sh --now'
+```
+
+근본 수정은 커밋 `240e0fb51ad` 에서 실행권한을 `100755` 로 인덱스에 박은 것이다. 이제 `chmod +x` 가 no-op 이라 드리프트가 다시 생기지 않는다.
+
 ### 로그 파일이 git 을 더럽히지 않는 이유
 
 `chris-local/auto-deploy.log` 는 저장소 안에 있지만 `.git/info/exclude` 에 자동 등록된다(스크립트가 멱등하게 넣는다). 업스트림 `.gitignore` 를 건드리지 않으므로 리베이스 충돌이 생기지 않고, 워크트리는 깨끗하게 유지돼 `--ff-only` pull 이 막히지 않는다.
