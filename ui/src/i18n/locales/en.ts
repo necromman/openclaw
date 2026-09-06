@@ -3192,7 +3192,7 @@ export const en: TranslationMap & {
     },
   },
   aboutPage: {
-    productName: "OpenClaw",
+    productName: "OpenClaw (Chris fork)",
     tagline: "Your personal AI assistant, running on your own devices.",
     waveHello: "Wave hello to Clawd",
     linksLabel: "Community and resources",
