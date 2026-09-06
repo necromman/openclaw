@@ -1,5 +1,4 @@
-// Gateway connection authorization.
-// Authorizes HTTP/websocket gateway requests across shared-secret, Tailscale, and proxy modes.
+// Gateway authorization checks.
 import type { IncomingMessage } from "node:http";
 import {
   normalizeLowercaseStringOrEmpty,
@@ -26,6 +25,7 @@ import {
 import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
 import { ixAuthAuditActorFacts } from "./ix-auth-audit-actor.js";
 import { isIxAuthImpersonating } from "./ix-auth-impersonation-policy.js";
+import { isInvalidGatewayToken } from "./known-weak-gateway-secrets.js";
 import {
   isLocalDirectRequest,
   isLoopbackAddress,
@@ -180,6 +180,11 @@ export function assertGatewayAuthConfigured(
   auth: ResolvedGatewayAuth,
   rawAuthConfig?: GatewayAuthConfig | null,
 ): void {
+  if (auth.mode === "token" && isInvalidGatewayToken(auth.token)) {
+    throw new Error(
+      "Gateway token must not be blank or the literal string undefined/null. Run `openclaw doctor --fix --generate-gateway-token` for an inline token, or rotate its external secret source.",
+    );
+  }
   if (auth.mode === "token" && !auth.token) {
     if (auth.allowTailscale) {
       return;
@@ -352,7 +357,7 @@ async function authorizeTokenAuth(params: {
   deferRateLimitFailure?: boolean;
   resetOnSuccess?: boolean;
 }): Promise<GatewayAuthResult> {
-  if (!params.authToken) {
+  if (!params.authToken || isInvalidGatewayToken(params.authToken)) {
     return { ok: false, reason: "token_missing_config" };
   }
   if (!params.connectToken) {
