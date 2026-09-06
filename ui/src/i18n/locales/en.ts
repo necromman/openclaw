@@ -212,6 +212,22 @@ export const en: TranslationMap & {
       file: "File",
     },
   },
+  documentPreview: {
+    toolbarLabel: "Document preview",
+    downloadFile: "Download file",
+    unavailableTitle: "No preview for this document",
+    errorTooLarge:
+      "This document is larger than the preview limit, so it was not converted. Download it to read the whole file.",
+    errorConverterUnavailable:
+      "The gateway host has no document converter installed, so this file cannot be rendered here. You can still download it.",
+    errorConversionFailed:
+      "Converting this document for preview failed. It may be password protected or damaged.",
+    errorUnsupportedFormat: "This file format cannot be previewed as a document.",
+    hangulNotice:
+      "Preview of Hangul documents (hwp, hwpx) is not available yet. You can still download the file.",
+    convertedBy: "Converted for preview",
+    loading: "Loading document preview",
+  },
   mcpApp: {
     title: "MCP App",
     unavailable: "MCP App unavailable: {error}",

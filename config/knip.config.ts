@@ -466,6 +466,10 @@ const config = {
     // production uses them through their owning module/controller.
     "ui/src/pages/chat/chat-state-refresh.ts": ["exports"],
     "ui/src/pages/chat/composer-persistence.ts": ["exports"],
+    // Focused document-preview tests consume the classifier and the base64
+    // decoder directly; production reaches them through their owning module.
+    "ui/src/components/file-preview/document-preview-kinds.ts": ["exports", "types"],
+    "ui/src/components/file-preview/document-preview.ts": ["exports"],
     // Focused media tests consume these explicit seams; production uses the helpers in-module.
     "src/agents/embedded-agent-subscribe.handlers.lifecycle.ts": ["exports"],
     "src/gateway/server-methods/chat-webchat-media.ts": ["exports"],

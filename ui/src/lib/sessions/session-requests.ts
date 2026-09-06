@@ -242,12 +242,13 @@ export function requestSessionFile(
   client: SessionRequestClient,
   key: string,
   path: string,
-  options: { agentId?: string | null } = {},
+  options: { agentId?: string | null; documentPreview?: boolean } = {},
 ): Promise<SessionWorkspaceGetResult | null> {
   return client.request<SessionWorkspaceGetResult | null>("sessions.files.get", {
     sessionKey: key,
     path,
     ...(options.agentId?.trim() ? { agentId: options.agentId.trim() } : {}),
+    ...(options.documentPreview === true ? { documentPreview: true } : {}),
   });
 }
 

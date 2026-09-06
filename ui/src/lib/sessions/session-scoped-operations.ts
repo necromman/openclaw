@@ -104,7 +104,7 @@ export function createSessionScopedOperations(host: SessionScopedOperationsHost)
   const getFile = async (
     key: string,
     path: string,
-    options: { agentId?: string | null } = {},
+    options: { agentId?: string | null; documentPreview?: boolean } = {},
   ): Promise<SessionWorkspaceGetResult | null> => {
     const scope = host.connection.capture();
     if (!scope) {

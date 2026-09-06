@@ -122,8 +122,29 @@ type FileSidebarContent = {
   edit?: FileSidebarEdit;
 };
 
+/**
+ * A Gateway-rendered document preview. `errorCode` carries the reason a
+ * conversion could not be shown, and leaves `format`/`content` empty.
+ */
+type DocumentSidebarContent = {
+  kind: "document";
+  path: string;
+  root?: string;
+  name: string;
+  format: "pdf" | "html" | "";
+  contentEncoding: "base64" | "utf8" | "";
+  content: string;
+  sourceFormat: string;
+  converter?: string;
+  errorCode?: string;
+  size?: number;
+  updatedAtMs?: number;
+  rawText?: string | null;
+};
+
 export type SidebarContent =
   | MarkdownSidebarContent
+  | DocumentSidebarContent
   | CanvasSidebarContent
   | ImageSidebarContent
   | AttachmentSidebarContent

@@ -3,6 +3,10 @@ import { GatewayRequestError } from "../../../api/gateway.ts";
 import type { ArtifactDownloadResult, SessionWorkspaceGetResult } from "../../../api/types.ts";
 import { hasOperatorAdminAccess } from "../../../app/operator-access.ts";
 import { patchSettings, type ChatWorkspaceDock } from "../../../app/settings.ts";
+import {
+  isDocumentPreviewPath,
+  isHangulDocumentPath,
+} from "../../../components/file-preview/document-preview-kinds.ts";
 import { t } from "../../../i18n/index.ts";
 import { formatUiError } from "../../../lib/format-error.ts";
 import { isGatewayMethodAdvertised } from "../../../lib/gateway-methods.ts";
@@ -100,6 +104,28 @@ function unsupportedFileSidebarContent(
     kind: "markdown",
     content,
     rawText: content,
+  };
+}
+
+type DocumentSidebarContent = Extract<SidebarContent, { kind: "document" }>;
+
+/** Builds the document preview variant; overrides carry either a payload or an error. */
+function documentSidebarContent(
+  result: SessionWorkspaceGetResult,
+  documentPath: string,
+  name: string,
+  overrides: Partial<DocumentSidebarContent>,
+): DocumentSidebarContent {
+  return {
+    kind: "document",
+    path: documentPath,
+    name,
+    format: "",
+    contentEncoding: "",
+    content: "",
+    sourceFormat: languageForFile(name),
+    ...(result.root ? { root: result.root } : {}),
+    ...overrides,
   };
 }
 
@@ -230,6 +256,7 @@ function openFile(
   opts: { line?: number | null; requestPath?: string } = {},
 ) {
   const requestPath = opts.requestPath ?? path;
+  const documentPreview = isDocumentPreviewPath(basenameForPath(path));
   openWorkspaceItem(
     state,
     workspace,
@@ -237,6 +264,7 @@ function openFile(
     () =>
       state.sessions.getFile(workspace.sessionKey, requestPath, {
         agentId: workspace.agentId,
+        ...(documentPreview ? { documentPreview: true } : {}),
       }),
     (result) => {
       const file = result.file;
@@ -244,6 +272,29 @@ function openFile(
         return null;
       }
       const name = file.name || basenameForPath(path);
+      const documentPath = file.workspacePath || file.path || path;
+      // hwp/hwpx never asked for a conversion, so they carry their own notice.
+      if (isHangulDocumentPath(name)) {
+        return documentSidebarContent(result, documentPath, name, { errorCode: "hangul" });
+      }
+      if (file.previewKind === "document" && file.document) {
+        return typeof file.content === "string"
+          ? documentSidebarContent(result, documentPath, name, {
+              format: file.document.format,
+              contentEncoding: file.contentEncoding === "base64" ? "base64" : "utf8",
+              content: file.content,
+              sourceFormat: file.document.sourceFormat,
+              ...(file.document.converter ? { converter: file.document.converter } : {}),
+              ...(typeof file.size === "number" ? { size: file.size } : {}),
+              ...(typeof file.updatedAtMs === "number" ? { updatedAtMs: file.updatedAtMs } : {}),
+            })
+          : null;
+      }
+      if (file.previewKind === "unsupported" && file.documentError) {
+        return documentSidebarContent(result, documentPath, name, {
+          errorCode: file.documentError,
+        });
+      }
       if (file.previewKind === "image") {
         if (
           file.contentEncoding !== "base64" ||

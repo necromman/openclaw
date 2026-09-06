@@ -19,6 +19,7 @@ import {
   type SessionLinkTarget,
 } from "../../../components/markdown-session-links.ts";
 import { toSanitizedMarkdownHtml } from "../../../components/markdown.ts";
+import "../../../components/file-preview/document-preview.ts";
 import "../../../components/tooltip.ts";
 import { t } from "../../../i18n/index.ts";
 import {
@@ -226,7 +227,9 @@ function renderMarkdownSidebar(props: MarkdownSidebarProps) {
               ? t("chat.sessionDiff.title")
               : content?.kind === "markdown"
                 ? t("chat.detailPanel.markdownPreview")
-                : t("chat.detailPanel.toolDetails");
+                : content?.kind === "document"
+                  ? content.name.trim() || t("chat.detailPanel.file")
+                  : t("chat.detailPanel.toolDetails");
   return html`
     <div class="sidebar-panel">
       ${
@@ -363,44 +366,54 @@ function renderMarkdownSidebar(props: MarkdownSidebarProps) {
                               props.attachmentRuntime,
                             )}
                           </div>`
-                        : html`
-                            <section class="sidebar-markdown-shell">
-                              <div class="sidebar-markdown-shell__toolbar">
-                                <div class="sidebar-markdown-shell__intro">
-                                  <div class="sidebar-markdown-shell__eyebrow">
-                                    ${icons.scrollText}
-                                    <span>${t("chat.detailPanel.renderedMarkdown")}</span>
+                        : content.kind === "document"
+                          ? html`<openclaw-document-preview
+                              .name=${content.name}
+                              .format=${content.format}
+                              .contentEncoding=${content.contentEncoding}
+                              .content=${content.content}
+                              .sourceFormat=${content.sourceFormat}
+                              .converter=${content.converter ?? ""}
+                              .errorCode=${content.errorCode ?? ""}
+                            ></openclaw-document-preview>`
+                          : html`
+                              <section class="sidebar-markdown-shell">
+                                <div class="sidebar-markdown-shell__toolbar">
+                                  <div class="sidebar-markdown-shell__intro">
+                                    <div class="sidebar-markdown-shell__eyebrow">
+                                      ${icons.scrollText}
+                                      <span>${t("chat.detailPanel.renderedMarkdown")}</span>
+                                    </div>
+                                    <div class="sidebar-markdown-shell__hint">
+                                      ${t("chat.detailPanel.renderedMarkdownHint")}
+                                    </div>
                                   </div>
-                                  <div class="sidebar-markdown-shell__hint">
-                                    ${t("chat.detailPanel.renderedMarkdownHint")}
-                                  </div>
+                                  <button
+                                    @click=${props.onViewRawText}
+                                    class="btn btn--sm"
+                                    type="button"
+                                  >
+                                    ${t("chat.detailPanel.viewRawText")}
+                                  </button>
                                 </div>
-                                <button
-                                  @click=${props.onViewRawText}
-                                  class="btn btn--sm"
-                                  type="button"
-                                >
-                                  ${t("chat.detailPanel.viewRawText")}
-                                </button>
-                              </div>
-                              ${
-                                markdownHtml
-                                  ? html`
-                                      <article
-                                        class="sidebar-markdown-reader sidebar-markdown"
-                                        dir=${detectTextDirection(content.content)}
-                                      >
-                                        ${unsafeHTML(markdownHtml)}
-                                      </article>
-                                    `
-                                  : html`
-                                      <div class="sidebar-markdown-empty">
-                                        ${t("chat.detailPanel.noPreviewableMarkdown")}
-                                      </div>
-                                    `
-                              }
-                            </section>
-                          `
+                                ${
+                                  markdownHtml
+                                    ? html`
+                                        <article
+                                          class="sidebar-markdown-reader sidebar-markdown"
+                                          dir=${detectTextDirection(content.content)}
+                                        >
+                                          ${unsafeHTML(markdownHtml)}
+                                        </article>
+                                      `
+                                    : html`
+                                        <div class="sidebar-markdown-empty">
+                                          ${t("chat.detailPanel.noPreviewableMarkdown")}
+                                        </div>
+                                      `
+                                }
+                              </section>
+                            `
               : html` <div class="muted">${t("chat.detailPanel.noContent")}</div> `
         }
       </div>
@@ -420,6 +433,7 @@ export function renderSidebarPanel(
     props.content?.kind === "file" ||
     props.content?.kind === "markdown" ||
     props.content?.kind === "attachment" ||
+    props.content?.kind === "document" ||
     props.content?.kind === "session-diff";
   return html`
     <div

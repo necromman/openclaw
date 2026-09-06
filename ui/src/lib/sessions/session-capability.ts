@@ -231,7 +231,7 @@ export type SessionCapability = {
   getFile: (
     key: string,
     path: string,
-    options?: { agentId?: string | null },
+    options?: { agentId?: string | null; documentPreview?: boolean },
   ) => Promise<SessionWorkspaceGetResult | null>;
   setFile: (
     key: string,
