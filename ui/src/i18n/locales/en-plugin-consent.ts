@@ -52,7 +52,7 @@ const enPluginConsent = {
     sha256: "SHA-256",
     commit: "Commit",
     pinnedArtifact: "Pinned to the exact installed artifact.",
-    source{brandSkillHub}: "{brandSkillHub}",
+    sourceClawHub: "{brandSkillHub}",
     sourceNpm: "npm",
     sourceGit: "Git",
     sourcePath: "Local path",
