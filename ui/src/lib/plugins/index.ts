@@ -1,5 +1,3 @@
-// Shared Control UI plugin catalog Gateway contracts.
-import { BRAND_LINKS } from "../../brand.ts";
 import type {
   PluginCatalogEntry,
   PluginDeclaredSurface as ProtocolPluginDeclaredSurface,
@@ -16,6 +14,8 @@ import type {
   PluginsUninstallResult,
 } from "../../../../packages/gateway-protocol/src/schema/plugins.js";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
+// Shared Control UI plugin catalog Gateway contracts.
+import { BRAND_LINKS } from "../../brand.ts";
 import type { RuntimeConfigCapability } from "../config/runtime-config-capability.ts";
 
 export type PluginCatalogItem = PluginCatalogEntry;

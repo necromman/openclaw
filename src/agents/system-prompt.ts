@@ -1,9 +1,3 @@
-/**
- * OpenClaw system prompt renderer.
- *
- * Assembles runtime, workspace, tooling, memory, delegation, channel, and cache-boundary prompt sections.
- */
-import { BRAND_NAME } from "../brand.js";
 import { createHmac, createHash } from "node:crypto";
 import {
   normalizePromptCapabilityIds,
@@ -22,6 +16,12 @@ import {
 import type { SourceReplyDeliveryMode } from "../auto-reply/get-reply-options.types.js";
 import type { ReasoningLevel } from "../auto-reply/thinking.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
+/**
+ * OpenClaw system prompt renderer.
+ *
+ * Assembles runtime, workspace, tooling, memory, delegation, channel, and cache-boundary prompt sections.
+ */
+import { BRAND_NAME } from "../brand.js";
 import { normalizeChatType, type ChatType } from "../channels/chat-type.js";
 import { CHANNEL_IDS } from "../channels/ids.js";
 import {

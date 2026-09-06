@@ -451,8 +451,7 @@ export const zh_TW = {
     },
     security: {
       askForHelp: "啟用工具或暴露到網際網路之前，請找有經驗的人協助。",
-      attribution:
-        "{brand} 是由 {brand} 基金會（非營利組織）開發的開源助手，會與你一同學習成長。",
+      attribution: "{brand} 是由 {brand} 基金會（非營利組織）開發的開源助手，會與你一同學習成長。",
       baselineDmSessions:
         "共享收件箱：隔離 DM 工作階段（session.dmScope: per-channel-peer），並盡量減少工具存取權限。",
       baselinePairing: "使用配對或允許清單；在群組聊天中要求 @ 提及。",

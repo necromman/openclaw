@@ -9,12 +9,12 @@ import type { SessionObserverDigest } from "../../../packages/gateway-protocol/s
 import { isSessionRouteId, pathForRoute } from "../app-route-paths.ts";
 import { beginNativeWindowDragFromTopInset } from "../app/native-window-drag.ts";
 import { t } from "../i18n/index.ts";
-import { COMMUNITY_DISCORD_URL } from "../lib/product-links.ts";
+import { createIdleImport } from "../lib/idle-import.ts";
 import "./session-menu.ts";
 import "./sidebar-agent-card.ts";
 import "./sidebar-attention.ts";
-import { createIdleImport } from "../lib/idle-import.ts";
 import { shouldHandleNavigationClick } from "../lib/navigation-click.ts";
+import { COMMUNITY_DISCORD_URL } from "../lib/product-links.ts";
 import "./theme-mode-toggle.ts";
 import "./tooltip.ts";
 import type { CatalogSessionKey } from "../lib/sessions/catalog-key.ts";

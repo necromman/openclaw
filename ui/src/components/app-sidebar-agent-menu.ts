@@ -15,8 +15,8 @@ import {
   KEYBOARD_SHORTCUT_COMBOS,
 } from "../lib/keyboard-shortcut-catalog.ts";
 import { openExternalUrlSafe } from "../lib/open-external-url.ts";
-import { COMMUNITY_DISCORD_URL } from "../lib/product-links.ts";
 import type { PresenceViewer } from "../lib/presence-users.ts";
+import { COMMUNITY_DISCORD_URL } from "../lib/product-links.ts";
 import { normalizeAgentId } from "../lib/sessions/session-key.ts";
 import {
   DEBUG_OVERLAY_SHORTCUT_LABEL,
