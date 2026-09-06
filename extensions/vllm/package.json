@@ -2,7 +2,7 @@
   "name": "@openclaw/vllm-provider",
   "version": "2026.9.2",
   "private": true,
-  "description": "OpenClaw vLLM provider plugin",
+  "description": "VLLM provider plugin",
   "type": "module",
   "devDependencies": {
     "@openclaw/plugin-sdk": "workspace:*"

@@ -2,7 +2,7 @@
   "name": "@openclaw/migrate-hermes",
   "version": "2026.9.2",
   "private": true,
-  "description": "Hermes to OpenClaw migration provider",
+  "description": "Hermes to the gateway migration provider",
   "type": "module",
   "dependencies": {
     "dotenv": "17.4.2",

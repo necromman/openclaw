@@ -2,7 +2,7 @@
   "name": "@openclaw/policy",
   "version": "2026.9.2",
   "private": true,
-  "description": "OpenClaw policy doctor checks for workspace conformance",
+  "description": "Policy doctor checks for workspace conformance",
   "type": "module",
   "dependencies": {
     "json5": "2.2.3"

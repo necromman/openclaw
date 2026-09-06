@@ -2,7 +2,7 @@
   "name": "@openclaw/workboard",
   "version": "2026.9.2",
   "private": true,
-  "description": "OpenClaw dashboard workboard plugin",
+  "description": "Dashboard workboard plugin",
   "type": "module",
   "dependencies": {
     "typebox": "1.3.18",

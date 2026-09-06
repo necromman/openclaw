@@ -1,7 +1,7 @@
 {
   "name": "@openclaw/line",
   "version": "2026.9.2",
-  "description": "OpenClaw LINE channel plugin for LINE Bot API chats.",
+  "description": "LINE channel plugin for LINE Bot API chats.",
   "repository": {
     "type": "git",
     "url": "https://github.com/openclaw/openclaw"

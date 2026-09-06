@@ -2,7 +2,7 @@
   "name": "@openclaw/browser-plugin",
   "version": "2026.9.2",
   "private": true,
-  "description": "OpenClaw browser tool plugin",
+  "description": "Browser tool plugin",
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
