@@ -145,8 +145,9 @@ async function callIxAuthEndpoint(params: {
   if (!response.ok) {
     return readRelayFailure(response.status, parsed);
   }
-  // SAFETY: parsed came from JSON.parse of a successful response; every field is read
-  // back through a typeof check before use, so a non-object simply yields undefined.
+  // Every field below is read back through a typeof check, so a non-object body simply
+  // yields undefined rather than a wrong value.
+  // SAFETY: parsed came from JSON.parse of a response the server marked successful.
   const envelope = parsed as Record<string, unknown>;
   const data =
     envelope.data !== null && typeof envelope.data === "object"

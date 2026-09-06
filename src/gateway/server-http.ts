@@ -490,9 +490,9 @@ export function createGatewayHttpServer(opts: {
               clientIp: ingressAttribution.rateLimit.subject.key,
               isLocalClient: isLocalDirectRequest(req, trustedProxies),
               isSecureContext: isSecureGatewayBrowserContext({
-                // SAFETY: node types the request socket as net.Socket, but a TLS server
-                // supplies a TLSSocket whose encrypted flag is the only way to tell the
-                // two apart here; reading it as optional is correct for both.
+                // A TLS server hands this handler a TLSSocket, a plain server a net.Socket.
+                // The encrypted flag is what distinguishes them at this point.
+                // SAFETY: the property is read as optional, which holds for both socket types.
                 encrypted: Boolean((req.socket as { encrypted?: boolean }).encrypted),
                 remoteAddressIsLoopback: isLoopbackAddress(req.socket?.remoteAddress),
                 forwardedProto: req.headers["x-forwarded-proto"],

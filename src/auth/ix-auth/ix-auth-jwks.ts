@@ -41,8 +41,8 @@ function importJwksKeys(document: unknown): Map<string, KeyObject> {
   const keys = new Map<string, KeyObject>();
   const list =
     document !== null && typeof document === "object"
-      ? // SAFETY: the preceding typeof guard proves document is a non-null object; keys
-        // is read as unknown and validated by the Array.isArray check below.
+      ? // The keys field stays unknown here and is validated by Array.isArray below.
+        // SAFETY: the typeof guard on the preceding line proves document is an object.
         (document as { keys?: unknown }).keys
       : undefined;
   if (!Array.isArray(list)) {
@@ -63,9 +63,10 @@ function importJwksKeys(document: unknown): Map<string, KeyObject> {
       continue;
     }
     try {
-      // SAFETY: node:crypto types the jwk key as a concrete JsonWebKey, but a JWKS entry
-      // is untrusted input whose shape is validated by createPublicKey itself; a malformed
-      // key throws into the catch below rather than producing an unusable KeyObject.
+      // node:crypto types this parameter as a concrete JsonWebKey, but a JWKS entry is
+      // untrusted input. createPublicKey validates the shape itself and throws into the
+      // catch below, so a malformed key is rejected rather than half-imported.
+      // SAFETY: createPublicKey is the validator; an invalid shape raises instead of returning.
       keys.set(keyId, createPublicKey({ key: jwk as never, format: "jwk" }));
     } catch {
       // A malformed key must not discard the sound keys beside it.
