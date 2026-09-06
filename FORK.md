@@ -6,6 +6,7 @@
 - 기준 태그: **v2026.9.2** (커밋 `3928bad9badfcb6c7d140530435e806fb8092190`, "docs: finalize 2026.9.2 release notes")
 - 상위 라이선스: MIT (c) OpenClaw Foundation. `LICENSE` 와 `THIRD_PARTY_NOTICES.md` 는 그대로 유지한다.
 - **코드베이스 구조**(어디가 백엔드·프런트인지, 인프라 요구, 데이터베이스)는 별도 문서다: [chris-local/CODEBASE.md](chris-local/CODEBASE.md) (HTML 판 `chris-local/codebase.html`).
+- **문서 미리보기**(PDF·Word·Excel·PowerPoint 를 파일 패널에서 바로 보기, 한글 폰트 포함)는 별도 문서다: [chris-local/FILE-PREVIEW.md](chris-local/FILE-PREVIEW.md).
 
 ---
 
@@ -743,6 +744,8 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 | `chris-local/CODEBASE.md` · `codebase.html` | 코드베이스 구조 문서 (백엔드·프런트·DB·인프라, 파일 경로 근거 포함) |
 | `chris-local/BRANDING-AUDIT.md`             | 브랜딩 전수 조사 (바꾼 것·남긴 것·남은 흔적, 5장의 정본)            |
 | `chris-local/BROWSER.md`                    | 브라우저 기능 (탐지 원인·Chrome 설치·설정 키·한글 폰트·Docker)      |
+| `chris-local/FILE-PREVIEW.md`               | 문서 미리보기 (선택지 비교·구조·보안 경계·한글 폰트·되돌리기)       |
+| `chris-local/workspace-pdf-rules.md`        | 에이전트 PDF 생성 규칙 원문 (`install-pdf-rules.sh` 가 설치)        |
 | `src/brand.ts` · `ui/src/brand.ts`          | 브랜드 상수 정본과 Control UI 재수출                                |
 | `ui/src/components/brand-mark.ts`           | 중립 브랜드 마크 (인라인 SVG)                                       |
 | `ui/src/styles/fork-style.css`              | 포크 공통 스타일 계층 (full width · 라운드 5px)                     |
