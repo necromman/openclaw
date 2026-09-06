@@ -1,0 +1,13 @@
+# systemd *user* unit: one auto-deploy pass. Driven by openclaw-auto-deploy.timer.
+# Installed by chris-local/install-auto-deploy.sh to ~/.config/systemd/user/.
+[Unit]
+Description=OpenClaw fork auto-deploy (pull chris/main, rebuild, restart Gateway)
+Documentation=https://github.com/necromman/openclaw/blob/chris/main/FORK.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/openclaw
+ExecStart=%h/openclaw/chris-local/auto-deploy.sh
+# A full rebuild takes a few minutes; never let the timer kill one mid-flight.
+TimeoutStartSec=1800

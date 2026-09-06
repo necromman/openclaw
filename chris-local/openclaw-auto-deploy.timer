@@ -1,0 +1,13 @@
+# Runs the auto-deploy pass every 2 minutes.
+# Stop it with:  systemctl --user disable --now openclaw-auto-deploy.timer
+[Unit]
+Description=OpenClaw fork auto-deploy every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Unit=openclaw-auto-deploy.service
+
+[Install]
+WantedBy=timers.target

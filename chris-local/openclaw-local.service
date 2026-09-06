@@ -1,0 +1,27 @@
+# systemd *user* unit for this fork's local gateway.
+# Installed by chris-local/install.sh to ~/.config/systemd/user/openclaw-local.service.
+# NOTE: `openclaw gateway install` refuses a non-default state dir, so this fork
+# ships its own unit instead. %h expands to the user's home directory.
+[Unit]
+Description=OpenClaw Gateway (Chris fork, local source build)
+Documentation=https://github.com/necromman/openclaw/blob/chris/main/FORK.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/openclaw
+Environment=OPENCLAW_HOME=%h/openclaw-local
+Environment=OPENCLAW_CONFIG_DIR=%h/openclaw-local/.openclaw
+Environment=OPENCLAW_CONFIG_PATH=%h/openclaw-local/.openclaw/openclaw.json
+Environment=OPENCLAW_STATE_DIR=%h/openclaw-local/.openclaw
+Environment=OPENCLAW_WORKSPACE_DIR=%h/openclaw-local/.openclaw/workspace
+Environment=NODE_ENV=production
+ExecStart=@NODE_BIN@ %h/openclaw/openclaw.mjs gateway
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:%h/openclaw-local/gateway.log
+StandardError=append:%h/openclaw-local/gateway.log
+
+[Install]
+WantedBy=default.target

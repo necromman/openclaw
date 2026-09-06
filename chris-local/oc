@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# `openclaw` CLI bound to this fork's source build and the isolated local home.
+set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/oc-env.sh"
+exec node "$OPENCLAW_SRC/openclaw.mjs" "$@"
