@@ -127,3 +127,30 @@ progress::-webkit-progress-value {
 .settings-save-indicator__claw svg .claw-icon__jaw {
   transform-origin: 12px 12px;
 }
+
+/* ── 5. Form controls share one height ──
+ *
+ * Upstream pins `--settings-control-height` on native `input.settings-input`
+ * and `select.settings-select`, but a Web Awesome `<wa-select>` is a custom
+ * element and never matched that rule, so it rendered 38px next to a 32px
+ * input. The automations "every N minutes" row showed the mismatch: same top,
+ * different height, so the two controls' centres were 3px apart.
+ *
+ * Give the custom element the same token and centre every inline control group
+ * so a residual difference never becomes a misalignment. */
+wa-select.settings-select {
+  height: var(--settings-control-height);
+}
+
+wa-select.settings-select::part(combobox) {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+}
+
+.cron-inline-controls,
+.model-providers__inline-form,
+.settings-row__control,
+.settings-value {
+  align-items: center;
+}
