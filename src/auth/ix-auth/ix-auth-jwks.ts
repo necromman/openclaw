@@ -96,17 +96,29 @@ async function resolveIxAuthSigningKey(params: {
     if (hit) {
       return hit;
     }
-    // Key rotation publishes a new kid before the old one retires. Refetch once,
-    // rate-limited, so a forged kid cannot turn every request into an outbound call.
+    // Key rotation publishes a new kid before the old one retires, so an unknown kid
+    // earns exactly one out-of-band refetch. The cooldown is what stops a flood of
+    // forged key ids from turning every request into an outbound call.
     if (params.nowMs - cached.lastRefetchAtMs < IX_AUTH_JWKS_REFETCH_COOLDOWN_MS) {
       return undefined;
     }
+    const rotated = await fetchIxAuthJwksDocument(params.jwksUrl);
+    jwksCacheByUrl.set(params.jwksUrl, {
+      keys: rotated,
+      // The TTL still runs from the original load: a rotation refetch refreshes the
+      // key set without granting the document another full lifetime.
+      fetchedAtMs: cached.fetchedAtMs,
+      lastRefetchAtMs: params.nowMs,
+    });
+    return rotated.get(params.keyId);
   }
   const keys = await fetchIxAuthJwksDocument(params.jwksUrl);
   jwksCacheByUrl.set(params.jwksUrl, {
     keys,
-    fetchedAtMs: isFresh && cached ? cached.fetchedAtMs : params.nowMs,
-    lastRefetchAtMs: params.nowMs,
+    fetchedAtMs: params.nowMs,
+    // A first load is not a rotation refetch. Leaving this at zero keeps the single
+    // rotation refetch available immediately afterwards.
+    lastRefetchAtMs: 0,
   });
   return keys.get(params.keyId);
 }
