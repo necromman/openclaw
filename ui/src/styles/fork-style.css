@@ -102,3 +102,17 @@ progress::-webkit-progress-bar,
 progress::-webkit-progress-value {
   border-radius: 0;
 }
+
+/* ── 4. Activity mark animation origin ──
+ *
+ * The `claw` icon is this fork's neutral ring-and-arc mark (see
+ * components/icons-tools.ts). Upstream pinned the animated part's rotation to
+ * the mascot's palm joint (8.6px 11px); our mark is concentric, so the same
+ * keyframes read as a spinner only when they turn about the icon centre.
+ * Every consumer of .claw-icon__jaw is retargeted here rather than in the
+ * upstream chat and layout stylesheets. */
+.chat-reading-indicator svg .claw-icon__jaw,
+.chat-tasks-status__claw svg .claw-icon__jaw,
+.settings-save-indicator__claw svg .claw-icon__jaw {
+  transform-origin: 12px 12px;
+}
