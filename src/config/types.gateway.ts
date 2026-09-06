@@ -175,7 +175,54 @@ export type GatewayControlUiConfig = {
 };
 
 /** Gateway authentication strategy for WebSocket and HTTP clients. */
-export type GatewayAuthMode = "none" | "token" | "password" | "trusted-proxy";
+export type GatewayAuthMode = "none" | "token" | "password" | "trusted-proxy" | "ix-auth";
+
+/**
+ * Configuration for the built-in IX-Auth identity provider.
+ *
+ * The Gateway acts as the backend-for-frontend: browsers post credentials to the
+ * Gateway's own `/auth/*` routes, the Gateway relays them to IX-Auth over the
+ * internal network with the shared service key, and only an opaque session cookie
+ * reaches the browser. IX-Auth is never exposed to the browser directly.
+ */
+export type GatewayIxAuthConfig = {
+  /** Internal base URL of the IX-Auth server, for example `http://ix-auth:9100`. */
+  baseUrl: string;
+  /** JWKS document URL. Defaults to `<baseUrl>/.well-known/jwks.json`. */
+  jwksUrl?: string;
+  /** Shared app-to-server secret sent as `X-IxAuth-Key` (plaintext or SecretRef). */
+  serviceKey: SecretInput;
+  /** Expected `iss` claim. Rejects tokens minted by another issuer. */
+  issuer?: string;
+  /** Expected `aud` claim. Rejects tokens minted for another application. */
+  audience?: string;
+  /** Session cookie name. Defaults to `__Host-openclaw-session`. */
+  cookieName?: string;
+  /**
+   * Maps an IX-Auth role code from the `ixauth_roles` claim onto a
+   * `gateway.roles.definitions` key. Unmapped codes are ignored.
+   */
+  roleMap?: Record<string, string>;
+  /**
+   * Role names that may resolve to the unrestricted operator role. A user whose
+   * mapped roles fall outside this list can never reach admin scopes even when the
+   * role map names one, which contains a typo in `roleMap` to a denial.
+   */
+  superAdminRoles?: string[];
+  /** Claim carrying department codes. Defaults to `ixauth_groups`. */
+  departmentClaim?: string;
+  /** Only group codes with this prefix become departments. Defaults to `dept-`. */
+  departmentGroupPrefix?: string;
+  /** Absolute URL of the IX-Auth admin console, surfaced to admins in the Control UI. */
+  adminConsoleUrl?: string;
+  /** Login session lifetime policy. */
+  session?: {
+    /** Idle expiry in minutes. @default 30 */
+    idleTimeoutMinutes?: number;
+    /** Absolute expiry in hours regardless of activity. @default 12 */
+    absoluteTimeoutHours?: number;
+  };
+};
 
 /**
  * Configuration for trusted reverse proxy authentication.
@@ -242,6 +289,11 @@ export type GatewayAuthConfig = {
    * Required when mode is "trusted-proxy".
    */
   trustedProxy?: GatewayTrustedProxyConfig;
+  /**
+   * Configuration for ix-auth mode.
+   * Required when mode is "ix-auth".
+   */
+  ixAuth?: GatewayIxAuthConfig;
 };
 
 export type GatewayAuthRateLimitConfig = {

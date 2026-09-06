@@ -33,6 +33,29 @@ export function shouldSkipControlUiPairing(params: {
   return null;
 }
 
+/**
+ * True when this Control UI operator authenticated with an IX-Auth session cookie.
+ *
+ * Mirrors the trusted-proxy predicate: in both cases an external identity provider,
+ * not a per-device credential, vouched for the person, so requiring a paired device
+ * would add friction without adding assurance.
+ */
+export function isIxAuthControlUiOperatorAuth(params: {
+  isControlUi: boolean;
+  role: GatewayRole;
+  authMode: string;
+  authOk: boolean;
+  authMethod: string | undefined;
+}): boolean {
+  return (
+    params.isControlUi &&
+    params.role === "operator" &&
+    params.authMode === "ix-auth" &&
+    params.authOk &&
+    params.authMethod === "ix-auth"
+  );
+}
+
 export function isTrustedProxyControlUiOperatorAuth(params: {
   isControlUi: boolean;
   role: GatewayRole;
@@ -63,7 +86,10 @@ export function shouldClearUnboundScopesForMissingDeviceIdentity(params: {
     params.decision.kind !== "allow" ||
     params.authMethod === "token" ||
     params.authMethod === "password" ||
-    params.authMethod === "trusted-proxy"
+    params.authMethod === "trusted-proxy" ||
+    // The browser declares operator.admin in its default scope list. A person's scopes
+    // come from their mapped role, never from what the page asked for.
+    params.authMethod === "ix-auth"
   );
 }
 
@@ -72,6 +98,7 @@ export function evaluateMissingDeviceIdentity(params: {
   role: GatewayRole;
   isControlUi: boolean;
   trustedProxyAuthOk?: boolean;
+  ixAuthOk?: boolean;
   localBackendSelfPairingOk?: boolean;
   sharedAuthOk: boolean;
   authOk: boolean;
@@ -81,7 +108,7 @@ export function evaluateMissingDeviceIdentity(params: {
   if (params.hasDeviceIdentity) {
     return { kind: "allow" };
   }
-  if (params.isControlUi && params.trustedProxyAuthOk) {
+  if (params.isControlUi && (params.trustedProxyAuthOk || params.ixAuthOk)) {
     return { kind: "allow" };
   }
   if (params.localBackendSelfPairingOk && params.role === "operator") {

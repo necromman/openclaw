@@ -18,7 +18,12 @@ export async function resolveGatewayConnectUserProfile(params: {
   authenticatedUserId: string | undefined;
   authResult: GatewayAuthResult;
   resolveAuthenticatedGitHubIdentity: ReturnType<typeof createAuthenticatedGitHubIdentitySync>;
+  /** Profile already bound by an earlier verified login, bypassing identity discovery. */
+  boundProfileId?: string;
 }) {
+  if (params.boundProfileId) {
+    return resolveAuthenticatedProfile(params.boundProfileId, Date.now());
+  }
   const profile = params.ownerProfileExpected
     ? ensureGatewayOwnerProfile(await resolveHostAccountName())
     : params.resolveAuthenticatedGitHubIdentity

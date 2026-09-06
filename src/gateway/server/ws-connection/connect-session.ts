@@ -124,6 +124,7 @@ export async function attachAuthenticatedGatewayConnect(
     deviceToken,
     authResult,
     authMethod,
+    ixAuthPrincipal,
     pairingLocality,
     sessionUsesSharedGatewayAuth,
     sessionSharedGatewaySessionGeneration,
@@ -212,6 +213,9 @@ export async function attachAuthenticatedGatewayConnect(
         authenticatedUserId,
         authResult,
         resolveAuthenticatedGitHubIdentity,
+        // The login route already bound this identity to a profile. Reusing that id
+        // keeps the WebSocket on the same profile even if the display email changes.
+        boundProfileId: ixAuthPrincipal?.profileId,
       });
     } catch (error) {
       logWsControl.warn(

@@ -19,6 +19,7 @@ export async function issueGatewayConnectDeviceTokens(params: {
     isBrowserOperatorUi,
     isWebchat,
     trustedProxyAuthOk,
+    ixAuthOk,
     sessionUsesSharedGatewayAuth,
     sessionSharedGatewaySessionGeneration,
     deviceTokenSharedGatewaySessionGeneration,
@@ -33,8 +34,10 @@ export async function issueGatewayConnectDeviceTokens(params: {
           generation: sessionSharedGatewaySessionGeneration,
         }
       : undefined;
+  // A device token would outlive logout: it is a bearer credential the browser keeps.
+  // Human sessions therefore never receive one, exactly as trusted-proxy sessions do not.
   const issuedDeviceGrant =
-    !trustedProxyAuthOk && device && hasApprovedDeviceBaseline
+    !trustedProxyAuthOk && !ixAuthOk && device && hasApprovedDeviceBaseline
       ? await ensureDeviceToken({
           deviceId: device.id,
           role,

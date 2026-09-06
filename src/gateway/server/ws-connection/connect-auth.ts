@@ -33,6 +33,7 @@ import { isControlUiOperatorBootstrapProfile } from "./connect-device-metadata.j
 import { verifyGatewayConnectDeviceProof } from "./connect-device-proof.js";
 import {
   evaluateMissingDeviceIdentity,
+  isIxAuthControlUiOperatorAuth,
   isTrustedProxyControlUiOperatorAuth,
   shouldClearUnboundScopesForMissingDeviceIdentity,
   shouldSkipControlUiPairing,
@@ -154,6 +155,7 @@ async function authenticateGatewayConnectCore(
     bootstrapTokenCandidate,
     deviceTokenCandidate,
     deviceTokenCandidateSource,
+    ixAuthPrincipal,
   } = connectAuthState;
   let { authResult, authOk, authMethod } = connectAuthState;
   let rejectedPendingSharedAuthFailure = pendingSharedAuthFailure;
@@ -294,6 +296,13 @@ async function authenticateGatewayConnectCore(
       role,
       isControlUi,
       trustedProxyAuthOk,
+      ixAuthOk: isIxAuthControlUiOperatorAuth({
+        isControlUi,
+        role,
+        authMode: resolvedAuth.mode,
+        authOk,
+        authMethod,
+      }),
       localBackendSelfPairingOk: skipLocalBackendSelfPairing,
       sharedAuthOk,
       authOk,
@@ -520,7 +529,14 @@ async function authenticateGatewayConnectCore(
     authOk,
     authMethod,
   });
-  if (trustedProxyAuthOk) {
+  const ixAuthOk = isIxAuthControlUiOperatorAuth({
+    isControlUi,
+    role,
+    authMode: resolvedAuth.mode,
+    authOk,
+    authMethod,
+  });
+  if (trustedProxyAuthOk || ixAuthOk) {
     scopes = applyConnectionScopeCap({ scopes, upgradeReq });
     connectParams.scopes = scopes;
   }
@@ -562,6 +578,8 @@ async function authenticateGatewayConnectCore(
     issuedBootstrapProfile,
     handoffBootstrapProfile,
     trustedProxyAuthOk,
+    ixAuthOk,
+    ixAuthPrincipal,
     controlUiPairingKind,
     skipLocalBackendSelfPairing,
     rejectUnauthorized,

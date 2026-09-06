@@ -7,6 +7,7 @@ import {
   AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
   type AuthRateLimiter,
 } from "../../auth-rate-limit.js";
+import type { IxAuthPrincipal } from "../../../auth/ix-auth/ix-auth-types.js";
 import {
   authorizeHttpGatewayConnect,
   authorizeWsControlUiGatewayConnect,
@@ -14,6 +15,7 @@ import {
   type ResolvedGatewayAuth,
 } from "../../auth.js";
 import { PROXY_ATTRIBUTION_REQUIRED_REASON } from "../../ingress-attribution.js";
+import { resolveIxAuthRequestPrincipal } from "../../ix-auth-principal.js";
 import { withSerializedRateLimitAttempt } from "../../rate-limit-attempt-serialization.js";
 
 type HandshakeConnectAuth = {
@@ -36,6 +38,8 @@ type ConnectAuthState = {
   bootstrapTokenCandidate?: string;
   deviceTokenCandidate?: string;
   deviceTokenCandidateSource?: DeviceTokenCandidateSource;
+  /** Present only in ix-auth mode once the handshake cookie verified. */
+  ixAuthPrincipal?: IxAuthPrincipal;
 };
 
 type SharedGatewayAuthDeviceTokenIssuer = {
@@ -135,6 +139,32 @@ export async function resolveConnectAuthState(params: {
   rateLimiter?: AuthRateLimiter;
   clientIp?: string;
 }): Promise<ConnectAuthState> {
+  // In ix-auth mode the browser proves identity with the session cookie carried on the
+  // upgrade request, so the handshake never asks for a token or a paired device.
+  const ixAuthPrincipal =
+    params.resolvedAuth.mode === "ix-auth"
+      ? (
+          await resolveIxAuthRequestPrincipal({
+            req: params.req,
+            trustedProxies: params.trustedProxies,
+            allowRealIpFallback: params.allowRealIpFallback,
+            touch: false,
+          })
+        )?.principal
+      : undefined;
+  if (ixAuthPrincipal) {
+    return {
+      authResult: { ok: true, method: "ix-auth", user: ixAuthPrincipal.claims.email },
+      authOk: true,
+      authMethod: "ix-auth",
+      // Not shared auth: a human session must not unlock the device-less paths that a
+      // shared secret unlocks for machine clients.
+      sharedAuthOk: false,
+      pendingSharedAuthFailure: false,
+      ixAuthPrincipal,
+    };
+  }
+
   const sharedConnectAuth = resolveSharedConnectAuth(params.connectAuth);
   const sharedAuthProvided = Boolean(sharedConnectAuth);
   const bootstrapTokenCandidate = params.hasDeviceIdentity

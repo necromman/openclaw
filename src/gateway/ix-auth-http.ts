@@ -1,0 +1,608 @@
+// Gateway backend-for-frontend routes that relay browser credentials to IX-Auth.
+//
+// Design invariant 4 (ix-auth/MODULE.md section 7): the identity server is never exposed
+// to the browser. The browser only ever talks to these routes, and only ever receives an
+// opaque session cookie. Access and refresh tokens stay in this process.
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
+import {
+  relayIxAuthLogin,
+  relayIxAuthLogout,
+  relayIxAuthMfaVerify,
+  type IxAuthRelayFailure,
+  type IxAuthRequestMeta,
+  type IxAuthTokenBundle,
+} from "../auth/ix-auth/ix-auth-client.js";
+import {
+  matchesIxAuthCsrfDigest,
+  persistIxAuthLoginSession,
+  resolveIxAuthSessionToken,
+  verifyIxAuthTokenBundle,
+} from "../auth/ix-auth/ix-auth-sessions.js";
+import { IX_AUTH_CSRF_HEADER_NAME, type IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
+import { revokeIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
+import { ensureProfileForEmail } from "../state/user-profiles.js";
+import { AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET, type AuthRateLimiter } from "./auth-rate-limit.js";
+import {
+  appendGatewayClearCookie,
+  appendGatewaySetCookie,
+  readRequestCookieValue,
+  serializeGatewaySetCookie,
+  type GatewayCookieAttributes,
+} from "./cookie-header.js";
+import { readJsonBody } from "./hooks.js";
+import { sendJson } from "./http-common.js";
+import { classifyIxAuthHttpPath, type IxAuthHttpRoute } from "./ix-auth-http-paths.js";
+import { checkBrowserOrigin } from "./origin-check.js";
+import { withSerializedRateLimitAttempt } from "./rate-limit-attempt-serialization.js";
+
+/** Login bodies are tiny; anything larger is not a login form. */
+const IX_AUTH_BODY_MAX_BYTES = 4 * 1024;
+
+/** Uniform failure body. Never distinguishes "no such account" from "wrong password". */
+const IX_AUTH_INVALID_CREDENTIALS = {
+  error: "invalid_credentials",
+  message: "The email or password is incorrect.",
+} as const;
+
+export type IxAuthHttpDependencies = {
+  settings: IxAuthRuntimeSettings;
+  /** Origins permitted to drive these routes, from gateway.controlUi.allowedOrigins. */
+  allowedOrigins?: string[];
+  allowHostHeaderOriginFallback?: boolean;
+  /** Real visitor IP resolved by ingress attribution, not the socket address. */
+  clientIp?: string;
+  isLocalClient: boolean;
+  /** True when the browser reached the Gateway over TLS or a loopback secure context. */
+  isSecureContext: boolean;
+  rateLimiter?: AuthRateLimiter;
+  onSecurityEvent?: (event: IxAuthSecurityEvent) => void;
+};
+
+/** Audit-shaped record of one authentication decision on the HTTP line. */
+export type IxAuthSecurityEvent = {
+  action:
+    | "ix-auth.login.succeeded"
+    | "ix-auth.login.failed"
+    | "ix-auth.login.mfa-required"
+    | "ix-auth.logout"
+    | "ix-auth.session.rejected";
+  outcome: "succeeded" | "failed" | "denied";
+  clientIp?: string;
+  profileId?: string;
+  identitySubject?: string;
+  identitySessionId?: string;
+  loginSessionId?: string;
+  reason?: string;
+};
+
+function buildSessionCookieAttributes(params: {
+  isSecureContext: boolean;
+  maxAgeSeconds?: number;
+}): GatewayCookieAttributes {
+  return {
+    path: "/",
+    httpOnly: true,
+    // A __Host- cookie requires Secure. Plain-HTTP loopback development therefore falls
+    // back to an unprefixed name; serializeGatewaySetCookie enforces the rest.
+    secure: params.isSecureContext,
+    // Lax keeps top-level navigations working while blocking cross-site form posts. It is
+    // a backstop: the CSRF token below is the actual defense.
+    sameSite: "Lax",
+    maxAgeSeconds: params.maxAgeSeconds,
+  };
+}
+
+/**
+ * Resolve the cookie name actually used.
+ *
+ * `__Host-` prefixed cookies are silently dropped by browsers over plain HTTP, which
+ * would make loopback development look like a broken login rather than a policy choice.
+ */
+function resolveEffectiveCookieName(settings: IxAuthRuntimeSettings, isSecureContext: boolean) {
+  if (isSecureContext || !settings.cookieName.startsWith("__Host-")) {
+    return settings.cookieName;
+  }
+  return settings.cookieName.slice("__Host-".length);
+}
+
+/**
+ * Name of the companion cookie holding the CSRF token.
+ *
+ * The session cookie is HttpOnly so script cannot read it. The CSRF token must be
+ * readable by the Control UI to echo it in a header, so it rides in a separate,
+ * script-visible cookie. That is the standard double-submit shape, hardened here by
+ * also checking the presented token against a per-session digest on the server, so a
+ * forged cookie pair alone is not enough.
+ */
+function resolveCsrfCookieName(sessionCookieName: string): string {
+  return `${sessionCookieName}-csrf`;
+}
+
+/** Write the session cookie and its companion CSRF cookie in one place. */
+function writeIxAuthSessionCookies(params: {
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+  session: { sessionToken: string; csrfToken: string };
+}): void {
+  const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
+  const maxAgeSeconds = Math.floor(params.deps.settings.absoluteTimeoutMs / 1000);
+  appendGatewaySetCookie(
+    params.res,
+    serializeGatewaySetCookie({
+      name: cookieName,
+      value: params.session.sessionToken,
+      attributes: buildSessionCookieAttributes({
+        isSecureContext: params.deps.isSecureContext,
+        maxAgeSeconds,
+      }),
+    }),
+  );
+  appendGatewaySetCookie(
+    params.res,
+    serializeGatewaySetCookie({
+      name: resolveCsrfCookieName(cookieName),
+      value: params.session.csrfToken,
+      attributes: {
+        ...buildSessionCookieAttributes({
+          isSecureContext: params.deps.isSecureContext,
+          maxAgeSeconds,
+        }),
+        httpOnly: false,
+      },
+    }),
+  );
+}
+
+/** Expire both cookies so a rejected or ended session leaves nothing behind. */
+function clearIxAuthSessionCookies(params: {
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+}): void {
+  const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
+  const attributes = buildSessionCookieAttributes({
+    isSecureContext: params.deps.isSecureContext,
+  });
+  appendGatewayClearCookie(params.res, { name: cookieName, attributes });
+  appendGatewayClearCookie(params.res, {
+    name: resolveCsrfCookieName(cookieName),
+    attributes: { ...attributes, httpOnly: false },
+  });
+}
+
+function readRequestMeta(req: IncomingMessage, clientIp: string | undefined): IxAuthRequestMeta {
+  const userAgent = req.headers["user-agent"];
+  const requestId = req.headers["x-request-id"];
+  return {
+    clientIp,
+    userAgent: typeof userAgent === "string" ? userAgent : undefined,
+    requestId: typeof requestId === "string" ? requestId : undefined,
+  };
+}
+
+function rejectDisallowedOrigin(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+}): boolean {
+  const origin = params.req.headers.origin;
+  // A same-origin navigation may omit Origin; a cross-site fetch may not. Requiring the
+  // header on state-changing routes is what makes the check meaningful.
+  const result = checkBrowserOrigin({
+    requestHost: Array.isArray(params.req.headers.host)
+      ? params.req.headers.host[0]
+      : params.req.headers.host,
+    origin: Array.isArray(origin) ? origin[0] : origin,
+    allowedOrigins: params.deps.allowedOrigins,
+    allowHostHeaderOriginFallback: params.deps.allowHostHeaderOriginFallback,
+    isLocalClient: params.deps.isLocalClient,
+  });
+  if (result.ok) {
+    return false;
+  }
+  sendJson(params.res, 403, { error: "origin_not_allowed" });
+  return true;
+}
+
+async function readIxAuthJsonBody(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<Record<string, unknown> | undefined> {
+  const body = await readJsonBody(req, IX_AUTH_BODY_MAX_BYTES);
+  if (!body.ok) {
+    sendJson(res, 400, { error: "invalid_body" });
+    return undefined;
+  }
+  if (body.value === null || typeof body.value !== "object" || Array.isArray(body.value)) {
+    sendJson(res, 400, { error: "invalid_body" });
+    return undefined;
+  }
+  return body.value as Record<string, unknown>;
+}
+
+function mapRelayFailureToResponse(res: ServerResponse, failure: IxAuthRelayFailure): void {
+  if (failure.code === "IXAUTH_UNAVAILABLE") {
+    sendJson(res, 503, {
+      error: "identity_unavailable",
+      message: "The identity server is unavailable. Try again shortly.",
+    });
+    return;
+  }
+  if (failure.code === "AUTH_ACCOUNT_LOCKED") {
+    sendJson(res, 423, {
+      error: "account_locked",
+      message: "This account is locked. Contact an administrator.",
+      // Present only for automatic lockouts; an administrator lock has no expiry.
+      lockedUntilMs: failure.lockedUntilMs,
+    });
+    return;
+  }
+  if (failure.code === "AUTH_ACCOUNT_DISABLED") {
+    sendJson(res, 403, { error: "account_disabled", message: "This account is disabled." });
+    return;
+  }
+  if (failure.code === "AUTH_ACCOUNT_PENDING_APPROVAL") {
+    sendJson(res, 403, {
+      error: "account_pending_approval",
+      message: "This account is waiting for administrator approval.",
+    });
+    return;
+  }
+  if (failure.code === "AUTH_ACCOUNT_PENDING") {
+    sendJson(res, 403, {
+      error: "account_pending",
+      message: "Accept the invitation email before signing in.",
+    });
+    return;
+  }
+  // Everything else, including a wrong password and an unknown account, is uniform.
+  sendJson(res, 401, IX_AUTH_INVALID_CREDENTIALS);
+}
+
+async function completeIxAuthLogin(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+  tokens: IxAuthTokenBundle;
+}): Promise<void> {
+  const { deps, res } = params;
+  const nowMs = Date.now();
+  const userAgentHeader = params.req.headers["user-agent"];
+  const userAgent = typeof userAgentHeader === "string" ? userAgentHeader : undefined;
+
+  const verified = await verifyIxAuthTokenBundle({
+    tokens: params.tokens,
+    settings: deps.settings,
+    nowMs,
+  });
+  if (!verified.ok) {
+    deps.onSecurityEvent?.({
+      action: "ix-auth.login.failed",
+      outcome: "failed",
+      clientIp: deps.clientIp,
+      reason: verified.reason,
+    });
+    sendJson(res, 502, { error: "identity_token_invalid" });
+    return;
+  }
+
+  let session;
+  let profileId: string;
+  try {
+    // The Gateway profile is keyed off the verified email so display name, avatar, and
+    // operator role continue to live in user_profiles, unchanged by this mode. The
+    // profile is only touched after the token proved genuine.
+    profileId = ensureProfileForEmail(verified.claims.email).id;
+    session = persistIxAuthLoginSession({
+      tokens: params.tokens,
+      claims: verified.claims,
+      settings: deps.settings,
+      profileId,
+      userAgent,
+      nowMs,
+    });
+  } catch {
+    sendJson(res, 500, { error: "session_persist_failed" });
+    return;
+  }
+
+  writeIxAuthSessionCookies({ res, deps, session });
+  deps.onSecurityEvent?.({
+    action: "ix-auth.login.succeeded",
+    outcome: "succeeded",
+    clientIp: deps.clientIp,
+    profileId,
+    identitySubject: session.claims.subject,
+    identitySessionId: session.claims.identitySessionId,
+    loginSessionId: session.sessionId,
+  });
+  sendJson(res, 200, {
+    authenticated: true,
+    csrfToken: session.csrfToken,
+    user: {
+      profileId,
+      email: session.claims.email,
+      displayName: session.claims.displayName,
+      roles: session.claims.roles,
+      groups: session.claims.groups,
+    },
+  });
+}
+
+async function handleIxAuthLoginRoute(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+}): Promise<void> {
+  const body = await readIxAuthJsonBody(params.req, params.res);
+  if (!body) {
+    return;
+  }
+  const email = normalizeOptionalString(body.email);
+  const password = typeof body.password === "string" ? body.password : undefined;
+  if (!email || !password) {
+    sendJson(params.res, 400, IX_AUTH_INVALID_CREDENTIALS);
+    return;
+  }
+  const relay = await relayIxAuthLogin({
+    settings: params.deps.settings,
+    email,
+    password,
+    meta: readRequestMeta(params.req, params.deps.clientIp),
+  });
+  if (!relay.ok) {
+    if (relay.code === "AUTH_MFA_REQUIRED" && relay.mfaChallenge) {
+      params.deps.onSecurityEvent?.({
+        action: "ix-auth.login.mfa-required",
+        outcome: "denied",
+        clientIp: params.deps.clientIp,
+      });
+      sendJson(params.res, 200, { authenticated: false, mfaRequired: true, challenge: relay.mfaChallenge });
+      return;
+    }
+    params.deps.rateLimiter?.recordFailure(
+      params.deps.clientIp,
+      AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
+    );
+    params.deps.onSecurityEvent?.({
+      action: "ix-auth.login.failed",
+      outcome: "failed",
+      clientIp: params.deps.clientIp,
+      reason: relay.code,
+    });
+    mapRelayFailureToResponse(params.res, relay);
+    return;
+  }
+  params.deps.rateLimiter?.reset(params.deps.clientIp, AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET);
+  await completeIxAuthLogin({ ...params, tokens: relay.tokens });
+}
+
+async function handleIxAuthMfaRoute(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+}): Promise<void> {
+  const body = await readIxAuthJsonBody(params.req, params.res);
+  if (!body) {
+    return;
+  }
+  const challenge = normalizeOptionalString(body.challenge);
+  const code = normalizeOptionalString(body.code);
+  if (!challenge || !code) {
+    sendJson(params.res, 400, { error: "invalid_code" });
+    return;
+  }
+  const relay = await relayIxAuthMfaVerify({
+    settings: params.deps.settings,
+    challenge,
+    code,
+    meta: readRequestMeta(params.req, params.deps.clientIp),
+  });
+  if (!relay.ok) {
+    params.deps.rateLimiter?.recordFailure(
+      params.deps.clientIp,
+      AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
+    );
+    params.deps.onSecurityEvent?.({
+      action: "ix-auth.login.failed",
+      outcome: "failed",
+      clientIp: params.deps.clientIp,
+      reason: relay.code,
+    });
+    sendJson(params.res, 401, { error: "invalid_code", message: "That code is not valid." });
+    return;
+  }
+  params.deps.rateLimiter?.reset(params.deps.clientIp, AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET);
+  await completeIxAuthLogin({ ...params, tokens: relay.tokens });
+}
+
+async function handleIxAuthLogoutRoute(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+}): Promise<void> {
+  const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
+  const sessionToken = readRequestCookieValue(params.req, cookieName);
+  clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
+  if (!sessionToken) {
+    sendJson(params.res, 200, { authenticated: false });
+    return;
+  }
+  const resolution = await resolveIxAuthSessionToken({
+    sessionToken,
+    settings: params.deps.settings,
+    meta: readRequestMeta(params.req, params.deps.clientIp),
+    nowMs: Date.now(),
+    touch: false,
+  });
+  if (resolution.ok) {
+    // CSRF applies to logout too: a forced logout is a real denial-of-service.
+    const presented = params.req.headers[IX_AUTH_CSRF_HEADER_NAME];
+    const csrfToken = typeof presented === "string" ? presented : undefined;
+    if (!csrfToken || !matchesIxAuthCsrfDigest({ presented: csrfToken, storedDigest: resolution.row.csrf_digest })) {
+      sendJson(params.res, 403, { error: "csrf_mismatch" });
+      return;
+    }
+    revokeIxAuthLoginSession({
+      sessionId: resolution.row.id,
+      revokedAt: Date.now(),
+      reason: "user-logout",
+    });
+    // Best effort: the Gateway session is already dead, so a failure here only delays
+    // the identity server's own cleanup.
+    await relayIxAuthLogout({
+      settings: params.deps.settings,
+      refreshToken: resolution.row.refresh_token,
+      meta: readRequestMeta(params.req, params.deps.clientIp),
+    });
+    params.deps.onSecurityEvent?.({
+      action: "ix-auth.logout",
+      outcome: "succeeded",
+      clientIp: params.deps.clientIp,
+      profileId: resolution.row.profile_id,
+      identitySubject: resolution.row.identity_subject,
+      identitySessionId: resolution.row.identity_session_id,
+      loginSessionId: resolution.row.id,
+    });
+  }
+  sendJson(params.res, 200, { authenticated: false });
+}
+
+async function handleIxAuthSessionProbeRoute(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  deps: IxAuthHttpDependencies;
+  refresh: boolean;
+}): Promise<void> {
+  const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
+  const sessionToken = readRequestCookieValue(params.req, cookieName);
+  const unauthenticated = {
+    authenticated: false,
+    authMode: "ix-auth" as const,
+    adminConsoleUrl: undefined as string | undefined,
+  };
+  if (!sessionToken) {
+    sendJson(params.res, 200, unauthenticated);
+    return;
+  }
+  const resolution = await resolveIxAuthSessionToken({
+    sessionToken,
+    settings: params.deps.settings,
+    meta: readRequestMeta(params.req, params.deps.clientIp),
+    nowMs: Date.now(),
+    touch: params.refresh,
+  });
+  if (!resolution.ok) {
+    clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
+    params.deps.onSecurityEvent?.({
+      action: "ix-auth.session.rejected",
+      outcome: "denied",
+      clientIp: params.deps.clientIp,
+      reason: resolution.rejection,
+    });
+    sendJson(params.res, 200, unauthenticated);
+    return;
+  }
+  const { principal } = resolution;
+  sendJson(params.res, 200, {
+    authenticated: true,
+    authMode: "ix-auth",
+    // The admin console link is only meaningful to someone who can use it, so it is
+    // withheld from everyone else rather than hidden in the browser.
+    adminConsoleUrl: principal.isSuperAdmin ? params.deps.settings.adminConsoleUrl : undefined,
+    user: {
+      profileId: principal.profileId,
+      email: principal.claims.email,
+      displayName: principal.claims.displayName,
+      roles: principal.claims.roles,
+      groups: principal.claims.groups,
+      gatewayRole: principal.gatewayRole,
+      departments: principal.departments,
+      isSuperAdmin: principal.isSuperAdmin,
+      impersonatedBy: principal.claims.impersonatorEmail,
+    },
+  });
+}
+
+const IX_AUTH_POST_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAuthHttpRoute>([
+  "login",
+  "mfa",
+  "logout",
+  "refresh",
+]);
+
+/**
+ * Handle one `/auth/*` request.
+ *
+ * Returns false only when the path lies outside the namespace, so the caller falls
+ * through to later stages. Every path inside `/auth` is answered here.
+ */
+export async function handleIxAuthHttpRequest(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  pathname: string;
+  deps: IxAuthHttpDependencies;
+}): Promise<boolean> {
+  const route = classifyIxAuthHttpPath(params.pathname);
+  if (route === "outside") {
+    return false;
+  }
+  params.res.setHeader("Cache-Control", "no-store");
+  if (route === "unknown") {
+    sendJson(params.res, 404, { error: "not_found" });
+    return true;
+  }
+
+  const isPost = IX_AUTH_POST_ROUTES.has(route);
+  if (isPost ? params.req.method !== "POST" : params.req.method !== "GET") {
+    sendJson(params.res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+  // Every route here is cookie-bearing, so cross-site callers are rejected outright
+  // rather than relying on SameSite alone.
+  if (rejectDisallowedOrigin({ req: params.req, res: params.res, deps: params.deps })) {
+    return true;
+  }
+
+  if (route === "me") {
+    await handleIxAuthSessionProbeRoute({ ...params, refresh: false });
+    return true;
+  }
+  if (route === "refresh") {
+    await handleIxAuthSessionProbeRoute({ ...params, refresh: true });
+    return true;
+  }
+  if (route === "logout") {
+    await handleIxAuthLogoutRoute(params);
+    return true;
+  }
+
+  // Login and MFA are the brute-force surface. Serialize per IP so parallel guesses
+  // cannot outrun the limiter's own bookkeeping.
+  await withSerializedRateLimitAttempt({
+    ip: params.deps.clientIp,
+    scope: AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
+    run: async () => {
+      const rateCheck = params.deps.rateLimiter?.check(
+        params.deps.clientIp,
+        AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
+      );
+      if (rateCheck && !rateCheck.allowed) {
+        if (rateCheck.retryAfterMs > 0) {
+          params.res.setHeader("Retry-After", String(Math.ceil(rateCheck.retryAfterMs / 1000)));
+        }
+        sendJson(params.res, 429, {
+          error: "rate_limited",
+          retryAfterMs: rateCheck.retryAfterMs,
+        });
+        return;
+      }
+      if (route === "login") {
+        await handleIxAuthLoginRoute(params);
+        return;
+      }
+      await handleIxAuthMfaRoute(params);
+    },
+  });
+  return true;
+}

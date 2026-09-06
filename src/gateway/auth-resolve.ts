@@ -4,6 +4,7 @@ import { copyConfigResolutionFactsExcept } from "../config/resolution-facts.js";
 import { getRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
 import type {
   GatewayAuthConfig,
+  GatewayIxAuthConfig,
   GatewayTailscaleMode,
   GatewayTrustedProxyConfig,
 } from "../config/types.gateway.js";
@@ -13,7 +14,7 @@ import { createGatewayCredentialPlan } from "./credential-planner.js";
 import { resolveGatewayCredentialsFromValues } from "./credentials.js";
 
 /** Authentication modes after config, override, and credential inputs are combined. */
-type ResolvedGatewayAuthMode = "none" | "token" | "password" | "trusted-proxy";
+type ResolvedGatewayAuthMode = "none" | "token" | "password" | "trusted-proxy" | "ix-auth";
 
 /** Records which input selected the effective Gateway auth mode. */
 type ResolvedGatewayAuthModeSource = "override" | "config" | "password" | "token" | "default";
@@ -26,6 +27,7 @@ export type ResolvedGatewayAuth = {
   password?: string;
   allowTailscale: boolean;
   trustedProxy?: GatewayTrustedProxyConfig;
+  ixAuth?: GatewayIxAuthConfig;
 };
 
 function mergeGatewayAuthConfig(
@@ -43,6 +45,7 @@ function mergeGatewayAuthConfig(
     "allowTailscale",
     "rateLimit",
     "trustedProxy",
+    "ixAuth",
   ] as const) {
     if (override[key] !== undefined) {
       Object.assign(merged, { [key]: override[key] });
@@ -59,6 +62,9 @@ function finalizeResolvedGatewayAuth(params: {
   tailscaleMode?: GatewayTailscaleMode;
 }): ResolvedGatewayAuth {
   const { authConfig, authOverride, token, password } = params;
+  // ix-auth never inherits the token/password fallback: a Gateway configured for
+  // human logins must not silently accept a shared secret when the identity server
+  // is unreachable.
   const mode =
     authOverride?.mode ?? authConfig.mode ?? (password ? "password" : token ? "token" : "token");
   const modeSource =
@@ -78,8 +84,12 @@ function finalizeResolvedGatewayAuth(params: {
     password,
     allowTailscale:
       authConfig.allowTailscale ??
-      (params.tailscaleMode === "serve" && mode !== "password" && mode !== "trusted-proxy"),
+      (params.tailscaleMode === "serve" &&
+        mode !== "password" &&
+        mode !== "trusted-proxy" &&
+        mode !== "ix-auth"),
     trustedProxy: authConfig.trustedProxy,
+    ixAuth: authConfig.ixAuth,
   };
 }
 

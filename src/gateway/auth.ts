@@ -42,7 +42,8 @@ export type GatewayAuthResult = {
     | "tailscale"
     | "device-token"
     | "bootstrap-token"
-    | "trusted-proxy";
+    | "trusted-proxy"
+    | "ix-auth";
   user?: string;
   /** Full verified Tailscale identity; present only after header + WhoIs agreement. */
   tailscaleIdentity?: VerifiedTailscaleIdentity;
@@ -171,6 +172,18 @@ export function assertGatewayAuthConfigured(
     throw new Error(
       `gateway auth mode is password, but no password was configured.${LEGACY_OPENCLAW_ENV_NOTE}`,
     );
+  }
+  if (auth.mode === "ix-auth") {
+    if (!auth.ixAuth) {
+      throw new Error(
+        "gateway auth mode is ix-auth, but no ixAuth config was provided (set gateway.auth.ixAuth)",
+      );
+    }
+    if (auth.token) {
+      throw new Error(
+        "gateway auth mode is ix-auth, but a shared token is also configured; remove gateway.auth.token / OPENCLAW_GATEWAY_TOKEN because a shared secret would bypass per-person login",
+      );
+    }
   }
   if (auth.mode === "trusted-proxy") {
     if (!auth.trustedProxy) {
@@ -504,6 +517,51 @@ async function authorizeGatewayConnectCore(
       });
     }
     return { ok: false, reason: result.reason };
+  }
+
+  if (auth.mode === "ix-auth") {
+    // The Control UI proves identity with the Gateway's own session cookie, verified
+    // against the identity server's public key without any outbound call.
+    const resolved = req
+      ? await (
+          await import("./ix-auth-principal.js")
+        ).resolveIxAuthRequestPrincipal({
+          req,
+          trustedProxies,
+          allowRealIpFallback: params.allowRealIpFallback === true,
+          touch: false,
+        })
+      : undefined;
+    if (resolved) {
+      const originResult = authorizeHttpBrowserOrigin({
+        authSurface,
+        browserOriginPolicy: params.browserOriginPolicy,
+        isLocalClient: localDirect,
+        reason: "origin_not_allowed",
+      });
+      if (originResult) {
+        return originResult;
+      }
+      return { ok: true, method: "ix-auth", user: resolved.principal.claims.email };
+    }
+    // Loopback password stays available so local recovery and CLI bootstrap keep working
+    // when the identity server is down. It is not reachable from a browser off-host.
+    if (localDirect && auth.password && connectAuth?.password) {
+      const rateLimitResult = rejectIfRateLimited({ limiter, ip: subject, rateLimitScope });
+      if (rateLimitResult) {
+        return rateLimitResult;
+      }
+      return await authorizePasswordAuth({
+        authPassword: auth.password,
+        connectPassword: connectAuth.password,
+        limiter,
+        ip: subject,
+        rateLimitScope,
+        deferRateLimitFailure: params.deferRateLimitFailure,
+        resetOnSuccess,
+      });
+    }
+    return { ok: false, reason: "gateway_auth_required" };
   }
 
   if (auth.mode === "none") {

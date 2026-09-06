@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { WebSocket } from "ws";
+import type { IxAuthPrincipal } from "../../../auth/ix-auth/ix-auth-types.js";
 import type {
   ConnectParams,
   RequestFrame,
@@ -151,6 +152,10 @@ export type AuthenticatedGatewayConnect = {
   issuedBootstrapProfile: DeviceBootstrapProfile | null;
   handoffBootstrapProfile: DeviceBootstrapProfile | null;
   trustedProxyAuthOk: boolean;
+  /** True when a verified IX-Auth session cookie authenticated this Control UI operator. */
+  ixAuthOk: boolean;
+  /** Verified IX-Auth identity, present only in ix-auth mode. */
+  ixAuthPrincipal?: IxAuthPrincipal;
   controlUiPairingKind: ControlUiPairingKind;
   skipLocalBackendSelfPairing: boolean;
   rejectUnauthorized: (failedAuth: GatewayAuthResult) => void;

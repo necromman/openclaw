@@ -122,6 +122,7 @@ export const GatewayConfigSchema = z
             z.literal("token"),
             z.literal("password"),
             z.literal("trusted-proxy"),
+            z.literal("ix-auth"),
           ])
           .optional(),
         token: SecretInputSchema.optional().register(sensitive),
@@ -146,6 +147,27 @@ export const GatewayConfigSchema = z
               .strictObject({
                 enabled: z.boolean().optional(),
                 scopes: z.array(z.string().min(1)).optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        ixAuth: z
+          .strictObject({
+            baseUrl: z.string().min(1, "baseUrl is required for ix-auth mode"),
+            jwksUrl: z.string().min(1).optional(),
+            serviceKey: SecretInputSchema.register(sensitive),
+            issuer: z.string().min(1).optional(),
+            audience: z.string().min(1).optional(),
+            cookieName: z.string().min(1).optional(),
+            roleMap: z.record(z.string().min(1), z.string().min(1)).optional(),
+            superAdminRoles: z.array(z.string().min(1)).optional(),
+            departmentClaim: z.string().min(1).optional(),
+            departmentGroupPrefix: z.string().optional(),
+            adminConsoleUrl: z.string().min(1).optional(),
+            session: z
+              .strictObject({
+                idleTimeoutMinutes: z.number().int().min(1).optional(),
+                absoluteTimeoutHours: z.number().int().min(1).optional(),
               })
               .optional(),
           })

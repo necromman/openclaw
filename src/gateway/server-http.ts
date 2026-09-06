@@ -26,6 +26,7 @@ import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import type { ResolvedGatewayAuth } from "./auth.js";
 import { parseControlUiUserAvatarPath, parseControlUiResourcePath } from "./control-ui-contract.js";
 import { respondNotFound, respondPlainText } from "./control-ui-http-utils.js";
+import { isSecureGatewayBrowserContext } from "./cookie-header.js";
 import { controlUiPluginAssetRoot } from "./control-ui-plugin-assets-contract.js";
 import { resolveAssistantMediaRoutePath } from "./control-ui-resource-routes.js";
 import {
@@ -56,6 +57,8 @@ import {
   type GatewayIngressTransport,
   type GatewayUnattributableProxyReporter,
 } from "./ingress-attribution.js";
+import { classifyIxAuthHttpPath } from "./ix-auth-http-paths.js";
+import { isLocalDirectRequest, isLoopbackAddress, isTrustedProxyAddress } from "./net.js";
 import { normalizePluginNodeCapabilityScopedUrl } from "./plugin-node-capability.js";
 import {
   getCachedPluginGatewayAuthBypassPaths,
@@ -127,6 +130,8 @@ const getUserProfilesHttpModule = createLazyRuntimeModule(() => import("./user-p
 const getDevicePairingJoinHttpModule = createLazyRuntimeModule(
   () => import("./device-pairing-join-http.js"),
 );
+const getIxAuthHttpModule = createLazyRuntimeModule(() => import("./ix-auth-http.js"));
+const getIxAuthPrincipalModule = createLazyRuntimeModule(() => import("./ix-auth-principal.js"));
 const getPluginNodeCapabilityAuthModule = createLazyRuntimeModule(
   () => import("./server/plugin-node-capability-auth.js"),
 );
@@ -454,6 +459,46 @@ export function createGatewayHttpServer(opts: {
           rateLimiter: joinRateLimiter,
           callback: opts.handleNodeWorkspaceTransferRequest,
         }),
+      );
+
+      // The Gateway's own /auth/* routes run before login exists, so they register as a
+      // plain request stage rather than an admitted one, and ahead of handleHooksRequest
+      // so a configured hook base path cannot swallow the auth namespace.
+      addRequestStage(
+        resolvedAuthValue.mode === "ix-auth" &&
+          classifyIxAuthHttpPath(scopedRequestPath) !== "outside",
+        async () => {
+          const [httpModule, principalModule] = await Promise.all([
+            getIxAuthHttpModule(),
+            getIxAuthPrincipalModule(),
+          ]);
+          const settings = await principalModule.loadIxAuthGatewaySettings();
+          if (!settings) {
+            respondNotFound(res);
+            return true;
+          }
+          return await httpModule.handleIxAuthHttpRequest({
+            req,
+            res,
+            pathname: scopedRequestPath,
+            deps: {
+              settings,
+              allowedOrigins: configSnapshot.gateway?.controlUi?.allowedOrigins,
+              allowHostHeaderOriginFallback:
+                configSnapshot.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback ===
+                true,
+              clientIp: ingressAttribution.rateLimit.subject.key,
+              isLocalClient: isLocalDirectRequest(req, trustedProxies),
+              isSecureContext: isSecureGatewayBrowserContext({
+                encrypted: Boolean((req.socket as { encrypted?: boolean }).encrypted),
+                remoteAddressIsLoopback: isLoopbackAddress(req.socket?.remoteAddress),
+                forwardedProto: req.headers["x-forwarded-proto"],
+                fromTrustedProxy: isTrustedProxyAddress(req.socket?.remoteAddress, trustedProxies),
+              }),
+              rateLimiter: joinRateLimiter,
+            },
+          });
+        },
       );
 
       const devicePairingJoinShortcode = parseDevicePairingJoinRequestPath(scopedRequestPath);
