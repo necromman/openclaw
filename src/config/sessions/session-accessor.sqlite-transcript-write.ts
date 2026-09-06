@@ -29,7 +29,6 @@ import {
   readTranscriptSnapshot,
   type SqliteTranscriptSnapshotRow,
 } from "./session-accessor.sqlite-read.js";
-import { runSqliteTranscriptWriteTransaction } from "./session-accessor.sqlite-reclamation-commit.js";
 import {
   cloneSessionEntry,
   resolveSqliteTranscriptScope,
@@ -207,7 +206,7 @@ export function replaceTranscriptEventsSync(
   const fencedScope = withOwnedSessionTranscriptWriterFence(scope);
   const resolved = resolveSqliteTranscriptScope(fencedScope);
   let replaced = false;
-  runSqliteTranscriptWriteTransaction((database) => {
+  runOpenClawAgentWriteTransaction((database) => {
     assertOwnedTranscriptWriteCommit(fencedScope);
     const fresh = readSessionEntryRow(database, resolved.sessionKey);
     if (
@@ -323,7 +322,7 @@ export function appendTranscriptEventSync(
   const fencedScope = withOwnedSessionTranscriptWriterFence(scope);
   const resolved = resolveSqliteTranscriptScope(fencedScope);
   let result: Result<boolean, TranscriptAppendRefusal> = ok(false);
-  runSqliteTranscriptWriteTransaction((database) => {
+  runOpenClawAgentWriteTransaction((database) => {
     options.beforeCommitInTransaction?.();
     assertOwnedTranscriptWriteCommit(fencedScope);
     const fresh = readSessionEntryRow(database, resolved.sessionKey);
@@ -409,7 +408,7 @@ export function appendTranscriptMessageSync<TMessage>(
   const resolved = resolveSqliteTranscriptScope(fencedScope);
   let result: Result<TranscriptMessageAppendResult<TMessage> | undefined, TranscriptAppendRefusal> =
     ok(undefined);
-  runSqliteTranscriptWriteTransaction((database) => {
+  runOpenClawAgentWriteTransaction((database) => {
     assertOwnedTranscriptWriteCommit(fencedScope);
     const fresh = readSessionEntryRow(database, resolved.sessionKey);
     const refusal = resolveTranscriptAppendRefusal(fresh?.entry, resolved, fencedScope);
