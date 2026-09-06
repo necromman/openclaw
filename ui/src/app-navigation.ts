@@ -1,9 +1,9 @@
 import { normalizeLowercaseStringOrEmpty } from "@openclaw/normalization-core/string-coerce";
 import { isValidWorkboardBoardId } from "@openclaw/workboard-contract";
-import { BRAND_NAME } from "./brand.ts";
 // Control UI app navigation defines sidebar and settings presentation metadata.
 import type { RouteId } from "./app-route-paths.ts";
 import type { NativeDeviceSettingsCapability } from "./app/native-device-settings.ts";
+import { BRAND_NAME } from "./brand.ts";
 import type { IconName } from "./components/icons.ts";
 import { i18n, t } from "./i18n/index.ts";
 

@@ -24,18 +24,18 @@ npm 배포본(`npm i -g openclaw`)은 바이너리라 **고칠 수가 없다.** 
 
 ## 2. 좌표
 
-| 항목 | 값 |
-|------|-----|
-| 포크 (origin) | `https://github.com/necromman/openclaw` (necromman 계정) |
-| 업스트림 (upstream) | `https://github.com/openclaw/openclaw` |
+| 항목                   | 값                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| 포크 (origin)          | `https://github.com/necromman/openclaw` (necromman 계정)                                 |
+| 업스트림 (upstream)    | `https://github.com/openclaw/openclaw`                                                   |
 | **빌드 정본 체크아웃** | **WSL2 Ubuntu 24.04: `~/openclaw`** (= `\\wsl.localhost\Ubuntu\home\necromman\openclaw`) |
-| 편집·IDE 체크아웃 | Windows: `D:\PROJECT\openclaw` |
-| 로컬 인스턴스 홈 | WSL: `~/openclaw-local/` (설정·상태·워크스페이스·로그) |
-| 기본 브랜치 | `main` (= 태그 v2026.9.2 로 맞춰 둠) |
-| 작업 브랜치 | **`chris/main`** (모든 커스터마이즈는 여기에 쌓는다) |
-| Node | WSL **v24.20.0** (nvm). 저장소 요구: `>=22.22.3 <23 \|\| >=24.15.0 <25 \|\| >=25.9.0` |
-| pnpm | **12.1.0** (corepack, `package.json` 의 `packageManager` 핀) |
-| Control UI | `http://127.0.0.1:18789/` (loopback 전용) |
+| 편집·IDE 체크아웃      | Windows: `D:\PROJECT\openclaw`                                                           |
+| 로컬 인스턴스 홈       | WSL: `~/openclaw-local/` (설정·상태·워크스페이스·로그)                                   |
+| 기본 브랜치            | `main` (= 태그 v2026.9.2 로 맞춰 둠)                                                     |
+| 작업 브랜치            | **`chris/main`** (모든 커스터마이즈는 여기에 쌓는다)                                     |
+| Node                   | WSL **v24.20.0** (nvm). 저장소 요구: `>=22.22.3 <23 \|\| >=24.15.0 <25 \|\| >=25.9.0`    |
+| pnpm                   | **12.1.0** (corepack, `package.json` 의 `packageManager` 핀)                             |
+| Control UI             | `http://127.0.0.1:18789/` (loopback 전용)                                                |
 
 **두 체크아웃의 역할이 다르다.** `~/openclaw` 가 빌드·테스트·구동의 정본이고, `D:\PROJECT\openclaw` 는 편집용이다. 둘은 같은 origin 을 보므로 **동기화는 push/pull 로만** 한다. `/mnt/d/...` 를 WSL 에서 직접 빌드하면 I/O 가 느리고 퍼미션 문제가 나므로 쓰지 않는다.
 
@@ -131,7 +131,7 @@ git push origin chris/main
 
 ```ts
 // src/brand.ts
-export const BRAND_NAME = "Chris Agent";      // 임시값. 여기만 바꾸면 된다
+export const BRAND_NAME = "Chris Agent"; // 임시값. 여기만 바꾸면 된다
 export const BRAND_SHORT_NAME = "Chris";
 export const BRAND_TAGLINE = "Your personal AI assistant, running on your own devices.";
 export const BRAND_LINKS = { website: "", docs: "...FORK.md", github: "...", discord: "", x: "" };
@@ -144,12 +144,12 @@ i18n 문자열은 `{brand}`·`{brandShort}`·`{brandSkillHub}`·`{brandCloud}` �
 
 ### 5-2. 로고·아이콘
 
-| 파일 | 내용 |
-|------|------|
-| `ui/public/favicon.svg` | 중립 기하 마크(둥근 판 + 링 + "C" 아크). 파비콘·apple-touch·어시스턴트 아바타의 원본 |
-| `ui/public/favicon-32.png` · `favicon.ico` · `apple-touch-icon.png` | 같은 도형을 래스터한 것 |
-| `ui/src/components/brand-mark.ts` | 같은 도형의 lit 인라인 SVG (About 히어로) |
-| `ui/src/components/icons-tools.ts` 의 `lobster` | 아이콘 키 이름은 식별자라 그대로, 그림만 브랜드 마크 |
+| 파일                                                                | 내용                                                                                 |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `ui/public/favicon.svg`                                             | 중립 기하 마크(둥근 판 + 링 + "C" 아크). 파비콘·apple-touch·어시스턴트 아바타의 원본 |
+| `ui/public/favicon-32.png` · `favicon.ico` · `apple-touch-icon.png` | 같은 도형을 래스터한 것                                                              |
+| `ui/src/components/brand-mark.ts`                                   | 같은 도형의 lit 인라인 SVG (About 히어로)                                            |
+| `ui/src/components/icons-tools.ts` 의 `lobster`                     | 아이콘 키 이름은 식별자라 그대로, 그림만 브랜드 마크                                 |
 
 마크를 바꾸려면 `favicon.svg` 와 `brand-mark.ts` 와 `icons-tools.ts` 세 곳의 같은 도형을 함께 고치고, PNG/ICO 를 다시 굽는다. 네이티브 앱(`apps/`) 아이콘은 아직 교체하지 않았고 방법만 감사 문서 5장에 적어 뒀다.
 
@@ -170,7 +170,9 @@ i18n 문자열은 `{brand}`·`{brandShort}`·`{brandSkillHub}`·`{brandCloud}` �
 `.settings-page`(760px)와 `.settings-page--wide`(1120px), settings 셸 헤더(1120px)가 콘텐츠를 가운데 좁은 칼럼에 가두고 있었다. 자동화 화면 좌측 절반이 비어 보이던 원인이 이것이다.
 
 ```css
-:root { --page-max-width: none; }   /* 길이를 넣으면 다시 캡이 걸린다 */
+:root {
+  --page-max-width: none;
+} /* 길이를 넣으면 다시 캡이 걸린다 */
 ```
 
 `.settings-page` 는 `components/settings-ui.ts` 의 `renderSettingsPage()` 가 쓰는 **공용 컨테이너**라, 이 한 토큰으로 설정 전 하위 페이지·자동화·플러그인·세션·기기·사용량·시크릿·정보가 전부 창 폭을 쓴다. 상하좌우 패딩(`--space-3`/`--space-4`/`--space-8`, 대략 24~32px)은 그대로다.
@@ -183,10 +185,14 @@ i18n 문자열은 `{brand}`·`{brandShort}`·`{brandSkillHub}`·`{brandCloud}` �
 
 ```css
 :root {
-  --radius-sm: 2px;  --radius-md: 4px;  --radius-lg: 5px;  --radius-xl: 5px;  --radius: 4px;
-  --radius-full: 9999px;                 /* 원형 전용: 아바타·상태 점·스피너·토글 */
-  --openclaw-corner-radius-scale: 0.25;  /* base.css 의 고정 px 코너까지 5px 이하로 */
-  --radius-pill: var(--radius-lg);       /* pill·chip 도 5px */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 5px;
+  --radius-xl: 5px;
+  --radius: 4px;
+  --radius-full: 9999px; /* 원형 전용: 아바타·상태 점·스피너·토글 */
+  --openclaw-corner-radius-scale: 0.25; /* base.css 의 고정 px 코너까지 5px 이하로 */
+  --radius-pill: var(--radius-lg); /* pill·chip 도 5px */
 }
 ```
 
@@ -318,29 +324,29 @@ bash chris-local/gateway.sh logs 100
 
 ### 7-3. 좌표
 
-| 항목 | 값 |
-|------|-----|
-| 포트 | **18789** (Windows 쪽에서 18789/18790/18791 모두 비어 있음을 확인하고 기본값 사용) |
-| bind | `loopback` (127.0.0.1 과 ::1 에만 붙는다. LAN 노출 없음) |
-| 인증 | `gateway.auth.mode=token` + 레이트리밋 (10회/60초, 5분 락아웃) |
-| 설정 파일 | `~/openclaw-local/.openclaw/openclaw.json` (0600) |
-| 상태·세션 DB | `~/openclaw-local/.openclaw/state/openclaw.sqlite` |
-| 워크스페이스 | `~/openclaw-local/.openclaw/workspace` |
-| 게이트웨이 토큰 | `~/openclaw-local/.openclaw/gateway-token.txt` (0600, **git 미추적**) |
-| 서비스 로그 | `~/openclaw-local/gateway.log` |
-| 서비스 | systemd **user** 유닛 `openclaw-local.service` (`~/.config/systemd/user/`) |
-| Control UI | `http://127.0.0.1:18789/` - Windows 브라우저에서 WSL2 localhost 포워딩으로 그대로 열린다 |
+| 항목            | 값                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| 포트            | **18789** (Windows 쪽에서 18789/18790/18791 모두 비어 있음을 확인하고 기본값 사용)       |
+| bind            | `loopback` (127.0.0.1 과 ::1 에만 붙는다. LAN 노출 없음)                                 |
+| 인증            | `gateway.auth.mode=token` + 레이트리밋 (10회/60초, 5분 락아웃)                           |
+| 설정 파일       | `~/openclaw-local/.openclaw/openclaw.json` (0600)                                        |
+| 상태·세션 DB    | `~/openclaw-local/.openclaw/state/openclaw.sqlite`                                       |
+| 워크스페이스    | `~/openclaw-local/.openclaw/workspace`                                                   |
+| 게이트웨이 토큰 | `~/openclaw-local/.openclaw/gateway-token.txt` (0600, **git 미추적**)                    |
+| 서비스 로그     | `~/openclaw-local/gateway.log`                                                           |
+| 서비스          | systemd **user** 유닛 `openclaw-local.service` (`~/.config/systemd/user/`)               |
+| Control UI      | `http://127.0.0.1:18789/` - Windows 브라우저에서 WSL2 localhost 포워딩으로 그대로 열린다 |
 
 `openclaw gateway install` 은 **쓰지 않는다.** 비기본 state dir 을 쓰면 `service management skipped: non-default state dir or config path` 로 거부하기 때문에, 이 포크는 `chris-local/openclaw-local.service` 로 유닛을 직접 들고 있다.
 
 ### 7-4. WSL 에서 한 시스템 변경 (재현용 기록)
 
-| 변경 | 명령 | 이유 |
-|------|------|------|
-| nvm + Node 24 설치 | 6-1 참조 | 배포판 Node 18 은 요구 버전 미달 |
-| `~/.config` 소유권 수정 | `sudo chown -R $USER:$USER ~/.config` (root 셸에서 실행) | root 소유라 systemd user 유닛을 못 만들었다 |
-| linger 활성화 | `loginctl enable-linger $USER` | 로그아웃 후에도 user 서비스 유지 |
-| git 자격증명 | `git config --global credential.helper store` + `~/.git-credentials` (0600) | WSL 에는 gh CLI 미설치. GitHub 토큰은 Windows gh 에서 가져왔다 |
+| 변경                    | 명령                                                                        | 이유                                                           |
+| ----------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| nvm + Node 24 설치      | 6-1 참조                                                                    | 배포판 Node 18 은 요구 버전 미달                               |
+| `~/.config` 소유권 수정 | `sudo chown -R $USER:$USER ~/.config` (root 셸에서 실행)                    | root 소유라 systemd user 유닛을 못 만들었다                    |
+| linger 활성화           | `loginctl enable-linger $USER`                                              | 로그아웃 후에도 user 서비스 유지                               |
+| git 자격증명            | `git config --global credential.helper store` + `~/.git-credentials` (0600) | WSL 에는 gh CLI 미설치. GitHub 토큰은 Windows gh 에서 가져왔다 |
 
 ---
 
@@ -380,14 +386,14 @@ wsl -d Ubuntu -- bash -lc '~/openclaw/chris-local/auto-deploy.sh --force'
 
 ### 안전 규칙 (이 스크립트가 지키는 것)
 
-| 규칙 | 왜 |
-|------|-----|
-| `flock` 단일 실행 | 빌드가 4분 넘게 걸리므로 2분 타이머가 앞 실행과 겹치면 안 된다. 겹치면 뒤 tick 은 그냥 빠진다 |
-| 원격 SHA 가 로컬과 같으면 아무것도 안 한다 | 평상시 타이머는 `git fetch` 한 번으로 끝난다 |
-| `pnpm install` 은 `pnpm-lock.yaml` 이 바뀐 커밋에서만 | 매번 install 하면 2분 주기를 못 지킨다 |
-| `git pull --ff-only` | WSL 쪽에 로컬 커밋이 생겨 히스토리가 갈라지면 조용히 머지하지 않고 **실패로 남긴다** |
-| 빌드 성공했을 때만 재시작 | 빌드가 깨지면 돌던 게이트웨이는 **이전 빌드 그대로 계속 서비스**하고 로그에만 사유가 남는다 |
-| 재시작 후 HTTP 200 확인 | 재시작은 됐는데 안 뜨는 경우를 `WARN` 으로 구분한다 |
+| 규칙                                                  | 왜                                                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `flock` 단일 실행                                     | 빌드가 4분 넘게 걸리므로 2분 타이머가 앞 실행과 겹치면 안 된다. 겹치면 뒤 tick 은 그냥 빠진다 |
+| 원격 SHA 가 로컬과 같으면 아무것도 안 한다            | 평상시 타이머는 `git fetch` 한 번으로 끝난다                                                  |
+| `pnpm install` 은 `pnpm-lock.yaml` 이 바뀐 커밋에서만 | 매번 install 하면 2분 주기를 못 지킨다                                                        |
+| `git pull --ff-only`                                  | WSL 쪽에 로컬 커밋이 생겨 히스토리가 갈라지면 조용히 머지하지 않고 **실패로 남긴다**          |
+| 빌드 성공했을 때만 재시작                             | 빌드가 깨지면 돌던 게이트웨이는 **이전 빌드 그대로 계속 서비스**하고 로그에만 사유가 남는다   |
+| 재시작 후 HTTP 200 확인                               | 재시작은 됐는데 안 뜨는 경우를 `WARN` 으로 구분한다                                           |
 
 ### 상태 확인 / 실패 확인법
 
@@ -503,41 +509,41 @@ printf '%s' '<claude setup-token 값>' | ~/openclaw-local/bin/oc \
 
 ### 10-1. 빌드
 
-| 항목 | 결과 |
-|------|------|
-| `pnpm install --frozen-lockfile` | exit 0 |
-| `pnpm build` | exit 0 |
-| `pnpm ui:build` | exit 0 |
-| `openclaw --version` | `OpenClaw 2026.9.2 (3928bad)` (소스 커밋 해시가 찍힌다 = 배포본이 아니라 우리 빌드) |
+| 항목                             | 결과                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile` | exit 0                                                                              |
+| `pnpm build`                     | exit 0                                                                              |
+| `pnpm ui:build`                  | exit 0                                                                              |
+| `openclaw --version`             | `OpenClaw 2026.9.2 (3928bad)` (소스 커밋 해시가 찍힌다 = 배포본이 아니라 우리 빌드) |
 
 ### 10-2. 구동
 
-| 항목 | 결과 |
-|------|------|
-| systemd user 서비스 | `active (running)` |
-| 리스너 | `127.0.0.1:18789`, `[::1]:18789` |
-| Control UI (WSL 내부) | HTTP 200 |
-| Control UI (Windows 브라우저) | HTTP 200 (WSL2 localhost 포워딩 동작) |
-| 기기 페어링 | loopback 자동 승인 (`device pairing auto-approved ... role=operator`) |
-| 로드된 플러그인 | 16개 (acpx, browser, canvas, cua-computer, device-pair, file-transfer, geolocation, google-meet, linux-node, memory-core, ollama, openai, talk-voice, teams-meetings, xai, zoom-meetings) |
+| 항목                          | 결과                                                                                                                                                                                      |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| systemd user 서비스           | `active (running)`                                                                                                                                                                        |
+| 리스너                        | `127.0.0.1:18789`, `[::1]:18789`                                                                                                                                                          |
+| Control UI (WSL 내부)         | HTTP 200                                                                                                                                                                                  |
+| Control UI (Windows 브라우저) | HTTP 200 (WSL2 localhost 포워딩 동작)                                                                                                                                                     |
+| 기기 페어링                   | loopback 자동 승인 (`device pairing auto-approved ... role=operator`)                                                                                                                     |
+| 로드된 플러그인               | 16개 (acpx, browser, canvas, cua-computer, device-pair, file-transfer, geolocation, google-meet, linux-node, memory-core, ollama, openai, talk-voice, teams-meetings, xai, zoom-meetings) |
 
 ### 10-2b. 테스트 (`pnpm check` / `pnpm test`)
 
-| 명령 | 결과 |
-|------|------|
-| `pnpm check` (포맷·린트·타입·아키텍처 가드 전량) | **exit 0, 실패 0** |
-| `pnpm test` (전체 스위트, 약 2시간) | **exit 1** - 통과 **192,671** / 실패 **450** / 스킵 다수 |
+| 명령                                             | 결과                                                     |
+| ------------------------------------------------ | -------------------------------------------------------- |
+| `pnpm check` (포맷·린트·타입·아키텍처 가드 전량) | **exit 0, 실패 0**                                       |
+| `pnpm test` (전체 스위트, 약 2시간)              | **exit 1** - 통과 **192,671** / 실패 **450** / 스킵 다수 |
 
 실패 450건은 **전부 환경 의존이고 우리 변경과 무관하다.** 이 실행은 커스터마이즈가 들어가기 전의 순정 태그 트리에서 돌렸으므로 업스트림 v2026.9.2 자체의 이 환경에서의 상태다.
 
-| 분류 | 건수 | 원인 | 근거 |
-|------|------|------|------|
-| `tooling` 레인 (PR·릴리스 셸 자동화) | **419** | **`jq` 미설치** | 로그에 `scripts/pr-lib/merge-outcome.sh: line 14: jq: command not found` 가 직접 찍힌다. `apt-get install -y jq` 로 해소되는 종류다 |
-| `extension-browser` (browser control server) | 20 | 헤드리스 WSL 에 실제 브라우저/CDP 대상이 없음 | `server.agent-contract-core`, `server-context.remote-profile-tab-ops.fallback` 두 파일에 집중 |
-| `unit-fast-isolated` `entry.respawn` | 5 | 프로세스 respawn 이 WSL 환경에 의존 | |
-| `gateway-core` `portal-http-proxy` | 1 | **IPv6 전용 타깃**으로 접속하는 케이스. WSL2 네트워크 스택 제약 | 테스트명에 `reaches IPv6-only targets` |
-| `ui` `sessions-page.typing` | 1 | 타이밍 플레이키 (`expected 1 to be +0`) | 같은 파일의 다른 변형은 전부 통과 |
-| 기타 산발 | 4 | `browser-open`, `portal-stream-command`, `package-acceptance-workflow`, codex `native-hook-relay` | 모두 외부 바이너리·네트워크 의존 |
+| 분류                                         | 건수    | 원인                                                                                              | 근거                                                                                                                                |
+| -------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `tooling` 레인 (PR·릴리스 셸 자동화)         | **419** | **`jq` 미설치**                                                                                   | 로그에 `scripts/pr-lib/merge-outcome.sh: line 14: jq: command not found` 가 직접 찍힌다. `apt-get install -y jq` 로 해소되는 종류다 |
+| `extension-browser` (browser control server) | 20      | 헤드리스 WSL 에 실제 브라우저/CDP 대상이 없음                                                     | `server.agent-contract-core`, `server-context.remote-profile-tab-ops.fallback` 두 파일에 집중                                       |
+| `unit-fast-isolated` `entry.respawn`         | 5       | 프로세스 respawn 이 WSL 환경에 의존                                                               |                                                                                                                                     |
+| `gateway-core` `portal-http-proxy`           | 1       | **IPv6 전용 타깃**으로 접속하는 케이스. WSL2 네트워크 스택 제약                                   | 테스트명에 `reaches IPv6-only targets`                                                                                              |
+| `ui` `sessions-page.typing`                  | 1       | 타이밍 플레이키 (`expected 1 to be +0`)                                                           | 같은 파일의 다른 변형은 전부 통과                                                                                                   |
+| 기타 산발                                    | 4       | `browser-open`, `portal-stream-command`, `package-acceptance-workflow`, codex `native-hook-relay` | 모두 외부 바이너리·네트워크 의존                                                                                                    |
 
 **업스트림 CI 대조는 하지 못했다** (포크 CI 를 돌리려면 `workflow` 스코프가 필요하고, 이 환경에서 그 스코프를 얻지 못했다 - 3-1 참조). 대신 **원인을 로그에서 직접 특정**했다: `jq` 미설치는 메시지가 그대로 나오고, 나머지는 브라우저·IPv6·프로세스 respawn 같은 호스트 능력 부재다. 소스 결함으로 분류할 근거가 있는 실패는 **없다**.
 
@@ -547,9 +553,9 @@ printf '%s' '<claude setup-token 값>' | ~/openclaw-local/bin/oc \
 
 `jq` 를 깔고 tooling 레인만 다시 돌렸다.
 
-| 실행 | tooling 레인 실패 |
-|------|------------------|
-| 최초 (`jq` 없음) | **419** |
+| 실행               | tooling 레인 실패                               |
+| ------------------ | ----------------------------------------------- |
+| 최초 (`jq` 없음)   | **419**                                         |
 | 재실행 (`jq` 있음) | **103** (통과 15,608 / 파일 578 통과 · 13 실패) |
 
 남은 103건은 **또 다른 실패이고, 그나마 내 실행 방법이 만든 것이다.** 전부 같은 에러다.
@@ -581,33 +587,33 @@ Control UI 경유 (브라우저 채팅 왕복): 질문 "say UI-OK and name your 
 
 **0 critical / 2 warn / 1 info.**
 
-| 항목 | 내용 | 판정 |
-|------|------|------|
-| `gateway.trusted_proxies_missing` | bind 가 loopback 인데 `trustedProxies` 가 비어 있다 | **의도된 것.** 리버스 프록시를 안 쓰는 로컬 전용 인스턴스다 |
-| `gateway.probe_failed` | deep 프로브가 `missing scope: operator.read` | CLI 기기에 operator.read 스코프가 없어서 나는 것. 게이트웨이 자체는 정상 (HTTP 200 + 실제 채팅 왕복 성공) |
+| 항목                              | 내용                                                | 판정                                                                                                      |
+| --------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `gateway.trusted_proxies_missing` | bind 가 loopback 인데 `trustedProxies` 가 비어 있다 | **의도된 것.** 리버스 프록시를 안 쓰는 로컬 전용 인스턴스다                                               |
+| `gateway.probe_failed`            | deep 프로브가 `missing scope: operator.read`        | CLI 기기에 operator.read 스코프가 없어서 나는 것. 게이트웨이 자체는 정상 (HTTP 200 + 실제 채팅 왕복 성공) |
 
 ### 10-5. `openclaw doctor`
 
 경고는 모두 **"설정 안 함"** 계열이고 결함이 아니다.
 
-| 경고 | 원인 |
-|------|------|
-| GitHub 검색이 public-only | `gateway.controlUi.github.token` 미설정 (의도) |
-| Legacy Browser Relay Auth 켜짐 | 업스트림 기본값. 브라우저 확장을 안 쓰므로 방치 |
-| 스킬 30개 사용 불가 | 외부 바이너리·API 키 미설치 (1password, github, spotify-player 등) |
-| Memory search 비활성 | `OPENAI_API_KEY` 미설정. Anthropic 만 붙였다 |
+| 경고                           | 원인                                                               |
+| ------------------------------ | ------------------------------------------------------------------ |
+| GitHub 검색이 public-only      | `gateway.controlUi.github.token` 미설정 (의도)                     |
+| Legacy Browser Relay Auth 켜짐 | 업스트림 기본값. 브라우저 확장을 안 쓰므로 방치                    |
+| 스킬 30개 사용 불가            | 외부 바이너리·API 키 미설치 (1password, github, spotify-player 등) |
+| Memory search 비활성           | `OPENAI_API_KEY` 미설정. Anthropic 만 붙였다                       |
 
 ---
 
 ### 10-6. Docker 경로
 
-| 항목 | 결과 |
-|------|------|
-| `docker build -t openclaw-chris:local .` | **exit 0**, 이미지 4.37GB |
-| 이미지 안 CLI | `OpenClaw 2026.9.2` |
-| 컨테이너 기동 | `docker run -d -p 127.0.0.1:18790:18789 openclaw-chris:local node openclaw.mjs gateway --allow-unconfigured --bind lan --auth token --token <생성값>` -> **healthy** |
-| Windows 브라우저 접근 | `http://127.0.0.1:18790/` **HTTP 200** |
-| 이 포크의 커스터마이즈가 이미지에 반영됐나 | **예.** 컨테이너가 서빙한 `<title>` 이 `OpenClaw Control (Chris fork)`, mount-fallback 라벨이 `OpenClaw Control UI (Chris fork)` |
+| 항목                                       | 결과                                                                                                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker build -t openclaw-chris:local .`   | **exit 0**, 이미지 4.37GB                                                                                                                                            |
+| 이미지 안 CLI                              | `OpenClaw 2026.9.2`                                                                                                                                                  |
+| 컨테이너 기동                              | `docker run -d -p 127.0.0.1:18790:18789 openclaw-chris:local node openclaw.mjs gateway --allow-unconfigured --bind lan --auth token --token <생성값>` -> **healthy** |
+| Windows 브라우저 접근                      | `http://127.0.0.1:18790/` **HTTP 200**                                                                                                                               |
+| 이 포크의 커스터마이즈가 이미지에 반영됐나 | **예.** 컨테이너가 서빙한 `<title>` 이 `OpenClaw Control (Chris fork)`, mount-fallback 라벨이 `OpenClaw Control UI (Chris fork)`                                     |
 
 주의 2가지.
 
@@ -640,18 +646,18 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 
 ## 12. 파일 지도 (이 포크가 추가한 것)
 
-| 경로 | 역할 |
-|------|------|
-| `FORK.md` | 이 문서 (정본) |
-| `chris-local/install.sh` | 격리된 로컬 인스턴스 설치 (멱등) |
-| `chris-local/gateway.sh` | start/stop/restart/status/logs |
-| `chris-local/oc-env.sh` | 격리 환경변수 (HOME/CONFIG/STATE/WORKSPACE + nvm) |
-| `chris-local/oc` | 소스 빌드에 묶인 `openclaw` CLI 래퍼 |
-| `chris-local/openclaw-local.service` | systemd user 유닛 템플릿 (`@NODE_BIN@` 치환) |
+| 경로                                        | 역할                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| `FORK.md`                                   | 이 문서 (정본)                                                      |
+| `chris-local/install.sh`                    | 격리된 로컬 인스턴스 설치 (멱등)                                    |
+| `chris-local/gateway.sh`                    | start/stop/restart/status/logs                                      |
+| `chris-local/oc-env.sh`                     | 격리 환경변수 (HOME/CONFIG/STATE/WORKSPACE + nvm)                   |
+| `chris-local/oc`                            | 소스 빌드에 묶인 `openclaw` CLI 래퍼                                |
+| `chris-local/openclaw-local.service`        | systemd user 유닛 템플릿 (`@NODE_BIN@` 치환)                        |
 | `chris-local/CODEBASE.md` · `codebase.html` | 코드베이스 구조 문서 (백엔드·프런트·DB·인프라, 파일 경로 근거 포함) |
-| `chris-local/BRANDING-AUDIT.md` | 브랜딩 전수 조사 (바꾼 것·남긴 것·남은 흔적, 5장의 정본) |
-| `src/brand.ts` · `ui/src/brand.ts` | 브랜드 상수 정본과 Control UI 재수출 |
-| `ui/src/components/brand-mark.ts` | 중립 브랜드 마크 (인라인 SVG) |
-| `ui/src/styles/fork-style.css` | 포크 공통 스타일 계층 (full width · 라운드 5px) |
+| `chris-local/BRANDING-AUDIT.md`             | 브랜딩 전수 조사 (바꾼 것·남긴 것·남은 흔적, 5장의 정본)            |
+| `src/brand.ts` · `ui/src/brand.ts`          | 브랜드 상수 정본과 Control UI 재수출                                |
+| `ui/src/components/brand-mark.ts`           | 중립 브랜드 마크 (인라인 SVG)                                       |
+| `ui/src/styles/fork-style.css`              | 포크 공통 스타일 계층 (full width · 라운드 5px)                     |
 
 업스트림 파일 수정 범위는 5장(브랜딩)·5-A장(스타일)에 적혀 있다. 원칙은 같다: 새 파일을 만들고 기존 파일은 최소 줄만 고친다.

@@ -1,9 +1,9 @@
 /* @vitest-environment jsdom */
 
-import { BRAND_NAME } from "../brand.ts";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentsListResult, GatewayAgentRow, GatewaySessionRow } from "../api/types.ts";
 import type { RouteId } from "../app-routes.ts";
+import { BRAND_NAME } from "../brand.ts";
 import "./app-host.ts";
 import type { ApplicationContext } from "./context.ts";
 

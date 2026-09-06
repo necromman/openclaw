@@ -1,9 +1,9 @@
 import { html } from "lit";
 import { property } from "lit/decorators.js";
 import type { ControlUiEnvironment } from "../../../src/gateway/control-ui-bootstrap-contract.js";
-import { BRAND_NAME } from "../brand.ts";
 import { beginNativeWindowDrag } from "../app/native-window-drag.ts";
 import { controlUiPublicAssetPath } from "../app/public-assets.ts";
+import { BRAND_NAME } from "../brand.ts";
 import { t } from "../i18n/index.ts";
 import { OpenClawLightDomContentsElement } from "../lit/openclaw-element.ts";
 import { icons } from "./icons.ts";

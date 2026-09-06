@@ -1,6 +1,3 @@
-// @vitest-environment node
-// Control UI tests cover navigation behavior.
-import { BRAND_NAME } from "./brand.ts";
 import { describe, expect, it } from "vitest";
 import {
   SIDEBAR_NAV_ROUTES,
@@ -23,6 +20,9 @@ import {
 } from "./app-route-paths.ts";
 import { createApplicationRouter, routeIdFromPath, type RouteId } from "./app-routes.ts";
 import { sessionRefFromPath } from "./app-session-route-paths.ts";
+// @vitest-environment node
+// Control UI tests cover navigation behavior.
+import { BRAND_NAME } from "./brand.ts";
 import { sessionNavigationTarget } from "./lib/sessions/route-navigation.ts";
 import { pluginTabKey, pluginTabRefFromSearch, pluginTabSearch } from "./pages/plugin/route.ts";
 

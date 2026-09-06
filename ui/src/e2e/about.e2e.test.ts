@@ -1,6 +1,6 @@
+import { expect, it } from "vitest";
 // Control UI tests cover About artifact identity against a mocked Gateway.
 import { BRAND_NAME } from "../brand.ts";
-import { expect, it } from "vitest";
 import { installMockGateway } from "../test-helpers/control-ui-e2e.ts";
 import { createControlUiE2eSuite } from "./control-ui-e2e-suite.test-support.ts";
 

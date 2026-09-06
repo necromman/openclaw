@@ -1,4 +1,3 @@
-import { BRAND_NAME } from "../brand.ts";
 import { copyFile, rm } from "node:fs/promises";
 import path from "node:path";
 import type { Browser, BrowserContext, Page, Video } from "playwright";
@@ -7,6 +6,7 @@ import type {
   AllowedApprovalSnapshot,
   PendingApprovalSnapshot,
 } from "../../../packages/gateway-protocol/src/index.js";
+import { BRAND_NAME } from "../brand.ts";
 import { createControlUiE2eArtifactDir } from "../test-helpers/control-ui-e2e-artifacts.ts";
 import {
   controlUiE2eWaitTimeoutMs,
