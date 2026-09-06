@@ -1,0 +1,94 @@
+# Gateway + IX-Auth identity server + PostgreSQL.
+#
+# Usage:
+#   cp chris-local/ixauth.env.example chris-local/ixauth.env   # then fill in the secrets
+#   docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml up -d
+#
+# Design invariant 4 (ix-auth/MODULE.md section 7): the identity server publishes no
+# host port. Only the Gateway reaches it, over the private compose network. The browser
+# talks to the Gateway's own /auth/* routes and receives one opaque session cookie.
+#
+# Design invariant 3 is deliberately broken here, and the exception is recorded in
+# ix-auth/MODULE.md section 7.1: OpenClaw stores its state in SQLite and IX-Auth
+# supports only PostgreSQL, MariaDB, and MySQL, so there is no database to share.
+# Swapping in a customer's MariaDB is a matter of changing IXAUTH_DB_URL and the
+# credentials; the server carries migrations for all three dialects.
+
+name: openclaw-ixauth
+
+services:
+  ix-auth-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${IXAUTH_DB_NAME:-ixauth}
+      POSTGRES_USER: ${IXAUTH_DB_USERNAME:-ixauth}
+      POSTGRES_PASSWORD: ${IXAUTH_DB_PASSWORD:?set IXAUTH_DB_PASSWORD}
+    volumes:
+      - ix-auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${IXAUTH_DB_USERNAME:-ixauth} -d ${IXAUTH_DB_NAME:-ixauth}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [ix-auth-internal]
+
+  ix-auth:
+    build:
+      context: ../ix-auth
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      ix-auth-db:
+        condition: service_healthy
+    environment:
+      IXAUTH_DB_URL: jdbc:postgresql://ix-auth-db:5432/${IXAUTH_DB_NAME:-ixauth}
+      IXAUTH_DB_USERNAME: ${IXAUTH_DB_USERNAME:-ixauth}
+      IXAUTH_DB_PASSWORD: ${IXAUTH_DB_PASSWORD:?set IXAUTH_DB_PASSWORD}
+      # 32 characters or more; the server refuses to boot with a shorter key.
+      IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
+      # Must equal gateway.auth.ixAuth.issuer / .audience in the Gateway config, or
+      # every locally verified token is rejected for issuer or audience mismatch.
+      IXAUTH_JWT_ISSUER: ${IXAUTH_JWT_ISSUER:?set IXAUTH_JWT_ISSUER}
+      IXAUTH_JWT_AUDIENCE: ${IXAUTH_JWT_AUDIENCE:-openclaw}
+      # Seeded once on first boot. Change the password after the first sign-in.
+      IXAUTH_ADMIN_EMAIL: ${IXAUTH_ADMIN_EMAIL:?set IXAUTH_ADMIN_EMAIL}
+      IXAUTH_ADMIN_PASSWORD: ${IXAUTH_ADMIN_PASSWORD:?set IXAUTH_ADMIN_PASSWORD}
+      # Self-service signup stays closed; administrators create accounts. Switch to
+      # APPROVAL once mail is configured to accept requests that an admin then approves.
+      IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
+      # Without SMTP the server logs the message instead of sending it, which keeps
+      # invitations and password resets testable before mail infrastructure exists.
+      IXAUTH_MAIL_TRANSPORT: ${IXAUTH_MAIL_TRANSPORT:-LOG}
+      IXAUTH_MAIL_APP_BASE_URL: ${IXAUTH_PUBLIC_APP_URL:?set IXAUTH_PUBLIC_APP_URL}
+      IXAUTH_ADMIN_UI_ENABLED: ${IXAUTH_ADMIN_UI_ENABLED:-true}
+    # No ports section on purpose. To reach the admin console, publish it deliberately
+    # on a separate hostname behind an IP allowlist or a VPN; see ix-auth/MODULE.md 7.2.
+    networks: [ix-auth-internal]
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      ix-auth:
+        condition: service_healthy
+    environment:
+      OPENCLAW_CONFIG_PATH: /config/openclaw.json
+    volumes:
+      - ./ixauth-gateway-config:/config:ro
+      - gateway-state:/root/.openclaw
+    ports:
+      # The Gateway is the only service the browser ever reaches.
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+    networks: [ix-auth-internal]
+
+volumes:
+  ix-auth-db-data:
+  gateway-state:
+
+networks:
+  ix-auth-internal:
+    driver: bridge
