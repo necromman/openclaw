@@ -128,7 +128,9 @@ describe("openclaw launcher version provenance", () => {
       const result = runLauncherVersion(fixtureRoot);
 
       expect(result.status).toBe(0);
-      expect(result.stdout).toBe(`${BRAND_NAME} ${packageVersion} (${checkoutCommit.slice(0, 7)})\n`);
+      expect(result.stdout).toBe(
+        `${BRAND_NAME} ${packageVersion} (${checkoutCommit.slice(0, 7)})\n`,
+      );
       expect(result.stderr).toBe("");
     },
   );
