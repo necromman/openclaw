@@ -592,7 +592,8 @@ function tryOutputLauncherVersion(argv) {
     }
     const version = resolveLauncherVersion();
     const commit = resolveLauncherCommit();
-    process.stdout.write(commit ? `OpenClaw ${version} (${commit})\n` : `OpenClaw ${version}\n`);
+    const brand = "Chris Agent"; // fork brand; duplicated from src/brand.ts (launcher imports nothing)
+    process.stdout.write(commit ? `${brand} ${version} (${commit})\n` : `${brand} ${version}\n`);
     return true;
   } catch {
     return false;
