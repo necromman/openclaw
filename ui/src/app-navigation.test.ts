@@ -198,7 +198,7 @@ describe("titleForRoute", () => {
       Object.fromEntries(ALL_ROUTES.map((routeId) => [routeId, titleForRoute(routeId)])),
     ).toEqual({
       chat: "Chat",
-      custodian: `${BRAND_NAME}`,
+      custodian: BRAND_NAME,
       activity: "Activity",
       meetings: "Meetings",
       apps: "Apps",

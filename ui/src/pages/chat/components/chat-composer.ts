@@ -6,7 +6,6 @@ import {
   type ChatFollowUpMode,
 } from "../../../app/settings.ts";
 import "../../../components/tooltip.ts";
-import { BRAND_NAME } from "../../../brand.ts";
 import { t } from "../../../i18n/index.ts";
 import type { HumanMention } from "../../../lib/chat/chat-types.ts";
 import type { SlashCommandDef } from "../../../lib/chat/commands.ts";
@@ -152,7 +151,7 @@ export function renderChatComposer(props: ChatComposerProps) {
   const composerLeadControl = props.permissionPicker
     ? renderChatPermissionPicker(props.permissionPicker)
     : nothing;
-  const assistantName = props.assistantName || BRAND_NAME;
+  const assistantName = props.assistantName || t("custodian.title");
   const inProgressLabel = props.waitingApproval
     ? t("chat.waitingForApproval")
     : submittedProgress?.sendState === "waiting-model"
