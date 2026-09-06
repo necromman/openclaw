@@ -1,4 +1,4 @@
-import { definePage, redirect } from "@openclaw/uirouter";
+import { definePage, redirect, type RouteLocation } from "@openclaw/uirouter";
 import { html, nothing } from "lit";
 import { pathForRoute, routePageSpec } from "../../app-route-paths.ts";
 import type { ApplicationContext } from "../../app/context.ts";
@@ -6,13 +6,18 @@ import { BRAND_FEATURES } from "../../brand.ts";
 
 export const page = definePage({
   ...routePageSpec("apps"),
-  // Hidden in this fork (see BRAND_FEATURES.appsPage): the route stays
-  // registered so upstream keeps applying, but it sends a direct visit home
-  // instead of rendering the companion-apps page. Flip the flag to restore it.
+  // Hidden in this fork (BRAND_FEATURES.appsPage): the route stays registered so
+  // upstream keeps applying, but a direct visit is sent home instead of
+  // rendering the companion-apps page. Flip the flag to restore it.
+  loaderDeps: (_context: ApplicationContext, location: RouteLocation) => location.pathname,
   loader: (context: ApplicationContext) =>
     BRAND_FEATURES.appsPage
-      ? undefined
-      : redirect({ pathname: pathForRoute("chat", context.basePath) }),
+      ? null
+      : redirect({
+          pathname: pathForRoute("chat", context.basePath),
+          search: "",
+          hash: "",
+        }),
   component: () =>
     BRAND_FEATURES.appsPage
       ? import("./apps-page.ts").then(() => ({
