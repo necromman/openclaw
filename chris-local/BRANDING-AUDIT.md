@@ -92,7 +92,10 @@ rg -i "openclaw" dist/control-ui --glob '!*.map' -c
 | ACP 게이트웨이 표시명    | `src/acp/types.ts`                                  | `BRAND_NAME` (프로토콜 id `openclaw-acp` 는 유지)                    |
 | 시스템 프롬프트 페르소나 | `src/agents/system-prompt.ts` · `prompt-surface.ts` | "You are a personal assistant running inside ${BRAND_NAME}." 외 10건 |
 | 설치 마법사              | `src/wizard/i18n/locales/{en,zh-CN,zh-TW}.ts`       | 85건 `{brand}`                                                       |
-| 플러그인 카탈로그 설명   | `extensions/*/package.json` `description`·`blurb`   | 149건 중립화                                                         |
+| 플러그인 카탈로그 설명 | `extensions/*/package.json` · `openclaw.plugin.json` · 시드 카탈로그 | 199건 중립화 + 렌더 시점 `neutralizeCatalogCopy()` |
+| 업데이트 알림 7종 | `src/infra/update-run-report.ts` · `src/cli/update-cli/status.ts` | `BRAND_NAME` |
+| 음성 도구 오류 6건 | `ui/src/pages/chat/realtime-talk-shared.ts` | `BRAND_NAME` |
+| 런처 `--version` | `openclaw.mjs` | 리터럴 1개(모듈 그래프 로드 전이라 import 불가). `src/brand.test.ts` 가 `BRAND_NAME` 과 동기화를 단언 |
 
 ---
 
