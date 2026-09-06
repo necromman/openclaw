@@ -236,3 +236,11 @@ extensions/discord/assets/embedded-app-sdk.mjs
 
 # Pinned Swift lint/format tools installed by scripts/install-swift-tools.sh
 .build/
+
+# Vendored IX-Auth identity server build outputs (see ix-auth/VENDOR.md).
+# ix-auth/.gitignore already covers these; repeated here so a root-level
+# `git add -A` can never stage the ~70 MB Gradle tree or the built jar.
+/ix-auth/**/build/
+/ix-auth/.gradle/
+/ix-auth/**/node_modules/
+/ix-auth/**/dist/

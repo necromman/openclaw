@@ -33,6 +33,9 @@
     "docs/_layouts/",
     "extensions/diffs/assets/viewer-runtime.js",
     "extensions/browser/chrome-extension/modules/copilot-runtime.js",
+    // Vendored IX-Auth identity server (see ix-auth/VENDOR.md). Upstream owns its formatting;
+    // reformatting it here would corrupt every re-sync diff against the source repository.
+    "ix-auth/",
     "**/*.json",
     "node_modules/",
     "patches/",

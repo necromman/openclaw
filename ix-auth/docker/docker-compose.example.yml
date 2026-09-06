@@ -1,0 +1,65 @@
+# IX-Auth 를 기존 프로젝트에 동봉하는 예시.
+#
+# 추가되는 것은 서비스 블록 하나뿐이다. DB 는 앱이 쓰던 것을 그대로 쓰고
+# 스키마(`ixauth`)만 분리한다 — DB 컨테이너를 새로 띄우지 않는다 (설계 불변식 3).
+#
+# 포트를 열지 않는 것에 주의: jar 는 내부 통신 전용이며, 브라우저는 앱을 거친다
+# (설계 불변식 4). 그래서 도메인·SSL 인증서·리버스 프록시 설정이 필요 없다.
+
+services:
+  # ── 앱 (기술스택 무관) ──
+  app:
+    image: my-app:latest
+    environment:
+      # 앱 → jar 내부 호출 주소. 컨테이너 네트워크 안에서만 닿는다
+      IXAUTH_BASE_URL: http://ix-auth:9100
+      IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY}
+      # 앱은 이 주소에서 공개키를 받아 토큰을 로컬 검증한다 (매 요청 jar 호출 없음)
+      IXAUTH_JWKS_URL: http://ix-auth:9100/.well-known/jwks.json
+    ports:
+      - "8080:8080"      # 외부에 열리는 것은 앱뿐이다
+    depends_on:
+      ix-auth:
+        condition: service_healthy
+
+  # ── IX-Auth (추가되는 건 이 블록 하나) ──
+  ix-auth:
+    image: registry.prost.kr/ix-auth:0.1.0
+    environment:
+      # 앱과 같은 DB. 스키마만 ixauth 로 분리된다
+      IXAUTH_DB_URL: jdbc:postgresql://db:5432/myapp
+      IXAUTH_DB_USERNAME: myapp
+      IXAUTH_DB_PASSWORD: ${DB_PASSWORD}
+
+      IXAUTH_JWT_ISSUER: https://myapp.example.com
+      IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY}      # 32자 이상. 짧으면 부팅 거부
+
+      # 최초 부팅에 1회 생성된다. 첫 로그인 후 반드시 변경할 것
+      IXAUTH_ADMIN_EMAIL: admin@example.com
+      IXAUTH_ADMIN_PASSWORD: ${IXAUTH_ADMIN_PASSWORD}
+
+      # 내장 관리 화면이 필요 없으면 끈다 (끄면 경로 자체가 404)
+      # IXAUTH_ADMIN_UI_ENABLED: "false"
+    # ports 를 열지 않는다 — 외부 미노출이 설계 전제다
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── 앱이 원래 쓰던 DB (IX-Auth 가 새로 요구하는 것이 아니다) ──
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: myapp
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:

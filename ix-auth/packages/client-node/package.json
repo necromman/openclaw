@@ -1,0 +1,23 @@
+{
+  "name": "@ix-auth/client-node",
+  "version": "0.1.0",
+  "description": "IX-Auth 앱 측 클라이언트 (Node) — JWKS 로컬 검증 + 권한 판정 + 로그인 중계",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./express": "./src/express.js"
+  },
+  "files": ["src", "README.md"],
+  "engines": { "node": ">=20" },
+  "peerDependencies": {
+    "express": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "express": { "optional": true }
+  },
+  "dependencies": {
+    "jose": "^5.9.6"
+  },
+  "license": "UNLICENSED"
+}

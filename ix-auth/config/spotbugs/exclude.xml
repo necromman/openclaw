@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclude filter — moderate strict.
+
+  Lombok generated code, JPA entity equals/hashCode, Spring Data Repository proxy 등
+  검사 false-positive 가 잦은 영역 제외.
+
+  공식 docs: https://spotbugs.readthedocs.io/en/latest/filter.html
+-->
+<FindBugsFilter
+    xmlns="https://github.com/spotbugs/filter/3.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!-- Lombok generated equals/hashCode/toString 의 모든 null/equals 관련 false-positive -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,NP_NULL_ON_SOME_PATH"/>
+    </Match>
+
+    <!-- JPA entity (domain 패키지) 의 mutable 컬렉션 노출 — Hibernate 가 강제 -->
+    <Match>
+        <Package name="team.prost.ixtrust.domain"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Spring Data Repository proxy 의 동기화 누락 false-positive -->
+    <Match>
+        <Source name="~.*Repository.*"/>
+        <Bug pattern="IS2_INCONSISTENT_SYNC"/>
+    </Match>
+
+    <!-- @Configuration 의 Bean factory method — 동일 메서드 여러 번 호출 false-positive -->
+    <Match>
+        <Class name="~.*Config.*"/>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- 테스트 코드는 검사 제외 — test 코드는 mock + assertion 위주, anti-pattern 만 잡으면 충분.
+         Source 매처는 SpotBugs SourceFile metadata 가 단순 파일명만 가져 path 매칭 실패 가능 →
+         Class name 매처 추가 (JUnit 관행: Test/Tests 로 끝나는 class + 그 inner class). -->
+    <Match>
+        <Source name="~.*src/test/.*"/>
+    </Match>
+    <Match>
+        <Class name="~.*Tests?(\$.*)?$"/>
+    </Match>
+
+    <!--
+      의도된 광범위 catch — Exception 잡아서 audit log / fallback redirect / metric noop 처리하는 케이스.
+      SP 측 callback / Spring filter / metric collector 의 robustness 패턴.
+    -->
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+
+    <!--
+      의도된 생성자 throw — DTO/record 의 validation (예: @NotBlank, @Pattern check).
+      Spring Validator + Lombok @Builder 가 record/생성자에서 IllegalArgumentException 발화 정상.
+    -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!--
+      Random 인스턴스 1회 사용 — 단발 토큰/code/salt 생성 패턴 (예: PKCE codeVerifier, OAuth state).
+      SecureRandom 재사용도 ThreadLocal 패턴 외 굳이 의미 X — 의도된 인스턴스화.
+    -->
+    <Match>
+        <Bug pattern="DMI_RANDOM_USED_ONLY_ONCE"/>
+    </Match>
+
+    <!--
+      catch + ignored (예: best-effort cleanup, optional dependency probing).
+      코드 안에 `// ignored` 주석 명시된 케이스만 적용 — 코드 review 시 의도 확인 가능.
+    -->
+    <Match>
+        <Bug pattern="DE_MIGHT_IGNORE"/>
+    </Match>
+
+</FindBugsFilter>

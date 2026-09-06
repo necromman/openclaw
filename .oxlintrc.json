@@ -233,6 +233,8 @@
     "**/a2ui.bundle.js",
     "extensions/diffs/assets/viewer-runtime.js",
     "extensions/diffs-language-pack/assets/viewer-runtime.js",
+    // Vendored IX-Auth identity server (see ix-auth/VENDOR.md); upstream owns its lint rules.
+    "ix-auth/",
     "node_modules/",
     "patches/",
     "pnpm-lock.yaml",

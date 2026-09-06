@@ -1,0 +1,75 @@
+# IX-Auth CI — test → build → publish
+#
+# 문서만 바뀐 커밋에서는 무거운 job 을 돌리지 않는다 (rules:changes).
+
+stages: [test, build]
+
+variables:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  IMAGE: "$CI_REGISTRY_IMAGE"
+
+cache:
+  key: "gradle-$CI_COMMIT_REF_SLUG"
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+
+# ── 검증 ──
+# `test` 가 아니라 `check` 를 부른다 — checkstyle(maxWarnings=0) + spotbugs 가 함께 돌아야
+# 로컬에서 통과한 코드가 CI 에서 늦게 깨지지 않는다 (.claude/rules/coding-style.md)
+test:
+  stage: test
+  image: eclipse-temurin:21-jdk
+  # docker executor 러너 지정 — 태그가 없으면 shell 러너(runner-office)에 잡혀 image: 가
+  # 무시되고 JAVA_HOME 부재로 죽는다(파이프라인 #7107 실측, main 도 동일 원인으로 연쇄 실패 중).
+  # git.prost.kr 의 도커 러너 태그 관례는 docker-prost (IX-Trust·canon CI 참조).
+  tags:
+    - docker-prost
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    # Testcontainers 가 dind 를 쓰도록
+    TESTCONTAINERS_HOST_OVERRIDE: "docker"
+    TESTCONTAINERS_RYUK_DISABLED: "true"
+  script:
+    - ./gradlew --no-daemon :ix-auth-server:check
+  artifacts:
+    when: always
+    reports:
+      junit: ix-auth-server/build/test-results/test/TEST-*.xml
+    paths:
+      - ix-auth-server/build/reports/
+    expire_in: 1 week
+  rules:
+    - changes:
+        - "ix-auth-server/**/*"
+        - "*.gradle.kts"
+        - "config/**/*"
+        - ".gitlab-ci.yml"
+
+# ── 이미지 ──
+build-image:
+  stage: build
+  image: docker:27
+  tags:
+    - docker-prost
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - docker build -f docker/Dockerfile -t "$IMAGE:$CI_COMMIT_SHORT_SHA" -t "$IMAGE:latest" .
+    - docker push "$IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$IMAGE:latest"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - "ix-auth-server/**/*"
+        - "docker/**/*"
+        - "*.gradle.kts"

@@ -1,0 +1,16 @@
+-- MariaDB 방언 (postgresql/ 원본과 1:1 대응)
+-- groups → ixauth_groups 개명.
+--
+-- V1~V11 은 고정이다. 이미 배포된 DB 가 그 체크섬을 들고 있으므로 고치면 부팅에 실패한다.
+-- 그래서 V1 의 `CREATE TABLE groups` 를 손대지 않고 여기서 이름만 바꾼다.
+-- 개명의 근거는 postgresql/V12 주석에 있다 — GROUPS 는 MySQL 8.0.2+ 예약어이고,
+-- 표 이름을 정하는 것은 방언별 마이그레이션이 아니라 엔티티 하나다.
+--
+-- MariaDB 에서는 GROUPS 가 예약어가 아니므로 이 방언만 놓고 보면 바꿀 이유가 없다.
+-- 그래도 함께 바꾸는 이유는 이미 배포된 두 설치본(MariaDB 11.4)이 다음 배포에서
+-- 엔티티와 어긋나 Hibernate validate 로 부팅을 거부하지 않게 하기 위해서다.
+--
+-- MariaDB/MySQL 의 컬럼 인라인 REFERENCES 는 실제 외래키를 만들지 않으므로
+-- (V1 의 user_groups.group_id · group_roles.group_id) 따라 고칠 제약이 없다.
+-- 데이터는 한 줄도 움직이지 않는다.
+RENAME TABLE groups TO ixauth_groups;

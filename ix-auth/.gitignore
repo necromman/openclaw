@@ -1,0 +1,56 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+bin/
+out/
+
+# Java
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+hs_err_pid*
+
+# Node (SDK 모듈, Phase 2)
+node_modules/
+**/node_modules/
+**/dist/
+
+# Python (SDK 모듈, Phase 2)
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/*.egg-info/
+
+# ── 시크릿 (절대 커밋 금지) ──
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!config/**/*.example.pem
+secrets/
+
+# 로그·임시
+*.log
+*.tsbuildinfo
+
+# Claude Code
+.claude/settings.local.json
+.claude/tmp-*
+.claude/worktrees/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,92 @@
+:root {
+  --bg: #f6f7f9; --panel: #fff; --line: #e3e6ea; --text: #1c2024;
+  --muted: #6b7280; --accent: #2563eb; --danger: #dc2626; --ok: #059669;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#14171a; --panel:#1c2024; --line:#2c3238; --text:#e8eaed;
+          --muted:#9aa4af; --accent:#5b8cff; --danger:#f16a6a; --ok:#4ade80; }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+}
+main { max-width: 720px; margin: 0 auto; padding: 32px 20px 60px; }
+h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 20px; margin-bottom: 16px;
+}
+.panel h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+input {
+  width: 100%; background: var(--bg); border: 1px solid var(--line);
+  color: var(--text); padding: 9px 11px; border-radius: 7px; font-size: 14px;
+}
+button {
+  background: var(--accent); border: none; color: #fff;
+  padding: 9px 16px; border-radius: 7px; cursor: pointer; font-size: 13px;
+}
+button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+button:disabled { opacity: 0.5; cursor: default; }
+.row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.row > .grow { flex: 1 1 200px; }
+.msg { padding: 10px 12px; border-radius: 7px; font-size: 13px; margin: 12px 0; }
+.msg.err { background: rgba(220,38,38,.12); color: var(--danger); }
+.msg.ok { background: rgba(5,150,105,.12); color: var(--ok); }
+.badge {
+  display: inline-block; padding: 2px 9px; border: 1px solid var(--line);
+  border-radius: 20px; font-size: 12px; margin: 0 4px 4px 0;
+}
+.badge.on { border-color: var(--ok); color: var(--ok); }
+.badge.off { border-color: var(--danger); color: var(--danger); }
+dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; word-break: break-all; }
+code { font-size: 12px; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+.kpi { display: flex; gap: 20px; flex-wrap: wrap; }
+.kpi div { font-size: 12px; color: var(--muted); }
+.kpi strong { display: block; font-size: 20px; color: var(--text); font-weight: 650; }
+
+/* 탭 — 라우터 없이 화면을 나눈다 (데모 / 내 계정) */
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.tabs .tab {
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  padding: 7px 14px; border-radius: 7px;
+}
+.tabs .tab.on { background: var(--panel); border-color: var(--line); color: var(--text); }
+
+/* 소셜 로그인 — 버튼처럼 보이지만 <a> 다.
+   fetch 로 부르면 provider 로 나가는 리다이렉트가 CORS 에 막힌다 */
+.social { margin-top: 18px; }
+.social-sep {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted); font-size: 12px; margin-bottom: 12px;
+}
+.social-sep::before, .social-sep::after {
+  content: ''; flex: 1; height: 1px; background: var(--line);
+}
+a.social-btn {
+  display: block; text-align: center; text-decoration: none;
+  background: transparent; border: 1px solid var(--line); color: var(--text);
+  padding: 9px 16px; border-radius: 7px; font-size: 13px; margin-bottom: 8px;
+}
+a.social-btn:hover { border-color: var(--accent); color: var(--accent); }
+a.social-btn.compact { display: inline-block; margin: 0; padding: 7px 14px; }
+
+/* 연결된 소셜 계정 */
+.links { display: flex; flex-direction: column; gap: 4px; }
+.linkrow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.linkrow:last-child { border-bottom: none; }
+.linkrow .grow { flex: 1; }
+
+/* 내 세션 표 — 좁은 화면에서 가로로 넘치지 않게 */
+table.sessions { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+table.sessions td { padding: 6px 8px; border-bottom: 1px solid var(--line, #2a2f3a); vertical-align: middle; }
+table.sessions td.ua { color: var(--dim, #8b93a7); overflow: hidden; text-overflow: ellipsis; max-width: 260px; white-space: nowrap; }
+table.sessions .badge { margin-left: 6px; }

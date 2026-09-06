@@ -1,0 +1,18 @@
+# 여러 PC(Windows·macOS)를 오가므로 저장소 안은 LF 로 고정한다.
+# .editorconfig 의 end_of_line=lf 와 일치시켜 diff 노이즈를 없앤다.
+* text=auto eol=lf
+
+# Windows 전용 스크립트는 CRLF 유지
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# 유닉스 실행 스크립트는 LF 고정 (CRLF 면 실행 실패)
+gradlew text eol=lf
+*.sh    text eol=lf
+
+# 바이너리
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.pdf   binary
+*.woff2 binary

@@ -1,0 +1,16 @@
+{
+  "name": "ix-auth-demo-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "IX-Auth 데모 앱의 BFF — @ix-auth/client-node 를 그대로 쓴다",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@ix-auth/client-node": "file:../../../packages/client-node",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0"
+  }
+}

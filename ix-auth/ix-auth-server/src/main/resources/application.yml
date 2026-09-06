@@ -1,0 +1,142 @@
+server:
+  port: ${IXAUTH_PORT:9100}
+  error:
+    include-stacktrace: never   # 응답에 내부 정보를 절대 싣지 않는다 (contract/errors.md)
+    include-message: never
+
+spring:
+  application:
+    name: ix-auth
+  datasource:
+    url: ${IXAUTH_DB_URL}
+    username: ${IXAUTH_DB_USERNAME}
+    password: ${IXAUTH_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${IXAUTH_DB_POOL_SIZE:10}
+      pool-name: ixauth-pool
+      # 커넥션의 search_path 를 전용 스키마로 고정한다.
+      # 앱 DB 를 공유하므로(불변식 3) 이걸 안 걸면 앱 테이블과 같은 공간을 보게 된다.
+      schema: ${IXAUTH_DB_SCHEMA:ixauth}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate        # 스키마 소유는 Flyway. Hibernate 가 만들지 않는다
+    properties:
+      hibernate:
+        default_schema: ${IXAUTH_DB_SCHEMA:ixauth}
+        jdbc.time_zone: UTC     # 저장·비교는 UTC (rules/coding-style.md)
+  flyway:
+    enabled: ${IXAUTH_DB_MIGRATE_ON_START:true}
+    schemas: ${IXAUTH_DB_SCHEMA:ixauth}
+    default-schema: ${IXAUTH_DB_SCHEMA:ixauth}
+    create-schemas: true
+    # {vendor} = JDBC URL 로 자동 결정 (postgresql | mariadb) — 방언별 마이그레이션 분리
+    locations: classpath:db/migration/{vendor}
+    # 앱의 Flyway 와 히스토리 테이블을 분리한다 (같은 DB 를 쓰므로)
+    table: ixauth_flyway_history
+    baseline-on-migrate: false
+
+# ── IX-Auth 설정 (docs/contract/config.md 가 정본) ──
+ixauth:
+  mode: ${IXAUTH_MODE:standalone}
+  db:
+    schema: ${IXAUTH_DB_SCHEMA:ixauth}
+    embedded: ${IXAUTH_DB_EMBEDDED:false}
+  jwt:
+    algorithm: ${IXAUTH_JWT_ALGORITHM:RS256}
+    issuer: ${IXAUTH_JWT_ISSUER}
+    audience: ${IXAUTH_JWT_AUDIENCE:}
+    access-ttl: ${IXAUTH_JWT_ACCESS_TTL:15m}
+    refresh-ttl: ${IXAUTH_JWT_REFRESH_TTL:7d}
+    private-key: ${IXAUTH_JWT_PRIVATE_KEY:}
+    key-rotation-days: ${IXAUTH_JWT_KEY_ROTATION_DAYS:90}
+    clock-skew: ${IXAUTH_JWT_CLOCK_SKEW:60s}
+  service-key: ${IXAUTH_SERVICE_KEY}
+  admin:
+    email: ${IXAUTH_ADMIN_EMAIL}
+    password: ${IXAUTH_ADMIN_PASSWORD}
+    name: ${IXAUTH_ADMIN_NAME:관리자}
+  password:
+    encoder: ${IXAUTH_PASSWORD_ENCODER:bcrypt}
+    bcrypt-strength: ${IXAUTH_PASSWORD_BCRYPT_STRENGTH:10}
+    min-length: ${IXAUTH_PASSWORD_MIN_LENGTH:10}
+    require-uppercase: ${IXAUTH_PASSWORD_REQUIRE_UPPERCASE:true}
+    require-digit: ${IXAUTH_PASSWORD_REQUIRE_DIGIT:true}
+    require-special: ${IXAUTH_PASSWORD_REQUIRE_SPECIAL:true}
+    rehash-on-login: ${IXAUTH_PASSWORD_REHASH_ON_LOGIN:true}
+    # 0 = 이력을 검사하지 않는다(기본). 이력을 남기는 것 자체가 보관하는 개인정보를
+    # 늘리므로 요구받는 곳에서만 켠다. 0 이어도 직전 비밀번호는 늘 막는다
+    history-count: ${IXAUTH_PASSWORD_HISTORY_COUNT:0}
+    # 유출 목록(HIBP) 대조. 외부 API 라 폐쇄망에서는 못 쓴다 → 기본 false.
+    # 조회 실패는 가입·변경을 막지 않는다(fail-open, WARN 로그)
+    check-breached: ${IXAUTH_PASSWORD_CHECK_BREACHED:false}
+  lockout:
+    enabled: ${IXAUTH_LOCKOUT_ENABLED:true}
+    max-attempts: ${IXAUTH_LOCKOUT_MAX_ATTEMPTS:5}
+    duration: ${IXAUTH_LOCKOUT_DURATION:15m}
+    reset-window: ${IXAUTH_LOCKOUT_RESET_WINDOW:30m}
+  authz:
+    permission-map-cache: ${IXAUTH_AUTHZ_PERMISSION_MAP_CACHE:1h}
+    check-cache-ttl: ${IXAUTH_AUTHZ_CHECK_CACHE_TTL:60s}
+    fallback-on-unavailable: ${IXAUTH_AUTHZ_FALLBACK_ON_UNAVAILABLE:deny}
+    batch-check-max: ${IXAUTH_AUTHZ_BATCH_CHECK_MAX:100}
+    list-resources-max: ${IXAUTH_AUTHZ_LIST_RESOURCES_MAX:1000}
+  admin-ui:
+    enabled: ${IXAUTH_ADMIN_UI_ENABLED:true}
+    path: ${IXAUTH_ADMIN_UI_PATH:/admin-ui}
+    session-ttl: ${IXAUTH_ADMIN_UI_SESSION_TTL:2h}
+  rate-limit:
+    enabled: ${IXAUTH_RATE_LIMIT_ENABLED:true}
+    login-per-minute: ${IXAUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
+    refresh-per-minute: ${IXAUTH_RATE_LIMIT_REFRESH_PER_MINUTE:60}
+    default-per-minute: ${IXAUTH_RATE_LIMIT_DEFAULT_PER_MINUTE:600}
+  account:
+    # 새 기기·새 IP 로그인 알림. 켜 두는 쪽이 안전한 드문 설정이다 —
+    # 계정을 빼앗겼다는 사실을 사용자가 스스로 알아챌 통로가 사실상 이것뿐이다
+    notify-new-device: ${IXAUTH_ACCOUNT_NOTIFY_NEW_DEVICE:true}
+    # 0 = 제한 없음. 기본으로 제한을 걸면 여러 기기를 쓰는 사람이 영문도 모르고 로그아웃된다
+    max-concurrent-sessions: ${IXAUTH_ACCOUNT_MAX_CONCURRENT_SESSIONS:0}
+    # DISABLED | IMMEDIATE | GRACE — 어느 쪽이든 물리 삭제하지 않는다
+    self-delete-mode: ${IXAUTH_ACCOUNT_SELF_DELETE_MODE:DISABLED}
+    self-delete-grace: ${IXAUTH_ACCOUNT_SELF_DELETE_GRACE:7d}
+    # 정의에 없는 속성 키를 거부할지. 켜면 정의 기능이 없던 시절의 키를 가진 사용자를
+    # 수정할 수 없게 되므로, 먼저 정의를 등록하고 켠다 → 기본 false
+    strict-attributes: ${IXAUTH_ACCOUNT_STRICT_ATTRIBUTES:false}
+    # 일괄 등록 1회 상한. 없으면 요청 하나로 서버를 세울 수 있다
+    bulk-import-max: ${IXAUTH_ACCOUNT_BULK_IMPORT_MAX:500}
+  terms:
+    # 약관 동의 기능 전체 스위치. 사내 인스턴스에는 받을 약관이 없다 → 기본 false.
+    # 꺼도 등록해 둔 약관과 동의 이력은 지우지 않는다
+    enabled: ${IXAUTH_TERMS_ENABLED:false}
+    require-on-signup: ${IXAUTH_TERMS_REQUIRE_ON_SIGNUP:true}
+    # 새 버전 게시 시 재동의 요구. 로그인을 막지 않고 응답에 신호만 실어 보낸다 —
+    # 막으면 게시하는 순간 전원이 못 들어온다
+    reagreement-required: ${IXAUTH_TERMS_REAGREEMENT_REQUIRED:true}
+  mfa:
+    mode: ${IXAUTH_MFA_MODE:OPTIONAL}
+    backup-code-count: ${IXAUTH_MFA_BACKUP_CODE_COUNT:10}
+    issuer: ${IXAUTH_MFA_ISSUER:}
+    challenge-ttl: ${IXAUTH_MFA_CHALLENGE_TTL:5m}
+    # 휴대폰과 백업 코드를 모두 잃은 사람의 복구 경로. 끄면 남는 수단은 DB 직접 수정뿐이라
+    # 오히려 흔적이 남지 않는다. 초기화는 항상 감사 로그 + 본인 통지가 따라붙는다
+    admin-reset: ${IXAUTH_MFA_ADMIN_RESET:true}
+    # 시크릿 — 화면에서 다루지 않는다. 비우면 service-key 에서 파생한다
+    # (그 경우 service-key 를 바꾸면 등록된 TOTP 가 전부 무효가 된다)
+    encryption-key: ${IXAUTH_MFA_ENCRYPTION_KEY:}
+  impersonation:
+    # 관리자가 특정 사용자로 전환한다. 끄면 "그 화면이 안 나온다" 를 재현할 수단이
+    # 비밀번호 초기화뿐이고, 그건 사용자를 쫓아내고 본인 로그인으로 기록된다.
+    # 실제 통제는 이 스위치가 아니라 전용 권한(ixauth:impersonation:create) 과
+    # 끌 수 없는 감사 기록(IMPERSONATION_STARTED) 이다
+    enabled: ${IXAUTH_IMPERSONATION_ENABLED:true}
+    # 대리 세션 수명. 일반 로그인(jwt.refresh-ttl, 기본 7d)보다 짧게 둔다 —
+    # refresh 회전으로 늘어나지 않는다(원래 만료를 물려받는다)
+    ttl: ${IXAUTH_IMPERSONATION_TTL:1h}
+  audit:
+    enabled: ${IXAUTH_AUDIT_ENABLED:true}
+    retention-days: ${IXAUTH_AUDIT_RETENTION_DAYS:365}
+    log-failed-login: ${IXAUTH_AUDIT_LOG_FAILED_LOGIN:true}
+
+logging:
+  level:
+    team.prost.ixauth: ${IXAUTH_LOG_LEVEL:INFO}

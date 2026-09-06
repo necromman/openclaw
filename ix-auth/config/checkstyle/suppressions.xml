@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+  "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+  "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!--
+  Checkstyle 위반 file-level suppression — 현재 모든 제외 해제됨.
+
+  옛 제외 1: config/AuthorizationServerConfig.java — 2026-05-18 commit c33c4a6c 에서 분리 정공 처리.
+  옛 제외 2: service/SamlIdpService.java — 2026-05-18 에서 buildSamlResponse 를 7 sub-helper 로 분리.
+-->
+<suppressions>
+</suppressions>
