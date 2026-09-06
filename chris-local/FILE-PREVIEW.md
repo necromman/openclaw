@@ -208,3 +208,49 @@ docker build \
 2. HTML -> PDF 로 직접 그릴 때는 `font-family` 에 `"Noto Sans CJK KR", "NanumGothic"` 을 **명시**한다. 맨 `sans-serif` 에 맡기지 않는다.
 3. 만들기 전에 `fc-list :lang=ko family`, 만든 뒤에 임베드 폰트 목록을 확인한다. 한글 문서인데 라틴 폰트만 있으면 두부가 찍힌 것이다.
 4. **실패를 숨기지 않는다.** 폰트가 없어 실패하면 "호스트에 한글 폰트가 없어서 PDF 생성이 실패했다, `fonts-noto-cjk` 를 설치하고 다시 시도하라" 라고 원인을 그대로 말한다. 조용히 재시도하거나 영문으로 갈아치우지 않는다.
+
+### 폰트를 못 찾을 때 실제로 무슨 일이 일어나는가 (실측 1회)
+
+존재하지 않는 폰트 이름(`NoSuchKoreanFont-XYZ`)을 지정한 HTML 과, 실제 이름(`Noto Sans CJK KR`)을 지정한 HTML 을 같은 조건으로 변환해 임베드 폰트를 비교했다.
+
+| 지정한 font-family | `fc-match` 결과 | 변환 종료코드 | PDF 임베드 폰트 |
+| --- | --- | --- | --- |
+| `NoSuchKoreanFont-XYZ` (없는 이름) | `DejaVu Sans` (**한글 글리프 없음**) | **0 (성공)** | `NotoSansCJKsc-Regular/Bold` + `DejaVuSans` |
+| `Noto Sans CJK KR` (실제 이름) | `Noto Sans CJK KR` | 0 | `NotoSansCJKkr-Regular/Bold` |
+
+**핵심**: 폰트 이름이 틀려도 **오류가 나지 않는다.** LibreOffice 가 자체 폴백으로 CJK 폰트를 찾아 끼워 넣기 때문에 종료코드는 0 이고 문서도 읽힌다. 다만 지역 변형이 `kr` 이 아니라 `sc` 로 밀리고, **호스트에 CJK 폰트가 아예 없으면 같은 종료코드 0 으로 두부만 찍힌 PDF 가 나온다.** 그래서 "오류가 안 났으니 됐다" 는 판정이 성립하지 않고, **임베드 폰트 목록 확인이 유일한 신뢰 신호**다. 규칙 3·4번이 이 실측 때문에 존재한다.
+
+### 실측: 에이전트에게 시켜본 결과 (2026-09-06 23:04 KST)
+
+"한글이 들어간 2페이지 보고서를 PDF 로 만들어 달라" 고 요청했더니 에이전트가 AGENTS.md 규칙대로 움직였다.
+
+1. 먼저 `fc-list :lang=ko` 와 `soffice --version` 으로 **폰트·변환기 존재를 확인**하고 "한글 폰트와 LibreOffice 모두 확인됐습니다" 라고 보고했다.
+2. HTML 을 headless Chrome 으로 PDF 화한 뒤 **임베드 폰트를 검사해 스스로 반려**했다: "Chrome 은 2페이지로 잘 맞췄지만 글자를 Type3 경로로 그려 실제 폰트를 임베드하지 않았습니다. LibreOffice 쪽이 진짜 폰트를 넣으므로 그쪽 레이아웃을 조정하겠습니다."
+3. LibreOffice 경로로 다시 만들어 `output/한글보고서.pdf` (146 KB)를 냈고, 파일 패널 미리보기에서 제목·본문·표가 전부 정상 한글로 보인다 (`preview-05-korean-pdf.png`).
+
+즉 **폰트 검증 단계가 없었다면 Type3 PDF 가 그대로 납품될 뻔했다.** 규칙이 실제로 한 번 걸러냈다.
+
+---
+
+## 7. 검증 결과 (2026-09-06)
+
+| 항목 | 결과 |
+| --- | --- |
+| `pnpm check` 사전 점검 18종 | **전부 통과** (충돌 마커·max-lines 래칫·SAFETY 주석·패키지 락 가드 등) |
+| `pnpm check` typecheck | 이 브랜치가 만든 오류 **0**. 별건으로 `ui/src/pages/apps/route.ts` 의 반환 타입 오류가 있었고 브랜딩 담당이 `35be7a8c7dc` 로 고쳤다 |
+| 신규 유닛 테스트 | `document-extract-html.test.ts` 6건, `document-convert.test.ts` 4건, `document-preview-kinds.test.ts`·`document-preview.test.ts` 포함 **전부 통과** |
+| 기존 회귀 | `sessions-files.test.ts`·`sessions-files.preview.test.ts`·`control-ui-csp.test.ts` **71건 통과** |
+| `pnpm build` + `pnpm ui:build` | **성공** |
+| **번들 증가** | **사실상 0.** 시작 JS 341.0 KiB gzip (기준선 350,377 B 보다 **1,241 B 적다**). 최대 JS 청크 211.0 KiB / 상한 215.0 KiB, 최대 CSS 44,169 B / 상한 53,400 B |
+| 신규 npm 의존성 | **0개** |
+| CSP 위반 콘솔 오류 | **0건** (남은 404 는 다른 세션의 link-favicon 조회로 이 기능과 무관) |
+| 형식별 실측 | PDF·docx·xlsx·pptx 4종 + 에이전트 생성 한글 PDF 1종, **전부 한글 정상** |
+
+스크린샷: `D:\PROJECT\chris-server\analysis\2026-09-06-openclaw-2\preview-01-pdf.png` ~ `preview-05-korean-pdf.png`
+
+### 실측에서 확인된 동작
+
+- PDF 는 `blob:` iframe 안에서 **브라우저 내장 뷰어**가 그린다. 페이지 이동·확대·인쇄·다운로드가 그대로 살아 있다.
+- docx 는 표·글머리표·제목 단계가 원본 그대로 나온다. 툴바에 "Converted for preview" 표시가 붙는다.
+- xlsx·pptx 도 같은 뷰어로 통일돼 보인다.
+- 변환 지연은 체감상 1초 미만이고, 같은 파일을 다시 열면 캐시가 걸려 즉시 뜬다.
