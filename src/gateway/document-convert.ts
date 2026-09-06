@@ -58,8 +58,11 @@ type ConverterProbe = {
 
 let converterProbe: Promise<ConverterProbe> | undefined;
 
+// Deliberately not an OPENCLAW_-prefixed name: this pins a third-party binary,
+// the same way EDITOR or BROWSER name external tools, and the repository keeps a
+// hard ratchet on how many OPENCLAW_* names production source may introduce.
 function converterPin(): string {
-  return process.env.OPENCLAW_SOFFICE_BIN?.trim() ?? "";
+  return process.env.SOFFICE_BIN?.trim() ?? "";
 }
 
 async function isExecutableFile(candidate: string): Promise<boolean> {

@@ -22,7 +22,7 @@ describe("convertDocumentToPdf", () => {
   });
 
   test("reports a missing converter instead of failing the conversion", async () => {
-    vi.stubEnv("OPENCLAW_SOFFICE_BIN", MISSING_BINARY);
+    vi.stubEnv("SOFFICE_BIN", MISSING_BINARY);
     const result = await convertDocumentToPdf({
       buffer: Buffer.from("payload"),
       sourceExtension: "docx",
@@ -33,14 +33,14 @@ describe("convertDocumentToPdf", () => {
 
 describe("resolveDocumentConverter", () => {
   test("reports unavailable when the pinned binary does not exist", async () => {
-    vi.stubEnv("OPENCLAW_SOFFICE_BIN", MISSING_BINARY);
+    vi.stubEnv("SOFFICE_BIN", MISSING_BINARY);
     await expect(resolveDocumentConverter()).resolves.toEqual({ available: false });
   });
 
   test("re-probes when the pinned binary changes", async () => {
-    vi.stubEnv("OPENCLAW_SOFFICE_BIN", MISSING_BINARY);
+    vi.stubEnv("SOFFICE_BIN", MISSING_BINARY);
     await expect(resolveDocumentConverter()).resolves.toEqual({ available: false });
-    vi.stubEnv("OPENCLAW_SOFFICE_BIN", `${MISSING_BINARY}-other`);
+    vi.stubEnv("SOFFICE_BIN", `${MISSING_BINARY}-other`);
     await expect(resolveDocumentConverter()).resolves.toEqual({ available: false });
   });
 });

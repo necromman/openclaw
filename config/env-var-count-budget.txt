@@ -3,5 +3,4 @@
 # Worker bundle installation no longer injects OPENCLAW_STATE_DIR into a remote npm process.
 # The internal Node-version check no longer contributes a false OPENCLAW_* name.
 # The next-turn runtime-context preface constant no longer exists as an OPENCLAW_* name.
-# +1 for OPENCLAW_SOFFICE_BIN: pins the LibreOffice binary the document preview converter uses.
-499
+498
