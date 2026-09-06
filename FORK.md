@@ -282,6 +282,102 @@ bash chris-local/gateway.sh logs 100
 
 ---
 
+## 7-5. 자동 반영 (Windows 에서 고치고 push 하면 WSL 이 알아서 따라온다)
+
+편집은 `D:\PROJECT\openclaw`, 실행은 WSL `~/openclaw` 라는 두 체크아웃 구조에서 손으로 pull 하고 빌드하는 것을 없애기 위한 레인이다. **Windows 에서 커밋·푸시만 하면 2분 안에 WSL 인스턴스가 스스로 pull 하고 빌드하고 게이트웨이를 재시작한다.**
+
+```
+D:\PROJECT\openclaw  --(git push origin chris/main)-->  GitHub 포크
+                                                            |
+                                       (2분 타이머) auto-deploy.sh 가 fetch
+                                                            |
+                        SHA 가 움직였을 때만: pull --ff-only -> (lock 바뀌었을 때만) pnpm install
+                                            -> pnpm build -> 성공했을 때만 게이트웨이 재시작
+                                                            |
+                                                 ~/openclaw (WSL) 에 반영
+```
+
+### 설치
+
+```bash
+cd ~/openclaw
+bash chris-local/install-auto-deploy.sh
+```
+
+systemd user 매니저가 있으면 **2분 주기 systemd user 타이머**(`openclaw-auto-deploy.timer`)를 걸고, 없으면 같은 주기의 `nohup` 폴링 루프로 대체한다.
+
+### 즉시 반영 (타이머를 안 기다리고 손으로)
+
+```bash
+# Windows Git Bash / PowerShell 에서 바로
+wsl -d Ubuntu -- bash -lc '~/openclaw/chris-local/auto-deploy.sh --now'
+
+# SHA 가 안 움직였어도 강제로 다시 빌드·재시작
+wsl -d Ubuntu -- bash -lc '~/openclaw/chris-local/auto-deploy.sh --force'
+```
+
+### 안전 규칙 (이 스크립트가 지키는 것)
+
+| 규칙 | 왜 |
+|------|-----|
+| `flock` 단일 실행 | 빌드가 4분 넘게 걸리므로 2분 타이머가 앞 실행과 겹치면 안 된다. 겹치면 뒤 tick 은 그냥 빠진다 |
+| 원격 SHA 가 로컬과 같으면 아무것도 안 한다 | 평상시 타이머는 `git fetch` 한 번으로 끝난다 |
+| `pnpm install` 은 `pnpm-lock.yaml` 이 바뀐 커밋에서만 | 매번 install 하면 2분 주기를 못 지킨다 |
+| `git pull --ff-only` | WSL 쪽에 로컬 커밋이 생겨 히스토리가 갈라지면 조용히 머지하지 않고 **실패로 남긴다** |
+| 빌드 성공했을 때만 재시작 | 빌드가 깨지면 돌던 게이트웨이는 **이전 빌드 그대로 계속 서비스**하고 로그에만 사유가 남는다 |
+| 재시작 후 HTTP 200 확인 | 재시작은 됐는데 안 뜨는 경우를 `WARN` 으로 구분한다 |
+
+### 상태 확인 / 실패 확인법
+
+```bash
+# 배포 이력 (KST 시각 + SHA)
+wsl -d Ubuntu -- bash -lc 'tail -20 ~/openclaw/chris-local/auto-deploy.log'
+
+# 타이머가 살아 있나 / 다음 실행 언제
+wsl -d Ubuntu -- bash -lc 'systemctl --user list-timers openclaw-auto-deploy.timer --no-pager'
+
+# 마지막 실행 자체가 실패했나
+wsl -d Ubuntu -- bash -lc 'systemctl --user status openclaw-auto-deploy.service --no-pager | head -20'
+```
+
+로그에 `FAIL:` 이 보이면 그 줄이 원인을 그대로 말한다. 자주 나올 것은 셋이다.
+
+- `git pull --ff-only rejected` - WSL 체크아웃에 로컬 커밋이 생겼다. `cd ~/openclaw && git status` 로 확인하고 커밋을 포크에 올리거나 버린다.
+- `pnpm build failed` - 소스가 깨졌다. 게이트웨이는 이전 빌드로 계속 돈다. 로그의 빌드 출력이 그대로 붙어 있으니 거기서 원인을 본다. (주의: 실패한 빌드가 `dist/` 를 부분적으로 덮었을 수 있으므로, 고친 뒤 다음 성공 빌드까지는 `dist/` 를 신뢰하지 않는다.)
+- `pnpm install failed` - 락파일과 레지스트리가 안 맞는다.
+
+### 타이머 중지 / 재개
+
+```bash
+# 중지 (자동 반영 끄기)
+wsl -d Ubuntu -- bash -lc 'systemctl --user disable --now openclaw-auto-deploy.timer'
+
+# 재개
+wsl -d Ubuntu -- bash -lc 'systemctl --user enable --now openclaw-auto-deploy.timer'
+
+# nohup 루프 모드로 돌고 있을 때 중지
+wsl -d Ubuntu -- bash -lc 'pkill -f openclaw-auto-deploy-loop'
+```
+
+### 실측 (2026-09-06, 무개입 확인)
+
+Windows 체크아웃에서 Control UI 제목에 `v2` 를 붙인 커밋 `14513fdec725` 를 `git push origin chris/main` 한 것 외에 **아무 조작도 하지 않았다.**
+
+```
+2026-09-06 15:57:02 KST  deploy start: 07de85cd4e2e -> 14513fdec725 (origin/chris/main, mode=timer)
+2026-09-06 16:00:51 KST  OK: deployed 14513fdec725, Gateway restarted and answering HTTP 200
+```
+
+- 푸시 시각 약 15:56 -> 타이머가 15:57:02 에 잡음(주기 2분) -> 빌드 3분 41초 -> 16:00:51 재시작 완료. **push 에서 반영까지 약 4분.**
+- 그 직전 15:54:58 타이머 tick 은 SHA 가 안 움직여서 로그 한 줄 없이 조용히 빠졌다(설계대로).
+- 반영 확인: `curl -s http://127.0.0.1:18789/ | grep -oE '<title>[^<]*</title>'` -> `<title>OpenClaw Control (Chris fork v2)</title>`
+
+### 로그 파일이 git 을 더럽히지 않는 이유
+
+`chris-local/auto-deploy.log` 는 저장소 안에 있지만 `.git/info/exclude` 에 자동 등록된다(스크립트가 멱등하게 넣는다). 업스트림 `.gitignore` 를 건드리지 않으므로 리베이스 충돌이 생기지 않고, 워크트리는 깨끗하게 유지돼 `--ff-only` pull 이 막히지 않는다.
+
+---
+
 ## 8. 모델 연결
 
 ```bash
@@ -333,6 +429,28 @@ printf '%s' '<claude setup-token 값>' | ~/openclaw-local/bin/oc \
 | 기기 페어링 | loopback 자동 승인 (`device pairing auto-approved ... role=operator`) |
 | 로드된 플러그인 | 16개 (acpx, browser, canvas, cua-computer, device-pair, file-transfer, geolocation, google-meet, linux-node, memory-core, ollama, openai, talk-voice, teams-meetings, xai, zoom-meetings) |
 
+### 10-2b. 테스트 (`pnpm check` / `pnpm test`)
+
+| 명령 | 결과 |
+|------|------|
+| `pnpm check` (포맷·린트·타입·아키텍처 가드 전량) | **exit 0, 실패 0** |
+| `pnpm test` (전체 스위트, 약 2시간) | **exit 1** - 통과 **192,671** / 실패 **450** / 스킵 다수 |
+
+실패 450건은 **전부 환경 의존이고 우리 변경과 무관하다.** 이 실행은 커스터마이즈가 들어가기 전의 순정 태그 트리에서 돌렸으므로 업스트림 v2026.9.2 자체의 이 환경에서의 상태다.
+
+| 분류 | 건수 | 원인 | 근거 |
+|------|------|------|------|
+| `tooling` 레인 (PR·릴리스 셸 자동화) | **419** | **`jq` 미설치** | 로그에 `scripts/pr-lib/merge-outcome.sh: line 14: jq: command not found` 가 직접 찍힌다. `apt-get install -y jq` 로 해소되는 종류다 |
+| `extension-browser` (browser control server) | 20 | 헤드리스 WSL 에 실제 브라우저/CDP 대상이 없음 | `server.agent-contract-core`, `server-context.remote-profile-tab-ops.fallback` 두 파일에 집중 |
+| `unit-fast-isolated` `entry.respawn` | 5 | 프로세스 respawn 이 WSL 환경에 의존 | |
+| `gateway-core` `portal-http-proxy` | 1 | **IPv6 전용 타깃**으로 접속하는 케이스. WSL2 네트워크 스택 제약 | 테스트명에 `reaches IPv6-only targets` |
+| `ui` `sessions-page.typing` | 1 | 타이밍 플레이키 (`expected 1 to be +0`) | 같은 파일의 다른 변형은 전부 통과 |
+| 기타 산발 | 4 | `browser-open`, `portal-stream-command`, `package-acceptance-workflow`, codex `native-hook-relay` | 모두 외부 바이너리·네트워크 의존 |
+
+**업스트림 CI 대조는 하지 못했다** (포크 CI 를 돌리려면 `workflow` 스코프가 필요하고, 이 환경에서 그 스코프를 얻지 못했다 - 3-1 참조). 대신 **원인을 로그에서 직접 특정**했다: `jq` 미설치는 메시지가 그대로 나오고, 나머지는 브라우저·IPv6·프로세스 respawn 같은 호스트 능력 부재다. 소스 결함으로 분류할 근거가 있는 실패는 **없다**.
+
+`jq` 는 그 뒤 설치했다(`apt-get install -y jq`, jq-1.7). 새 환경을 만들 때는 **`pnpm test` 전에 `jq` 를 먼저 깔면 419건이 사라진다.**
+
 ### 10-3. 모델 실동작
 
 CLI 경유 (`oc agent --json -m ...`):
@@ -364,6 +482,25 @@ Control UI 경유 (브라우저 채팅 왕복): 질문 "say UI-OK and name your 
 | Legacy Browser Relay Auth 켜짐 | 업스트림 기본값. 브라우저 확장을 안 쓰므로 방치 |
 | 스킬 30개 사용 불가 | 외부 바이너리·API 키 미설치 (1password, github, spotify-player 등) |
 | Memory search 비활성 | `OPENAI_API_KEY` 미설정. Anthropic 만 붙였다 |
+
+---
+
+### 10-6. Docker 경로
+
+| 항목 | 결과 |
+|------|------|
+| `docker build -t openclaw-chris:local .` | **exit 0**, 이미지 4.37GB |
+| 이미지 안 CLI | `OpenClaw 2026.9.2` |
+| 컨테이너 기동 | `docker run -d -p 127.0.0.1:18790:18789 openclaw-chris:local node openclaw.mjs gateway --allow-unconfigured --bind lan --auth token --token <생성값>` -> **healthy** |
+| Windows 브라우저 접근 | `http://127.0.0.1:18790/` **HTTP 200** |
+| 이 포크의 커스터마이즈가 이미지에 반영됐나 | **예.** 컨테이너가 서빙한 `<title>` 이 `OpenClaw Control (Chris fork)`, mount-fallback 라벨이 `OpenClaw Control UI (Chris fork)` |
+
+주의 2가지.
+
+- 컨테이너 안에서는 `--bind lan` 이 필요하다. 기본 `loopback` 이면 컨테이너 내부 127.0.0.1 에만 붙어서 포트 매핑이 닿지 않는다.
+- 설정 없이 그냥 띄우면 `Missing config. Run 'openclaw setup' or set gateway.mode=local` 로 죽는다. 위처럼 `--allow-unconfigured` 를 주거나 마운트한 `.openclaw/` 에 설정을 넣어야 한다.
+
+검증 후 컨테이너와 볼륨은 지웠고 이미지 `openclaw-chris:local` 만 남겼다.
 
 ---
 
