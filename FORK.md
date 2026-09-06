@@ -5,6 +5,7 @@
 - 포크 생성일: 2026-09-06 (KST, 일요일)
 - 기준 태그: **v2026.9.2** (커밋 `3928bad9badfcb6c7d140530435e806fb8092190`, "docs: finalize 2026.9.2 release notes")
 - 상위 라이선스: MIT (c) OpenClaw Foundation. `LICENSE` 와 `THIRD_PARTY_NOTICES.md` 는 그대로 유지한다.
+- **코드베이스 구조**(어디가 백엔드·프런트인지, 인프라 요구, 데이터베이스)는 별도 문서다: [chris-local/CODEBASE.md](chris-local/CODEBASE.md) (HTML 판 `chris-local/codebase.html`).
 
 ---
 
@@ -608,5 +609,6 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 | `chris-local/oc-env.sh` | 격리 환경변수 (HOME/CONFIG/STATE/WORKSPACE + nvm) |
 | `chris-local/oc` | 소스 빌드에 묶인 `openclaw` CLI 래퍼 |
 | `chris-local/openclaw-local.service` | systemd user 유닛 템플릿 (`@NODE_BIN@` 치환) |
+| `chris-local/CODEBASE.md` · `codebase.html` | 코드베이스 구조 문서 (백엔드·프런트·DB·인프라, 파일 경로 근거 포함) |
 
 업스트림 파일 중 수정한 것은 5장 표의 세 곳뿐이다.

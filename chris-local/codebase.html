@@ -1,0 +1,1259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenClaw 코드베이스 구조 (포크 chris/main)</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0ed;
+    --text: #1c1c1a;
+    --text-dim: #5c5c56;
+    --line: #dcdcd6;
+    --line-strong: #b9b9b1;
+    --accent: #1f5f4f;
+    --accent-soft: #e3efeb;
+    --warn: #8a4b00;
+    --warn-soft: #fbeedd;
+    --danger: #8c2f2f;
+    --danger-soft: #f8e6e6;
+    --live: #1c4b8a;
+    --live-soft: #e2ecf8;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --surface: #1e1e23;
+      --surface-2: #26262c;
+      --text: #e8e8e4;
+      --text-dim: #a3a39c;
+      --line: #34343c;
+      --line-strong: #4a4a54;
+      --accent: #7fd3ba;
+      --accent-soft: #1d302c;
+      --warn: #e0a95e;
+      --warn-soft: #33281a;
+      --danger: #e59090;
+      --danger-soft: #331f1f;
+      --live: #8ab6e8;
+      --live-soft: #1b2836;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo",
+                 "Noto Sans KR", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px 80px; }
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  nav.toc .inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    align-items: baseline;
+  }
+  nav.toc .brand {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: .04em;
+    color: var(--accent);
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+  nav.toc a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    white-space: nowrap;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a:hover { color: var(--text); border-bottom-color: var(--line-strong); }
+
+  header.doc { padding: 40px 0 8px; }
+  header.doc h1 { font-size: 30px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; }
+  header.doc .sub { color: var(--text-dim); font-size: 15px; margin: 0 0 6px; }
+  header.doc .meta { color: var(--text-dim); font-size: 13px; font-family: var(--mono); }
+
+  h2 {
+    font-size: 22px;
+    margin: 56px 0 6px;
+    padding-top: 20px;
+    border-top: 2px solid var(--line-strong);
+    scroll-margin-top: 64px;
+  }
+  h2 .num {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    margin-right: 8px;
+    vertical-align: 2px;
+  }
+  h3 { font-size: 17px; margin: 32px 0 8px; }
+  h4 { font-size: 15px; margin: 22px 0 6px; color: var(--text-dim); letter-spacing: .02em; }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 5px;
+    word-break: break-word;
+  }
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin: 18px 0 22px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 16px 14px;
+  }
+  .card .q {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: var(--accent);
+    margin: 0 0 8px;
+  }
+  .card .a { margin: 0; font-size: 15px; line-height: 1.65; }
+
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 22px 0 10px;
+  }
+  .fig { background: var(--surface); padding: 14px 14px 12px; }
+  .fig .v { font-family: var(--mono); font-size: 19px; font-weight: 700; letter-spacing: -.02em; display: block; }
+  .fig .k { font-size: 12px; color: var(--text-dim); display: block; margin-top: 3px; line-height: 1.45; }
+
+  .diagram {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    margin: 18px 0 8px;
+    padding: 6px 0;
+  }
+  .diagram svg { display: block; min-width: 1060px; width: 100%; height: auto; }
+  .dcap { font-size: 12.5px; color: var(--text-dim); margin: 6px 2px 0; }
+
+  .tw { overflow-x: auto; margin: 14px 0 6px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; background: var(--surface); }
+  caption {
+    caption-side: top;
+    text-align: left;
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 10px 12px 8px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+  }
+  th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  thead th { background: var(--surface-2); font-size: 13px; letter-spacing: .02em; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  .b {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+    vertical-align: 1px;
+  }
+  .b-ok { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+  .b-no { color: var(--danger); background: var(--danger-soft); border-color: var(--danger); }
+  .b-w  { color: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
+  .b-i  { color: var(--live); background: var(--live-soft); border-color: var(--live); }
+
+  .box {
+    border: 1px solid var(--line-strong);
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 20px 0;
+    background: var(--surface);
+  }
+  .box > :first-child { margin-top: 0; }
+  .box > :last-child { margin-bottom: 0; }
+  .box .t { font-weight: 700; font-size: 14px; letter-spacing: .02em; margin-bottom: 6px; }
+  .box-live { border-left-color: var(--live); background: var(--live-soft); }
+  .box-warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .box-acc  { border-left-color: var(--accent); background: var(--accent-soft); }
+
+  .src {
+    margin: 18px 0 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-2);
+    padding: 10px 14px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.65;
+    word-break: break-word;
+  }
+  .src b { color: var(--text); font-weight: 700; }
+
+  footer.doc {
+    margin-top: 60px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  @media print {
+    :root {
+      --bg: #fff; --surface: #fff; --surface-2: #f4f4f2; --text: #000; --text-dim: #444;
+      --line: #ccc; --line-strong: #888;
+    }
+    body { font-size: 11pt; }
+    nav.toc { display: none; }
+    .wrap { max-width: none; padding: 0; }
+    h2 { break-after: avoid; page-break-after: avoid; }
+    .tw, .box, .card, table, .diagram { break-inside: avoid; page-break-inside: avoid; }
+    a { color: #000; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <div class="inner">
+    <span class="brand">OpenClaw / CODEBASE</span>
+    <a href="#summary">30초 요약</a>
+    <a href="#s1">1. 저장소 지도</a>
+    <a href="#s2">2. 백엔드</a>
+    <a href="#s3">3. 프런트</a>
+    <a href="#s4">4. 데이터 저장</a>
+    <a href="#s5">5. 인프라</a>
+    <a href="#s6">6. 빌드·테스트</a>
+    <a href="#s7">7. 확장 지점</a>
+    <a href="#s8">8. 커스터마이즈</a>
+    <a href="#gap">부록. 확인 못한 것</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="doc">
+  <h1>OpenClaw 코드베이스 구조</h1>
+  <p class="sub">어디가 백엔드고 어디가 프런트인지, 인프라는 무엇이 필요한지, 데이터베이스는 무엇을 쓰는지</p>
+  <p class="meta">작성 2026-09-06 (KST) &middot; 포크 necromman/openclaw @ chris/main &middot; 업스트림 v2026.9.2 (3928bad) &middot; 편집 D:\PROJECT\openclaw &middot; 빌드 정본 WSL ~/openclaw</p>
+</header>
+
+<!-- ==================== SUMMARY ==================== -->
+<section id="summary">
+<h2><span class="num">SUMMARY</span>30초 요약</h2>
+
+<div class="cards">
+  <div class="card">
+    <p class="q">백엔드</p>
+    <p class="a"><strong><code>src/</code> 하나</strong>에 TypeScript 16,626 파일이 들어 있고, 실행되는 것은
+    <strong>게이트웨이 프로세스 한 개</strong>다. HTTP 는 <code>node:http</code> 원본, WebSocket 은 <code>ws</code> 라이브러리.
+    <strong>Express &middot; Hono &middot; Fastify 를 코어에 쓰지 않는다</strong>(Express 는 플러그인 3개 전용).
+    기능은 <code>extensions/</code> 플러그인 153개로 갈라져 있고, 실제 로드는 설정으로 고른다.</p>
+  </div>
+  <div class="card">
+    <p class="q">프런트</p>
+    <p class="a">주 표면은 <code>ui/</code> Control UI - <strong>Lit 3 + Vite 8</strong>, 로케일 21개, React 아님.
+    빌드 산출물은 <code>ui/dist</code> 가 아니라 <strong><code>dist/control-ui/</code></strong> 이고 게이트웨이가 직접 정적 서빙한다.
+    그 밖에 네이티브 앱 4종(Swift &middot; Kotlin &middot; Rust), TUI, Telegram Mini App 이 같은 게이트웨이에 붙는다.</p>
+  </div>
+  <div class="card">
+    <p class="q">데이터 &middot; 인프라</p>
+    <p class="a"><strong>SQLite 전용</strong>이고 드라이버는 Node 내장 <code>node:sqlite</code> 하나다.
+    better-sqlite3 &middot; libsql 없음, <strong>Postgres &middot; MySQL &middot; Redis 없음</strong>.
+    필수 외부 서비스는 <strong>0</strong>, 기본 포트는 <strong>18789</strong> 하나.
+    Node 22.22.3+ / 24.15+ / 25.9+ 와 pnpm 12.1.0 만 있으면 뜬다.</p>
+  </div>
+</div>
+
+<div class="figures">
+  <div class="fig"><span class="v">16,626</span><span class="k">src/ 의 TypeScript 파일</span></div>
+  <div class="fig"><span class="v">153</span><span class="k">extensions/ 플러그인 (로컬 로드 16개)</span></div>
+  <div class="fig"><span class="v">23</span><span class="k">packages/ 워크스페이스 패키지</span></div>
+  <div class="fig"><span class="v">18789</span><span class="k">기본 게이트웨이 포트 (HTTP + WS)</span></div>
+  <div class="fig"><span class="v">108</span><span class="k">공용 DB 테이블 (실측, user_version 15)</span></div>
+  <div class="fig"><span class="v">4.37GB</span><span class="k">Docker 이미지 (node_modules 2.65GB)</span></div>
+</div>
+
+<div class="diagram">
+<svg viewBox="0 0 1120 512" role="img" aria-label="OpenClaw 계층 다이어그램: 프런트 표면에서 게이트웨이 프로세스 내부 모듈을 거쳐 저장소와 외부 서비스까지">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--line-strong)"/>
+    </marker>
+  </defs>
+
+  <!-- BAND 1 : front surfaces -->
+  <text x="112" y="24" font-size="12" font-weight="700" letter-spacing="1" fill="var(--accent)">프런트 표면</text>
+  <g font-family="-apple-system, Segoe UI, Malgun Gothic, sans-serif">
+    <rect x="110" y="34" width="155" height="76" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="187" y="60" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">Control UI</text>
+    <text x="187" y="78" font-size="11" text-anchor="middle" fill="var(--text-dim)">Lit 3 + Vite 8</text>
+    <text x="187" y="94" font-size="11" text-anchor="middle" fill="var(--text-dim)">ui/ &rarr; dist/control-ui</text>
+
+    <rect x="277" y="34" width="155" height="76" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+    <text x="354" y="60" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">네이티브 앱 4종</text>
+    <text x="354" y="78" font-size="11" text-anchor="middle" fill="var(--text-dim)">iOS &middot; macOS &middot; Android</text>
+    <text x="354" y="94" font-size="11" text-anchor="middle" fill="var(--text-dim)">Linux (Swift/Kotlin/Rust)</text>
+
+    <rect x="444" y="34" width="155" height="76" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+    <text x="521" y="60" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">TUI</text>
+    <text x="521" y="78" font-size="11" text-anchor="middle" fill="var(--text-dim)">src/tui</text>
+    <text x="521" y="94" font-size="11" text-anchor="middle" fill="var(--text-dim)">pi-tui</text>
+
+    <rect x="611" y="34" width="155" height="76" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+    <text x="688" y="60" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">Telegram Mini App</text>
+    <text x="688" y="78" font-size="11" text-anchor="middle" fill="var(--text-dim)">서버 렌더 HTML 한 장</text>
+    <text x="688" y="94" font-size="11" text-anchor="middle" fill="var(--text-dim)">프레임워크 없음</text>
+
+    <rect x="778" y="34" width="155" height="76" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+    <text x="855" y="60" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">메시징 채널 27</text>
+    <text x="855" y="78" font-size="11" text-anchor="middle" fill="var(--text-dim)">telegram &middot; slack &middot; discord</text>
+    <text x="855" y="94" font-size="11" text-anchor="middle" fill="var(--text-dim)">msteams &middot; matrix 외</text>
+
+    <rect x="945" y="34" width="155" height="76" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+    <text x="1022" y="60" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">CLI / MCP</text>
+    <text x="1022" y="78" font-size="11" text-anchor="middle" fill="var(--text-dim)">openclaw.mjs</text>
+    <text x="1022" y="94" font-size="11" text-anchor="middle" fill="var(--text-dim)">src/cli &middot; src/mcp</text>
+  </g>
+
+  <!-- arrows band1 -> band2 -->
+  <g stroke="var(--line-strong)" stroke-width="1.4" marker-end="url(#ar)">
+    <line x1="187" y1="110" x2="187" y2="146"/>
+    <line x1="354" y1="110" x2="354" y2="146"/>
+    <line x1="521" y1="110" x2="521" y2="146"/>
+    <line x1="688" y1="110" x2="688" y2="146"/>
+    <line x1="855" y1="110" x2="855" y2="146"/>
+    <line x1="1022" y1="110" x2="1022" y2="146"/>
+  </g>
+  <text x="600" y="136" font-size="11" text-anchor="middle" fill="var(--text-dim)">WebSocket (protocol v4) + HTTP &middot; 포트 18789</text>
+
+  <!-- BAND 2 : gateway process -->
+  <rect x="110" y="150" width="990" height="192" rx="10" fill="var(--live-soft)" stroke="var(--live)" stroke-width="1.6"/>
+  <text x="126" y="172" font-size="13" font-weight="700" fill="var(--text)">Gateway 프로세스 (단일)</text>
+  <text x="330" y="172" font-size="11" fill="var(--text-dim)">node:http / node:https + ws WebSocketServer(noServer) &middot; 런처 openclaw.mjs 가 respawn 감독 &middot; worker_threads 4종 &middot; ACP 는 child_process</text>
+
+  <g font-family="-apple-system, Segoe UI, Malgun Gothic, sans-serif">
+    <rect x="126" y="182" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="217" y="204" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">HTTP / WS 리스너</text>
+    <text x="217" y="221" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">src/gateway/server-http.ts</text>
+    <text x="217" y="236" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">/healthz /readyz /startupz</text>
+
+    <rect x="319" y="182" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="410" y="204" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">인증 &middot; 기기 페어링</text>
+    <text x="410" y="221" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">토큰 + Ed25519 기기 키</text>
+    <text x="410" y="236" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">src/pairing &middot; src/infra</text>
+
+    <rect x="512" y="182" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="603" y="204" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">RPC 메서드 카탈로그</text>
+    <text x="603" y="221" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">server-methods/ 312 파일</text>
+    <text x="603" y="236" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">코어 + 보조 + 채널 등록</text>
+
+    <rect x="705" y="182" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="796" y="204" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">세션 &middot; 전사</text>
+    <text x="796" y="221" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">제어평면 = 공용 DB</text>
+    <text x="796" y="236" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">데이터평면 = 에이전트 DB</text>
+
+    <rect x="898" y="182" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="989" y="204" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">채널 런타임</text>
+    <text x="989" y="221" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">ChannelPlugin 어댑터</text>
+    <text x="989" y="236" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">src/channels/plugins</text>
+
+    <rect x="126" y="256" width="183" height="64" rx="7" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="217" y="278" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">에이전트 하네스</text>
+    <text x="217" y="295" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">embedded (내장 openclaw)</text>
+    <text x="217" y="310" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">acp (codex &middot; claude ...)</text>
+
+    <rect x="319" y="256" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="410" y="278" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">모델 프로바이더</text>
+    <text x="410" y="295" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">ProviderPlugin 계약</text>
+    <text x="410" y="310" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">프로바이더 플러그인 62</text>
+
+    <rect x="512" y="256" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="603" y="278" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">플러그인 레지스트리</text>
+    <text x="603" y="295" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">in-process 로드</text>
+    <text x="603" y="310" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">plugin-sdk 서브패스 57</text>
+
+    <rect x="705" y="256" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="796" y="278" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">스킬 &middot; 훅 &middot; 메모리</text>
+    <text x="796" y="295" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">SKILL.md / HOOK.md 로더</text>
+    <text x="796" y="310" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">memory-core + host SDK</text>
+
+    <rect x="898" y="256" width="183" height="64" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="989" y="278" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text)">크론 &middot; 작업 &middot; 워커</text>
+    <text x="989" y="295" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">cron_jobs &middot; task_runs</text>
+    <text x="989" y="310" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">워커 배치 + 원격 노드</text>
+  </g>
+
+  <!-- arrows band2 -> band3 -->
+  <g stroke="var(--line-strong)" stroke-width="1.4" marker-end="url(#ar)">
+    <line x1="380" y1="342" x2="380" y2="372"/>
+    <line x1="890" y1="342" x2="890" y2="372"/>
+  </g>
+
+  <!-- BAND 3 : storage + external -->
+  <rect x="110" y="376" width="550" height="122" rx="10" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+  <text x="126" y="398" font-size="12.5" font-weight="700" fill="var(--text)">저장소 (전부 로컬 디스크)</text>
+  <g font-family="-apple-system, Segoe UI, Malgun Gothic, sans-serif">
+    <rect x="124" y="408" width="167" height="76" rx="7" fill="var(--surface)" stroke="var(--accent)"/>
+    <text x="207" y="430" font-size="12" font-weight="700" text-anchor="middle" fill="var(--text)">openclaw.sqlite</text>
+    <text x="207" y="447" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">공용 제어평면</text>
+    <text x="207" y="462" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">테이블 122 &middot; user_version 15</text>
+    <text x="207" y="477" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">기기 &middot; 승인 &middot; 크론 &middot; 워커</text>
+
+    <rect x="301" y="408" width="167" height="76" rx="7" fill="var(--surface)" stroke="var(--accent)"/>
+    <text x="384" y="430" font-size="12" font-weight="700" text-anchor="middle" fill="var(--text)">openclaw-agent.sqlite</text>
+    <text x="384" y="447" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">에이전트별 &middot; 테이블 39</text>
+    <text x="384" y="462" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">세션 &middot; 전사 &middot; FTS5</text>
+    <text x="384" y="477" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">메모리 색인 + vec0</text>
+
+    <rect x="478" y="408" width="167" height="76" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="561" y="430" font-size="12" font-weight="700" text-anchor="middle" fill="var(--text)">파일시스템</text>
+    <text x="561" y="447" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">openclaw.json (JSON5)</text>
+    <text x="561" y="462" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">workspace Markdown</text>
+    <text x="561" y="477" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">media &middot; logs &middot; plugins</text>
+  </g>
+
+  <rect x="680" y="376" width="420" height="122" rx="10" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-dasharray="5 4"/>
+  <text x="696" y="398" font-size="12.5" font-weight="700" fill="var(--text)">외부 (필수 서비스 0)</text>
+  <g font-family="-apple-system, Segoe UI, Malgun Gothic, sans-serif">
+    <rect x="694" y="408" width="124" height="76" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="756" y="432" font-size="12" font-weight="700" text-anchor="middle" fill="var(--text)">모델 API</text>
+    <text x="756" y="450" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">anthropic &middot; openai</text>
+    <text x="756" y="465" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">ollama &middot; vllm 등</text>
+
+    <rect x="828" y="408" width="124" height="76" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="890" y="432" font-size="12" font-weight="700" text-anchor="middle" fill="var(--text)">ClawHub</text>
+    <text x="890" y="450" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">스킬 &middot; 플러그인</text>
+    <text x="890" y="465" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">설치할 때만</text>
+
+    <rect x="962" y="408" width="124" height="76" rx="7" fill="var(--surface)" stroke="var(--line-strong)"/>
+    <text x="1024" y="432" font-size="12" font-weight="700" text-anchor="middle" fill="var(--text)">망 &middot; 관측</text>
+    <text x="1024" y="450" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">Tailscale &middot; Cloudflare</text>
+    <text x="1024" y="465" font-size="10.5" text-anchor="middle" fill="var(--text-dim)">OTLP &middot; Prometheus</text>
+  </g>
+</svg>
+</div>
+<p class="dcap">계층 다이어그램. 위에서 아래로 프런트 표면 &rarr; 게이트웨이 프로세스 내부 모듈 &rarr; 저장소와 외부 서비스. 점선 상자는 전부 선택이다. 근거는 각 절에 파일 경로로 붙였다.</p>
+
+<div class="box box-acc">
+  <p class="t">이 문서의 규칙</p>
+  <p>모든 주장에 파일 경로(가능하면 줄 번호)를 붙였다. 수치는 이 PC 에서 직접 센 값이다.
+  확인하지 못한 것은 <a href="#gap">부록</a>에 그대로 적었다.
+  운영 &middot; 설치 &middot; 동기화 절차는 포크의 <code>FORK.md</code> 가 정본이고, 이 문서는 코드 구조만 다룬다.</p>
+</div>
+</section>
+
+<!-- ==================== S1 ==================== -->
+<section id="s1">
+<h2><span class="num">1</span>저장소 지도</h2>
+
+<pre><code>openclaw/
+├── src/                 백엔드 전부 (게이트웨이·CLI·에이전트·채널·상태). TS 16,626 파일 / 78 하위 디렉터리
+├── ui/                  Control UI (Lit 3 + Vite 8). 빌드 산출물은 루트 dist/control-ui/
+├── packages/            내부 워크스페이스 패키지 23개 (@openclaw/*)
+├── extensions/          플러그인 153개 (채널·모델 프로바이더·도구·메모리·인프라)
+├── apps/                네이티브 앱 (android/ios/macos/linux/swabble/shared/macos-mlx-tts/mobile)
+├── skills/              번들 스킬 51개 (SKILL.md 디렉터리)
+├── custodian-skills/    커스토디언 스킬 4개
+├── scripts/             빌드·검사·릴리스 오케스트레이션 (.mts/.mjs)
+├── test/                vitest 프로젝트 매트릭스 (test/vitest/*.config.ts 118개)
+├── docs/                제품 문서 751개 (.md/.mdx)
+├── config/ deploy/ qa/ security/ patches/ git-hooks/ examples/
+├── Dockerfile           멀티스테이지 (node:24-bookworm 빌드 -> bookworm-slim 런타임)
+├── docker-compose.yml   gateway + cli 2 서비스
+├── package.json         루트 겸 메인 패키지 (스크립트 700개 이상)
+├── openclaw.mjs         CLI 런처 (bin)
+├── AGENTS.md            기여자 규칙 정본 (362줄). CLAUDE.md 는 이것의 심링크
+├── FORK.md              이 포크의 운영 정본
+└── chris-local/         이 포크가 추가한 설치·운영 스크립트 + CODEBASE.md</code></pre>
+
+<h3>워크스페이스 패키지 전수 (23개)</h3>
+<p><code>pnpm-workspace.yaml:1-6</code> 이 <code>.</code>(루트) &middot; <code>ui</code> &middot; <code>packages/*</code> &middot; <code>extensions/*</code> &middot; <code>examples/*</code> 를 워크스페이스로 잡는다. <code>packages/</code> 는 전부 TypeScript 다.</p>
+
+<div class="tw">
+<table>
+  <caption>packages/ 전수. 이름은 각 package.json 의 name 필드</caption>
+  <thead><tr><th>경로</th><th>패키지명</th><th>역할</th></tr></thead>
+  <tbody>
+    <tr><td><code>packages/acp-core/</code></td><td><code>@openclaw/acp-core</code></td><td>ACP(Agent Client Protocol) 공통 타입</td></tr>
+    <tr><td><code>packages/agent-core/</code></td><td><code>@openclaw/agent-core</code></td><td>에이전트 런타임 공통 계약</td></tr>
+    <tr><td><code>packages/ai/</code></td><td><code>@openclaw/ai</code></td><td>모델 프로바이더 어댑터 + 스트리밍 런타임 (외부 공개용)</td></tr>
+    <tr><td><code>packages/gateway-client/</code></td><td><code>@openclaw/gateway-client</code></td><td>게이트웨이 WebSocket 레퍼런스 클라이언트. Control UI 가 <code>/browser</code> 서브패스를 쓴다</td></tr>
+    <tr><td><code>packages/gateway-protocol/</code></td><td><code>@openclaw/gateway-protocol</code></td><td>프로토콜 스키마 &middot; 검증기. <code>src/version.ts:2</code> <code>PROTOCOL_VERSION = 4</code></td></tr>
+    <tr><td><code>packages/llm-core/</code></td><td><code>@openclaw/llm-core</code></td><td>LLM 와이어 계약 (Api &middot; Provider &middot; Transport &middot; ProviderResponse)</td></tr>
+    <tr><td><code>packages/markdown-core/</code></td><td><code>@openclaw/markdown-core</code></td><td>마크다운 &middot; frontmatter 파서</td></tr>
+    <tr><td><code>packages/media-core/</code></td><td><code>@openclaw/media-core</code></td><td>미디어 공통</td></tr>
+    <tr><td><code>packages/media-generation-core/</code></td><td><code>@openclaw/media-generation-core</code></td><td>이미지 &middot; 비디오 &middot; 음악 생성 공통</td></tr>
+    <tr><td><code>packages/media-understanding-common/</code></td><td><code>@openclaw/media-understanding-common</code></td><td>미디어 이해 공통</td></tr>
+    <tr><td><code>packages/memory-host-sdk/</code></td><td><code>@openclaw/memory-host-sdk</code></td><td>메모리 호스트 SDK. FTS5 &middot; sqlite-vec 스키마와 임베딩 클라이언트</td></tr>
+    <tr><td><code>packages/mermaid-renderer/</code></td><td><code>@openclaw/mermaid-renderer</code></td><td>mermaid 렌더러</td></tr>
+    <tr><td><code>packages/model-catalog-core/</code></td><td><code>@openclaw/model-catalog-core</code></td><td>모델 카탈로그 타입 &middot; 정규화</td></tr>
+    <tr><td><code>packages/net-policy/</code></td><td><code>@openclaw/net-policy</code></td><td>네트워크 정책(SSRF 등)</td></tr>
+    <tr><td><code>packages/normalization-core/</code></td><td><code>@openclaw/normalization-core</code></td><td>문자열 &middot; 값 정규화</td></tr>
+    <tr><td><code>packages/plugin-package-contract/</code></td><td><code>@openclaw/plugin-package-contract</code></td><td>외부 플러그인 package.json 필수 필드 검증</td></tr>
+    <tr><td><code>packages/plugin-sdk/</code></td><td><code>@openclaw/plugin-sdk</code></td><td><strong>플러그인 SDK 공개 표면</strong> (<code>src/plugin-sdk</code> 재수출 파사드)</td></tr>
+    <tr><td><code>packages/retry/</code></td><td><code>@openclaw/retry</code></td><td>재시도 유틸</td></tr>
+    <tr><td><code>packages/sdk/</code></td><td><code>@openclaw/sdk</code></td><td>외부 SDK</td></tr>
+    <tr><td><code>packages/session-url-contract/</code></td><td><code>@openclaw/session-url-contract</code></td><td>세션 URL 계약</td></tr>
+    <tr><td><code>packages/terminal-core/</code></td><td><code>@openclaw/terminal-core</code></td><td>터미널 공통</td></tr>
+    <tr><td><code>packages/tool-call-repair/</code></td><td><code>@openclaw/tool-call-repair</code></td><td>툴콜 복구</td></tr>
+    <tr><td><code>packages/workboard-contract/</code></td><td><code>@openclaw/workboard-contract</code></td><td>워크보드 계약</td></tr>
+  </tbody>
+</table>
+</div>
+<p>그 밖의 워크스페이스 멤버: <code>ui</code>(<code>openclaw-control-ui</code>), <code>examples/ai-chat</code>(<code>@openclaw/example-ai-chat</code>), 그리고 <code>extensions/*</code> 153개.</p>
+</section>
+
+<!-- ==================== S2 ==================== -->
+<section id="s2">
+<h2><span class="num">2</span>백엔드</h2>
+
+<h3>2-1. 진입점 체인</h3>
+<pre><code>openclaw (bin) = openclaw.mjs
+   ├─ Node 버전 게이트 (&gt;=22.22.3 &lt;23 || &gt;=24.15.0 &lt;25 || &gt;=25.9.0)
+   ├─ compile-cache respawn 감독 (자식 spawn + 시그널 포워딩)
+   └─ import("./dist/entry.js") -> src/entry.ts -> src/cli/* -> gateway 명령
+                                                     └─ src/gateway/server.ts
+                                                          startGatewayServer(port = 18789)</code></pre>
+<ul>
+  <li><code>package.json</code> 의 <code>bin</code> 이 <code>openclaw.mjs</code>. 순수 <code>.mjs</code> 라 빌드 없이도 돈다.</li>
+  <li><strong>respawn 감독자가 런처 안에 있다.</strong> <code>runRespawnedChild()</code> 가 자식을 spawn 하고 SIGTERM/SIGINT/SIGHUP/SIGQUIT(Windows 는 SIGBREAK)를 전달한 뒤, 1초 유예 &rarr; 강제 kill &rarr; 1초 후 하드 exit 로 내려간다. 같은 로직의 TS 판이 <code>src/entry.compile-cache.ts</code> 에 있다.</li>
+  <li>게이트웨이 시작: <code>src/gateway/server.ts:29-36</code> <code>startGatewayServer(port = 18789, opts)</code>. 무거운 구현은 동적 import 로 늦게 로드한다. 기본 포트 상수는 <code>src/config/paths.ts:406</code>.</li>
+</ul>
+
+<h3>2-2. src/ 디렉터리 지도</h3>
+<div class="tw">
+<table>
+  <caption>78개 하위 디렉터리 중 규모 상위. 파일 수는 그 디렉터리의 .ts 개수(테스트 포함)</caption>
+  <thead><tr><th>디렉터리</th><th>.ts</th><th>역할</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/agents/</code></td><td>3,342</td><td>에이전트 런타임 본체. 하네스(<code>harness/</code>), 임베디드 러너, 서브에이전트, 샌드박스, 워크트리, 인증 프로필, 시스템 프롬프트</td></tr>
+    <tr><td><code>src/gateway/</code></td><td>2,538</td><td><strong>게이트웨이 서버.</strong> HTTP/WS 리스너, 인증, RPC 메서드 312개, 채널 런타임, 워커 배치, 리로드 &middot; 재시작</td></tr>
+    <tr><td><code>src/infra/</code></td><td>1,429</td><td>SQLite 로더 &middot; WAL &middot; 무결성, Ed25519 서명 &middot; 기기 아이덴티티, 상태 마이그레이션, ClawHub 클라이언트</td></tr>
+    <tr><td><code>src/commands/</code></td><td>1,086</td><td>슬래시 / 봇 명령 구현</td></tr>
+    <tr><td><code>src/plugins/</code></td><td>1,031</td><td>플러그인 로더 &middot; 레지스트리 &middot; 매니페스트 &middot; API 타입</td></tr>
+    <tr><td><code>src/auto-reply/</code></td><td>805</td><td>자동 응답 파이프라인</td></tr>
+    <tr><td><code>src/cli/</code></td><td>795</td><td>CLI 명령 트리 (<code>gateway-cli/</code>, <code>daemon-cli/</code>, <code>node-cli/</code>)</td></tr>
+    <tr><td><code>src/config/</code></td><td>790</td><td>설정 스키마 &middot; 로드 &middot; 검증 &middot; 경로 해석(<code>paths.ts</code>), 세션 접근자</td></tr>
+    <tr><td><code>src/plugin-sdk/</code></td><td>664</td><td>플러그인 SDK <strong>구현부</strong>. <code>packages/plugin-sdk</code> 가 이것을 재수출한다</td></tr>
+    <tr><td><code>src/channels/</code></td><td>486</td><td>채널 추상화. <code>plugins/types.plugin.ts</code> 가 채널 인터페이스 정본</td></tr>
+    <tr><td><code>src/cron/</code></td><td>398</td><td>예약 작업</td></tr>
+    <tr><td><code>src/skills/</code></td><td>253</td><td>스킬 로더 &middot; 라이프사이클 &middot; 보안 &middot; 워크숍</td></tr>
+    <tr><td><code>src/state/</code></td><td>171</td><td><strong>DB 스키마 &middot; 마이그레이션 정본</strong> (<code>*.sql</code>, <code>*-db.ts</code>)</td></tr>
+    <tr><td><code>src/node-host/</code></td><td>136</td><td>원격 노드(다른 기기) 호스트</td></tr>
+    <tr><td><code>src/acp/</code></td><td>126</td><td>ACP 클라이언트 &middot; 서버 &middot; 이벤트 매퍼 &middot; 권한 릴레이</td></tr>
+    <tr><td><code>src/daemon/</code> / <code>src/tui/</code></td><td>123 / 122</td><td>데몬 실행 / 터미널 UI</td></tr>
+    <tr><td><code>src/hooks/</code></td><td>77</td><td>훅 시스템(내부 훅 + HOOK.md 파일 훅) + Gmail 워처</td></tr>
+    <tr><td><code>src/sessions/</code> / <code>src/worker/</code></td><td>77 / 65</td><td>세션 정책 &middot; 투영 / 워커 런타임</td></tr>
+    <tr><td><code>src/transcripts/</code> / <code>src/pairing/</code></td><td>22 / 16</td><td>전사 저장소(SQLite) / 기기 페어링 코드 &middot; 챌린지</td></tr>
+    <tr><td><code>src/memory/</code></td><td>3</td><td><strong>얇다.</strong> 메모리 본체는 <code>extensions/memory-core</code> 와 <code>packages/memory-host-sdk</code> 에 있다</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>2-3. HTTP / WS 서버는 무엇으로 띄우나</h3>
+<div class="box box-live">
+  <p class="t">프레임워크를 쓰지 않는다</p>
+  <p>HTTP 는 <code>src/gateway/server-http.ts:4-9</code> 에서 <code>node:http</code> 의 <code>createServer</code>(TLS 는 <code>node:https</code>).
+  WebSocket 은 <code>src/gateway/server-runtime-state.ts:58</code> 이 <code>ws</code> 를 <code>require</code> 하고 <code>:300-303</code> 에서
+  <code>new WebSocketServer({ noServer: true })</code> 로 만들어 HTTP upgrade 에 붙인다(<code>server-http-upgrades.ts</code>).
+  <span class="b b-no">Hono 없음</span> <span class="b b-no">Fastify 없음</span>
+  루트에 <code>express 5.2.1</code> 이 있지만 <strong>코어가 아니라 플러그인 3개 전용</strong>이다:
+  <code>extensions/browser/src/server.ts:4</code>, <code>extensions/line/src/webhook.ts:3</code>, <code>extensions/msteams/src/monitor.ts:3</code>.</p>
+</div>
+
+<div class="tw">
+<table>
+  <caption>HTTP 라우트 계약 (src/gateway/gateway-http-route-contracts.ts:1-15)</caption>
+  <thead><tr><th>경로</th><th>용도</th></tr></thead>
+  <tbody>
+    <tr><td><code>/health</code>, <code>/healthz</code></td><td>liveness</td></tr>
+    <tr><td><code>/ready</code>, <code>/readyz</code></td><td>채널 인지 readiness</td></tr>
+    <tr><td><code>/startup</code>, <code>/startupz</code></td><td>트래픽 수용 시작 판정</td></tr>
+    <tr><td><code>/__openclaw__/worker</code></td><td>워커 게이트웨이</td></tr>
+    <tr><td><code>/__openclaw__/worker-bundle</code>, <code>-transfer</code>, <code>-bootstrap</code></td><td>워커 번들 &middot; 워크스페이스 &middot; 부트스트랩 전송</td></tr>
+    <tr><td><code>/__openclaw__/mcp-app</code>, <code>.../view</code></td><td>MCP 앱 샌드박스 셸 / 뷰</td></tr>
+    <tr><td>그 밖의 GET</td><td>Control UI 정적 서빙 (3-2 참조)</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Dockerfile <code>435-436</code> 이 이 프로브를 그대로 HEALTHCHECK 로 쓴다. RPC 표면은 WebSocket 위의 메서드 카탈로그다: <code>src/gateway/server-methods-list.ts:36-40</code> 이 코어 메서드 + 보조 메서드 + 로드된 채널 플러그인이 등록한 메서드를 합쳐 광고하고, 구현체는 <code>src/gateway/server-methods/</code> 에 312개 파일로 있다.</p>
+
+<h3>2-4. 프로토콜 패키지</h3>
+<ul>
+  <li><code>packages/gateway-protocol/src/version.ts:2-8</code> - <code>PROTOCOL_VERSION = 4</code>, <code>MIN_CLIENT_PROTOCOL_VERSION = 4</code>, <code>MIN_NODE_PROTOCOL_VERSION = 3</code>, <code>MIN_PROBE_PROTOCOL_VERSION = 3</code>.</li>
+  <li>스키마 &middot; 프레임 가드: <code>public-schema.ts</code>, <code>frame-guards.ts</code>, <code>connect-error-details.ts</code>.</li>
+  <li><strong>네이티브 앱이 같은 상수에 잠겨 있다.</strong> <code>native-protocol-levels.guard.test.ts:132-175</code> 가 Swift &middot; Kotlin 쪽 <code>GATEWAY_PROTOCOL_VERSION</code> 일치를 단언한다. 프로토콜을 바꾸면 이 가드가 먼저 깨진다.</li>
+  <li>레퍼런스 클라이언트: <code>packages/gateway-client/src/</code> - <code>protocol-client.ts</code>, <code>connect-auth.ts</code>, <code>device-auth.ts</code>, <code>reconnect-policy.ts</code>, <code>scope-upgrade.ts</code>.</li>
+</ul>
+
+<h3>2-5. 인증: 토큰 + Ed25519 기기 페어링</h3>
+<p>두 층이다. <strong>(1) 게이트웨이 토큰 / 패스워드</strong> - <code>src/gateway/auth.ts</code> 와 <code>auth-mode-policy.ts</code> &middot; <code>auth-rate-limit.ts</code> &middot; <code>auth-token-resolution.ts</code>. <strong>(2) Ed25519 기기 아이덴티티</strong> - 아래 표.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>코드</th><th>하는 일</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/infra/ed25519-signature.ts:87-98</code></td><td>raw 키와 PEM 변환, <code>asymmetricKeyType !== "ed25519"</code> 거부</td></tr>
+    <tr><td><code>src/infra/device-identity-store.ts:83</code></td><td><code>crypto.generateKeyPairSync("ed25519")</code> 로 기기 키쌍 생성. <code>:100</code>, <code>:189</code> 에서 재검증</td></tr>
+    <tr><td><code>src/infra/state-migrations.device-identity.ts:19</code></td><td>기존 시드에서 Ed25519 키 파생</td></tr>
+    <tr><td><code>src/pairing/</code></td><td><code>join-code.ts</code>, <code>setup-code.ts</code>, <code>pairing-challenge.ts</code>, <code>pairing-store-sqlite.ts</code></td></tr>
+    <tr><td>DB</td><td><code>device_identities</code>, <code>device_auth_tokens</code>, <code>device_pairing_{pending,paired,join_codes}</code>, <code>device_bootstrap_tokens</code>, <code>gateway_origin_device_tokens</code></td></tr>
+    <tr><td><code>src/plugins/official-external-plugin-catalog-envelope.ts:207</code></td><td>같은 Ed25519 코드가 플러그인 카탈로그 서명 검증에도 쓰인다</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>2-6. 에이전트 런타임: 하네스 구조</h3>
+<p><strong>하네스(harness) = 이 턴을 실제로 돌리는 실행기</strong>다. 두 종류가 공존한다.</p>
+<pre><code>AgentRuntimeConfig  (src/config/types.agents.ts:30-37)
+   ├─ { type: "embedded" }        -> 내장 OpenClaw 하네스
+   └─ { type: "acp", acp: {...} } -> ACP 로 외부 에이전트에 위임 (agent: "codex" | "claude" | ...)</code></pre>
+<div class="tw">
+<table>
+  <thead><tr><th>요소</th><th>코드</th></tr></thead>
+  <tbody>
+    <tr><td>내장 하네스</td><td><code>src/agents/harness/builtin-openclaw.ts</code> - <code>runEmbeddedAttempt</code> 를 <code>AgentHarness</code> 계약으로 감싼다</td></tr>
+    <tr><td>레지스트리</td><td><code>src/agents/harness/registry.ts:38-47</code>. <strong>id <code>"openclaw"</code> 는 내장 런타임 전용으로 예약</strong>돼 플러그인이 못 쓴다(<code>:46-48</code> throw)</td></tr>
+    <tr><td>네이티브 압축</td><td><code>registry.ts:23</code> <code>CODEX_NATIVE_COMPACTION_OWNER_ID = "codex"</code>. 레지스트리 소유 Codex 하네스만 가능(<code>:49-54</code>)</td></tr>
+    <tr><td>하네스 플러그인</td><td><code>extensions/codex/index.ts:228</code>, <code>extensions/copilot/index.ts:48</code> 이 <code>api.registerAgentHarness</code> 호출</td></tr>
+    <tr><td>ACP 계층</td><td><code>src/acp/</code> - <code>client.ts</code>, <code>server.ts</code>, <code>event-mapper.ts</code>, <code>translator.*.ts</code>, <code>permission-relay.ts</code>. 어댑터 id 는 설정 <code>agents.&lt;id&gt;.runtime.acp.agent</code>(<code>src/config/types.agents.ts:20-28</code>)</td></tr>
+    <tr><td>계약 타입</td><td><code>src/agents/harness/types.ts</code>, 정책 <code>policy.ts:17</code>, 호스트 능력 <code>host-capability-types.ts:33</code>, 훅 컨텍스트 <code>hook-context.ts:19</code></td></tr>
+    <tr><td>네이티브 훅 릴레이</td><td><code>src/agents/harness/native-hook-relay*.ts</code> 18개 - 외부 CLI 하네스의 훅을 게이트웨이로 되돌리는 브리지</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>2-7. 모델 프로바이더 추상화</h3>
+<ul>
+  <li>인터페이스 정본: <code>src/plugins/provider-plugin.types.ts:93</code> <code>ProviderPlugin</code>. 필수는 <code>id</code> &middot; <code>label</code> &middot; <code>auth</code>. 그 밖에 <code>aliases</code>(<code>:99</code>), <code>envVars</code>(<code>:113</code>), <code>staticCatalog</code>(<code>:133</code>), <code>resolveDynamicModel</code>(<code>:159</code>).</li>
+  <li>와이어 계약은 별도 패키지: <code>packages/llm-core/src/types.ts</code> - <code>Api</code>(<code>:6</code>), <code>Provider</code>(<code>:27</code>), <code>ThinkingLevel</code>(<code>:36</code>), <code>Transport</code>(<code>:55</code>), <code>ProviderResponse</code>(<code>:61</code>).</li>
+  <li><strong>내장 프로바이더 배열 같은 상수는 없다.</strong> <code>extensions/*</code> 매니페스트의 <code>openclaw.providers</code> 를 스캔해 발견한다(<code>src/plugins/manifest.ts:216</code>). 가장 가까운 열거인 <code>src/agents/sessions/provider-display-names.ts:5-36</code> (34개 id) 은 그 파일 주석이 스스로 "표시명 폴백"이라고 못박는다. 실제 목록은 프로바이더 플러그인 62개다.</li>
+  <li>주의: <code>src/provider-runtime/</code> 에는 <code>operation-retry.ts</code> 하나뿐이다. 이름과 달리 프로바이더 인터페이스의 집이 아니다.</li>
+</ul>
+
+<h3>2-8. 채널 플러그인 인터페이스</h3>
+<p>정본은 <code>src/channels/plugins/types.plugin.ts:60</code> <code>ChannelPlugin</code>. 필수는 <code>id</code>(<code>:61</code>) &middot; <code>meta</code>(<code>:62</code>) &middot; <code>capabilities</code>(<code>:63</code>) &middot; <code>config</code>(<code>:81</code>) 네 개뿐이고, 나머지 30여 개는 전부 선택 어댑터 슬롯이다: <code>setupWizard</code>(<code>:80</code>), <code>pairing</code>(<code>:87</code>), <code>groups</code>(<code>:89</code>), <code>mentions</code>(<code>:90</code>), <code>outbound</code>(<code>:91</code>), <code>gatewayMethods</code>(<code>:93</code>), <code>commands</code>(<code>:100</code>), <code>lifecycle</code>(<code>:101</code>), <code>allowlist</code>(<code>:103</code>), <code>doctor</code>(<code>:104</code>), <code>streaming</code>(<code>:107</code>), <code>threading</code>(<code>:108</code>), <code>agentPrompt</code>(<code>:111</code>), <code>agentTools</code>(<code>:117</code>) 등.</p>
+<p>작성 진입점은 <code>src/plugin-sdk/core.ts:553</code> <code>defineChannelPluginEntry(...)</code> 이고 내부에서 <code>:580</code> <code>api.registerChannel({ plugin })</code> 을 부른다. <code>registrationMode</code> 로 <code>cli-metadata</code> / <code>tool-discovery</code> / <code>discovery</code> / <code>full</code> 을 나눠 로드한다(<code>:562-596</code>).</p>
+
+<h3>2-9. 스킬 로더와 ClawHub</h3>
+<ul>
+  <li><strong>스킬 = <code>SKILL.md</code> 를 담은 디렉터리.</strong> 로더 <code>src/skills/loading/local-loader.ts:77</code> 이 <code>SKILL.md</code> 를 읽고 <code>:89</code> 에서 frontmatter 를 파싱한다. <code>name</code> &middot; <code>description</code> 이 없으면 거부(<code>:98-107</code>).</li>
+  <li>frontmatter 의 <code>openclaw:</code> 블록 스키마: <code>src/skills/types.ts:5-34</code> (<code>always</code>, <code>skillKey</code>, <code>os</code>, <code>requires.{bins,env,config}</code>, <code>install[]</code>).</li>
+  <li>탐색 한도(<code>skill-root-discovery.ts:15-23</code>): 루트당 후보 300, 소스당 200, 파일 256KB, 깊이 6. 심링크 &middot; 경로 봉쇄 가드 포함.</li>
+  <li>소스 우선순위(<code>workspace-skill-loader.ts:387-430</code>): <code>skills/</code> &rarr; <code>custodian-skills/</code> &rarr; 설정 <code>extraDirs</code> + 플러그인 스킬 &rarr; managed &rarr; <code>~/.agents/skills</code> &rarr; <code>&lt;workspace&gt;/.agents/skills</code> &rarr; 워크스페이스.</li>
+  <li><strong>ClawHub = 원격 스킬 &middot; 플러그인 레지스트리.</strong> 기본 <code>https://clawhub.ai</code>(<code>src/infra/clawhub-client.ts:15</code>), <code>OPENCLAW_CLAWHUB_URL</code> 로 교체(<code>:70-74</code>). 설치 종류는 <code>clawhub | github | skills-sh</code>(<code>src/infra/clawhub-skills.ts:53</code>).</li>
+</ul>
+
+<h3>2-10. 메모리 색인</h3>
+<div class="tw">
+<table>
+  <caption>메모리는 코어에 얇게, 플러그인과 SDK 에 두껍게 있다 (src/memory 는 3파일뿐)</caption>
+  <thead><tr><th>계층</th><th>위치</th></tr></thead>
+  <tbody>
+    <tr><td>호스트 SDK</td><td><code>packages/memory-host-sdk/src/host/</code> - 스키마(<code>memory-schema-base.ts:16-34</code>), FTS5 생성(<code>memory-schema-fts.ts:168,240</code>), sqlite-vec 로딩(<code>sqlite-vec.ts:58-90</code>), 임베딩 클라이언트</td></tr>
+    <tr><td>기본 구현</td><td><code>extensions/memory-core/</code> - <code>manager-sync-base.ts:591</code> 에서 <code>vec0</code> 가상 테이블 생성, KNN 검색 <code>manager-search-knn.ts</code>(취소용 서브프로세스 별도)</td></tr>
+    <tr><td>선택 백엔드</td><td><code>extensions/memory-lancedb/</code> - LanceDB. 런타임 동적 import(<code>lancedb-runtime.ts:2,47</code>), 기본 경로 <code>~/.openclaw/memory/lancedb</code>(<code>config.ts:30</code>). <span class="b b-w">기본 설치 아님</span></td></tr>
+    <tr><td>설정</td><td><code>src/config/types.memory.ts</code> - 벡터 토글 <code>:80-83</code>, 캐시 <code>:85-101</code>, FTS 토크나이저 <code>unicode61 | trigram</code> <code>:76-79</code></td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- ==================== S3 ==================== -->
+<section id="s3">
+<h2><span class="num">3</span>프런트</h2>
+
+<h3>3-1. Control UI (<code>ui/</code>)</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>항목</th><th>값</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td>프레임워크</td><td><strong>Lit 3.3.3</strong> (Web Components). React &middot; Preact 아님</td><td><code>ui/package.json:44</code></td></tr>
+    <tr><td>상태 / DI</td><td><code>@lit/context 1.1.6</code> + 손으로 만든 스토어. Redux &middot; MobX &middot; 시그널 라이브러리 없음</td><td><code>ui/package.json:19</code>; <code>ui/src/app/gateway-store.ts</code></td></tr>
+    <tr><td>라우터</td><td><code>@openclaw/uirouter 0.1.1</code> (외부 패키지)</td><td><code>ui/package.json:35</code>; <code>ui/src/app-routes.ts</code></td></tr>
+    <tr><td>컴포넌트 라이브러리</td><td><code>@awesome.me/webawesome 3.12.0</code></td><td><code>ui/package.json:12</code></td></tr>
+    <tr><td>번들러</td><td><strong>Vite 8.2.2</strong> (Rolldown)</td><td><code>ui/package.json:60</code>; <code>ui/vite.config.ts:599-607</code></td></tr>
+    <tr><td>진입</td><td><code>ui/index.html:565</code> &rarr; <code>/src/main.ts</code>, 루트 엘리먼트 <code>&lt;openclaw-app&gt;</code></td><td><code>ui/index.html:357</code></td></tr>
+    <tr><td>베이스 클래스</td><td><code>OpenClawLitElement</code> / light-DOM 변형</td><td><code>ui/src/lit/openclaw-element.ts:5,10-11</code></td></tr>
+    <tr><td>CSS</td><td>순수 CSS + CSS 변수 토큰. <strong>Tailwind 없음.</strong> PostCSS 는 커스텀 플러그인 하나만</td><td><code>ui/src/styles.css:1-8</code>; <code>ui/vite.config.ts:574-578</code></td></tr>
+    <tr><td>i18n</td><td>라이브러리 없이 자체 구현. <strong>로케일 21개</strong>(en + 지연 로드 20). 카탈로그는 TypeScript 모듈</td><td><code>ui/src/i18n/lib/registry.ts:7,9-30,35</code></td></tr>
+    <tr><td>테마</td><td>토큰 <code>ui/src/styles/base.css</code>, 추가 팔레트 10종 <code>ui/public/themes/*.css</code>, 이름 레지스트리 <code>ui/src/app/theme.ts:41-54</code></td><td></td></tr>
+  </tbody>
+</table>
+</div>
+<p><strong>WS 클라이언트</strong>: <code>ui/src/api/gateway.ts:1-29</code> 가 <code>@openclaw/gateway-client/browser</code> 에서 <code>GatewayProtocolClient</code> &middot; <code>PROTOCOL_VERSION</code> &middot; <code>buildGatewayConnectAuth</code> 를 가져오고, 실제 소켓은 <code>ui/src/api/gateway-browser-socket.ts:7-12</code> 가 <code>new WebSocket(url)</code> 로 만든다.</p>
+
+<h3>3-2. 빌드 산출물과 게이트웨이 서빙</h3>
+<pre><code>pnpm ui:build
+  -> scripts/ui.js:2-5 -> scripts/ui.mts:393-394 (vite build)
+  -> ui/vite.config.ts:26   outDir = &lt;repo&gt;/dist/control-ui        (ui/dist 가 아니다)
+  -> 부가 산출: .br/.gz 사전압축(:468-505), 해시 에셋 매니페스트(:540-559), 서비스워커 sw.js(:431-441)
+
+게이트웨이 서빙
+  -> src/infra/control-ui-assets.ts:183  resolveControlUiRootSync()
+       후보 경로 :213-221  &lt;execDir&gt;/../Resources/control-ui, &lt;moduleDir&gt;/control-ui,
+                           &lt;moduleDir&gt;/../control-ui, &lt;moduleDir&gt;/../../dist/control-ui,
+                           &lt;argv1Dir&gt;/dist/control-ui
+  -> src/gateway/control-ui.ts:1004  handleControlUiHttpRequest()
+       SPA fallback :1186-1190, 경로 봉쇄 :1203-1207, 사전압축 협상 :1209-1215
+  -> src/gateway/control-ui-static.ts:10  Cache-Control: public, max-age=31536000, immutable
+  -> 설정 override: gateway.controlUi.root   (src/config/types.gateway.ts:143-144)</code></pre>
+<p>빌드가 없으면 <code>src/gateway/control-ui.ts:239</code> 가 "Control UI assets not found at ... Build them with <code>pnpm ui:build</code>" 를 그대로 뱉는다.</p>
+
+<h3>3-3. 네이티브 앱 (<code>apps/</code>)</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>디렉터리</th><th>무엇</th><th>스택</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td><code>apps/android/</code></td><td>Android 폰 앱 + Wear OS</td><td>Kotlin + Jetpack Compose, Gradle KTS</td><td><code>app/build.gradle.kts:106,116,200,320-335</code></td></tr>
+    <tr><td><code>apps/ios/</code></td><td>iOS 앱 + WatchApp + ShareExtension + Widget</td><td>Swift 6 / SwiftUI, XcodeGen</td><td><code>apps/ios/project.yml:1,4-6,10,14-20</code></td></tr>
+    <tr><td><code>apps/macos/</code></td><td>메뉴바 앱 + <code>openclaw-mac</code> CLI + IPC 라이브러리</td><td>Swift 6.3 SwiftPM, SwiftUI, Sparkle</td><td><code>apps/macos/Package.swift:1,7-16,17-28</code></td></tr>
+    <tr><td><code>apps/macos-mlx-tts/</code></td><td>온디바이스 MLX TTS 헬퍼(격리)</td><td>Swift 6.3 + mlx-audio-swift</td><td><code>Package.swift:1-2,13,16-19</code></td></tr>
+    <tr><td><code>apps/linux/</code></td><td>리눅스 데스크톱 컴패니언</td><td>Rust + Tauri 2, 프레임워크 없는 웹뷰 UI</td><td><code>src-tauri/Cargo.toml:1-13</code></td></tr>
+    <tr><td><code>apps/shared/</code></td><td>iOS &middot; macOS &middot; watch 공용 Swift 패키지</td><td>Swift 6.3 SwiftPM (OpenClawKit, GRDB)</td><td><code>OpenClawKit/Package.swift:1,12-16,22-25</code></td></tr>
+    <tr><td><code>apps/swabble/</code></td><td>독립 Swift 라이브러리 + CLI (앱에 벤더링)</td><td>Swift 6.3 SwiftPM</td><td><code>Package.swift:1,5-9,10-14</code></td></tr>
+    <tr><td><code>apps/mobile/</code></td><td><strong>버전 핀 스텁뿐.</strong> 소스도 빌드 파일도 없다</td><td>-</td><td><code>apps/mobile/version.json</code> 한 파일</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>3-4. 그 밖의 프런트 표면</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>표면</th><th>위치</th><th>스택</th></tr></thead>
+  <tbody>
+    <tr><td>TUI</td><td><code>src/tui/</code> (122 파일)</td><td><code>@earendil-works/pi-tui</code>. Ink &middot; React 아님(<code>src/tui/tui.ts:5-12</code>)</td></tr>
+    <tr><td>Telegram Mini App</td><td><code>extensions/telegram/src/miniapp/</code></td><td><strong>프레임워크 없음.</strong> 서버가 인라인 CSS + nonce 스크립트로 HTML 한 장을 렌더(<code>page.ts:8-11,14-32</code>). launch ticket 을 기기 부트스트랩 토큰으로 바꿔 Control UI 로 넘긴다(<code>routes.ts:5-8</code>)</td></tr>
+    <tr><td>웹 채팅</td><td>Control UI 안의 페이지</td><td>서버 <code>src/gateway/server-methods/chat-webchat-media.ts</code>, UI <code>ui/src/pages/chat/</code></td></tr>
+    <tr><td>Canvas</td><td><code>extensions/canvas/</code> (백엔드) + Control UI Lit 컴포넌트(렌더러)</td><td><code>ui/src/components/canvas-widget-view.ts</code></td></tr>
+    <tr><td>Control UI 플러그인 표면</td><td><code>ui/src/plugins/</code> + <code>src/gateway/control-ui-plugin-assets.ts</code></td><td>플러그인이 UI 탭을 추가하는 경로</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- ==================== S4 ==================== -->
+<section id="s4">
+<h2><span class="num">4</span>데이터 저장</h2>
+
+<div class="box box-acc">
+  <p class="t">드라이버는 <code>node:sqlite</code> 하나</p>
+  <p>로더 정본은 <code>src/infra/node-sqlite.ts:1-11</code> - <code>createRequire</code> 로 <code>require("node:sqlite")</code>.
+  <span class="b b-no">better-sqlite3 없음</span> <span class="b b-no">libsql 없음</span> <span class="b b-no">bun:sqlite 없음</span>
+  같은 파일 <code>:47-64</code> 가 SQLite 3.51.3 / 3.50.7 / 3.44.6 미만을 <strong>거부</strong>한다(업스트림 WAL 리셋 손상 버그).
+  Windows 롱패스 네임스페이싱(<code>:17-24</code>)도 여기 있다.
+  <strong>Kysely 는 드라이버가 아니라 컴파일 전용 쿼리 빌더</strong>다 - <code>src/infra/kysely-sync.ts:47-54</code> 의
+  <code>compileOnlySqliteDialect</code> 는 실행을 시도하면 throw 하고, 컴파일된 SQL 만 <code>DatabaseSync</code> 에 동기 실행한다.
+  CI 가 <code>pnpm lint:kysely</code> / <code>db:kysely:check</code> 로 강제한다.</p>
+</div>
+
+<h3>4-1. 스키마 정본과 마이그레이션</h3>
+<p><strong>마이그레이션 디렉터리도, 번호 매긴 마이그레이션 파일도, ORM 마이그레이터도 없다.</strong> 대신 체크인된 전체 스키마 <code>.sql</code> + <code>PRAGMA user_version</code> 사다리다.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>항목</th><th>값</th></tr></thead>
+  <tbody>
+    <tr><td>공용 DB 스키마</td><td><code>src/state/openclaw-state-schema.sql</code> - <strong>2,493줄 / <code>CREATE TABLE</code> 122개</strong>, 전부 <code>STRICT</code></td></tr>
+    <tr><td>에이전트 DB 스키마</td><td><code>src/state/openclaw-agent-schema.sql</code> - <strong>780줄 / <code>CREATE TABLE</code> 39개</strong></td></tr>
+    <tr><td>스키마 버전 상수</td><td><code>openclaw-state-db-contract.ts:15</code> = 15, <code>openclaw-agent-db-contract.ts:24</code> = 19</td></tr>
+    <tr><td>package.json 선언</td><td><code>package.json:4-9</code> <code>openclaw.schemaVersions = { state: 15, agent: 19 }</code> - 런타임 마이그레이션이 아니라 <strong>업데이트 프리플라이트용</strong>(<code>src/infra/update-runner-git-target.ts:36</code>)</td></tr>
+    <tr><td><strong>실측 대조</strong></td><td>WSL 로컬 인스턴스 <code>~/openclaw-local/.openclaw/state/openclaw.sqlite</code> 의 <code>PRAGMA user_version</code> = <strong>15</strong>, 테이블 &middot; 뷰 <strong>108개</strong> (<code>node:sqlite</code> 로 직접 조회)</td></tr>
+    <tr><td>업그레이드 본체</td><td><code>src/state/openclaw-state-db.ts:390-455</code> - <code>BEGIN IMMEDIATE</code> 안에서 은퇴 테이블 정리 &rarr; 마이그레이션 함수들 &rarr; <code>executeCanonicalStateSchema</code>(<code>:424</code>) &rarr; STRICT 전환(<code>:427-437</code>) &rarr; 인덱스 복구(<code>:438</code>) &rarr; <code>PRAGMA user_version = 15</code>(<code>:442</code>)</td></tr>
+    <tr><td>에이전트 DB 사다리</td><td><code>src/state/openclaw-agent-db-schema.ts:162-…</code> (<code>userVersion &lt; 7</code>, <code>&lt; 6</code>, <code>&lt; 3</code> 분기), 종결 <code>:688</code></td></tr>
+    <tr><td>은퇴 테이블</td><td>데이터 주도: <code>src/state/openclaw-schema-retirements.json</code> &rarr; <code>openclaw-state-db-table-retirements.ts:18-25</code></td></tr>
+    <tr><td>버전 역행 거부</td><td><code>src/infra/sqlite-user-version.ts:38-50</code>, 문서 <code>docs/reference/database-schemas.md:104-118</code> (exit 78)</td></tr>
+    <tr><td>Kysely 타입</td><td><strong>.sql 에서 생성</strong>: <code>scripts/generate-kysely-types.mts:11,16</code> &rarr; <code>*-db.generated.d.ts</code></td></tr>
+  </tbody>
+</table>
+</div>
+<div class="box box-warn">
+  <p class="t">스키마를 고치는 순서</p>
+  <p><code>.sql</code> 수정 &rarr; 버전 상수 증가 &rarr; 마이그레이션 함수를 사다리에 추가 &rarr; <code>pnpm db:kysely:gen</code> 으로 타입 재생성 &rarr;
+  <code>pnpm sqlite:sessions-schema:gen</code> 베이스라인 갱신. CI 에 <code>check-sqlite-session-schema-baseline</code> 잡이 있다(<code>.github/workflows/ci.yml:1660</code>).</p>
+</div>
+
+<h3>4-2. 디스크 위의 DB 파일</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>파일</th><th>경로 결정</th><th>담는 것</th></tr></thead>
+  <tbody>
+    <tr><td><strong><code>openclaw.sqlite</code></strong></td><td><code>openclaw-state-db.paths.ts:6-13</code> &rarr; <code>&lt;stateDir&gt;/state/</code></td><td>공용 제어평면</td></tr>
+    <tr><td><strong><code>openclaw-agent.sqlite</code></strong></td><td><code>openclaw-agent-db.paths.ts:22-34</code> &rarr; <code>&lt;stateDir&gt;/agents/&lt;agentId&gt;/agent/</code></td><td>세션 &middot; 전사 &middot; FTS &middot; 메모리 색인 &middot; 인증 프로필 &middot; 보드</td></tr>
+    <tr><td><code>incognito-openclaw-agent.sqlite</code></td><td>같은 파일 <code>:19,37-44</code></td><td>시크릿 모드</td></tr>
+    <tr><td><code>openclaw-quarantine.sqlite</code></td><td><code>openclaw-quarantine-store.ts:30-32</code></td><td>손상 격리 DB 목록</td></tr>
+    <tr><td><code>plugins/workboard/workboard.sqlite</code></td><td><code>extensions/workboard/src/sqlite-store.ts:42,57-59</code></td><td>워크보드 (자체 <code>SCHEMA_VERSION = 3</code>)</td></tr>
+    <tr><td><code>logbook.sqlite</code> + <code>frames/</code></td><td><code>extensions/logbook/src/store.ts:186-190</code></td><td>로그북</td></tr>
+    <tr><td><code>debug-proxy/capture.sqlite</code></td><td><code>src/proxy-capture/paths.ts:12-19</code></td><td><span class="b b-w">deprecated</span> 캡처는 공용 DB <code>capture_*</code> 로 이관됨</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>4-3. 테이블 그룹</h3>
+<div class="tw">
+<table>
+  <caption>공용 openclaw.sqlite. 줄 번호는 src/state/openclaw-state-schema.sql</caption>
+  <thead><tr><th>그룹</th><th>테이블</th></tr></thead>
+  <tbody>
+    <tr><td>메타</td><td><code>schema_meta</code>:573, <code>config_machine_state</code>:583, <code>config_revision_keys</code>:258, <code>config_health_entries</code>:1038</td></tr>
+    <tr><td>감사 &middot; 실행 신원</td><td><code>audit_events</code>:151, <code>audit_identity_keys</code>:251, <code>execution_identity_contexts</code>:263, <code>execution_decision_facts</code>:278</td></tr>
+    <tr><td>세션 제어평면</td><td><code>session_state_events</code>:314, <code>session_state_heads</code>:335, <code>session_watch_cursors</code>:349, <code>session_upstream_links</code>:363, <code>session_groups</code>:1866, <code>state_leases</code>:383</td></tr>
+    <tr><td>승인</td><td><code>exec_approvals_config</code>:402, <code>operator_approvals</code>:416, <code>plugin_binding_approvals</code>:1659</td></tr>
+    <tr><td><strong>기기 &middot; 페어링</strong></td><td><code>device_pairing_pending</code>:589, <code>device_pairing_paired</code>:612, <code>device_bootstrap_tokens</code>:640, <code>device_pairing_join_codes</code>:673, <code>device_identities</code>:680, <code>device_auth_tokens</code>:692, <code>gateway_origin_device_tokens</code>:704</td></tr>
+    <tr><td>푸시</td><td><code>web_push_subscriptions</code>:842, <code>apns_registrations</code>:872</td></tr>
+    <tr><td>크론 &middot; 작업</td><td><code>cron_jobs</code>:1447, <code>cron_run_receipts</code>:1471, <code>task_runs</code>:1572, <code>subagent_runs</code>:1618, <code>flow_runs</code>:1679, <code>delivery_queue_entries</code>:1537</td></tr>
+    <tr><td>에이전트 레지스트리</td><td><code>agent_databases</code>:1226, <code>agent_provenance</code>:1248, <code>agent_database_leases</code>:1255</td></tr>
+    <tr><td>플러그인 &middot; 스킬</td><td><code>plugin_state_entries</code>:1264, <code>plugin_blob_entries</code>:1314, <code>skill_usage</code>:28, <code>skill_workshop_*</code>:83-129, <code>skill_uploads</code>:1332</td></tr>
+    <tr><td>워커 &middot; 워크트리</td><td><code>worker_environments</code>:1876, <code>worker_session_placements</code>:1942, <code>worker_transcript_commits</code>:2322, <code>worker_inference_turns</code>:2343, <code>worktrees</code>:1814, <code>projects</code>:1845, <code>fleet_cells</code>:2366</td></tr>
+    <tr><td>회의 전사</td><td><code>meeting_transcript_sessions</code>:1707, <code>..._utterances</code>:1738, <code>..._summaries</code>:1756</td></tr>
+    <tr><td>게이트웨이 라이프사이클</td><td><code>gateway_restart_sentinel</code>:1102, <code>gateway_boot_lifecycle</code>:1156, <code>update_runs</code>:1075, <code>migration_runs</code>:1770, <code>backup_runs</code>:1803</td></tr>
+    <tr><td>ACP</td><td><code>acp_sessions</code>:1169, <code>acp_replay_sessions</code>:1191, <code>acp_replay_events</code>:1211</td></tr>
+    <tr><td>시크릿 &middot; 미디어</td><td><code>secret_store_entries</code>:2478, <code>outbound_media_provenance</code>:2467, <code>mcp_oauth_stores</code>:3</td></tr>
+  </tbody>
+</table>
+</div>
+<p>공용 DB 에는 <strong>FTS5 테이블이 없다.</strong></p>
+
+<div class="tw">
+<table>
+  <caption>에이전트별 openclaw-agent.sqlite. 줄 번호는 src/state/openclaw-agent-schema.sql</caption>
+  <thead><tr><th>그룹</th><th>테이블</th></tr></thead>
+  <tbody>
+    <tr><td>세션</td><td><code>session_nodes</code>:15, <code>session_participants</code>:79, <code>session_windows</code>:116, <code>session_conversations</code>:225, <code>conversations</code>:160, <code>conversation_deliveries</code>:193</td></tr>
+    <tr><td><strong>전사</strong></td><td><code>transcript_events</code>:393, <code>session_transcript_archives</code>:404, <code>transcript_event_identities</code>:463, <code>trajectory_runtime_events</code>:436</td></tr>
+    <tr><td><strong>FTS5</strong></td><td><code>standing_intents_fts</code>:<strong>636</strong>, <code>session_transcript_fts</code>:<strong>698</strong> (+ <code>session_transcript_index_state</code>:666)</td></tr>
+    <tr><td><strong>메모리 색인 &middot; 임베딩</strong></td><td><code>memory_index_meta</code>:533, <code>memory_index_sources</code>:538, <code>memory_index_chunks</code>:548, <code>memory_embedding_cache</code>:595, <code>memory_index_state</code>:606.<br><em>.sql 에 없고 런타임에 생기는 것</em>: <code>memory_index_chunks_fts</code> &middot; <code>memory_index_paths_fts</code>(fts5, <code>memory-schema-fts.ts:168,240</code>), <code>memory_index_chunks_vec</code>(vec0, <code>manager-sync-base.ts:591</code>)</td></tr>
+    <tr><td><strong>인증 프로필</strong></td><td><code>auth_profile_store</code>:521, <code>auth_profile_state</code>:527</td></tr>
+    <tr><td><strong>대시보드 &middot; 보드</strong></td><td><code>board_tabs</code>:292, <code>board_widgets</code>:304, <code>session_progress_cards</code>:336 (지연 생성 <code>openclaw-agent-board-schema.ts:26-30</code>)</td></tr>
+    <tr><td>캐시</td><td><code>cache_entries</code>:504</td></tr>
+  </tbody>
+</table>
+</div>
+<p>인증 프로필 DB 는 별도 파일이 아니다. <code>src/agents/auth-profiles/sqlite.ts:199-203</code> 이 <code>&lt;agentDir&gt;/openclaw-agent.sqlite</code> 를 그대로 돌려주고, 설정 <code>auth.sharedStore.location === "state-db"</code> 면 공용 DB 로 간다(<code>path-resolve.ts:103-108</code>).</p>
+
+<h3>4-4. 파일 기반 저장</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>대상</th><th>경로</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td>상태 디렉터리</td><td><code>$OPENCLAW_STATE_DIR</code> 없으면 <code>~/.openclaw</code> (레거시 <code>~/.clawdbot</code> 폴백)</td><td><code>src/config/paths.ts:26-27,71-100</code></td></tr>
+    <tr><td>설정 파일</td><td><code>&lt;stateDir&gt;/openclaw.json</code> (<code>OPENCLAW_CONFIG_PATH</code> override)</td><td><code>paths.ts:28-29,275-284,380-404</code></td></tr>
+    <tr><td><strong>설정 형식</strong></td><td><strong>JSON5</strong> - 주석 허용, <code>$include</code> 지시자, 환경변수 치환</td><td><code>io.load.ts:57</code>; <code>includes.ts:5-8</code>; <code>env-substitution.ts:219</code></td></tr>
+    <tr><td>워크스페이스 (Markdown)</td><td><code>$OPENCLAW_WORKSPACE_DIR</code> 없으면 <code>&lt;stateDir&gt;/workspace</code></td><td><code>src/agents/workspace-default.ts:14-34</code></td></tr>
+    <tr><td>세션 파일</td><td><code>&lt;stateDir&gt;/agents/&lt;agentId&gt;/sessions/</code></td><td><code>src/config/sessions/paths.ts:12-35</code></td></tr>
+    <tr><td>미디어 blob</td><td><code>&lt;configDir&gt;/media</code> (+ <code>outgoing/</code>, <code>outbound/</code>)</td><td><code>src/media/store.ts:29,37-46</code></td></tr>
+    <tr><td>로그</td><td><code>&lt;stateDir&gt;/logs/</code> - <code>anthropic-payload.jsonl</code>, <code>cache-trace.jsonl</code>, <code>raw-stream.jsonl</code></td><td><code>src/agents/anthropic-payload-log.ts:51</code> 외</td></tr>
+    <tr><td>게이트웨이 락</td><td><code>&lt;stateDir&gt;/tmp/openclaw-&lt;uid&gt;</code></td><td><code>paths.ts:412-420</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>4-5. 외부 DB 옵션</h3>
+<div class="box box-live">
+  <p class="t">없다</p>
+  <p>Postgres &middot; MySQL &middot; MariaDB &middot; Redis &middot; MongoDB &middot; ClickHouse 드라이버가
+  <code>src/</code> &middot; <code>packages/</code> &middot; <code>extensions/</code> &middot; <code>ui/</code> 어디에도 없다.
+  전량 grep 히트는 두 개뿐이고 둘 다 드라이버가 아니다.</p>
+  <ul>
+    <li><code>src/logging/redact-patterns.ts:147</code> - 로그에 섞인 <code>postgres://</code> &middot; <code>mysql://</code> &middot; <code>redis://</code> 연결 문자열을 <strong>가리는 정규식</strong>.</li>
+    <li><code>extensions/memory-wiki/src/chatgpt-import.ts:389</code> - 분류기의 키워드 목록.</li>
+  </ul>
+  <p><code>package.json</code> 의존성 스캔에서도 <code>pg</code> &middot; <code>mysql</code> &middot; <code>redis</code> &middot; <code>drizzle</code> &middot; <code>prisma</code> 는 0건이다.
+  <strong>비 SQLite 영속 저장소는 파일시스템과 선택적 LanceDB 두 가지뿐이다.</strong></p>
+</div>
+</section>
+
+<!-- ==================== S5 ==================== -->
+<section id="s5">
+<h2><span class="num">5</span>인프라 요구</h2>
+
+<h3>5-1. 런타임</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>항목</th><th>값</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td>Node</td><td><code>&gt;=22.22.3 &lt;23 || &gt;=24.15.0 &lt;25 || &gt;=25.9.0</code></td><td><code>package.json</code> <code>engines.node</code></td></tr>
+    <tr><td>권장 메이저</td><td>26</td><td><code>openclaw.mjs</code> <code>RECOMMENDED_NODE_MAJOR</code></td></tr>
+    <tr><td>pnpm</td><td><strong>12.1.0</strong> (corepack 핀)</td><td><code>package.json</code> <code>packageManager</code></td></tr>
+    <tr><td>Bun</td><td><code>node:sqlite</code> 를 제공하는 빌드만. 없으면 즉시 exit 1</td><td><code>openclaw.mjs</code> <code>ensureSupportedRuntimeVersion()</code></td></tr>
+    <tr><td>네이티브 빌드 도구</td><td><span class="b b-ok">불필요</span> prebuilt 를 받는다. Ubuntu 24.04 기본 + Node 24 만으로 <code>pnpm install</code> 통과(실측)</td><td>FORK.md 6-1</td></tr>
+    <tr><td>pnpm 링커</td><td><code>nodeLinker: isolated</code>, <code>verifyDepsBeforeRun: false</code>, <code>blockExoticSubdeps: true</code></td><td><code>pnpm-workspace.yaml:44-49</code></td></tr>
+    <tr><td>의존성 쿨다운</td><td><code>minimumReleaseAge: 10080</code>(7일) strict. 예외는 사유와 만료일까지 적혀 있다</td><td><code>pnpm-workspace.yaml:8-40</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5-2. OS 지원</h3>
+<p><code>package.json</code> 에 <code>os</code> 필드는 없다. 실질 범위는 CI 매트릭스와 코드로 확인된다.</p>
+<ul>
+  <li><strong>Linux</strong>(주 레인): CI 기본 러너 <code>ubuntu-24.04</code> / blacksmith (<code>.github/workflows/ci.yml:98</code>).</li>
+  <li><strong>Windows</strong>: <code>checks-windows-node-test-*</code> 잡(<code>ci.yml:1744</code>), <code>src/cli/windows-argv.ts</code>, 런처의 <code>SIGBREAK</code> 분기, <code>node-sqlite.ts:17-24</code> 롱패스 처리, <code>test:windows:schtasks:integration</code>.</li>
+  <li><strong>macOS</strong>: <code>macos-node-*</code> 잡(<code>ci.yml:1755</code>), launchd 코드(<code>src/cli/daemon-cli/launchd-recovery.ts</code>).</li>
+  <li><strong>Android / iOS</strong>: 별도 릴리스 워크플로.</li>
+</ul>
+
+<h3>5-3. 필수 외부 서비스</h3>
+<div class="tw">
+<table>
+  <caption>없다. 게이트웨이는 SQLite + 파일시스템만으로 뜬다</caption>
+  <thead><tr><th>것</th><th>필수</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td>Tailscale</td><td><span class="b b-i">선택</span></td><td><code>src/gateway/server-tailscale.ts</code>, <code>tailscale-published-origin.ts</code></td></tr>
+    <tr><td>Cloudflare (Access / Tunnel)</td><td><span class="b b-i">선택</span></td><td><code>src/cli/node-cli/gateway-options.ts</code>, <code>src/node-host/gateway-cloudflare-access.ts</code></td></tr>
+    <tr><td>Bonjour / mDNS</td><td><span class="b b-i">선택</span> 컨테이너에서는 자동 비활성</td><td><code>docker-compose.yml</code> <code>OPENCLAW_DISABLE_BONJOUR</code>; <code>extensions/bonjour/</code></td></tr>
+    <tr><td>OpenTelemetry / Prometheus</td><td><span class="b b-i">선택</span> 아웃바운드 OTLP. Prometheus 는 별도 포트 없이 인증된 게이트웨이 경로 사용</td><td><code>docker-compose.yml</code> OTEL 블록; <code>extensions/diagnostics-*</code></td></tr>
+    <tr><td>ClawHub</td><td><span class="b b-i">선택</span> 스킬 설치 시에만</td><td><code>src/infra/clawhub-client.ts:15</code></td></tr>
+    <tr><td>모델 API</td><td><span class="b b-w">기능상 최소 하나</span> 인프라 의존은 아님</td><td>-</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5-4. 포트</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>포트</th><th>무엇</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td><strong>18789</strong></td><td>게이트웨이 HTTP + WS (Control UI 포함). 기본 bind 는 loopback</td><td><code>src/config/paths.ts:406</code>; <code>docker-compose.yml</code></td></tr>
+    <tr><td>18790</td><td>브라우저 브리지</td><td><code>docker-compose.yml</code> <code>OPENCLAW_BRIDGE_PORT</code></td></tr>
+    <tr><td>3978</td><td>MS Teams 웹훅</td><td><code>docker-compose.yml</code> <code>OPENCLAW_MSTEAMS_PORT</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5-5. 프로세스 모델</h3>
+<pre><code>openclaw.mjs (런처 = respawn 감독자)
+   └─ dist/entry.js = 게이트웨이 프로세스 1개
+        ├─ node:http/https 리스너 + ws WebSocketServer(noServer)
+        ├─ 플러그인 in-process 로드 (채널·프로바이더·도구)
+        ├─ worker_threads: prepared-model-catalog / session-accessor.sqlite-archive /
+        │                  session-transcript-reconcile / sqlite-integrity
+        ├─ child_process: ACP 하네스(codex·claude 등), 브라우저 사이드카, KNN 취소용 서브프로세스
+        └─ 원격 노드(src/node-host/): 다른 기기가 게이트웨이에 붙어 워커 역할</code></pre>
+<p>워커 배치 &middot; 이동은 게이트웨이가 관리한다(<code>src/gateway/server-worker-placement-*.ts</code> 12개 + 테이블 <code>worker_session_placements</code>).</p>
+
+<h3>5-6. 서비스 설치 (systemd / launchd / schtasks)</h3>
+<p>코드는 <code>src/cli/daemon-cli/</code> 에 있다: <code>install.ts</code>(유닛 생성), <code>lifecycle.ts</code> &middot; <code>lifecycle-core.ts</code> &middot; <code>lifecycle-safe-restart.ts</code>(start/stop/restart), <code>launchd-recovery.ts</code>(macOS 복구), <code>status.gather.ts</code> &middot; <code>status.print.ts</code>.</p>
+<div class="box box-warn">
+  <p class="t">함정 (이 포크가 실제로 겪은 것)</p>
+  <p><code>openclaw gateway install</code> 은 <strong>비기본 state dir 을 거부</strong>한다
+  (<code>service management skipped: non-default state dir or config path</code>).
+  그래서 이 포크는 유닛을 직접 들고 있다: <code>chris-local/openclaw-local.service</code>,
+  <code>chris-local/openclaw-auto-deploy.{service,timer}</code> (FORK.md 7-3).</p>
+</div>
+
+<h3>5-7. Docker</h3>
+<pre><code>Dockerfile (438줄, 멀티스테이지)
+  workspace-deps      node:24-bookworm@sha256:934240a1...   package.json 만 추출
+  dependency-inputs   같은 이미지                            corepack enable
+  production-deps     &lt;- dependency-inputs                  런타임 의존만 설치 + 네이티브 애드온 검증
+  bun-binary          oven/bun:1.4.0@sha256:5ff60936...
+  build               &lt;- dependency-inputs                  전체 빌드
+  runtime-build-output / runtime-assets                     dist 정리·플러그인 프루닝
+  base-runtime        node:24-bookworm-slim@sha256:3638d9a6...
+  최종                USER node, ENTRYPOINT ["tini","-s","--"], CMD ["node","openclaw.mjs","gateway"]</code></pre>
+<ul>
+  <li>베이스 이미지는 전부 <strong>SHA256 다이제스트 핀</strong>(<code>Dockerfile:16-21</code>). Dependabot 이 갱신한다.</li>
+  <li>런타임 apt 패키지(<code>:251</code>): <code>ca-certificates curl git hostname libgomp1 lsof openssh-client openssl procps python3 tini</code>.</li>
+  <li>Playwright chromium 을 조건부 설치(<code>:342-350</code>).</li>
+  <li>보안: 비루트 <code>USER node</code>, compose 에서 <code>cap_drop: [NET_RAW, NET_ADMIN]</code>, <code>no-new-privileges:true</code>.</li>
+  <li>컨테이너 안 경로를 고정한다(<code>docker-compose.yml</code>). 호스트 <code>.env</code> 의 경로가 새어 들어가 mkdir EACCES 가 났던 이슈(#77436) 대책이라고 주석에 적혀 있다.</li>
+</ul>
+
+<div class="tw">
+<table>
+  <caption>이미지 4.37GB 의 내역 (이 PC docker history openclaw-chris:local 실측)</caption>
+  <thead><tr><th>레이어</th><th>크기</th><th>무엇</th></tr></thead>
+  <tbody>
+    <tr><td><code>COPY /app/node_modules</code></td><td><strong>2.65GB</strong></td><td>압도적 1위</td></tr>
+    <tr><td><code>COPY /app/dist</code></td><td>175MB</td><td>빌드 산출물</td></tr>
+    <tr><td>Node 배포 설치 RUN</td><td>155MB</td><td>베이스의 Node</td></tr>
+    <tr><td>익명 RUN</td><td>151MB</td><td>(Playwright / apt 계열)</td></tr>
+    <tr><td>debian bookworm-slim 베이스</td><td>85.3MB</td><td></td></tr>
+    <tr><td>RUN</td><td>53.3MB</td><td></td></tr>
+    <tr><td><code>COPY /app/extensions</code></td><td>43.9MB</td><td>플러그인 153개</td></tr>
+    <tr><td><code>COPY /app/docs</code></td><td>25.7MB</td><td>문서 751개가 이미지에 들어간다</td></tr>
+    <tr><td><code>COPY /app/qa</code></td><td>3.58MB</td><td></td></tr>
+  </tbody>
+</table>
+</div>
+<p>즉 <strong>크기의 주범은 <code>node_modules</code> 하나</strong>다. 줄이려면 <code>OPENCLAW_EXTENSIONS</code> 빌드 인자로 플러그인을 골라 굽는 길이 있다(<code>Dockerfile:1-3,11</code>).</p>
+
+<h3>5-8. 리소스 실측 (WSL2 Ubuntu, 2026-09-06)</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>항목</th><th>값</th><th>방법</th></tr></thead>
+  <tbody>
+    <tr><td>게이트웨이 RSS</td><td><strong>418MB</strong>(재시작 직후 유휴) ~ <strong>600MB</strong>(빌드와 겹친 시점)</td><td><code>ps -eo pid,rss,cmd --sort=-rss</code></td></tr>
+    <tr><td>인스턴스 상태 총량</td><td><strong>108MB</strong> (그중 <code>cache/control-ui-assets</code> 104MB)</td><td><code>du -sh ~/openclaw-local/.openclaw</code></td></tr>
+    <tr><td><code>state/openclaw.sqlite</code></td><td>3.53MB (+ WAL 157KB, SHM 32KB)</td><td><code>ls -la state/</code></td></tr>
+    <tr><td>워크스페이스</td><td>152KB</td><td></td></tr>
+    <tr><td>소스 체크아웃 <code>node_modules</code></td><td>2.6GB</td><td><code>du -sh</code></td></tr>
+    <tr><td>빌드 산출물 <code>dist/</code></td><td>249MB</td><td></td></tr>
+    <tr><td><code>.git</code></td><td>3.6GB</td><td></td></tr>
+    <tr><td><code>.cache/vitest</code></td><td><strong>28GB</strong></td><td>전체 테스트 1회 후의 vitest 캐시. 지워도 되는 파생물</td></tr>
+    <tr><td>빌드 시간</td><td><code>pnpm build</code> 3분 47초 (증분 &middot; 캐시 적중 포함)</td><td><code>chris-local/auto-deploy.log</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>디스크 계획에서 <strong><code>.cache/vitest</code> 28GB 가 최대 변수</strong>다. 전체 테스트를 돌리지 않는 배포 머신에서는 생기지 않는다.</p>
+</section>
+
+<!-- ==================== S6 ==================== -->
+<section id="s6">
+<h2><span class="num">6</span>빌드 &middot; 테스트 파이프라인</h2>
+
+<h3>6-1. <code>pnpm build</code></h3>
+<p><code>node --import ./scripts/tsx.mjs scripts/build-all.mts</code>. 단계는 <code>scripts/build-all.mts:75-160</code> 에 배열로 선언되고 각 단계에 입출력 해시 캐시가 붙는다.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>#</th><th>단계</th><th>하는 일</th></tr></thead>
+  <tbody>
+    <tr><td>1-2</td><td><code>clean:dist</code>, <code>plugins:assets:build</code></td><td>dist 삭제, 플러그인 에셋</td></tr>
+    <tr><td>3-6</td><td><code>tsdown</code>, <code>tsdown-ai</code>, <code>tsdown-packages</code>, <code>tsdown-unified</code></td><td><strong>백엔드 번들</strong>. tsdown = rolldown 기반. 설정 <code>tsdown.config.ts</code></td></tr>
+    <tr><td>7</td><td><code>write-unified-entry-dts</code></td><td>타입 선언 생성. <strong>실측 최장 단계 2분 44초</strong></td></tr>
+    <tr><td>8-11</td><td><code>external-plugins:local-dist</code>, <code>check-cli-bootstrap-imports</code>, <code>plugins:assets:copy</code>, <code>runtime-postbuild</code>, <code>build-stamp</code>, 플러그인 SDK 표면</td><td>후처리 &middot; 가드</td></tr>
+    <tr><td>12</td><td><strong><code>ui:build</code></strong></td><td>Control UI. <strong>캐시를 일부러 끈다</strong> - 빌드 ID 가 package.json &middot; git HEAD &middot; env 에서 나와 파일 해시로 무효화할 수 없고, 캐시 적중이 낡은 서비스워커를 복원할 수 있기 때문(<code>build-all.mts:145-152</code> 주석)</td></tr>
+    <tr><td>13</td><td><code>write-build-info</code>, <code>write-cli-startup-metadata</code></td><td>버전 &middot; 헬프 텍스트 사전 계산</td></tr>
+  </tbody>
+</table>
+</div>
+<p><strong><code>pnpm build</code> 한 번이 백엔드와 Control UI 를 모두 굽는다.</strong> <code>pnpm ui:build</code> 는 UI 만 다시 굽는 부분 명령이다.</p>
+
+<h3>6-2. <code>pnpm check</code></h3>
+<p><code>scripts/check.mts</code>(219줄)가 개별 pnpm 스크립트를 순차 &middot; 병렬로 부른다. 주요 항목:</p>
+<ul>
+  <li><strong>정적 가드</strong>: 충돌 마커, 스크립트 erasability, max-lines 래칫, assertion SAFETY 주석 래칫, changelog 기여자, database-first 레거시 스토어 가드, doctor deprecation 레지스트리, opengrep 룰 메타데이터, npm lock, 패치 가드.</li>
+  <li><strong>경계 가드</strong>: 플러그인 wildcard 재수출 금지, deprecated 채널 접근 금지, 웹훅 저수준 body 읽기 금지, temp 경로 가드, 페어링 스토어 &middot; 계정 스코프 가드, import 사이클.</li>
+  <li><strong>타입</strong>: <code>tsgo:prod</code>, <code>tsgo:scripts</code>, <code>tsgo:test:root</code> (또는 <code>tsgo:all</code>).</li>
+  <li><strong>린트 &middot; 포맷</strong>: <code>lint</code>, <code>format:check</code>. 포매터는 <code>oxfmt</code>, 린터는 <code>oxlint</code> 계열.</li>
+</ul>
+<p>이 포크 실측(FORK.md 10-2b): <span class="b b-ok">exit 0, 실패 0</span></p>
+
+<h3>6-3. <code>pnpm test</code></h3>
+<p><code>scripts/test-projects.mts</code>(5줄)가 <code>runVitestCli("test", runTestProjects)</code> 를 부른다. 루트 <code>vitest.config.ts</code> 는 <code>test/vitest/vitest.config.ts</code> 를 재수출하고, 거기 <code>:97</code> 이 <code>projects: [...rootVitestProjects]</code> 로 <strong>118개 vitest 프로젝트 설정</strong>을 묶는다.</p>
+<div class="box box-warn">
+  <p class="t">새 환경에서 반드시 할 것 (실측 교훈)</p>
+  <p>실측 결과 통과 192,671 / 실패 450 이었고, <strong>그중 419건이 <code>jq</code> 미설치 하나</strong>였다
+  (로그에 <code>jq: command not found</code> 가 그대로 찍힌다).
+  <code>apt-get install -y jq</code> 를 먼저 하고, 레인만 볼 때도 <code>pnpm vitest</code> 직접 호출 대신
+  <strong><code>pnpm test</code> 를 쓴다</strong>(공식 러너가 temp/state 환경을 세팅한다).</p>
+</div>
+<p>그 밖의 진입점: <code>test:docker:*</code> 100개 이상(컨테이너 E2E), <code>test:live:*</code>(실제 모델 호출), <code>test:e2e:*</code>, <code>test:perf:*</code>, <code>test:startup:bench</code>.</p>
+
+<h3>6-4. 릴리스와 CI</h3>
+<ul>
+  <li>릴리스 스크립트: <code>release:prep</code>, <code>release:version</code>, <code>release:candidate</code>, <code>release:beta</code>, <code>release:plugins:npm:plan</code>, <code>release:plugins:clawhub:plan</code>, <code>ci:full-release</code>.</li>
+  <li>CI 워크플로 <strong>101개</strong>. 중심은 <code>ci.yml</code>(5,618줄). 러너는 조건부로 <code>ubuntu-24.04</code> 또는 blacksmith 4/8/32 vCPU 를 고른다(<code>ci.yml:98</code>). 잡 이름 예: <code>checks-fast-*</code>, <code>check-sqlite-session-schema-baseline</code>, <code>checks-windows-node-test-*</code>, <code>macos-node-*</code>, <code>android-test-play</code>.</li>
+  <li>그 밖: <code>docker-release.yml</code>, <code>codeql*.yml</code>(4개), <code>dependency-audit.yml</code>, <code>install-smoke.yml</code>, <code>node22-compat.yml</code>, 플랫폼별 릴리스 워크플로.</li>
+  <li><strong>포크 주의</strong>: gh 토큰에 <code>workflow</code> 스코프가 없으면 <code>.github/workflows/</code> 를 건드리는 push 가 거부된다(FORK.md 3-1 에 우회 절차).</li>
+</ul>
+</section>
+
+<!-- ==================== S7 ==================== -->
+<section id="s7">
+<h2><span class="num">7</span>확장 지점</h2>
+
+<h3>7-1. <code>extensions/</code> 153개</h3>
+<p><code>ls -d extensions/*/ | wc -l</code> = <strong>153</strong> (<code>package.json</code> 보유 149개. <code>active-memory</code> &middot; <code>device-pair</code> &middot; <code>talk-voice</code> &middot; <code>test-support</code> 는 매니페스트 없이 형제 플러그인 &middot; 테스트 픽스처에 흡수돼 있다). 분류는 (a) <code>package.json</code> 의 <code>openclaw.channel</code> 블록, (b) 코드가 실제로 부르는 <code>api.register*</code> 로 판정했다.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>분류</th><th>개수</th><th>예</th></tr></thead>
+  <tbody>
+    <tr><td><strong>채널</strong></td><td>27</td><td>telegram, slack, discord, msteams, matrix, signal, whatsapp, line, imessage, irc, mattermost, nostr, feishu, googlechat, twitch, sms, zalo, synology-chat, nextcloud-talk, tlon, a2a 외</td></tr>
+    <tr><td><strong>모델 프로바이더</strong></td><td>62</td><td>anthropic, openai, google, xai, ollama, lmstudio, vllm, sglang, llama-cpp, openrouter, groq, cerebras, deepseek, mistral, minimax, moonshot, qwen, zai, amazon-bedrock, github-copilot, litellm, clawrouter 외</td></tr>
+    <tr><td>미디어 (TTS/STT/이미지/비디오)</td><td>11</td><td>elevenlabs, azure-speech, microsoft, inworld, gradium, fish-audio-speech, deepgram, senseaudio, tts-local-cli, document-extract</td></tr>
+    <tr><td>도구</td><td>19</td><td>browser, canvas, workboard, memory-wiki, firecrawl, brave, tavily, exa, perplexity, searxng, duckduckgo, onepassword, google-meet, voice-call, file-transfer, diffs</td></tr>
+    <tr><td>메모리</td><td>3</td><td>memory-core, memory-lancedb, voyage(임베딩 전용)</td></tr>
+    <tr><td>인프라</td><td>16</td><td>acpx, admin-http-rpc, beam, device-pair, diagnostics-otel, diagnostics-prometheus, geolocation, imap, logbook, policy, vault, webhooks, teams-meetings, zoom-meetings</td></tr>
+    <tr><td>기타</td><td>15</td><td><strong>codex &middot; copilot(에이전트 하네스)</strong>, mxc &middot; openshell(샌드박스 백엔드), bonjour, cua-computer, linux-node, llm-task, migrate-claude, tokenjuice, web-readability</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="box box-live">
+  <p class="t">저장소에 있다고 다 켜지는 것이 아니다</p>
+  <p>이 포크의 로컬 인스턴스에서 실제 로드된 플러그인은 <strong>16개</strong>다(FORK.md 10-2):
+  acpx, browser, canvas, cua-computer, device-pair, file-transfer, geolocation, google-meet,
+  linux-node, memory-core, ollama, openai, talk-voice, teams-meetings, xai, zoom-meetings.
+  나머지는 설정으로 켜야 붙는다.</p>
+</div>
+
+<h3>7-2. 플러그인 SDK</h3>
+<p><code>packages/plugin-sdk</code> 는 <strong><code>src/plugin-sdk</code> 를 그대로 재수출하는 얇은 파사드</strong>다. <strong>루트 <code>"."</code> export 가 없어</strong> 작성자는 서브패스를 골라 import 해야 한다(선언된 서브패스 57개).</p>
+<div class="tw">
+<table>
+  <thead><tr><th>서브패스</th><th>진입 함수</th><th>용도</th></tr></thead>
+  <tbody>
+    <tr><td><code>openclaw/plugin-sdk/plugin-entry</code></td><td><code>definePluginEntry(...)</code> (<code>src/plugin-sdk/plugin-entry.ts:233</code>)</td><td>채널이 아닌 모든 플러그인</td></tr>
+    <tr><td><code>openclaw/plugin-sdk/core</code></td><td><code>defineChannelPluginEntry(...)</code> (<code>core.ts:553</code>), <code>defineSetupPluginEntry(...)</code> (<code>:601</code>)</td><td>채널 플러그인</td></tr>
+    <tr><td><code>openclaw/plugin-sdk/provider-entry</code></td><td><code>defineSingleProviderPluginEntry(...)</code></td><td>단일 모델 프로바이더</td></tr>
+    <tr><td><code>openclaw/plugin-sdk/provider-model-shared</code></td><td><code>defineSelfHostedOpenAICompatibleProvider(...)</code></td><td>OpenAI 호환 셀프호스트(vllm 등)</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="tw">
+<table>
+  <caption>등록 API 표면 OpenClawPluginApi (src/plugins/plugin-api.types.ts)</caption>
+  <thead><tr><th>훅</th><th>줄</th><th>훅</th><th>줄</th></tr></thead>
+  <tbody>
+    <tr><td><code>registerChannel</code></td><td>:226</td><td><code>registerProvider</code></td><td>:278</td></tr>
+    <tr><td><code>registerTool</code></td><td>:208</td><td><code>registerHook</code></td><td>:212</td></tr>
+    <tr><td><code>registerMemoryCapability</code></td><td>:447</td><td><code>registerEmbeddingProvider</code></td><td>:284</td></tr>
+    <tr><td><code>registerSpeechProvider</code></td><td>:288</td><td><code>registerRealtimeVoiceProvider</code></td><td>:292</td></tr>
+    <tr><td><code>registerImageGenerationProvider</code></td><td>:298</td><td><code>registerWebSearchProvider</code></td><td>:306</td></tr>
+    <tr><td><code>registerCommand</code></td><td>:316</td><td><code>registerService</code></td><td>:264</td></tr>
+    <tr><td><code>registerHttpRoute</code></td><td>:217</td><td><code>registerGatewayMethod</code></td><td>:234</td></tr>
+    <tr><td><code>registerAgentHarness</code></td><td>:324</td><td><code>registerContextEngine</code></td><td>:318</td></tr>
+    <tr><td><code>registerCliBackend</code></td><td>:268</td><td><code>registerControlUiDescriptor</code></td><td>:140</td></tr>
+  </tbody>
+</table>
+</div>
+<p>배타적 플러그인 <code>kind</code> 는 <code>"memory" | "context-engine"</code> 둘뿐이다(<code>src/plugins/plugin-kind.types.ts:2</code>). 외부 플러그인 package.json 필수 필드는 <code>openclaw.compat.pluginApi</code> 와 <code>openclaw.build.openclawVersion</code> 둘이고, 검증은 <code>packages/plugin-package-contract/src/index.ts:28-31,95</code> 가 한다.</p>
+
+<h3>7-3. 훅</h3>
+<p>세 층이다.</p>
+<ul>
+  <li><strong>(1) 내부(in-process) 훅</strong> - <code>src/hooks/internal-hooks.ts</code>: <code>registerInternalHook(eventKey, handler)</code>(<code>:214</code>), <code>triggerInternalHook(event)</code>(<code>:284</code>). 패밀리는 <code>command | session | agent | gateway | message</code>(<code>internal-hook-types.ts:2-9</code>). 알려진 키(<code>:20-36</code>): <code>agent:bootstrap</code>, <code>command:new</code>, <code>command:reset</code>, <code>command:stop</code>, <code>gateway:pre-restart</code>, <code>gateway:shutdown</code>, <code>gateway:startup</code>, <code>message:preprocessed</code>, <code>message:received</code>, <code>message:sent</code>, <code>message:transcribed</code>, <code>session:auto-reset</code>, <code>session:compact:after</code>, <code>session:compact:before</code>, <code>session:patch</code>.</li>
+  <li><strong>(2) 파일 훅</strong> - 디렉터리에 <code>HOOK.md</code> + <code>handler.ts</code>(<code>src/hooks/types.ts:37-44</code>). frontmatter 에 <strong><code>events: string[]</code> 필수</strong>(<code>:2-29</code>). 로더 <code>src/hooks/loader.ts:51</code>, 설정 게이트 <code>cfg.hooks.internal.enabled !== false</code>(<code>:59</code>). 번들 예: <code>src/hooks/bundled/command-logger/</code>.</li>
+  <li><strong>(3) 플러그인 훅</strong> - <code>api.registerHook(...)</code>(<code>plugin-api.types.ts:212</code>), 구현 <code>src/plugins/plugin-hooks.ts</code>.</li>
+</ul>
+</section>
+
+<!-- ==================== S8 ==================== -->
+<section id="s8">
+<h2><span class="num">8</span>커스터마이즈: 고치고 싶을 때 어디를 보나</h2>
+
+<div class="tw">
+<table>
+  <thead><tr><th>하고 싶은 것</th><th>손댈 곳</th><th>주의</th></tr></thead>
+  <tbody>
+    <tr><td>탭 제목(정적 부팅)</td><td><code>ui/index.html</code> 의 <code>&lt;title&gt;</code></td><td>번들 로드 전 표시되는 값</td></tr>
+    <tr><td>번들 기동 실패 화면 라벨</td><td><code>ui/index.html</code> <code>.mount-fallback__eyebrow</code>(<code>:367</code>)</td><td></td></tr>
+    <tr><td>About 페이지 제품명</td><td><code>ui/src/i18n/locales/en.ts:3195</code> <code>aboutPage.productName</code></td><td>en 이 원본, 나머지 20개는 번역</td></tr>
+    <tr><td>승인 화면 브랜드명</td><td><code>ui/src/i18n/locales/en.ts:1916</code> <code>approvalPage.brandName</code></td><td></td></tr>
+    <tr><td><strong>런타임 탭 제목 접미사</strong></td><td><code>ui/src/app-navigation.ts</code> <code>formatDocumentTitle()</code> 의 하드코딩 <code>"OpenClaw"</code></td><td><span class="b b-w">함정</span> i18n 키가 아니다. <code>app-host.document-title.test.ts</code> &middot; <code>app-navigation.test.ts</code> 가 이 문자열을 단언하므로 같이 고쳐야 한다</td></tr>
+    <tr><td>상단바 브랜드</td><td><code>ui/src/components/app-topbar.ts:39,46</code></td><td></td></tr>
+    <tr><td>색상 토큰</td><td><code>ui/src/styles/base.css:1-80</code> (<code>--bg</code>, <code>--text</code>, <code>--accent</code>)</td><td><code>base-theme-contrast.node.test.ts</code> 가 대비를 단언</td></tr>
+    <tr><td>첫 페인트 테마</td><td><code>ui/index.html:24-36</code>(THEMES), <code>:68-79</code>(FAMILIES), <code>:113-209</code></td><td><strong><code>ui/src/app/theme.ts</code> 와 반드시 동기화</strong></td></tr>
+    <tr><td>추가 테마 팔레트</td><td><code>ui/public/themes/*.css</code> (10종)</td><td></td></tr>
+    <tr><td>로고 &middot; 파비콘 &middot; 아트워크</td><td><code>ui/public/favicon.*</code>, <code>apple-touch-icon.png</code>, <code>manifest.webmanifest</code>, <code>app-art/*.webp</code></td><td><span class="b b-no">상표 영역</span> 이 포크는 건드리지 않았다</td></tr>
+    <tr><td><strong>새 채널 추가</strong></td><td><code>extensions/&lt;name&gt;/</code> 생성 &rarr; <code>package.json</code> 에 <code>openclaw.channel</code> &rarr; <code>defineChannelPluginEntry</code>(<code>src/plugin-sdk/core.ts:553</code>) &rarr; <code>ChannelPlugin</code>(<code>types.plugin.ts:60</code>) 구현</td><td>참고 구현은 <code>extensions/slack/</code></td></tr>
+    <tr><td><strong>새 모델 프로바이더 추가</strong></td><td><code>defineSingleProviderPluginEntry</code> 또는 <code>defineSelfHostedOpenAICompatibleProvider</code> &rarr; <code>ProviderPlugin</code>(<code>provider-plugin.types.ts:93</code>). 매니페스트에 <code>openclaw.providers</code></td><td>스캐폴드 스킬 <code>custodian-skills/add-model-provider/</code>. AGENTS.md 는 카탈로그 발행 워크플로 실행까지 규정한다</td></tr>
+    <tr><td><strong>게이트웨이 API 추가</strong></td><td>코어면 <code>src/gateway/server-methods/</code> + <code>methods/core-descriptors.ts</code> 등록. 플러그인이면 <code>api.registerGatewayMethod</code></td><td><code>check:protocol-coverage</code> 가 커버리지를 본다. 플러그인의 <code>registerHttpRoute</code> 는 린트로 제약(<code>lint:plugins:no-register-http-handler</code>)</td></tr>
+    <tr><td><strong>메모리 로직 변경</strong></td><td>기본 구현 <code>extensions/memory-core/src/memory/</code>, 스키마 &middot; FTS &middot; 임베딩은 <code>packages/memory-host-sdk/src/host/</code>, 설정 <code>src/config/types.memory.ts</code></td><td>벡터는 <code>sqlite-vec</code> 확장 로드가 전제</td></tr>
+    <tr><td><strong>기본 프롬프트(시스템 프롬프트)</strong></td><td><code>src/agents/system-prompt.ts</code></td><td>스냅샷 테스트 있음: <code>pnpm prompt:snapshots:check</code> / <code>:gen</code>, CI 잡 <code>check-prompt-snapshots</code></td></tr>
+    <tr><td>워크스페이스 AGENTS.md 템플릿</td><td>경로는 <code>src/agents/workspace-default.ts:14-34</code>. 부트스트랩 해시 테이블 <code>workspace_generated_bootstrap_hashes</code></td><td></td></tr>
+    <tr><td>설정 스키마 추가</td><td><code>src/config/types.*.ts</code> &rarr; <code>pnpm config:schema:gen</code> / <code>config:docs:gen</code></td><td>설정 파일은 JSON5</td></tr>
+    <tr><td>DB 테이블 추가</td><td>4-1 절의 5단계</td><td></td></tr>
+    <tr><td>CLI 명령 추가</td><td><code>src/cli/program/register*.ts</code> + <code>src/cli/*-cli.ts</code></td><td>헬프 텍스트는 빌드 시 사전 계산(<code>scripts/write-cli-startup-metadata.ts</code>)</td></tr>
+    <tr><td>스킬 추가</td><td><code>skills/&lt;name&gt;/SKILL.md</code> (frontmatter <code>name</code> &middot; <code>description</code> 필수)</td><td>작성 도우미 <code>skills/skill-creator/</code></td></tr>
+    <tr><td>훅 추가</td><td><code>src/hooks/bundled/&lt;name&gt;/{HOOK.md,handler.ts}</code> 또는 <code>api.registerHook</code></td><td><code>HOOK.md</code> frontmatter 의 <code>events</code> 필수</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>8-1. 이 포크의 커스터마이즈 커밋(<code>864d892</code>)이 실제로 건드린 것</h3>
+<pre><code>feat(ui): mark Control UI as the Chris fork
+ ui/index.html             | 4 ++--
+ ui/src/i18n/locales/en.ts | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)</code></pre>
+<p>세 문자열만 바꿨다: <code>ui/index.html</code> 의 <code>&lt;title&gt;</code>, 같은 파일의 mount-fallback 라벨, <code>ui/src/i18n/locales/en.ts</code> 의 <code>aboutPage.productName</code>. <strong>로고 &middot; 마스코트 &middot; 아이콘 에셋은 하나도 바꾸지 않았다</strong>(커밋 메시지에 상표 주의가 명시돼 있다).</p>
+<div class="box box-acc">
+  <p class="t">이 커밋이 말해 주는 것</p>
+  <p><strong>제품명 문자열이 한 곳에 모여 있지 않다.</strong> 정적 HTML(부팅 전), i18n 카탈로그(런타임),
+  그리고 <code>app-navigation.ts</code> 의 하드코딩 상수(테스트가 단언) 세 곳으로 흩어져 있다.
+  진짜 화이트라벨을 하려면 세 번째를 i18n 키로 빼고 관련 테스트 두 개를 함께 고쳐야 한다.</p>
+</div>
+</section>
+
+<!-- ==================== GAP ==================== -->
+<section id="gap">
+<h2><span class="num">부록</span>확인하지 못한 것</h2>
+<ul>
+  <li><strong>업스트림 CI 실행 결과와 대조하지 못했다.</strong> 포크 CI 를 돌리려면 gh 토큰의 <code>workflow</code> 스코프가 필요한데 이 환경에서 얻지 못했다(FORK.md 3-1).</li>
+  <li><strong><code>apps/</code> 네이티브 앱을 빌드해 보지 않았다.</strong> 스택 판정은 빌드 파일(<code>Package.swift</code> &middot; <code>build.gradle.kts</code> &middot; <code>Cargo.toml</code> &middot; <code>project.yml</code>) 근거이고, Xcode &middot; Android SDK &middot; Rust 툴체인이 이 PC 에 없어 실제 빌드는 못 했다.</li>
+  <li><strong><code>extensions/</code> 153개 전부를 실행해 보지 않았다.</strong> 분류는 매니페스트와 <code>api.register*</code> 호출 근거이고, 실제 로드해 확인한 것은 로컬 인스턴스의 16개다.</li>
+  <li>Docker 레이어 breakdown 은 <code>docker history</code> 요약이라 압축 전후 &middot; 공유 레이어를 정밀 분해한 것은 아니다. 합계 4.37GB 와 <code>node_modules</code> 2.65GB 는 그대로 실측값이다.</li>
+</ul>
+
+<div class="src">
+<b>근거 파일 (주요)</b>
+<code>package.json</code> &middot; <code>pnpm-workspace.yaml</code> &middot; <code>openclaw.mjs</code> &middot; <code>Dockerfile</code> &middot; <code>docker-compose.yml</code> &middot;
+<code>src/gateway/{server.ts, server-http.ts, server-runtime-state.ts, gateway-http-route-contracts.ts, server-methods-list.ts, control-ui.ts, control-ui-static.ts}</code> &middot;
+<code>src/config/{paths.ts, types.agents.ts, types.memory.ts, io.load.ts, includes.ts}</code> &middot;
+<code>src/state/{openclaw-state-schema.sql, openclaw-agent-schema.sql, openclaw-state-db.ts, openclaw-state-db-contract.ts, openclaw-agent-db-contract.ts}</code> &middot;
+<code>src/infra/{node-sqlite.ts, kysely-sync.ts, ed25519-signature.ts, device-identity-store.ts, control-ui-assets.ts, clawhub-client.ts}</code> &middot;
+<code>src/agents/harness/{registry.ts, builtin-openclaw.ts, types.ts}</code> &middot;
+<code>src/channels/plugins/types.plugin.ts</code> &middot; <code>src/plugins/{plugin-api.types.ts, provider-plugin.types.ts, manifest.ts}</code> &middot;
+<code>src/plugin-sdk/{core.ts, plugin-entry.ts}</code> &middot; <code>src/skills/{types.ts, loading/*}</code> &middot; <code>src/hooks/{internal-hooks.ts, internal-hook-types.ts, types.ts, loader.ts}</code> &middot;
+<code>ui/{package.json, index.html, vite.config.ts}</code> &middot; <code>ui/src/{api/gateway.ts, i18n/lib/registry.ts, app/theme.ts, styles/base.css}</code> &middot;
+<code>packages/gateway-protocol/src/version.ts</code> &middot; <code>packages/memory-host-sdk/src/host/{sqlite-vec.ts, memory-schema-fts.ts}</code> &middot;
+<code>packages/plugin-package-contract/src/index.ts</code> &middot; <code>scripts/{build-all.mts, check.mts, test-projects.mts, ui.mts}</code> &middot; <code>.github/workflows/ci.yml</code>
+<br><b>실측 명령</b>
+<code>find src -name "*.ts" | wc -l</code> &middot; <code>ls -d extensions/*/ | wc -l</code> &middot; <code>grep -c "^CREATE TABLE" src/state/*.sql</code> &middot;
+<code>node -e "new DatabaseSync(...).prepare('select ... from sqlite_master')"</code> &middot; <code>ps -eo pid,rss,cmd --sort=-rss</code> &middot;
+<code>du -sh</code> &middot; <code>docker images</code> &middot; <code>docker history openclaw-chris:local</code>
+</div>
+</section>
+
+<footer class="doc">
+  OpenClaw 코드베이스 구조 &middot; 포크 necromman/openclaw @ chris/main &middot; 업스트림 v2026.9.2 &middot; 작성 2026-09-06 (KST)<br>
+  마크다운 정본: <code>chris-local/CODEBASE.md</code> &middot; 운영 정본: <code>FORK.md</code>
+</footer>
+
+</div>
+</body>
+</html>
