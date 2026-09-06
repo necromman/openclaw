@@ -505,6 +505,44 @@ describe("buildGatewayCronService", () => {
     });
   });
 
+  it("finishes an accepted config replacement without a second reconciliation request", async () => {
+    const cfg = {
+      ...createCronConfig("server-cron-accepted-replacement"),
+      agents: { entries: { main: { heartbeat: { every: "1h" } } } },
+    } satisfies OpenClawConfig;
+    const state = loadCronService(cfg);
+    const inventoryStarted = createDeferred();
+    const releaseInventory = createDeferred();
+    const listJobs = state.cron.list.bind(state.cron);
+    try {
+      await state.reconcileSystemJobs();
+      vi.spyOn(state.cron, "list").mockImplementationOnce(async (options) => {
+        inventoryStarted.resolve();
+        await releaseInventory.promise;
+        return await listJobs(options);
+      });
+      const reconcile = state.reconcileSystemJobs();
+      await inventoryStarted.promise;
+      loadConfigMock.mockReturnValue({
+        ...cfg,
+        agents: { entries: { main: { heartbeat: { every: "2h" } } } },
+      });
+      releaseInventory.resolve();
+      await expect(reconcile).resolves.toBe("converged");
+      expect(await listJobs({ includeDisabled: true })).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            payload: { kind: "heartbeat" },
+            schedule: expect.objectContaining({ everyMs: 7_200_000 }),
+          }),
+        ]),
+      );
+    } finally {
+      releaseInventory.resolve();
+      state.cron.stop();
+    }
+  });
+
   it.each([
     { monitor: "heartbeat", blockedInventory: 1 },
     { monitor: "skill review", blockedInventory: 2 },
@@ -522,7 +560,7 @@ describe("buildGatewayCronService", () => {
       const state = loadCronService(autoConfig);
 
       try {
-        await expect(state.reconcileSystemJobs(autoConfig)).resolves.toBe("converged");
+        await expect(state.reconcileSystemJobs()).resolves.toBe("converged");
         const inventoryStarted = createDeferred();
         const releaseInventory = createDeferred();
         const listJobs = state.cron.list.bind(state.cron);
@@ -538,9 +576,11 @@ describe("buildGatewayCronService", () => {
         const addJob = vi.spyOn(state.cron, "add");
         const removeJob = vi.spyOn(state.cron, "remove");
 
-        const disable = state.reconcileSystemJobs(offConfig);
+        loadConfigMock.mockReturnValue(offConfig);
+        const disable = state.reconcileSystemJobs();
         await inventoryStarted.promise;
-        const reenable = state.reconcileSystemJobs(autoConfig);
+        loadConfigMock.mockReturnValue(autoConfig);
+        const reenable = state.reconcileSystemJobs();
         releaseInventory.resolve();
 
         await expect(disable).resolves.toBe("superseded");
@@ -569,7 +609,7 @@ describe("buildGatewayCronService", () => {
       .mockRejectedValueOnce(new Error("inventory failed"));
 
     try {
-      await expect(state.reconcileSystemJobs(cfg)).resolves.toBe("retry-scheduled");
+      await expect(state.reconcileSystemJobs()).resolves.toBe("retry-scheduled");
       expect(await listJobs({ includeDisabled: true })).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ enabled: true, payload: { kind: "skillCollectionReview" } }),
