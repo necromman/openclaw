@@ -181,24 +181,57 @@ function readRequestMeta(req: IncomingMessage, clientIp: string | undefined): Ix
   };
 }
 
+function readFirstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/**
+ * Reject a request whose browser origin is not allowed.
+ *
+ * Chrome omits `Origin` on same-origin GET requests, so demanding the header outright
+ * would reject the very session probe the Control UI makes on every load. The gateway's
+ * established rule applies instead: no Origin is acceptable only when the browser
+ * declares `Sec-Fetch-Site: same-origin`, which a cross-site caller cannot forge.
+ */
+export function isAllowedIxAuthBrowserOrigin(params: {
+  origin?: string;
+  fetchSite?: string;
+  requestHost?: string;
+  allowedOrigins?: string[];
+  allowHostHeaderOriginFallback?: boolean;
+  isLocalClient: boolean;
+}): boolean {
+  const origin = params.origin?.trim();
+  if (!origin) {
+    const fetchSite = params.fetchSite?.trim().toLowerCase();
+    // "same-origin" is set by the browser and cannot be forged by a cross-site page.
+    // "none" is a user-initiated navigation such as typing the address, which is not
+    // an attacker-controlled context either.
+    return fetchSite === "same-origin" || fetchSite === "none";
+  }
+  return checkBrowserOrigin({
+    requestHost: params.requestHost,
+    origin,
+    allowedOrigins: params.allowedOrigins,
+    allowHostHeaderOriginFallback: params.allowHostHeaderOriginFallback,
+    isLocalClient: params.isLocalClient,
+  }).ok;
+}
+
 function rejectDisallowedOrigin(params: {
   req: IncomingMessage;
   res: ServerResponse;
   deps: IxAuthHttpDependencies;
 }): boolean {
-  const origin = params.req.headers.origin;
-  // A same-origin navigation may omit Origin; a cross-site fetch may not. Requiring the
-  // header on state-changing routes is what makes the check meaningful.
-  const result = checkBrowserOrigin({
-    requestHost: Array.isArray(params.req.headers.host)
-      ? params.req.headers.host[0]
-      : params.req.headers.host,
-    origin: Array.isArray(origin) ? origin[0] : origin,
+  const allowed = isAllowedIxAuthBrowserOrigin({
+    origin: readFirstHeaderValue(params.req.headers.origin),
+    fetchSite: readFirstHeaderValue(params.req.headers["sec-fetch-site"]),
+    requestHost: readFirstHeaderValue(params.req.headers.host),
     allowedOrigins: params.deps.allowedOrigins,
     allowHostHeaderOriginFallback: params.deps.allowHostHeaderOriginFallback,
     isLocalClient: params.deps.isLocalClient,
   });
-  if (result.ok) {
+  if (allowed) {
     return false;
   }
   sendJson(params.res, 403, { error: "origin_not_allowed" });

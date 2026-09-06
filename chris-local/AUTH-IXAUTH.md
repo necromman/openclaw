@@ -1,0 +1,322 @@
+# IX-Auth 연동 정본
+
+> 이 문서가 포크의 `gateway.auth.mode: "ix-auth"` 정본이다.\
+> 채택 근거와 자체 구현안 대비 비교는 [AUTH-IXAUTH-OPTION.md](AUTH-IXAUTH-OPTION.md),\
+> 폐기된 자체 구현 계획은 [AUTH-PLAN.md](AUTH-PLAN.md) 의 부록에 있다.\
+> 벤더 트리 취급은 [ix-auth/VENDOR.md](../ix-auth/VENDOR.md), 수정 가능 범위는 [ix-auth/MODULE.md](../ix-auth/MODULE.md).
+>
+> 작성 2026-09-07 (KST, 일요일). 구현 범위 = 계획 v2 의 M1'.
+
+---
+
+## 1. 한 문단 요약
+
+게이트웨이가 **BFF** 가 되어 브라우저의 로그인을 IX-Auth 로 중계한다. 브라우저에는 불투명 세션 쿠키 하나만 나가고, IX-Auth 의 access/refresh 토큰은 게이트웨이 프로세스 밖으로 나가지 않는다. 매 요청·매 WS 핸드셰이크의 신원 확인은 **JWKS 공개키로 로컬 검증**하므로 신원 서버를 호출하지 않는다. 로그인한 사람은 기기 페어링도 게이트웨이 토큰도 없이 어느 PC 에서든 들어온다.
+
+## 2. 구조
+
+```text
+       브라우저
+          |  (1) POST /auth/login  {email, password}
+          |  (5) Set-Cookie: 세션(HttpOnly) + CSRF(스크립트 가독)
+          v
+ +---------------------------------------------+
+ |  OpenClaw Gateway  =  BFF                    |
+ |                                              |
+ |  [HTTP 비 admitted stage]   [WS upgrade]      |
+ |   /auth/login                쿠키 -> 세션 행   |
+ |   /auth/mfa                  -> JWKS 로컬 검증 |
+ |   /auth/logout               -> 신원·역할 주입 |
+ |   /auth/refresh              -> device 면제    |
+ |   /auth/me                   -> 기기토큰 미발급|
+ |            |                        |         |
+ |            +----------+-------------+         |
+ |                       v                       |
+ |            ix_auth_login_sessions (SQLite)    |
+ |            digest 만 저장 + refresh token      |
+ |                       |                       |
+ |            user_profiles (기존) / gateway.roles|
+ +-----------------------|----------------------+
+       (2) X-IxAuth-Key  |  (4) accessToken + refreshToken
+       (3) 자격 검증      v
+            +--------------------------+
+            | IX-Auth (외부 미노출)      |
+            |  계정·비밀번호·2FA·잠금    |
+            |  /admin-ui 관리 콘솔       |
+            +------------+-------------+
+                         v
+                   PostgreSQL 16
+```
+
+## 3. 시퀀스
+
+### 3.1 로그인
+
+```text
+1. 브라우저 -> POST /auth/login {email, password}   (Origin 검사, IP 레이트리밋)
+2. 게이트웨이 -> IX-Auth POST /auth/login
+      X-IxAuth-Key: <service key>
+      body 에 실방문자 ip·userAgent 를 함께 넘긴다
+3. 2단계 인증이 켜진 계정이면 401 AUTH_MFA_REQUIRED + challenge
+      -> 게이트웨이가 {mfaRequired:true, challenge} 로 응답, 브라우저는 코드 화면
+      -> POST /auth/mfa {challenge, code} 로 이어간다
+4. 성공하면 accessToken(JWT, 15분) + refreshToken(불투명, 7일)
+5. 게이트웨이가 accessToken 을 JWKS 로 로컬 검증
+      -> 검증된 email 로 user_profiles 확정 (ensureProfileForEmail)
+      -> ix_auth_login_sessions 에 새 행 (세션 ID 는 항상 신규 = 세션 고정 방지)
+      -> 저장하는 것: 세션 토큰 digest, CSRF digest, access/refresh 토큰, 만료 3종
+6. Set-Cookie 2개
+      <name>       = 불투명 세션 토큰   HttpOnly Secure SameSite=Lax Path=/
+      <name>-csrf  = CSRF 토큰          Secure SameSite=Lax Path=/  (스크립트 가독)
+7. 응답 본문에 user{profileId,email,displayName,roles,groups} + csrfToken
+```
+
+### 3.2 요청·핸드셰이크 인가
+
+```text
+[HTTP]  요청 -> 쿠키 -> ix_auth_login_sessions 조회(digest)
+            -> revoked / idle 만료 / absolute 만료 검사
+            -> access 만료 60초 전이면 IX-Auth /auth/refresh 로 회전
+               (회전된 refresh 토큰을 반드시 저장. 구 토큰 재사용은 절도로 간주돼
+                그 사용자의 모든 세션이 폐기된다)
+            -> accessToken JWKS 로컬 검증 -> 클레임 파싱
+            -> IxAuthPrincipal 생성 (요청 본문·헤더로는 절대 생성 불가)
+            -> 변경 요청이면 Origin 검사 + x-openclaw-csrf 헤더를 세션 digest 와 대조
+
+[WS upgrade]  auth-context.ts resolveConnectAuthState 가 req 를 이미 받는다
+            -> 같은 쿠키 검증을 touch=false 로 수행 (핸드셰이크가 유휴 창을 밀지 않는다)
+            -> authResult { ok, method:"ix-auth", user: email }
+[WS connect]  connect-policy.ts   isControlUi && (trustedProxyAuthOk || ixAuthOk) => device 면제
+              connect-device-tokens.ts  !trustedProxyAuthOk && !ixAuthOk => 기기 토큰 미발급
+              connect-user-profile.ts   boundProfileId 로 로그인 때 확정한 프로필에 직결
+              connect-auth.ts    브라우저 자기 선언 스코프를 버리고 역할 상한만 적용
+```
+
+### 3.3 로그아웃
+
+```text
+POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
+  -> ix_auth_login_sessions.revoked_at 기록  = 즉시 무효
+  -> IX-Auth /auth/logout 으로 refresh 토큰 폐기 (best effort)
+  -> 쿠키 2개 만료
+  -> UI 는 전체 리로드로 이전 사용자의 캐시·구독을 통째로 버린다
+```
+
+**즉시성이 여기서 나온다.** access token 은 15분짜리라 로컬 검증만으로는 무효화할 수 없다. 게이트웨이가 세션 행을 갖고 있기 때문에 로그아웃·정지가 다음 요청부터 바로 먹는다.
+
+## 4. 설정 키
+
+```json5
+{
+  gateway: {
+    mode: "local",
+    auth: {
+      mode: "ix-auth",
+      ixAuth: {
+        baseUrl: "http://ix-auth:9100",          // 내부망 주소. 브라우저는 모른다
+        jwksUrl: "...",                          // 생략 시 <baseUrl>/.well-known/jwks.json
+        serviceKey: "<SecretRef 또는 평문>",       // X-IxAuth-Key
+        issuer: "https://gateway.example",       // IX-Auth 의 IXAUTH_JWT_ISSUER 와 정확히 같아야 한다
+        audience: "openclaw",                    // IXAUTH_JWT_AUDIENCE 와 같아야 한다
+        cookieName: "__Host-openclaw-session",   // 기본값
+        adminConsoleUrl: "https://ixauth-admin.example/admin-ui",
+        roleMap: { SUPERADMIN: "superadmin", ADMIN: "admin", MODERATOR: "moderator", MEMBER: "member" },
+        superAdminRoles: ["superadmin"],
+        departmentClaim: "ixauth_groups",        // 기본값
+        departmentGroupPrefix: "dept-",          // 기본값
+        session: { idleTimeoutMinutes: 30, absoluteTimeoutHours: 12 },
+      },
+    },
+    roles: {
+      default: "member",
+      definitions: {
+        superadmin: { sessions: { others: "write" }, agents: "*", scopes: ["operator.admin"] },
+        admin:      { sessions: { others: "write" }, agents: "*", scopes: ["operator.read","operator.write","operator.approvals","operator.questions"] },
+        moderator:  { sessions: { others: "suggest" }, agents: "*", scopes: ["operator.read","operator.write","operator.approvals","operator.questions"] },
+        member:     { sessions: { others: "view" }, agents: "*", scopes: ["operator.read","operator.write","operator.questions"] },
+      },
+    },
+  },
+  tools: { sessions: { visibility: "self" } },
+}
+```
+
+**함정 3개** (전부 로컬 검증에서 실측으로 드러났다):
+
+| 함정 | 증상 | 해결 |
+| --- | --- | --- |
+| `issuer` / `audience` 불일치 | 로그인은 200 인데 곧바로 세션이 죽는다 | 게이트웨이 설정과 `IXAUTH_JWT_ISSUER`/`IXAUTH_JWT_AUDIENCE` 를 글자 그대로 맞춘다 |
+| `gateway.mode` 누락 | `Gateway start blocked: existing config is missing gateway.mode` | `"mode": "local"` 을 넣는다 |
+| `roles.definitions.<role>.agents` 누락 | `gateway.roles.definitions.admin.agents: Invalid input` | 각 역할에 `agents` 를 명시한다(`"*"` 또는 에이전트 ID 배열) |
+
+`gateway.auth.token` 과 상호배타다. 둘 다 있으면 기동을 거부한다 - 공유 비밀이 있으면 1인 로그인을 우회하는 길이 생기기 때문이다.
+
+## 5. 역할 매핑표
+
+| IX-Auth 역할 코드 | 게이트웨이 역할 | 세션 타인 열람 | 스코프 | 관리 콘솔 링크 |
+| --- | --- | --- | --- | --- |
+| `SUPERADMIN` | `superadmin` | write | `operator.admin` | 보인다 |
+| `ADMIN` | `admin` | write | read, write, approvals, questions | 보인다 |
+| `MODERATOR` | `moderator` | suggest | read, write, approvals, questions | 안 보인다 |
+| `MEMBER` | `member` | view | read, write, questions | 안 보인다 |
+| 매핑 없음 | (없음) | `gateway.roles.default` 적용 | 그 역할의 상한 | 안 보인다 |
+
+규칙:
+
+- **여러 역할을 가지면 가장 높은 것**을 취한다(superadmin > admin > moderator > member). 매핑 목록에 없는 이름은 모든 알려진 이름보다 낮게 정렬된다.
+- **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
+- 관리 콘솔 링크는 `superadmin`·`admin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다.
+- 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. **이번 단계는 매핑 데이터만 준비하고 강제하지 않는다** (6절).
+
+## 6. 이번 단계에서 하지 않은 것
+
+| 항목 | 상태 | 다음 단계 조건 |
+| --- | --- | --- |
+| 부서 접근 강제(`department-access`) | **미구현.** 부서 코드는 principal 까지만 온다 | 아래 6.1 |
+| `departments` / `department_agents` 테이블 | 미구현 | 6.1 |
+| 세션 목록·이벤트·`agents.list` 부서 필터 | 미구현 | 6.1 |
+| 초대장 가입 플로우 화면 3개 | 미구현 | 6.2 |
+| 포크 감사 원장 해시 체인 | 미구현. 인증 사건은 IX-Auth 원장에 남는다 | 6.3 |
+| TOTP 등록 화면 | 미구현. 로그인 시 코드 입력 단계는 구현했다 | IX-Auth 콘솔에서 등록 |
+
+**대신 지금 넣은 완화책**: `tools.sessions.visibility` 를 이 모드의 배포 설정에서 `"self"` 로 좁혀 둔다. 부서 강제가 없는 동안 모델의 sessions 도구가 남의 세션을 훑지 못하게 하는 최소 방어다.
+
+### 6.1 부서 강제 진입 조건
+
+1. 부서 코드 체계 확정(`dept-<slug>` 규칙, 부서 목록의 정본이 IX-Auth 그룹인지 포크 DB 인지).
+2. `departments` / `department_agents` 스키마 승인 - AGENTS.md 가 SQLite 스키마 변경에 명시 승인을 요구한다.
+3. AUTH-PLAN 3.2 "인가·부서 경계" 훅 10곳의 회귀 테스트 계획.
+
+### 6.2 초대장 가입 진입 조건
+
+1. SMTP 확정. 없으면 `IXAUTH_MAIL_TRANSPORT=LOG` 로 링크를 로그에서 꺼내는 운영이 된다.
+2. `IXAUTH_ACCOUNT_SIGNUP_MODE` 를 `APPROVAL` 로 올릴지 `CLOSED` + 초대장만 쓸지 결정.
+3. 포크가 `/reset-password`, `/accept-invite`, `/verify-email` 도착 화면 3개를 만든다(로직 없는 토큰 중계).
+
+### 6.3 감사 원장 진입 조건
+
+인증 사건은 이미 IX-Auth 원장(append-only, CSV 내보내기)에 있다. 포크 원장이 필요한 것은 세션 열람·설정 변경·부서 거부이고, 그것은 6.1 이 선행돼야 의미가 생긴다.
+
+## 7. 운영 절차
+
+### 7.1 최초 기동
+
+```bash
+cp chris-local/ixauth.env.example chris-local/ixauth.env   # 시크릿 채우기
+docker compose --env-file chris-local/ixauth.env \
+  -f chris-local/docker-compose.ixauth.yml up -d
+```
+
+`IXAUTH_ADMIN_EMAIL` / `IXAUTH_ADMIN_PASSWORD` 로 최초 관리자 1명이 **첫 부팅에만** 시드된다. 첫 로그인 후 비밀번호를 바꾼다.
+
+### 7.2 사용자 추가
+
+관리 콘솔(`/admin-ui`)에서 한다. 포크에는 사용자 관리 화면이 없다.
+
+기본 역할은 `ADMIN` 과 `USER` 둘뿐이다. `roleMap` 이 기대하는 `MEMBER`·`MODERATOR`·`SUPERADMIN` 은 콘솔에서 만들거나, `roleMap` 을 IX-Auth 의 실제 역할 코드에 맞춘다. **둘 중 하나를 반드시 해야 한다** - 매핑되지 않은 사용자는 `gateway.roles.default` 로 떨어진다.
+
+### 7.3 즉시 차단
+
+| 하고 싶은 것 | 방법 | 반영 시점 |
+| --- | --- | --- |
+| 한 사람을 지금 끊기 | 콘솔에서 `status=DISABLED` 또는 세션 종료 | 게이트웨이의 다음 갱신(최대 15분) 또는 즉시 재검증 시 |
+| 확실히 지금 끊기 | 위 + 게이트웨이에서 해당 프로필 세션 폐기 | 즉시 |
+| 역할 변경 반영 | 콘솔에서 역할 변경 + 세션 종료 | 세션 종료가 갱신 실패를 만들어 WS 가 끊긴다 |
+
+역할 변경을 세션 종료 없이 하면 **최대 15분** 늦게 반영된다. 이것은 로컬 검증의 대가이고 계약 문구에 넣어야 한다.
+
+### 7.4 진단
+
+| 증상 | 확인 |
+| --- | --- |
+| 로그인 화면이 안 뜨고 토큰 입력 화면이 뜬다 | `GET /auth/me` 가 `{"authMode":"ix-auth"}` 를 주는지. 아니면 모드가 안 켜진 것 |
+| 로그인 200 인데 바로 로그아웃된다 | `issuer`/`audience` 불일치. 게이트웨이 로그에서 `identity-claims-invalid` |
+| 로그인은 되는데 WS 가 안 붙는다 | `gateway.controlUi.allowedOrigins` 와 실제 Origin |
+| 반복 실패 후 계속 429 | 게이트웨이 IP 리미터(기본 5분) 또는 IX-Auth 분당 10회 리미터 |
+| 쿠키가 아예 안 저장된다 | HTTPS 도 루프백도 아닌 접근. `__Host-` 쿠키는 그런 곳에 저장되지 않는다 |
+
+## 8. 되돌리기
+
+```text
+1. gateway.auth.mode 를 "token" 또는 "trusted-proxy" 로 되돌리고
+   gateway.auth.ixAuth 블록을 제거한다. gateway.auth.token 을 다시 넣는다
+2. 게이트웨이 재시작
+3. ix_auth_login_sessions 는 남겨 둔다 (구버전은 모르는 테이블을 무시한다)
+   - 남은 행이 신경 쓰이면 revoked_at 을 채운다. DROP 은 하지 않는다
+4. IX-Auth 컨테이너와 PostgreSQL 은 정지만 한다. 계정 데이터는 보존한다
+5. 브라우저는 쿠키가 무의미해지므로 다음 접속에서 토큰 화면으로 떨어진다
+```
+
+**금지**: `ix_auth_login_sessions` DROP, IX-Auth DB 삭제. 되돌린 뒤 다시 켤 때 계정을 처음부터 만들게 된다.
+
+벤더 트리 자체를 걷어내는 절차는 [ix-auth/VENDOR.md](../ix-auth/VENDOR.md) 6절.
+
+## 9. 파일 지도
+
+### 9.1 신규
+
+| 경로 | 역할 |
+| --- | --- |
+| `src/auth/ix-auth/ix-auth-types.ts` | `IxAuthPrincipal` 등 닫힌 계약과 기본값 상수 |
+| `src/auth/ix-auth/ix-auth-claims.ts` | 클레임 파싱·검증, 부서 코드 추출 |
+| `src/auth/ix-auth/ix-auth-jwks.ts` | JWKS 캐시 + RS256/ES256 로컬 검증 (`node:crypto` 만) |
+| `src/auth/ix-auth/ix-auth-client.ts` | IX-Auth `/auth/*` 중계. 서비스 키·실방문자 IP 전달 |
+| `src/auth/ix-auth/ix-auth-role-map.ts` | 역할 코드 -> 게이트웨이 역할, 관리 콘솔 노출 판정 |
+| `src/auth/ix-auth/ix-auth-sessions.ts` | 세션 발급·검증·갱신·폐기 |
+| `src/auth/ix-auth/ix-auth-settings.ts` | 설정 해석·기본값·서비스 키 캐시 |
+| `src/state/ix-auth-sessions-schema.ts` | feature-local DDL (`user_profiles` 와 같은 방식) |
+| `src/state/ix-auth-sessions-store.ts` | Kysely 행 접근 |
+| `src/gateway/cookie-header.ts` | 쿠키 파서·직렬화·보안 컨텍스트 판정 (승격본) |
+| `src/gateway/ix-auth-http.ts` | `/auth/*` 핸들러 |
+| `src/gateway/ix-auth-http-paths.ts` | 경로 분류 |
+| `src/gateway/ix-auth-principal.ts` | 요청·핸드셰이크 -> principal |
+| `ui/src/features/ix-auth/ix-auth-session-api.ts` | Control UI 클라이언트 |
+| `ui/src/features/ix-auth/ix-auth-form-state.ts` | 로그인 폼 상태 |
+| `ui/src/components/ix-auth-login.ts` | 로그인 화면 (지연 로드) |
+| `ui/src/pages/connection/ix-auth-account-section.ts` | 계정 표시·로그아웃·콘솔 링크 |
+| `ui/src/i18n/locales/en-ix-auth.ts` | i18n 카탈로그 |
+| `chris-local/docker-compose.ixauth.yml` | 배포 정의 |
+| `chris-local/ixauth-verify.sh` | 로컬 검증 스택 |
+
+### 9.2 수정 (훅 지점만)
+
+| 경로 | 훅 |
+| --- | --- |
+| `src/config/types.gateway.ts` | 모드 유니온 + `GatewayIxAuthConfig` |
+| `src/config/zod-schema.gateway.ts` | 모드 리터럴 + `ixAuth` strictObject |
+| `src/gateway/auth-resolve.ts` | 모드 유니온·병합 키·Tailscale 비활성 |
+| `src/gateway/auth.ts` | method 유니온, 상호배타 검증, HTTP 인가 분기 |
+| `src/gateway/server-http.ts` | `/auth/*` 를 비 admitted stage 로 등록 |
+| `src/gateway/server/ws-connection/auth-context.ts` | 쿠키 -> principal |
+| `src/gateway/server/ws-connection/connect-auth.ts` | `ixAuthOk` 계산·전달 |
+| `src/gateway/server/ws-connection/connect-policy.ts` | device 면제 + 선언 스코프 폐기 |
+| `src/gateway/server/ws-connection/connect-device-tokens.ts` | 기기 토큰 미발급 |
+| `src/gateway/server/ws-connection/connect-user-profile.ts` | `boundProfileId` |
+| `src/gateway/server/ws-connection/connect-session.ts` | principal 전달 |
+| `src/gateway/server/ws-connection/message-handler-types.ts` | 상태 필드 2개 |
+| `packages/gateway-protocol/src/schema/snapshot.ts` | `authMode` 유니온 |
+| `ui/src/app/app-root.ts` | 세션 부트스트랩 + 로그인 화면 분기 |
+| `ui/src/app/lazy-custom-element.ts` | 로그인 화면 지연 로드 등록 |
+| `ui/src/api/gateway.ts` | 기기 토큰 저장 억제 |
+| `ui/src/pages/connection/view.ts`·`connection-page.ts` | 계정 블록·로그아웃 |
+| `ui/src/i18n/locales/en.ts`·`scripts/lib/control-ui-i18n-catalog.ts` | 카탈로그 등록 |
+
+## 10. 보안 체크리스트 대비표
+
+| 항목 | 구현 위치 | 테스트 |
+| --- | --- | --- |
+| 비밀번호 저장·해시 | **IX-Auth** (bcrypt, 정책·재해싱 포함) | 제품 자체 적합성 검사 |
+| 이메일 열거 방지 | `ix-auth-http.ts` `IX_AUTH_INVALID_CREDENTIALS` 단일 응답 | 라이브 1·2 (본문·상태 동일) |
+| 무차별 대입 | 게이트웨이 IP 리미터 + IX-Auth 분당·계정 잠금 | 라이브 5 |
+| CSRF | `ix-auth-http.ts` Origin 검사 + 세션 결합 토큰 digest 대조 | 라이브 4 |
+| 세션 고정 | `persistIxAuthLoginSession` 이 항상 새 ID 발급 | `ix-auth-sessions-store.test.ts` |
+| 쿠키 속성 | `cookie-header.ts` `serializeGatewaySetCookie` (`__Host-` 강제) | `cookie-header.test.ts` |
+| 세션 만료 | idle 30분 / absolute 12시간, 서버가 판정 | `ix-auth-sessions-store.test.ts` |
+| WS Origin | 기존 `checkGatewayWsBrowserOrigin` 유지 | 기존 회귀 |
+| 기기 토큰 우회 차단 | `connect-device-tokens.ts` + `ui/src/api/gateway.ts` | `connect-policy.ix-auth.test.ts` |
+| 자기 선언 스코프 불신 | `connect-policy.ts` `shouldClearUnboundScopes...` | `connect-policy.ix-auth.test.ts` |
+| 권한 상승 차단 | `superAdminRoles` 이중 조건 | `ix-auth-role-map.test.ts` |
+| 토큰 위조·알고리즘 강등 | `ix-auth-jwks.ts` (alg 화이트리스트, kid 필수) | `ix-auth-jwks.test.ts` |
+| 발급자·대상 위조 | `ix-auth-claims.ts` iss/aud 대조 | `ix-auth-claims.test.ts` |
+| 로그 비밀 배제 | 감사 이벤트에 토큰·비밀번호를 싣지 않는다 | 코드 리뷰 |
+| 부서 누출 | **미구현** (6.1) | - |
