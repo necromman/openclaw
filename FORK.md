@@ -206,38 +206,44 @@ Error: ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED
 
 이 PC 의 Windows Node 는 **v24.12.0** 이라 `>=24.15.0` 조건에 미달한다. 즉 툴체인 문제가 아니라 **Node 버전 하나** 때문이고, Windows 에 Node 24.15+ 를 올리면 풀린다. 지금은 시스템 Node 를 건드리지 않기로 하고 **WSL 레인을 정본으로 확정**했다. `D:\PROJECT\openclaw` 는 편집·git 전용으로 쓴다 (`node_modules` 불필요).
 
-### 6-3. WSL VM 유휴 종료 (해결됨)
+### 6-3. WSL 유휴 종료로 게이트웨이가 죽는 문제 (해결됨)
 
-**증상이었던 것.** WSL2 는 실행 중인 세션이 없으면 유틸리티 VM 을 내린다. 그러면 systemd user 매니저째로 내려가 `loginctl enable-linger` 를 켜 놨어도 게이트웨이가 같이 죽었다. "방금 200 이던 `http://127.0.0.1:18789/` 가 갑자기 ECONNREFUSED" 가 그것이다.
+**증상.** 세션이 없으면 WSL2 가 배포판을 내린다. 그러면 systemd user 매니저째로 내려가 `loginctl enable-linger` 를 켜 놨어도 게이트웨이가 같이 죽는다. "방금 200 이던 `http://127.0.0.1:18789/` 가 갑자기 ECONNREFUSED" 가 그것이다.
 
-**영구 조치 (적용 완료).** `%USERPROFILE%\.wslconfig` 에 유틸리티 VM 을 안 내리게 박았다.
+**먼저 시도했고 그것만으로는 안 됐던 것.** `%USERPROFILE%\.wslconfig` 에 다음을 넣고 `wsl --shutdown` 으로 적용했다.
 
 ```ini
 [wsl2]
 vmIdleTimeout=-1
 ```
 
-적용에는 `wsl --shutdown` 이 필요하다(WSL2 전체가 내려가므로 Docker Desktop 도 함께 재기동된다. 빌드·테스트가 안 돌 때 하라).
+이것만 걸고 **WSL 세션 없이 16분** 둔 뒤 확인했더니 `wsl -l -v` 가 `Ubuntu  Stopped` 였고 Control UI 는 연결 거부였다. `vmIdleTimeout` 은 유틸리티 VM 쪽 설정이라 **배포판 자체가 내려가는 것은 막지 못했다**(이 PC 실측). 설정 자체는 해가 없어 그대로 두었지만, **이것만 믿으면 안 된다.**
 
-**부팅/로그온 시 자동 기동.** WSL systemd 는 배포판에 첫 세션이 들어올 때 시작되므로, 로그온 때 WSL 을 한 번 깨워 주는 작업을 Windows 작업 스케줄러에 등록했다. 깨우기만 하면 linger 덕에 `openclaw-local.service` 와 `openclaw-auto-deploy.timer` 가 알아서 올라온다(상주 프로세스가 필요 없다).
+**실제로 통하는 조치: Windows 작업 스케줄러가 WSL 세션을 하나 붙잡는다.** Claude/터미널 세션에 묶이지 않으므로 그 세션이 끝나도 살아남는다.
 
 ```powershell
-# 등록 (재현용). 이미 'WakeWSL-OpenClaw' 이름으로 등록돼 있다.
-$act = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument '-d Ubuntu -- true'
-$trg = New-ScheduledTaskTrigger -AtLogOn
+$act = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument '-d Ubuntu -- sleep infinity'
+$t1  = New-ScheduledTaskTrigger -AtLogOn
 $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-        -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
-Register-ScheduledTask -TaskName 'WakeWSL-OpenClaw' -Action $act -Trigger $trg -Settings $set `
-  -Description 'Wake WSL Ubuntu at logon so the OpenClaw fork gateway (systemd user service) starts.' -Force
-
-# 확인 / 해제
-Get-ScheduledTask -TaskName 'WakeWSL-OpenClaw'
-Unregister-ScheduledTask -TaskName 'WakeWSL-OpenClaw' -Confirm:$false
+        -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 `
+        -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName 'OpenClawWSLKeepalive' -Action $act -Trigger $t1 -Settings $set -Force
+Start-ScheduledTask -TaskName 'OpenClawWSLKeepalive'     # 지금 즉시 살리기
 ```
 
-**실측.** `wsl --shutdown` 으로 두 배포판을 내린 뒤 `wsl -d Ubuntu -- true` 한 번(즉시 종료되는 비대화 호출)만으로 `openclaw-local.service` = active, `openclaw-auto-deploy.timer` = enabled + active 로 자동 복귀했고 Control UI 가 HTTP 200 을 냈다. 그 뒤 **WSL 세션을 하나도 열어 두지 않은 채 16분을 두고** Windows 에서 한 번 확인했을 때도 **HTTP 200** 이었다(예전이라면 VM 이 내려가 ECONNREFUSED 가 났을 구간).
+`-ExecutionTimeLimit ([TimeSpan]::Zero)` 가 중요하다. 기본값(3일)이면 사흘 뒤 작업이 강제 종료돼 같은 증상이 돌아온다.
 
-상주 `sleep infinity` 프로세스는 **더 이상 쓰지 않는다.** 세션에 묶여 있어 세션이 끝나면 같이 사라지기 때문에 임시방편이었다.
+확인 / 중지:
+
+```powershell
+(Get-ScheduledTask -TaskName 'OpenClawWSLKeepalive').State   # Running 이어야 한다
+Stop-ScheduledTask  -TaskName 'OpenClawWSLKeepalive'
+Unregister-ScheduledTask -TaskName 'OpenClawWSLKeepalive' -Confirm:$false
+```
+
+**로그온 시 자동 기동.** 위 작업이 로그온 트리거를 갖고 있어서 로그온하면 WSL 이 깨어나고, linger 덕에 `openclaw-local.service` 와 `openclaw-auto-deploy.timer` 가 알아서 올라온다. 별도로 `WakeWSL-OpenClaw`(`wsl.exe -d Ubuntu -- true`) 작업도 같은 트리거로 등록해 뒀다(깨우기 전용, 상주하지 않음).
+
+**실측.** `wsl --shutdown` 후 비대화 호출 한 번(`wsl -d Ubuntu -- true`)만으로 두 유닛이 자동 복귀하고 Control UI 가 HTTP 200 을 냈다. 그 뒤 상주 작업을 건 상태에서 **WSL 을 따로 열지 않고 16분 이상 방치**한 확인에서도 Control UI 가 HTTP 200 이었다.
 
 ---
 
