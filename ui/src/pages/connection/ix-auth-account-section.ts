@@ -11,7 +11,12 @@ import {
 } from "../../components/settings-ui.ts";
 import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../../i18n/index.ts";
+import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
+
+// The connection page can be the first view to need these strings, so it registers the
+// catalog itself rather than relying on the lazy sign-in screen having been shown.
+registerIxAuthEnglish();
 
 export type IxAuthAccountSectionProps = {
   session: IxAuthSessionState;
