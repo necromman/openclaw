@@ -1,3 +1,4 @@
+import * as fileDocument from "./sessions-file-document.js";
 import * as viewerPresence from "./sessions-viewer-presence.js";
 import * as sessions from "./sessions.js";
 
@@ -24,9 +25,9 @@ export const SessionLifecycleProtocolSchemas = {
   SessionFileBrowserResult: sessions.SessionFileBrowserResultSchema,
   SessionFileKind: sessions.SessionFileKindSchema,
   SessionFileEntry: sessions.SessionFileEntrySchema,
-  SessionFileDocumentFormat: sessions.SessionFileDocumentFormatSchema,
-  SessionFileDocumentError: sessions.SessionFileDocumentErrorSchema,
-  SessionFileDocumentPreview: sessions.SessionFileDocumentPreviewSchema,
+  SessionFileDocumentFormat: fileDocument.SessionFileDocumentFormatSchema,
+  SessionFileDocumentError: fileDocument.SessionFileDocumentErrorSchema,
+  SessionFileDocumentPreview: fileDocument.SessionFileDocumentPreviewSchema,
   SessionFilePreviewKind: sessions.SessionFilePreviewKindSchema,
   SessionFileRelevance: sessions.SessionFileRelevanceSchema,
   SessionsFilesListParams: sessions.SessionsFilesListParamsSchema,
