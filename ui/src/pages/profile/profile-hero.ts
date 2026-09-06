@@ -1,6 +1,7 @@
 // Profile hero card: featured agent identity with an authenticated avatar.
 import { html } from "lit";
 import type { AgentIdentityResult } from "../../api/types.ts";
+import { BRAND_NAME } from "../../brand.ts";
 import { icons } from "../../components/icons.ts";
 import { renderSettingsGroup } from "../../components/settings-ui.ts";
 import { resolveAgentAvatarUrl, resolveAssistantTextAvatar } from "../../lib/avatar.ts";
@@ -60,7 +61,7 @@ export function renderProfileHero(props: ProfileHeroProps) {
       <div class="profile-hero__name">${heroName(props)}</div>
       <div class="profile-hero__handle">
         <span>@${props.agentId}</span>
-        <span class="profile-hero__badge">OpenClaw</span>
+        <span class="profile-hero__badge">${BRAND_NAME}</span>
       </div>
     </section>
   `);

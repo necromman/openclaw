@@ -18,7 +18,7 @@ npm 배포본(`npm i -g openclaw`)은 바이너리라 **고칠 수가 없다.** 
    (업스트림 문서에는 제품명·로고 교체용 설정 키가 없다. 화이트라벨은 곧 소스 포크다.)
 3. **홈랩 이식성.** 리눅스에서 빌드해 두면 claw01 로 그대로 옮길 수 있다.
 
-상표 주의: 코드는 MIT 라 자유롭지만 **"OpenClaw" 이름과 로브스터 마스코트는 별개 권리**다. 이 포크는 **로고·아이콘 에셋을 교체하지 않고 위치만 기록**한다 (아래 5장 브랜딩 지점 표). 외부에 제품으로 내보낼 일이 생기면 이름과 마스코트를 먼저 걷어내야 한다.
+상표 주의: 코드는 MIT 라 자유롭지만 **"OpenClaw" 이름과 로브스터 마스코트는 별개 권리**다. **2026-09-06 에 사용자에게 보이는 이름과 마스코트를 전부 걷어냈다**(5장). 표시 문자열과 이미지는 이 포크의 것으로 바꾸고, 라이선스 고지만 원문 그대로 남겼다.
 
 ---
 
@@ -120,42 +120,81 @@ git push origin chris/main
 
 ---
 
-## 5. 브랜딩 지점 표
+## 5. 브랜딩 (2026-09-06 전면 교체)
 
-Control UI 의 제품명·로고·테마가 소스 어디에 있는지 실측한 결과다. **교체한 것은 "코드" 열이 `수정함` 인 세 곳뿐이고, 로고·마스코트 에셋은 건드리지 않았다.**
+사용자에게 보이는 업스트림 제품명과 마스코트를 전부 걷어냈다. 기능은 하나도 없애지 않았다.\
+전수 조사 결과와 근거는 **[chris-local/BRANDING-AUDIT.md](chris-local/BRANDING-AUDIT.md)** 가 정본이고, 여기에는 좌표만 적는다.
 
-| 대상 | 파일 | 위치 | 코드 |
-|------|------|------|------|
-| 부팅 시 탭 제목 (정적) | `ui/index.html` | `<title>` | **수정함** |
-| 번들 기동 실패 화면 라벨 | `ui/index.html` | `.mount-fallback__eyebrow` | **수정함** |
-| About 페이지 히어로 제품명 | `ui/src/i18n/locales/en.ts` | `aboutPage.productName` | **수정함** |
-| 승인 화면 브랜드명 | `ui/src/i18n/locales/en.ts` | `approvalPage.brandName` | 미수정 |
-| 런타임 탭 제목 접미사 | `ui/src/app-navigation.ts` | `formatDocumentTitle()` 의 하드코딩 `"OpenClaw"` | 미수정 (테스트 다수가 이 문자열을 단언한다) |
-| 탭 제목 적용 지점 | `ui/src/app/app-host.ts` | `syncDocumentTitle()` | 미수정 |
-| About 페이지 렌더링 | `ui/src/pages/about/view.ts` | `t("aboutPage.productName")` | 미수정 |
-| 파비콘 (SVG/PNG/ICO) | `ui/public/` | `favicon.svg`, `favicon-32.png`, `favicon.ico`, `apple-touch-icon.png` | **미수정 (상표)** |
-| PWA 매니페스트 | `ui/public/manifest.webmanifest` | 앱 이름·아이콘 | 미수정 |
-| 플랫폼 아트워크 | `ui/public/app-art/` | `*.webp` (플랫폼별 라이트/다크) | **미수정 (상표)** |
-| 내장 테마 11종 | `ui/public/themes/` | 테마 CSS | 미수정 |
-| 다국어 문자열 전체 | `ui/src/i18n/locales/` | `en.ts` 가 원본, 나머지는 번역 | en 만 수정 |
+### 5-1. 이름을 바꾸는 법
 
-**찾은 방법** (다음에 다시 찾을 때 그대로 쓸 수 있다):
+`src/brand.ts` **한 파일**이 정본이다. `BRAND_NAME` 을 고치면 Control UI 탭 제목, About 히어로, PWA 매니페스트, 모바일 상단바, 로그인 화면, CLI 배너, `--version`, 시스템 프롬프트 페르소나, 웹푸시 알림 제목이 전부 따라온다.
 
-```bash
-# 1. 정적 HTML 에 박힌 제품명
-grep -n "OpenClaw" ui/index.html
-
-# 2. i18n 원본에서 브랜드 키
-grep -n 'brandName\|productName' ui/src/i18n/locales/en.ts
-
-# 3. 런타임 탭 제목을 만드는 함수
-grep -rn "formatDocumentTitle" ui/src/
-
-# 4. 교체하면 안 되는 에셋 위치
-ls ui/public/*.svg ui/public/*.png ui/public/*.ico ui/public/app-art/
+```ts
+// src/brand.ts
+export const BRAND_NAME = "Chris Agent";      // 임시값. 여기만 바꾸면 된다
+export const BRAND_SHORT_NAME = "Chris";
+export const BRAND_TAGLINE = "Your personal AI assistant, running on your own devices.";
+export const BRAND_LINKS = { website: "", docs: "...FORK.md", github: "...", discord: "", x: "" };
 ```
 
-**교훈.** 런타임 탭 제목의 `"OpenClaw"` 는 i18n 키가 아니라 `app-navigation.ts` 에 **하드코딩**돼 있고, `app-host.document-title.test.ts` 와 `app-navigation.test.ts` 가 그 문자열을 단언한다. 진짜 화이트라벨을 하려면 이 상수를 i18n 키로 빼고 두 테스트 파일도 함께 고쳐야 한다. 이번 변경은 테스트를 깨지 않는 지점만 골랐다.
+빈 문자열(`""`)은 "이 포크에는 그런 목적지가 없다"는 뜻이고, About 링크 줄과 사이드바 커뮤니티 메뉴가 아예 렌더되지 않는다.\
+`ui/src/brand.ts` 는 이 파일을 재수출만 한다(Control UI 번들 경로). 값을 거기에 적지 마라.
+
+i18n 문자열은 `{brand}`·`{brandShort}`·`{brandSkillHub}`·`{brandCloud}` 플레이스홀더를 쓴다. `t()` 와 설치 마법사 `interpolate()` 가 항상 주입하므로 호출부에서 넘길 필요가 없다.
+
+### 5-2. 로고·아이콘
+
+| 파일 | 내용 |
+|------|------|
+| `ui/public/favicon.svg` | 중립 기하 마크(둥근 판 + 링 + "C" 아크). 파비콘·apple-touch·어시스턴트 아바타의 원본 |
+| `ui/public/favicon-32.png` · `favicon.ico` · `apple-touch-icon.png` | 같은 도형을 래스터한 것 |
+| `ui/src/components/brand-mark.ts` | 같은 도형의 lit 인라인 SVG (About 히어로) |
+| `ui/src/components/icons-tools.ts` 의 `lobster` | 아이콘 키 이름은 식별자라 그대로, 그림만 브랜드 마크 |
+
+마크를 바꾸려면 `favicon.svg` 와 `brand-mark.ts` 와 `icons-tools.ts` 세 곳의 같은 도형을 함께 고치고, PNG/ICO 를 다시 굽는다. 네이티브 앱(`apps/`) 아이콘은 아직 교체하지 않았고 방법만 감사 문서 5장에 적어 뒀다.
+
+### 5-3. 일부러 남긴 것
+
+- **내부 식별자**: npm 패키지명 `openclaw`, CLI 실행파일과 하위 명령(`openclaw doctor` 등), 설정 디렉터리 `~/.openclaw`, 설정 키, 환경변수, 커스텀 엘리먼트(`<openclaw-app>`), CSS 클래스, API 경로, i18n 키, 코드 심볼. 이걸 바꾸면 업스트림 리베이스가 불가능해진다. 사용자에게는 CLI 명령을 "내부 이름"으로 안내한다.
+- **라이선스 고지**: `LICENSE`, `THIRD_PARTY_NOTICES.md`, 소스 상단 저작권 주석, About 하단의 "© 2026 OpenClaw Foundation - MIT License." 는 MIT 조건이자 사실 관계라 원문 그대로 둔다. 브랜드를 바꾸는 것과 저작권 귀속을 지우는 것은 다른 일이다.
+- **업스트림 문서**: `CHANGELOG.md`·`docs/`·`AGENTS.md` 등은 내부 문서다. Control UI 안의 `docs.openclaw.ai` 딥링크도 실제로 동작하는 도움말이라 유지하고, About 의 대표 링크만 포크 저장소로 바꿨다.
+
+---
+
+## 5-A. 스타일 공통화 (2026-09-06)
+
+포크 공통 스타일 계층은 **`ui/src/styles/fork-style.css`** 한 파일이다. `ui/src/styles.css` 의 **마지막 import** 라서 업스트림 파일을 고치지 않고도 값을 덮는다.
+
+### 5-A-1. 상세 페이지 full width
+
+`.settings-page`(760px)와 `.settings-page--wide`(1120px), settings 셸 헤더(1120px)가 콘텐츠를 가운데 좁은 칼럼에 가두고 있었다. 자동화 화면 좌측 절반이 비어 보이던 원인이 이것이다.
+
+```css
+:root { --page-max-width: none; }   /* 길이를 넣으면 다시 캡이 걸린다 */
+```
+
+`.settings-page` 는 `components/settings-ui.ts` 의 `renderSettingsPage()` 가 쓰는 **공용 컨테이너**라, 이 한 토큰으로 설정 전 하위 페이지·자동화·플러그인·세션·기기·사용량·시크릿·정보가 전부 창 폭을 쓴다. 상하좌우 패딩(`--space-3`/`--space-4`/`--space-8`, 대략 24~32px)은 그대로다.
+
+**제외**: 채팅은 `--chat-thread-max-width` 를 쓰는 별도 계통이라 손대지 않았다. 대화 지문의 읽기 폭 제한은 유지된다.
+
+페이지별 하드코딩 max-width 는 `rg -n "max-width" ui/src/styles` 로 전수 조사했고, 페이지 폭을 가두는 것은 위 두 클래스와 셸 헤더 규칙뿐이었다. 나머지는 툴팁·토스트·드롭다운·아바타 같은 부품 폭이라 그대로 둔다.
+
+### 5-A-2. 라운드 5px 상한
+
+```css
+:root {
+  --radius-sm: 2px;  --radius-md: 4px;  --radius-lg: 5px;  --radius-xl: 5px;  --radius: 4px;
+  --radius-full: 9999px;                 /* 원형 전용: 아바타·상태 점·스피너·토글 */
+  --openclaw-corner-radius-scale: 0.25;  /* base.css 의 고정 px 코너까지 5px 이하로 */
+  --radius-pill: var(--radius-lg);       /* pill·chip 도 5px */
+}
+```
+
+`--openclaw-corner-radius-scale` 은 업스트림이 이미 가진 신호다. `base.css` 의 `@supports (corner-shape)` 블록이 14px/10px/20px 를 이 배수로 곱해 그리므로, 0.25 를 주면 그 블록을 건드리지 않고 3.5px/2.5px/5px 가 된다(`crt` 테마가 쓰는 것과 같은 수법).
+
+토큰을 안 읽는 하드코딩 값은 전수 조사해 캡했다: CSS 82건, lit `css` 블록 23건(`rg -n "border-radius" ui/src`). `50%` 와 `999px` 은 원형이라 남겼다.
+
+**바꾸는 법**: 위 블록의 값 하나만 고치면 전 화면이 따라온다. 페이지 스타일시트에 `border-radius` 를 새로 하드코딩하지 마라.
 
 ---
 
@@ -610,5 +649,9 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 | `chris-local/oc` | 소스 빌드에 묶인 `openclaw` CLI 래퍼 |
 | `chris-local/openclaw-local.service` | systemd user 유닛 템플릿 (`@NODE_BIN@` 치환) |
 | `chris-local/CODEBASE.md` · `codebase.html` | 코드베이스 구조 문서 (백엔드·프런트·DB·인프라, 파일 경로 근거 포함) |
+| `chris-local/BRANDING-AUDIT.md` | 브랜딩 전수 조사 (바꾼 것·남긴 것·남은 흔적, 5장의 정본) |
+| `src/brand.ts` · `ui/src/brand.ts` | 브랜드 상수 정본과 Control UI 재수출 |
+| `ui/src/components/brand-mark.ts` | 중립 브랜드 마크 (인라인 SVG) |
+| `ui/src/styles/fork-style.css` | 포크 공통 스타일 계층 (full width · 라운드 5px) |
 
-업스트림 파일 중 수정한 것은 5장 표의 세 곳뿐이다.
+업스트림 파일 수정 범위는 5장(브랜딩)·5-A장(스타일)에 적혀 있다. 원칙은 같다: 새 파일을 만들고 기존 파일은 최소 줄만 고친다.

@@ -1,6 +1,7 @@
 import type { GatewaySessionRow } from "../../api/types.ts";
 import type { ApplicationContext } from "../../app/context.ts";
 import type { ApplicationGatewaySnapshot } from "../../app/gateway.ts";
+import { BRAND_NAME } from "../../brand.ts";
 import { UI_COMMAND_EVENT } from "../../components/panel-toggle-contract.ts";
 import { t } from "../../i18n/index.ts";
 import type { ChatHistoryResult } from "../../pages/chat/chat-history-snapshot.ts";
@@ -134,7 +135,7 @@ async function copySessionMarkdown<TRouteId extends string>(
   }
   const assistantName =
     context.agents.state.agentsList?.agents.find((agent) => agent.id === agentId)?.name ??
-    "OpenClaw";
+    BRAND_NAME;
   const markdown = buildChatMarkdown(pages.toReversed().flat(), assistantName);
   if (!markdown) {
     throw new Error(t("chat.commandResults.emptyExport"));

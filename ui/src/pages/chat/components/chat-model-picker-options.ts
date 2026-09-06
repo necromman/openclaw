@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { ModelCatalogEntry } from "../../../api/types.ts";
+import { BRAND_NAME } from "../../../brand.ts";
 import { icons } from "../../../components/icons.ts";
 import "../../../components/tooltip.ts";
 import {
@@ -51,7 +52,7 @@ const AGENT_RUNTIME_LABELS: Readonly<Record<string, string>> = {
   codex: "Codex",
   "codex-cli": "Codex",
   "google-gemini-cli": "Gemini CLI",
-  openclaw: "OpenClaw",
+  openclaw: BRAND_NAME,
 };
 
 function formatAgentRuntimeLabel(id: string): string {
