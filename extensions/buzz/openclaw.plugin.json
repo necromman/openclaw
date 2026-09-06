@@ -17,7 +17,7 @@
   "channelConfigs": {
     "buzz": {
       "label": "Buzz",
-      "description": "Connect OpenClaw agents to Buzz team rooms."
+      "description": "Connect agents to Buzz team rooms."
     }
   },
   "configSchema": {
