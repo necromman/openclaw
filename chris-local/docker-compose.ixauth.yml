@@ -4,9 +4,13 @@
 #   cp chris-local/ixauth.env.example chris-local/ixauth.env   # then fill in the secrets
 #   docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml up -d
 #
+# Install procedure and the .env table: chris-local/DEPLOY.md.
+#
 # Design invariant 4 (ix-auth/MODULE.md section 7): the identity server publishes no
 # host port. Only the Gateway reaches it, over the private compose network. The browser
-# talks to the Gateway's own /auth/* routes and receives one opaque session cookie.
+# talks to the Gateway's own /auth/* routes and receives one opaque session cookie. The
+# identity server's admin console is reached only through the Gateway BFF route
+# /admin/identity/, which admits superadmin and admin sessions and nobody else.
 #
 # Design invariant 3 is deliberately broken here, and the exception is recorded in
 # ix-auth/MODULE.md section 7.1: OpenClaw stores its state in SQLite and IX-Auth
@@ -31,13 +35,15 @@ services:
         ["CMD-SHELL", "pg_isready -U ${IXAUTH_DB_USERNAME:-ixauth} -d ${IXAUTH_DB_NAME:-ixauth}"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
+      start_period: 10s
     networks: [ix-auth-internal]
 
   ix-auth:
     build:
       context: ../ix-auth
       dockerfile: docker/Dockerfile
+    image: openclaw-ix-auth:local
     restart: unless-stopped
     depends_on:
       ix-auth-db:
@@ -48,41 +54,80 @@ services:
       IXAUTH_DB_PASSWORD: ${IXAUTH_DB_PASSWORD:?set IXAUTH_DB_PASSWORD}
       # 32 characters or more; the server refuses to boot with a shorter key.
       IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
-      # Must equal gateway.auth.ixAuth.issuer / .audience in the Gateway config, or
-      # every locally verified token is rejected for issuer or audience mismatch.
-      IXAUTH_JWT_ISSUER: ${IXAUTH_JWT_ISSUER:?set IXAUTH_JWT_ISSUER}
-      IXAUTH_JWT_AUDIENCE: ${IXAUTH_JWT_AUDIENCE:-openclaw}
-      # Seeded once on first boot. Change the password after the first sign-in.
+      # Fixed, not operator-settable. The Gateway config file carries the same two
+      # literals, and a mismatch makes every locally verified token fail on issuer or
+      # audience. Pinning both sides here removes the single most common setup fault.
+      IXAUTH_JWT_ISSUER: openclaw-ix-auth
+      IXAUTH_JWT_AUDIENCE: openclaw-gateway
+      # Seeded once on first boot and granted SUPERADMIN. Change the password after the
+      # first sign-in; the console has a password-change screen.
       IXAUTH_ADMIN_EMAIL: ${IXAUTH_ADMIN_EMAIL:?set IXAUTH_ADMIN_EMAIL}
       IXAUTH_ADMIN_PASSWORD: ${IXAUTH_ADMIN_PASSWORD:?set IXAUTH_ADMIN_PASSWORD}
-      # Self-service signup stays closed; administrators create accounts. Switch to
-      # APPROVAL once mail is configured to accept requests that an admin then approves.
-      IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
-      # Without SMTP the server logs the message instead of sending it, which keeps
-      # invitations and password resets testable before mail infrastructure exists.
-      IXAUTH_MAIL_TRANSPORT: ${IXAUTH_MAIL_TRANSPORT:-LOG}
-      IXAUTH_MAIL_APP_BASE_URL: ${IXAUTH_PUBLIC_APP_URL:?set IXAUTH_PUBLIC_APP_URL}
-      IXAUTH_ADMIN_UI_ENABLED: ${IXAUTH_ADMIN_UI_ENABLED:-true}
-    # No ports section on purpose. To reach the admin console, publish it deliberately
-    # on a separate hostname behind an IP allowlist or a VPN; see ix-auth/MODULE.md 7.2.
+      IXAUTH_ADMIN_NAME: ${IXAUTH_ADMIN_NAME:-관리자}
+      IXAUTH_ADMIN_UI_ENABLED: "true"
+      # Password policy for seeded and console-created accounts.
+      IXAUTH_PASSWORD_MIN_LENGTH: ${IXAUTH_PASSWORD_MIN_LENGTH:-10}
+      IXAUTH_LOG_LEVEL: ${IXAUTH_LOG_LEVEL:-INFO}
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
+    # No ports section on purpose (design invariant 4). The console is reached through
+    # the Gateway route /admin/identity/.
     networks: [ix-auth-internal]
 
   gateway:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        # Chromium for the browser tool, and CJK fonts so Korean text renders in
+        # screenshots and PDF output instead of tofu boxes.
+        OPENCLAW_INSTALL_BROWSER: "1"
+        OPENCLAW_IMAGE_APT_PACKAGES: "fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji"
+    image: openclaw-gateway:local
     restart: unless-stopped
     depends_on:
       ix-auth:
         condition: service_healthy
     environment:
-      OPENCLAW_CONFIG_PATH: /config/openclaw.json
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_GATEWAY_PORT: "18789"
+      # Read by the committed config through its "${IXAUTH_SERVICE_KEY}" env SecretRef,
+      # so the shared secret never has to be written into a tracked file.
+      IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
+      # Declarative config: the tracked template is copied over the state copy on every
+      # start, so this file is the single source of truth for the deployment.
       - ./ixauth-gateway-config:/config:ro
-      - gateway-state:/root/.openclaw
+      - gateway-state:/home/node/.openclaw
     ports:
       # The Gateway is the only service the browser ever reaches.
-      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "${OPENCLAW_GATEWAY_PORT:-18800}:18789"
+    # The image binds loopback by default, which bridge networking cannot reach through
+    # -p. Binding "lan" is safe only because gateway.auth.mode is "ix-auth": there is no
+    # unauthenticated surface behind it.
+    command:
+      [
+        "sh",
+        "-c",
+        "cp /config/openclaw.json /home/node/.openclaw/openclaw.json && exec node dist/index.js gateway --bind lan --port 18789",
+      ]
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "dist/docker-healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks: [ix-auth-internal]
 
 volumes:

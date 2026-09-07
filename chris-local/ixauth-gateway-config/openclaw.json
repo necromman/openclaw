@@ -1,0 +1,59 @@
+{
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "ix-auth",
+      "ixAuth": {
+        "baseUrl": "http://ix-auth:9100",
+        "serviceKey": "${IXAUTH_SERVICE_KEY}",
+        "issuer": "openclaw-ix-auth",
+        "audience": "openclaw-gateway",
+        "session": {
+          "idleTimeoutMinutes": 30,
+          "absoluteTimeoutHours": 12
+        }
+      }
+    },
+    "controlUi": {
+      "allowedOrigins": ["__OPENCLAW_PUBLIC_ORIGIN__"]
+    },
+    "roles": {
+      "default": "member",
+      "definitions": {
+        "superadmin": {
+          "sessions": { "others": "write" },
+          "agents": "*",
+          "scopes": ["operator.admin"]
+        },
+        "admin": {
+          "sessions": { "others": "write" },
+          "agents": "*",
+          "scopes": [
+            "operator.read",
+            "operator.write",
+            "operator.approvals",
+            "operator.questions"
+          ]
+        },
+        "moderator": {
+          "sessions": { "others": "suggest" },
+          "agents": "*",
+          "scopes": [
+            "operator.read",
+            "operator.write",
+            "operator.approvals",
+            "operator.questions"
+          ]
+        },
+        "member": {
+          "sessions": { "others": "view" },
+          "agents": "*",
+          "scopes": ["operator.read", "operator.write", "operator.questions"]
+        }
+      }
+    }
+  },
+  "tools": {
+    "sessions": { "visibility": "self" }
+  }
+}

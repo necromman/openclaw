@@ -244,3 +244,6 @@ extensions/discord/assets/embedded-app-sdk.mjs
 /ix-auth/.gradle/
 /ix-auth/**/node_modules/
 /ix-auth/**/dist/
+
+# Local deployment secrets for the IX-Auth compose stack (chris-local/DEPLOY.md).
+chris-local/ixauth.env
