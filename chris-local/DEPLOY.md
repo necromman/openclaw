@@ -452,15 +452,15 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 ### 11.1 바꿔야 하는 것은 값 하나뿐이다
 
-| 항목                                                | 값                         | 어디서                                                      |
-| --------------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
-| `gateway.bind`                                      | `lan`                      | 이미 그렇다. `start-gateway.sh` 가 `--bind lan` 으로 띄운다 |
-| `gateway.publicOrigin` / `controlUi.allowedOrigins` | `http://192.168.0.8:18800` | `.env` 의 `OPENCLAW_PUBLIC_ORIGIN` 하나로 렌더링된다        |
-| 호스트 포트                                         | `18800`                    | `.env` 의 `OPENCLAW_GATEWAY_PORT`                           |
+| 항목                                                | 값                           | 어디서                                                      |
+| --------------------------------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| `gateway.bind`                                      | `lan`                        | 이미 그렇다. `start-gateway.sh` 가 `--bind lan` 으로 띄운다 |
+| `gateway.publicOrigin` / `controlUi.allowedOrigins` | `http://192.168.10.20:18800` | `.env` 의 `OPENCLAW_PUBLIC_ORIGIN` 하나로 렌더링된다        |
+| 호스트 포트                                         | `18800`                      | `.env` 의 `OPENCLAW_GATEWAY_PORT`                           |
 
 ```bash
 # chris-local/ixauth.env
-OPENCLAW_PUBLIC_ORIGIN=http://192.168.0.8:18800
+OPENCLAW_PUBLIC_ORIGIN=http://192.168.10.20:18800
 ```
 
 도메인·서브도메인·인증서·DNS 레코드는 하나도 필요 없다.\
@@ -518,8 +518,8 @@ sudo mkdir -p /etc/nginx/tls
 sudo openssl req -x509 -newkey rsa:2048 -nodes -days 398 \
   -keyout /etc/nginx/tls/gateway.key \
   -out    /etc/nginx/tls/gateway.crt \
-  -subj   "/CN=192.168.0.8" \
-  -addext "subjectAltName=IP:192.168.0.8" \
+  -subj   "/CN=192.168.10.20" \
+  -addext "subjectAltName=IP:192.168.10.20" \
   -addext "basicConstraints=critical,CA:FALSE" \
   -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
   -addext "extendedKeyUsage=serverAuth"
@@ -545,7 +545,7 @@ map $http_upgrade $connection_upgrade {
 server {
   listen 18443 ssl;
   http2 on;
-  server_name 192.168.0.8;
+  server_name 192.168.10.20;
 
   ssl_certificate     /etc/nginx/tls/gateway.crt;
   ssl_certificate_key /etc/nginx/tls/gateway.key;
@@ -581,7 +581,7 @@ server {
 
 ```bash
 # chris-local/ixauth.env
-OPENCLAW_PUBLIC_ORIGIN=https://192.168.0.8:18443
+OPENCLAW_PUBLIC_ORIGIN=https://192.168.10.20:18443
 ```
 
 ```json5
