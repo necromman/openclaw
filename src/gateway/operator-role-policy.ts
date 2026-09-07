@@ -9,6 +9,7 @@ import type { GatewayOperatorRoleDefinition } from "../config/types.gateway.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { getUserProfileRole } from "../state/user-profiles.js";
+import { authorizeDepartmentAgent, type DepartmentIdentity } from "./department-access.js";
 import { bumpGatewayAccessRevision } from "./gateway-access-revision.js";
 import { gatewayClientSessionCreator } from "./server-methods/gateway-client-identity.js";
 import {
@@ -30,6 +31,8 @@ const deniedOperatorRole: GatewayOperatorRoleDefinition = {
 type GatewaySessionAgentAuthorization = {
   cfg: OpenClawConfig;
   agentId: string;
+  /** Verified department facts for callers that never build a Gateway client. */
+  departments?: DepartmentIdentity;
 } & (
   | { actor: GatewayOperatorRoleActor; profileId?: never; client?: never }
   | { actor?: never; profileId: string | undefined; client?: never }
@@ -164,6 +167,18 @@ export function hasOperatorBoundary(client: GatewayClient | null, cfg: OpenClawC
 export function authorizeGatewaySessionCreation(
   params: GatewaySessionAgentAuthorization,
 ): ErrorShape | undefined {
+  // The department boundary is checked here because this is the one gate every creation
+  // and run-start path already passes through; putting it anywhere else would leave a
+  // caller free to reach an agent outside their department by another route.
+  const departmentError = authorizeDepartmentAgent({
+    cfg: params.cfg,
+    agentId: params.agentId,
+    ...("client" in params ? { client: params.client ?? null } : {}),
+    ...(params.departments ? { identity: params.departments } : {}),
+  });
+  if (departmentError) {
+    return departmentError;
+  }
   const actor =
     params.actor ??
     ("client" in params ? resolveGatewayOperatorRoleActor(params.client) : undefined);

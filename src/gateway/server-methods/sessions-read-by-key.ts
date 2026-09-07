@@ -1,8 +1,10 @@
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { validateSessionsDescribeParams } from "../../../packages/gateway-protocol/src/index.js";
+import type { SessionEntry } from "../../config/sessions.js";
+import { prepareDepartmentGate } from "../department-access.js";
 import { hasOperatorBoundary } from "../operator-role-policy.js";
 import { resolveRequestedSessionAgentId as resolveRequestedGlobalAgentId } from "../session-request-agent.js";
-import { createSessionListEntryFilter } from "../session-sharing.js";
+import { createSessionListEntryFilter, prepareSessionSharing } from "../session-sharing.js";
 import { readRecentSessionMessagesWithStatsAsync } from "../session-transcript-readers.js";
 import { buildGatewaySessionRow } from "../session-utils.js";
 import { readSessionPlacementFields } from "./session-placement-read-projection.js";
@@ -10,13 +12,39 @@ import { loadSessionEntriesForTarget, requireSessionKey } from "./sessions-share
 import type { GatewayRequestHandlers } from "./types.js";
 import { assertValidParams } from "./validation.js";
 
+/**
+ * Row predicate for a directly addressed session.
+ *
+ * The department verdict is folded in here so knowing a session key is not enough to
+ * read one: the list hides it and this refuses it, which are the two halves the fence
+ * needs to be real.
+ */
 function createRoleVisibilityFilter(
   client: Parameters<typeof hasOperatorBoundary>[0],
   cfg: Parameters<typeof hasOperatorBoundary>[1],
 ) {
-  return hasOperatorBoundary(client, cfg)
+  const boundaryFilter = hasOperatorBoundary(client, cfg)
     ? createSessionListEntryFilter({ client, cfg })
     : undefined;
+  const departmentGate = prepareDepartmentGate({ cfg, client });
+  if (!boundaryFilter && !departmentGate) {
+    return undefined;
+  }
+  const isCreator = prepareSessionSharing({ client, cfg }).isCreator;
+  return (
+    agentId: string,
+    key: string,
+    entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito"> | undefined,
+  ): boolean => {
+    if (!entry) {
+      return true;
+    }
+    const access = departmentGate?.agentAccess(agentId) ?? "open";
+    if (access === "denied" || (access === "creator-only" && !isCreator(entry.createdActor))) {
+      return false;
+    }
+    return boundaryFilter?.(key, entry) !== false;
+  };
 }
 
 export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
@@ -40,7 +68,7 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       ...(requestedAgent.agentId ? { agentId: requestedAgent.agentId } : {}),
     });
     const boundaryFilter = createRoleVisibilityFilter(client, cfg);
-    if (!entry || boundaryFilter?.(target.canonicalKey, entry) === false) {
+    if (!entry || boundaryFilter?.(target.agentId, target.canonicalKey, entry) === false) {
       respond(true, { session: null }, undefined);
       return;
     }
@@ -91,7 +119,10 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       agentId: requestedAgent.agentId,
     });
     const boundaryFilter = createRoleVisibilityFilter(client, cfg);
-    if (!entry?.sessionId || boundaryFilter?.(target.canonicalKey, entry) === false) {
+    if (
+      !entry?.sessionId ||
+      boundaryFilter?.(target.agentId, target.canonicalKey, entry) === false
+    ) {
       respond(true, { messages: [] }, undefined);
       return;
     }
@@ -130,7 +161,11 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       current.target.canonicalKey !== target.canonicalKey ||
       current.storePath !== storePath ||
       current.entry?.sessionId !== sessionId ||
-      currentBoundaryFilter?.(current.target.canonicalKey, current.entry) === false
+      currentBoundaryFilter?.(
+        current.target.agentId,
+        current.target.canonicalKey,
+        current.entry,
+      ) === false
     ) {
       respond(true, { messages: [] }, undefined);
       return;

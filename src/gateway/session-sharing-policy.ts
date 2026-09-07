@@ -9,6 +9,7 @@ import { GATEWAY_OWNER_PROFILE_ID } from "../../packages/gateway-protocol/src/sc
 import { isSessionMember, type SessionEntry } from "../config/sessions.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isIncognitoSessionKey } from "../routing/session-key.js";
+import { prepareDepartmentGate, type DepartmentAgentAccess } from "./department-access.js";
 import {
   authorizeGatewaySessionCreation,
   operatorSessionCap,
@@ -51,6 +52,22 @@ export function isGatewayAdmin(client: Pick<GatewayClient, "connect"> | null): b
   // Internal/plugin-runtime runs reach authorization with a client that has no
   // connect handshake; treat a connect-less client as a non-admin, never a crash.
   return client?.connect?.scopes?.includes("operator.admin") === true;
+}
+
+/**
+ * Department verdict for one already-resolved session target.
+ *
+ * Evaluated before the `operator.admin` bypass so a department administrator stays
+ * inside their own department; only a super administrator, who carries no department
+ * gate at all, passes untouched.
+ */
+export function departmentAccessForTarget(params: {
+  cfg?: OpenClawConfig;
+  client: GatewayClient | null;
+  target: Pick<SessionSharingTarget, "agentId">;
+}): DepartmentAgentAccess {
+  const gate = prepareDepartmentGate({ cfg: params.cfg, client: params.client });
+  return gate ? gate.agentAccess(params.target.agentId) : "open";
 }
 
 export function allowedSessionVisibilities(cfg: OpenClawConfig): SessionVisibility[] {
@@ -145,7 +162,13 @@ export function resolveSessionSharingRole(
   preparedCap?: { value: ReturnType<typeof operatorSessionCap> },
   isCreator?: ReturnType<typeof prepareSessionCreatorProfile>,
 ): SessionSharingRole {
-  if (isGatewayAdmin(params.client)) {
+  const departmentAccess = departmentAccessForTarget(params);
+  if (departmentAccess === "denied") {
+    return "viewer";
+  }
+  // An unbound agent is shared ground, so its sessions stay with whoever created them.
+  // The admin bypass runs after this so it cannot lift the fence.
+  if (departmentAccess === "open" && isGatewayAdmin(params.client)) {
     return "admin";
   }
   const operatorActor = resolveGatewayOperatorRoleActor(params.client);
@@ -160,6 +183,9 @@ export function resolveSessionSharingRole(
   const creatorMatches = isCreator ?? prepareSessionCreatorProfile(identity.id);
   if (creatorMatches(params.target.entry.createdActor)) {
     return "owner";
+  }
+  if (departmentAccess === "creator-only") {
+    return "viewer";
   }
   const sessionCap = preparedCap
     ? preparedCap.value
@@ -263,7 +289,8 @@ export function authorizeResolvedSessionMutation(params: {
   sessionKey: string;
   agentId?: string;
 }): ErrorShape | null {
-  if (isGatewayAdmin(params.client) && !params.cfg.gateway?.roles) {
+  const departmentGate = prepareDepartmentGate(params);
+  if (isGatewayAdmin(params.client) && !params.cfg.gateway?.roles && !departmentGate) {
     return null;
   }
   if (isGatewayClientProfilePending(params.client)) {
@@ -280,7 +307,10 @@ export function authorizeResolvedSessionMutation(params: {
       return agentError;
     }
   }
-  if (isGatewayAdmin(params.client)) {
+  if (target && departmentGate && !departmentGate.allowsAgent(target.agentId)) {
+    return hiddenSessionNotFound(params.sessionKey);
+  }
+  if (isGatewayAdmin(params.client) && !departmentGate) {
     return null;
   }
   const incognitoError = authorizeIncognitoSessionTarget({
@@ -328,6 +358,11 @@ export function authorizeSessionSharingTarget(params: {
   client: GatewayClient | null;
   target: SessionSharingTarget;
 }): ErrorShape | null {
+  // A session in another department is answered as absent, not as forbidden, so a caller
+  // cannot enumerate which keys exist outside their own department.
+  if (departmentAccessForTarget(params) === "denied") {
+    return hiddenSessionNotFound(params.target.canonicalKey);
+  }
   const visibility = resolveSessionVisibility(params.target.entry);
   const sessionCap = params.cfg && operatorSessionCap(params.client, params.cfg);
   const role = resolveSessionSharingRole(params, { value: sessionCap });

@@ -12,6 +12,7 @@ import {
   readOpenIncognitoAgentDatabaseGeneration,
 } from "../../state/openclaw-agent-db.js";
 import { readUserProfileVersion } from "../../state/user-profile-events.js";
+import { departmentCacheKeyPart } from "../department-access.js";
 import { operatorSessionCap } from "../operator-role-policy.js";
 import { readSessionAutomationVersion } from "../session-automation-index.js";
 import { readSessionLifecyclePersistenceVersion } from "../session-lifecycle-state.js";
@@ -140,6 +141,9 @@ function sessionListWorkKey(
     // Admin visibility is global, but owner-first and involving-me rows remain viewer-specific.
     gatewayClientSessionCreator(client)?.id ?? null,
     isGatewayAdmin(client) ? "admin" : (operatorSessionCap(client, config) ?? null),
+    // Two people can share a profile-less cap yet see different agents; without this the
+    // first caller's page would be replayed across the department boundary.
+    departmentCacheKeyPart({ cfg: config, client }),
     Object.entries(params).toSorted(([left], [right]) => left.localeCompare(right)),
   ]);
 }

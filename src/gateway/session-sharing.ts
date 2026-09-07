@@ -8,6 +8,7 @@ import { AgentSelectionRequiredError } from "../agents/agent-scope.js";
 import type { SessionEntry } from "../config/sessions.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isIncognitoSessionKey } from "../routing/session-key.js";
+import { prepareDepartmentGate } from "./department-access.js";
 import {
   authorizeGatewaySessionCreation,
   operatorSessionCap,
@@ -477,7 +478,8 @@ export function canReceiveSessionEvent(params: {
   payload?: unknown;
 }): boolean {
   const { cfg, client, sessionKeys, event } = params;
-  if (isGatewayAdmin(client)) {
+  const departmentGate = prepareDepartmentGate({ cfg, client });
+  if (isGatewayAdmin(client) && !departmentGate) {
     return true;
   }
   const operatorActor = resolveGatewayOperatorRoleActor(client);
@@ -501,6 +503,15 @@ export function canReceiveSessionEvent(params: {
   const visible = sessionKeys.every((sessionKey) => {
     const snapshot = loadSharingSnapshot({ ...lookup, sessionKey });
     const isCreator = sharing.isCreator(snapshot.createdActor);
+    if (departmentGate) {
+      // Fan-out must not leak what the list already hides, so the same verdict decides
+      // both. The owning agent comes from the resolved target, never from the event.
+      const target = resolveSessionSharingTarget({ ...lookup, sessionKey });
+      const access = target ? departmentGate.agentAccess(target.agentId) : "creator-only";
+      if (access === "denied" || (access === "creator-only" && !isCreator)) {
+        return false;
+      }
+    }
     if (snapshot.incognito || (hidesForeignSessions && !isCreator)) {
       return false;
     }

@@ -4,6 +4,7 @@ import type { SessionEntry } from "../../config/sessions.js";
 import { resolveSqliteTargetFromSessionStorePath } from "../../config/sessions/session-sqlite-target.js";
 import { normalizeAgentId, parseAgentSessionKey } from "../../routing/session-key.js";
 import { listOpenIncognitoAgentDatabases } from "../../state/openclaw-agent-db.js";
+import { prepareDepartmentGate } from "../department-access.js";
 import { prepareSessionSharing } from "../session-sharing.js";
 
 function listBoardSessionKeysByAgent(
@@ -56,10 +57,14 @@ export function listFilter(input: {
   p: SessionsListParams;
 }): ((key: string, entry: SessionEntry) => boolean) | undefined {
   const { loaded, p: params } = input;
-  const visibilityFilter = prepareSessionSharing({
+  const sharing = prepareSessionSharing({
     client: input.client,
     cfg: input.cfg,
-  }).entryFilter;
+  });
+  const visibilityFilter = sharing.entryFilter;
+  // The department verdict needs the owning agent, which only exists per row, so it
+  // joins the row predicate here rather than inside the profile filter.
+  const departmentGate = prepareDepartmentGate({ cfg: input.cfg, client: input.client });
   const excludedKeys = input.options.excludedKeys;
   const boardSessionKeys: BoardSessionKeys | undefined =
     params.hasBoard === undefined
@@ -68,7 +73,7 @@ export function listFilter(input: {
           durable: listBoardSessionKeysByAgent(loaded.durableTargets, params.agentId),
           incognito: listBoardSessionKeysByAgent(listOpenIncognitoAgentDatabases(), params.agentId),
         };
-  if (!visibilityFilter && !boardSessionKeys && !excludedKeys?.size) {
+  if (!visibilityFilter && !boardSessionKeys && !excludedKeys?.size && !departmentGate) {
     return undefined;
   }
   return (key, entry) => {
@@ -80,6 +85,13 @@ export function listFilter(input: {
     const inventory =
       entry.incognito === true ? boardSessionKeys?.incognito : boardSessionKeys?.durable;
     const hasBoard = inventory?.get(agentId)?.has(key) ?? false;
+    const departmentAccess = departmentGate?.agentAccess(agentId) ?? "open";
+    if (
+      departmentAccess === "denied" ||
+      (departmentAccess === "creator-only" && !sharing.isCreator(entry.createdActor))
+    ) {
+      return false;
+    }
     return (
       !excludedKeys?.has(key) &&
       (visibilityFilter?.(key, entry) ?? true) &&

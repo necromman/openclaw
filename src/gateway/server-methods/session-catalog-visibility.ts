@@ -12,6 +12,7 @@ import type {
 import { isIncognitoSessionKey } from "../../routing/session-key.js";
 import { readUserProfileAliases } from "../../state/user-profile-list.js";
 import { hasMultipleSessionSharingIdentities } from "../../state/user-profiles.js";
+import { departmentCacheKeyPart, prepareDepartmentGate } from "../department-access.js";
 import { ADMIN_SCOPE, authorizeOperatorScopesForRequiredScope } from "../method-scopes.js";
 import { operatorSessionCap } from "../operator-role-policy.js";
 import { prepareSessionCreatorProfile } from "../session-creator.js";
@@ -35,20 +36,25 @@ export function resolveSessionCatalogVisibility(
   config: OpenClawConfig,
 ): SessionCatalogVisibility {
   const scopes = Array.isArray(client?.connect?.scopes) ? client.connect.scopes : [];
-  const admin = authorizeOperatorScopesForRequiredScope(ADMIN_SCOPE, scopes).allowed;
+  // External CLI threads carry no department binding, so under the department boundary
+  // they stay with the person who adopted them rather than defaulting to shared.
+  const departmentGate = prepareDepartmentGate({ cfg: config, client });
+  const admin =
+    !departmentGate && authorizeOperatorScopesForRequiredScope(ADMIN_SCOPE, scopes).allowed;
   const multipleIdentities = hasMultipleSessionSharingIdentities();
   const attachedProfileId = client?.authenticatedUserProfile?.profileId;
   const profileId = attachedProfileId === GATEWAY_OWNER_PROFILE_ID ? undefined : attachedProfileId;
-  const others = admin ? undefined : operatorSessionCap(client, config);
+  const others = admin || departmentGate ? undefined : operatorSessionCap(client, config);
   const profileAliases = profileId ? readUserProfileAliases(profileId) : undefined;
   const cacheKey = JSON.stringify({
     admin,
+    department: departmentCacheKeyPart({ cfg: config, client }),
     multipleIdentities,
     profileId: profileId ?? null,
     profileAliases: profileAliases ? [...profileAliases].toSorted() : [],
     others: others ?? null,
   });
-  if (admin || (!multipleIdentities && !others)) {
+  if (admin || (!departmentGate && !multipleIdentities && !others)) {
     return { cacheKey, kind: "unrestricted" };
   }
   if (!profileId) {

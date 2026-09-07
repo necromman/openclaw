@@ -33,10 +33,13 @@ import {
 } from "../chat-abort.js";
 import { resolveEffectiveChatHistoryMaxChars } from "../chat-display-projection.js";
 import { resolveClaudeCliBindingSessionId } from "../cli-session-history.js";
+import { prepareDepartmentGate } from "../department-access.js";
 import type { ChatRunState } from "../server-chat-state.js";
 import { getMaxChatHistoryMessagesBytes } from "../server-constants.js";
 import { buildGatewaySessionSnapshot } from "../session-event-payload.js";
 import { tryResolveSessionCompatibilityOwnerAgentId } from "../session-request-agent.js";
+import { hiddenSessionNotFound } from "../session-sharing-policy.js";
+import { prepareSessionSharing } from "../session-sharing.js";
 import { capArrayByJsonBytes } from "../session-transcript-readers.js";
 import {
   buildGatewaySessionInfo,
@@ -213,6 +216,18 @@ async function handleChatHistoryRequest({
     config: cfg,
     agentId: selectedAgent.agentId,
   });
+  // The transcript is the widest read there is, so the department fence has to hold here
+  // as well: hiding a session from the list while its history stays readable by key
+  // would not be a boundary at all.
+  const departmentGate = prepareDepartmentGate({ cfg, client });
+  if (departmentGate) {
+    const access = departmentGate.agentAccess(sessionAgentId);
+    const ownedByCaller = prepareSessionSharing({ cfg, client }).isCreator(entry?.createdActor);
+    if (access === "denied" || (access === "creator-only" && !ownedByCaller)) {
+      respond(false, undefined, hiddenSessionNotFound(canonicalKey));
+      return;
+    }
+  }
   if (requestedSessionId) {
     const transcriptSessionKey = resolveTranscriptSessionKeyBySessionId({
       agentId: sessionAgentId,
