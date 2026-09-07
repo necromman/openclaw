@@ -38,7 +38,7 @@ export function describeAgentsWaitTool(sessionsSpawnAvailable: boolean): string 
 // Mirrors plugin-sdk SessionToolsVisibility; kept local because importing that
 // module here would close an agents<->plugin-sdk madge cycle. Call sites pass
 // the policy union, so a new mode fails compilation at every consumer.
-type SessionVisibilityScope = "self" | "tree" | "agent" | "all";
+type SessionVisibilityScope = "self" | "tree" | "agent" | "department" | "all";
 
 // Single source for model-facing session-visibility scope wording; every tool
 // description or warning that explains visibility renders through this so the
@@ -47,6 +47,7 @@ const SESSION_VISIBILITY_SCOPE_COPY = {
   self: "current session only",
   tree: "current session + own spawn subtree; the main session sees all sessions of its agent",
   agent: "all sessions of this agent",
+  department: "all sessions of this agent; cross-agent access stays inside the department boundary",
   all: "all sessions, cross-agent per tools.agentToAgent",
 } satisfies Record<SessionVisibilityScope, string>;
 

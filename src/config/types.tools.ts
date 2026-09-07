@@ -225,7 +225,7 @@ export type SwarmConfig =
       defaultAgentId?: string;
     };
 
-export type SessionsToolsVisibility = "self" | "tree" | "agent" | "all";
+export type SessionsToolsVisibility = "self" | "tree" | "agent" | "department" | "all";
 
 export type ToolAllowDenyPolicyConfig = {
   /** Exact tool names allowed in this policy scope. */

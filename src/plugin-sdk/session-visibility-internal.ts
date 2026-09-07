@@ -28,7 +28,7 @@ export type SessionVisibilityDecisionAction = "history" | "send" | "list" | "sta
 export type SessionVisibilityDecisionPresentationAction =
   | SessionVisibilityDecisionAction
   | "search";
-export type SessionVisibilityDecisionMode = "self" | "tree" | "agent" | "all";
+export type SessionVisibilityDecisionMode = "self" | "tree" | "agent" | "department" | "all";
 export type SessionVisibilityDecisionPolicy = {
   enabled: boolean;
   isAllowed: (requesterAgentId: string, targetAgentId: string) => boolean;

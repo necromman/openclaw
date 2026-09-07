@@ -105,7 +105,13 @@ export function resolveSessionToolsVisibility(cfg: OpenClawConfig): SessionTools
   const raw = (cfg.tools as { sessions?: { visibility?: unknown } } | undefined)?.sessions
     ?.visibility;
   const value = normalizeLowercaseStringOrEmpty(raw);
-  if (value === "self" || value === "tree" || value === "agent" || value === "all") {
+  if (
+    value === "self" ||
+    value === "tree" ||
+    value === "agent" ||
+    value === "department" ||
+    value === "all"
+  ) {
     return value;
   }
   return "all";
