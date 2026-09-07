@@ -64,6 +64,8 @@
 | `OPENCLAW_GATEWAY_PORT`                 |        | `18800`                               | 호스트에 여는 포트                                                                                                              |
 | `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다                |
 | `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                 |
+| `ANTHROPIC_API_KEY`                     |        | (없음)                                | 외부 모델 API 키. 사내 ollama 만 쓰면 비워 둔다. 설정 파일에는 `"${ANTHROPIC_API_KEY}"` 이름만 적는다 (3.4)                     |
+| `OPENAI_API_KEY`                        |        | (없음)                                | 위와 같다. 두 키 모두 비면 모델 목록이 비고 화면에 "사용 가능한 모델 없음" 이 뜬다                                              |
 
 `gateway.auth.ixAuth.selfSignup` 도 **환경변수가 아니다.** `start-gateway.sh` 가 `IXAUTH_ACCOUNT_SIGNUP_MODE` 에서 유도한다(`OPEN`·`APPROVAL` 이면 가입 화면이 열린다). 두 곳을 손으로 맞추면 "가입 화면은 있는데 누르면 거부" 가 생긴다.
 
@@ -156,6 +158,127 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | 에이전트 바인딩 변경 반영       | **즉시**. 재시작이 필요 없다                                                                                     |
 | 남의 부서 세션을 키로 직접 열면 | **404**(없다). 403 이 아니다 - 키 존재 여부를 열거당하지 않기 위해서다                                           |
 | 역할 부여 API                   | `PUT /admin/users/{id}/roles` 의 본문 필드는 `roles` 다. `codes` 로 보내면 서버가 오류 없이 기본 역할로 되돌린다 |
+
+### 3.4 모델 프로바이더
+
+기동 직후에는 **"사용 가능한 모델 없음"** 이다. 이 스택은 모델을 하나도 켜 놓지 않는다. 아래 둘 중 하나를 고른다.
+
+정본 설정 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 매 기동마다 상태 볼륨에 덮어쓴다(5절). 모델 설정도 이 파일에 넣는다.
+
+**시크릿 값은 이 파일에 절대 쓰지 않는다.** 게이트웨이가 `"${환경변수이름}"` 형태의 env SecretRef 를 해석하므로, 값은 `.env` 에만 두고 파일에는 이름만 적는다. `IXAUTH_SERVICE_KEY` 가 쓰는 것과 같은 장치다.
+
+#### (가) 외부 API 방식
+
+`.env` 에 키를 넣고, compose 가 그 이름 그대로 게이트웨이 컨테이너에 넘긴다.
+
+```jsonc
+// ixauth-gateway-config/openclaw.json 에 추가
+{
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "https://api.anthropic.com",
+        "apiKey": "${ANTHROPIC_API_KEY}",
+      },
+    },
+  },
+  "agents": {
+    "defaults": {
+      "model": "anthropic/claude-sonnet-5",
+    },
+  },
+}
+```
+
+`ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 는 게이트웨이가 **환경변수 이름 그대로도 읽는다**(프로바이더 기본 자격증명 조회). 그래서 `.env` 에 값만 채워도 동작하고, 위처럼 SecretRef 로 적는 것은 "이 배포가 어떤 키를 쓰는지" 를 설정 파일에 남기기 위해서다. 어느 쪽이든 값은 `.env` 에만 있다.
+
+> 외부 API 는 사내 자료가 회사 밖으로 나간다. 부서 기밀 요건이 있으면 (나) 를 쓴다.
+
+#### (나) 사내 ollama 방식
+
+모델과 임베딩을 전부 사내에서 끝낸다. compose 에 서비스를 하나 더 붙인다.
+
+```yaml
+# docker-compose.ixauth.yml 의 services: 아래
+ollama:
+  image: ollama/ollama:latest
+  restart: unless-stopped
+  volumes:
+    - ollama-models:/root/.ollama
+  # 포트를 열지 않는다. 게이트웨이만 내부망으로 붙는다.
+  networks: [ix-auth-internal]
+
+# volumes: 아래
+ollama-models:
+```
+
+게이트웨이 설정:
+
+```jsonc
+{
+  "models": {
+    "providers": {
+      "ollama": {
+        // /v1 을 붙이지 마라. OpenAI 호환 경로는 도구 호출을 깨뜨린다.
+        "baseUrl": "http://ollama:11434",
+        "api": "ollama",
+      },
+    },
+  },
+  "agents": {
+    "defaults": {
+      "model": "ollama/qwen4:32b",
+    },
+  },
+  "memory": {
+    "search": {
+      "provider": "ollama",
+      "model": "bge-m3",
+      "remote": { "baseUrl": "http://ollama:11434" },
+    },
+  },
+}
+```
+
+- 루프백·사설망·컨테이너 이름 주소는 토큰이 필요 없다. 게이트웨이가 `ollama-local` 표식을 쓴다.
+- 모델은 미리 받아 둔다: `docker compose ... exec ollama ollama pull qwen4:32b`, 임베딩은 `ollama pull bge-m3`.
+- 임베딩 모델을 바꾸면 색인 정체성이 달라진다. 반드시 3.5 의 재색인을 돌린다.
+- GPU 가 있으면 compose 서비스에 `deploy.resources.reservations.devices` 로 넘긴다. 없으면 CPU 로도 뜨지만 응답이 느리다.
+
+#### 확인
+
+```bash
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml \
+  exec -u node gateway node openclaw.mjs models list
+```
+
+### 3.5 한국어 검색 재색인
+
+납품 설정은 FTS 토크나이저를 `trigram` 으로 둔다(`memory.search.store.fts.tokenizer`). 기본값 `unicode61` 은 한국어를 공백 단위로만 끊어서 "결재규정" 같은 붙은 말이 검색되지 않는다.
+
+토크나이저나 임베딩 모델을 바꾼 뒤에는 **기존 색인이 새 설정과 맞지 않으므로 다시 만들어야 한다.** 에이전트마다 따로 돈다.
+
+```bash
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml \
+  exec -u node gateway node openclaw.mjs memory index --force --agent main
+```
+
+- `--agent` 를 빼면 전 에이전트를 돈다. 부서 에이전트가 여러 개면 시간이 오래 걸리므로 하나씩 도는 편이 낫다.
+- 진행 상황은 `memory status --agent <id>` 로 본다. 색인 정체성 경고가 남아 있으면 아직 옛 설정으로 만든 행이 있다는 뜻이다.
+- 재색인은 대화 이력을 지우지 않는다. 파생 색인만 다시 만든다.
+
+### 3.6 문서 미리보기 변환기
+
+게이트웨이 이미지 빌드 인자 `OPENCLAW_IMAGE_APT_PACKAGES` 에 LibreOffice 3종과 `fonts-nanum` 이 들어 있다(2026-09-07 반영). 이것이 있어야 docx·xlsx·pptx 가 PDF 로 변환돼 미리보기가 뜬다. 없으면 PDF 만 정상이고 docx·xlsx 는 이미지 없는 HTML 폴백, pptx·doc·xls·ppt 는 실패한다.
+
+| 항목        | 값                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------- |
+| 이미지 증가 | 약 **+580 MiB** (실측 `chris-local/FILE-PREVIEW.md` 6절)                              |
+| 대상 확장자 | pdf, docx, xlsx, pptx, doc, xls, ppt                                                  |
+| 제외        | hwp·hwpx (사용자 확정 범위 밖. 화면에 안내문이 뜬다)                                  |
+| 폰트        | `fonts-noto-cjk` 계열 + `fonts-nanum`. 폰트가 없어도 변환은 종료코드 0 을 내므로 주의 |
+
+디스크가 빠듯해 변환기를 빼야 하면 빌드 인자에서 `libreoffice-*` 세 개만 지운다. 폰트는 PDF 생성에도 쓰이므로 남긴다.
 
 ## 4. 백업 · 복구
 

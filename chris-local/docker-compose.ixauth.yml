@@ -94,6 +94,12 @@ services:
       # Password policy for seeded and console-created accounts.
       IXAUTH_PASSWORD_MIN_LENGTH: ${IXAUTH_PASSWORD_MIN_LENGTH:-10}
       IXAUTH_LOG_LEVEL: ${IXAUTH_LOG_LEVEL:-INFO}
+      # Model provider credentials, empty by default: a deployment that answers from an
+      # internal ollama service needs neither. The Gateway reads these names directly,
+      # and the tracked config can also name them through a "${ANTHROPIC_API_KEY}"
+      # SecretRef, so the value stays in the env file. Setup: DEPLOY.md 3.4.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     # No ports section on purpose (design invariant 4). The console is reached through
     # the Gateway route /admin/identity/.
