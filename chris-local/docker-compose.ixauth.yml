@@ -69,10 +69,28 @@ services:
       # service-key only, so a browser could not reach it anyway, but the default is
       # OPEN and a default that says "closed" is the one worth writing down.
       IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
-      # Where mail links would point. There is no SMTP here (transport stays LOG, which
-      # writes the message to the server log), but the base URL is what makes a logged
-      # invitation link usable at all.
+      IXAUTH_ACCOUNT_SIGNUP_VERIFICATION: ${IXAUTH_ACCOUNT_SIGNUP_VERIFICATION:-EMAIL}
+      # Empty means any address may sign up. A comma separated list restricts it.
+      IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS: ${IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS:-}
+      # Three days. Long enough to survive a weekend, short enough that a forwarded
+      # invitation does not stay usable for a week.
+      IXAUTH_ACCOUNT_INVITE_TOKEN_TTL: ${IXAUTH_ACCOUNT_INVITE_TOKEN_TTL:-72h}
+      # Where mail links point. These are Gateway screens, not identity server pages
+      # (design invariant 4), so the base URL is the browser origin.
       IXAUTH_MAIL_APP_BASE_URL: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
+      IXAUTH_MAIL_FROM: ${IXAUTH_MAIL_FROM:-no-reply@localhost}
+      IXAUTH_MAIL_PRODUCT_NAME: ${IXAUTH_MAIL_PRODUCT_NAME:-Chris Agent}
+      # WEBHOOK is the default because this stack has no SMTP server. The identity
+      # server hands each message to the Gateway instead, which keeps the invitation
+      # link so an administrator can copy it out of the invitation screen. Set SMTP
+      # once a mail server exists; then invitations are mailed and nothing is kept.
+      IXAUTH_MAIL_TRANSPORT: ${IXAUTH_MAIL_TRANSPORT:-WEBHOOK}
+      IXAUTH_MAIL_WEBHOOK_URL: ${IXAUTH_MAIL_WEBHOOK_URL:-http://gateway:18789/auth/mail-hook}
+      IXAUTH_MAIL_SMTP_HOST: ${IXAUTH_MAIL_SMTP_HOST:-}
+      IXAUTH_MAIL_SMTP_PORT: ${IXAUTH_MAIL_SMTP_PORT:-587}
+      IXAUTH_MAIL_SMTP_USERNAME: ${IXAUTH_MAIL_SMTP_USERNAME:-}
+      IXAUTH_MAIL_SMTP_PASSWORD: ${IXAUTH_MAIL_SMTP_PASSWORD:-}
+      IXAUTH_MAIL_SMTP_STARTTLS: ${IXAUTH_MAIL_SMTP_STARTTLS:-true}
       # Password policy for seeded and console-created accounts.
       IXAUTH_PASSWORD_MIN_LENGTH: ${IXAUTH_PASSWORD_MIN_LENGTH:-10}
       IXAUTH_LOG_LEVEL: ${IXAUTH_LOG_LEVEL:-INFO}
@@ -110,6 +128,10 @@ services:
       # Behind bridge networking the request no longer looks local to the Gateway, so
       # the loopback development shortcut does not apply and this must be right.
       OPENCLAW_PUBLIC_ORIGIN: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
+      # The same value the identity server gets. start-gateway.sh derives
+      # gateway.auth.ixAuth.selfSignup from it, so the signup screen and the identity
+      # server's signup mode can never disagree.
+      IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       # Declarative config: the tracked template is copied over the state copy on every
@@ -136,6 +158,21 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks: [ix-auth-internal]
+
+  # Development inbox. Started only with --profile mail, and used to prove the SMTP
+  # branch end to end: set IXAUTH_MAIL_TRANSPORT=SMTP and IXAUTH_MAIL_SMTP_HOST=mailpit
+  # with port 1025, then read the message at http://127.0.0.1:18025.
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ["mail"]
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
+    ports:
+      - "${MAILPIT_UI_PORT:-18025}:8025"
     networks: [ix-auth-internal]
 
 volumes:

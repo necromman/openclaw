@@ -8,6 +8,7 @@
         "serviceKey": "${IXAUTH_SERVICE_KEY}",
         "issuer": "openclaw-ix-auth",
         "audience": "openclaw-gateway",
+        "selfSignup": "__OPENCLAW_SELF_SIGNUP__",
         "session": {
           "idleTimeoutMinutes": 30,
           "absoluteTimeoutHours": 12
