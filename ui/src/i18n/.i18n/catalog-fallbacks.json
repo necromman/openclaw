@@ -110,6 +110,48 @@
       "zh-CN",
       "zh-TW"
     ],
+    "cron.jobs.createdBy": [
+      "ar",
+      "de",
+      "es",
+      "fa",
+      "fr",
+      "hi",
+      "id",
+      "it",
+      "ja-JP",
+      "nl",
+      "pl",
+      "pt-BR",
+      "ru",
+      "th",
+      "tr",
+      "uk",
+      "vi",
+      "zh-CN",
+      "zh-TW"
+    ],
+    "cron.jobs.createdByChannel": [
+      "ar",
+      "de",
+      "es",
+      "fa",
+      "fr",
+      "hi",
+      "id",
+      "it",
+      "ja-JP",
+      "nl",
+      "pl",
+      "pt-BR",
+      "ru",
+      "th",
+      "tr",
+      "uk",
+      "vi",
+      "zh-CN",
+      "zh-TW"
+    ],
     "documentPreview.convertedBy": [
       "ar",
       "de",
@@ -3393,6 +3435,6 @@
       "zh-TW"
     ]
   },
-  "sourceHash": "581c4723dc39342191870fe8f74cf6da7c6d5f4f1a5a405fbbeb949f53585a5e",
+  "sourceHash": "8072c43026e9a27120de557ed94ed450977f19686a8ba1dc659acf647bc5d3b8",
   "version": 1
 }
