@@ -71,6 +71,11 @@ export type UserDetailPanelProps = {
   onDelete: () => void;
 };
 
+function formatMoment(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
 function statusLabel(status: string): string {
   return t(`ixAuth.users.status.${status}`);
 }
@@ -82,6 +87,11 @@ function renderIdentityRows(props: UserDetailPanelProps): unknown[] {
       title: user.email,
       description: [
         statusLabel(user.status),
+        // An automatic lockout clears itself, so the expiry is what tells an
+        // administrator whether unlocking is worth doing at all.
+        user.lockedUntil
+          ? t("ixAuth.users.lockedUntil", { time: formatMoment(user.lockedUntil) })
+          : undefined,
         props.emailVerified ? undefined : t("ixAuth.users.emailUnverified"),
         props.mfaEnabled ? t("ixAuth.users.mfaOn") : t("ixAuth.users.mfaOff"),
         t("ixAuth.users.sessionCount", { count: String(props.sessionCount) }),

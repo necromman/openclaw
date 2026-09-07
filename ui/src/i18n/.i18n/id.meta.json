@@ -133,6 +133,7 @@
     "ixAuth.users.importTitle",
     "ixAuth.users.importToggle",
     "ixAuth.users.inviteToggle",
+    "ixAuth.users.lockedUntil",
     "ixAuth.users.mfaOff",
     "ixAuth.users.mfaOn",
     "ixAuth.users.mfaReset",
@@ -161,10 +162,10 @@
     "tabs.lobsterdex",
     "tabs.users"
   ],
-  "generatedAt": "2026-09-07T15:21:46.648Z",
+  "generatedAt": "2026-09-07T15:24:26.170Z",
   "locale": "id",
-  "sourceHash": "b022af6aee96cd48228dac4a4d1e0888f89f5520ded084c5aa0c9e7a1827ddd0",
-  "totalKeys": 6547,
+  "sourceHash": "581c4723dc39342191870fe8f74cf6da7c6d5f4f1a5a405fbbeb949f53585a5e",
+  "totalKeys": 6548,
   "translatedKeys": 6387,
   "workflow": 1
 }

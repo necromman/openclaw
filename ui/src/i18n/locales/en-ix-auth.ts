@@ -147,6 +147,7 @@ const enIxAuth = {
       departmentsHelp: "Departments decide whose sessions this person can read.",
       mfaOn: "Two-step verification is on",
       mfaOff: "Two-step verification is off",
+      lockedUntil: "Locked until {time}",
       emailUnverified: "Address not confirmed",
       sessionCount: "{count} live sessions",
       actionsTitle: "Actions",

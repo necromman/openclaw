@@ -2798,6 +2798,27 @@
       "zh-CN",
       "zh-TW"
     ],
+    "ixAuth.users.lockedUntil": [
+      "ar",
+      "de",
+      "es",
+      "fa",
+      "fr",
+      "hi",
+      "id",
+      "it",
+      "ja-JP",
+      "nl",
+      "pl",
+      "pt-BR",
+      "ru",
+      "th",
+      "tr",
+      "uk",
+      "vi",
+      "zh-CN",
+      "zh-TW"
+    ],
     "ixAuth.users.mfaOff": [
       "ar",
       "de",
@@ -3372,6 +3393,6 @@
       "zh-TW"
     ]
   },
-  "sourceHash": "b022af6aee96cd48228dac4a4d1e0888f89f5520ded084c5aa0c9e7a1827ddd0",
+  "sourceHash": "581c4723dc39342191870fe8f74cf6da7c6d5f4f1a5a405fbbeb949f53585a5e",
   "version": 1
 }
