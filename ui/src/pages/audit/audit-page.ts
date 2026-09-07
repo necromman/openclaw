@@ -152,6 +152,7 @@ export class AuditPage extends OpenClawLightDomElement {
             .value=${this.filters.person}
             placeholder=${t("ixAuth.audit.filterPersonPlaceholder")}
             @change=${(event: Event) =>
+              // SAFETY: the listener is bound to this input element.
               this.updateFilter({ person: (event.target as HTMLInputElement).value })}
           />
         </label>
@@ -161,6 +162,7 @@ export class AuditPage extends OpenClawLightDomElement {
             .value=${this.filters.kind}
             @change=${(event: Event) =>
               this.updateFilter({
+                // SAFETY: bound to this select, whose options are the kind union plus "".
                 kind: (event.target as HTMLSelectElement).value as AuditActivityFilters["kind"],
               })}
           >
@@ -176,6 +178,7 @@ export class AuditPage extends OpenClawLightDomElement {
             type="date"
             .value=${this.filters.since}
             @change=${(event: Event) =>
+              // SAFETY: the listener is bound to this input element.
               this.updateFilter({ since: (event.target as HTMLInputElement).value })}
           />
         </label>
@@ -185,6 +188,7 @@ export class AuditPage extends OpenClawLightDomElement {
             type="date"
             .value=${this.filters.until}
             @change=${(event: Event) =>
+              // SAFETY: the listener is bound to this input element.
               this.updateFilter({ until: (event.target as HTMLInputElement).value })}
           />
         </label>

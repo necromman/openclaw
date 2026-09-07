@@ -77,20 +77,20 @@ export const auditUserActivityHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    const profileId = normalizeOptionalString(params.profileId);
+    const email = normalizeOptionalString(params.email);
+    const agentId = normalizeOptionalString(params.agentId);
+    const sessionKey = normalizeOptionalString(params.sessionKey);
     const page = queryUserActivityAudit({
       reader: resolveUserActivityReader(client),
       ...(cursor !== undefined ? { cursor } : {}),
       ...(params.limit !== undefined ? { limit: params.limit } : {}),
       filters: {
-        ...(normalizeOptionalString(params.profileId)
-          ? { profileId: params.profileId as string }
-          : {}),
-        ...(normalizeOptionalString(params.email) ? { email: params.email as string } : {}),
+        ...(profileId ? { profileId } : {}),
+        ...(email ? { email } : {}),
         ...(params.kind ? { kind: params.kind } : {}),
-        ...(normalizeOptionalString(params.agentId) ? { agentId: params.agentId as string } : {}),
-        ...(normalizeOptionalString(params.sessionKey)
-          ? { sessionKey: params.sessionKey as string }
-          : {}),
+        ...(agentId ? { agentId } : {}),
+        ...(sessionKey ? { sessionKey } : {}),
         ...(params.from !== undefined ? { from: params.from } : {}),
         ...(params.to !== undefined ? { to: params.to } : {}),
       },

@@ -119,9 +119,11 @@ function serializeDetail(detail: Record<string, unknown> | undefined): string {
 function parseJsonObject(value: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(value);
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    // SAFETY: the object test directly above proves the cast.
+    return parsed as Record<string, unknown>;
   } catch {
     // A corrupt row must not break a whole page of otherwise readable evidence.
     return {};
@@ -141,7 +143,9 @@ function rowToEntry(row: UserActivityAuditRow): UserActivityAuditEntry {
   return {
     sequence: row.sequence,
     at: row.at,
+    // SAFETY: only this module writes these columns, and it writes the closed unions.
     kind: row.kind as UserActivityAuditKind,
+    // SAFETY: same writer, same closed union.
     actorSource: row.actor_source as UserActivityAuditActorSource,
     ...(row.profile_id ? { profileId: row.profile_id } : {}),
     ...(row.email ? { email: row.email } : {}),

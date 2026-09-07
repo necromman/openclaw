@@ -19,6 +19,10 @@ function requestQuery(req: IncomingMessage): URLSearchParams {
   return new URL(req.url ?? "/", "http://localhost").searchParams;
 }
 
+function readText(query: URLSearchParams, name: string): string | undefined {
+  return query.get(name)?.trim() || undefined;
+}
+
 function readTimestamp(value: string | null): number | undefined {
   if (!value) {
     return undefined;
@@ -27,20 +31,31 @@ function readTimestamp(value: string | null): number | undefined {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
+function readKind(query: URLSearchParams): UserActivityAuditFilters["kind"] {
+  const kind = readText(query, "kind");
+  const known: readonly string[] = USER_ACTIVITY_AUDIT_KINDS;
+  if (!kind || !known.includes(kind)) {
+    return undefined;
+  }
+  // SAFETY: the membership test directly above proves the cast.
+  return kind as UserActivityAuditFilters["kind"];
+}
+
 function readFilters(req: IncomingMessage): UserActivityAuditFilters {
   const query = requestQuery(req);
-  const kind = query.get("kind");
+  const kind = readKind(query);
   const from = readTimestamp(query.get("from"));
   const to = readTimestamp(query.get("to"));
+  const profileId = readText(query, "profileId");
+  const email = readText(query, "email");
+  const agentId = readText(query, "agentId");
+  const sessionKey = readText(query, "sessionKey");
   return {
-    ...(query.get("profileId") ? { profileId: query.get("profileId") as string } : {}),
-    ...(query.get("email") ? { email: query.get("email") as string } : {}),
-    ...(kind && (USER_ACTIVITY_AUDIT_KINDS as readonly string[]).includes(kind)
-      ? // SAFETY: the membership test directly above proves the cast.
-        { kind: kind as UserActivityAuditFilters["kind"] }
-      : {}),
-    ...(query.get("agentId") ? { agentId: query.get("agentId") as string } : {}),
-    ...(query.get("sessionKey") ? { sessionKey: query.get("sessionKey") as string } : {}),
+    ...(profileId ? { profileId } : {}),
+    ...(email ? { email } : {}),
+    ...(kind ? { kind } : {}),
+    ...(agentId ? { agentId } : {}),
+    ...(sessionKey ? { sessionKey } : {}),
     ...(from !== undefined ? { from } : {}),
     ...(to !== undefined ? { to } : {}),
   };

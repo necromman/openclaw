@@ -20,6 +20,20 @@ import { runCommandWithRuntime } from "../cli-utils.js";
  * A subcommand of `audit` rather than a command of its own because both read audit
  * history; they differ in whose history it is.
  */
+function optionalOption(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function auditUsersKind(value: unknown): AuditUsersCommandOptions["kind"] {
+  const kind = optionalOption(value);
+  const known: readonly string[] = USER_ACTIVITY_AUDIT_KINDS;
+  if (!kind || !known.includes(kind)) {
+    return undefined;
+  }
+  // SAFETY: the membership test directly above proves the cast.
+  return kind as AuditUsersCommandOptions["kind"];
+}
+
 function registerAuditUsersSubcommand(audit: Command): void {
   audit
     .command("users")
@@ -38,15 +52,15 @@ function registerAuditUsersSubcommand(audit: Command): void {
       await runCommandWithRuntime(defaultRuntime, async () => {
         await auditUsersCommand(
           {
-            email: opts.email as string | undefined,
-            profileId: opts.profile as string | undefined,
-            kind: opts.kind as AuditUsersCommandOptions["kind"],
-            agentId: opts.agent as string | undefined,
-            sessionKey: opts.session as string | undefined,
-            since: opts.since as string | undefined,
-            until: opts.until as string | undefined,
-            cursor: opts.cursor as string | undefined,
-            limit: opts.limit as string | undefined,
+            email: optionalOption(opts.email),
+            profileId: optionalOption(opts.profile),
+            kind: auditUsersKind(opts.kind),
+            agentId: optionalOption(opts.agent),
+            sessionKey: optionalOption(opts.session),
+            since: optionalOption(opts.since),
+            until: optionalOption(opts.until),
+            cursor: optionalOption(opts.cursor),
+            limit: optionalOption(opts.limit),
             json: Boolean(opts.json),
           },
           defaultRuntime,
