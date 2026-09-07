@@ -108,7 +108,7 @@ docker compose --env-file chris-local/ixauth.env \
 
 `http://<OPENCLAW_PUBLIC_ORIGIN>` 을 열면 로그인 화면이 뜬다. 토큰도 기기 페어링도 없다.
 
-> **`__Host-` 쿠키 주의.** HTTPS 가 아니고 루프백도 아닌 주소로 접근하면 브라우저가 세션 쿠키를 저장하지 않는다. 로컬 검증은 반드시 `http://127.0.0.1:18800` 으로 하고(`localhost` 는 다른 이름이라 오리진이 어긋난다), 실배포는 TLS 뒤에 둔다.
+> **`__Host-` 쿠키 주의.** 기본 쿠키 이름은 `__Host-` 접두라 `Secure` 를 요구하지만, 게이트웨이는 비보안 컨텍스트에서 접두사와 `Secure` 를 스스로 떼고 내리므로 평문 HTTP 사내망 IP 에서도 세션이 유지된다(근거와 대가는 11.2). 로컬 검증은 `http://127.0.0.1:18800` 으로 하고(`localhost` 는 다른 이름이라 오리진이 어긋난다), 실배포는 TLS 뒤에 두는 것을 권한다.
 
 ### 3.1 첫 로그인 직후 할 일 (운영 지시)
 
@@ -427,7 +427,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | `up -d` 후 게이트웨이가 계속 재시작한다        | `docker compose ... logs gateway`. 설정 오류면 `Gateway start blocked:` 로 시작하는 줄이 이유를 말한다    |
 | 로그인 폼에서 403 `origin_not_allowed`         | `OPENCLAW_PUBLIC_ORIGIN` 이 브라우저 주소창의 오리진과 글자 그대로 같은지. 다시 기동해야 반영된다         |
 | 로그인 200 인데 바로 로그아웃된다              | issuer/audience 불일치. 이 스택에서는 양쪽에 박혀 있으므로, 설정 파일을 손댔다면 되돌린다                 |
-| 쿠키가 아예 저장되지 않는다                    | HTTPS 도 루프백도 아닌 주소. `__Host-` 쿠키는 그런 곳에 저장되지 않는다                                   |
+| 쿠키가 아예 저장되지 않는다                    | 프록시 뒤인데 `gateway.trustedProxies` 가 비어 있거나, 반대로 `Secure` 가 붙었는데 평문이다 (11.2·11.3)   |
 | 로그인은 되는데 "승인되지 않은 기기" 로 끊긴다 | 이 모드는 기기 페어링을 요구하지 않는다. 이 메시지가 보이면 이미지가 구버전이다                           |
 | 사용자 관리가 403                              | 그 계정의 역할이 `superadmin`·`admin` 이 아니다. 설정 > 사용자 에서 역할을 바꾼다(세션은 자동으로 끊긴다) |
 | 콘솔에서 저장이 403 `csrf_mismatch`            | 게이트웨이 세션이 만료됐다. Control UI 탭을 새로 고쳐 로그인한 뒤 콘솔을 다시 연다                        |
@@ -443,3 +443,308 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | 초대장 가입 화면    | 미구현. 계정은 콘솔에서 만든다                                                                                    |
 | ko 외 로케일        | 번역 제공자 없이 동기화해 영어 폴백 상태다. `pnpm ui:i18n:check` 가 그 때문에 실패한다                            |
 | 메일                | SMTP 설정이 없다. 비밀번호 재설정·초대 메일은 보내지지 않는다                                                     |
+
+## 11. 사내망 IP:포트 프로파일
+
+> 도메인도 DNS 도 없이 `http://<사내 IP>:18800` 으로 배치하는 경우다.\
+> 설계 근거는 `infra/local/openclaw-jinbio-nas-feasibility.md` 7절, 폴더 통제는\
+> [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13절.
+
+### 11.1 바꿔야 하는 것은 값 하나뿐이다
+
+| 항목                                                | 값                         | 어디서                                                      |
+| --------------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
+| `gateway.bind`                                      | `lan`                      | 이미 그렇다. `start-gateway.sh` 가 `--bind lan` 으로 띄운다 |
+| `gateway.publicOrigin` / `controlUi.allowedOrigins` | `http://192.168.0.8:18800` | `.env` 의 `OPENCLAW_PUBLIC_ORIGIN` 하나로 렌더링된다        |
+| 호스트 포트                                         | `18800`                    | `.env` 의 `OPENCLAW_GATEWAY_PORT`                           |
+
+```bash
+# chris-local/ixauth.env
+OPENCLAW_PUBLIC_ORIGIN=http://192.168.0.8:18800
+```
+
+도메인·서브도메인·인증서·DNS 레코드는 하나도 필요 없다.\
+IX-Auth 의 `issuer`·`audience` 는 고정 리터럴이라 주소와 무관하고(2절), 브라우저가 보는 유일한\
+URL 키가 `publicOrigin` 이다. 오리진 검증은 문자열 완전 일치라 `IP:포트` 가 그대로 통과한다.
+
+값을 바꾼 뒤에는 반드시 다시 기동한다. 설정은 기동 시점에 렌더링된다.
+
+### 11.2 평문 HTTP 에서 세션이 유지되는 이유
+
+기본 세션 쿠키 이름은 `__Host-openclaw-session` 이다. `__Host-` 접두 쿠키는 브라우저가 `Secure`\
+없이는 저장하지 않고, `Secure` 는 평문 HTTP 에서 거부된다. 그대로면 사내망 IP 접속에서 로그인이\
+말없이 실패한다.
+
+게이트웨이는 그 경우 **접두사를 떼고 `Secure` 없이** 쿠키를 내린다.
+
+| 무엇                    | 어디                                                                   |
+| ----------------------- | ---------------------------------------------------------------------- |
+| 보안 컨텍스트 판정      | `src/gateway/cookie-header.ts:135-150` `isSecureGatewayBrowserContext` |
+| 쓸 때 접두사 제거       | `src/gateway/ix-auth-http.ts:86-92` `resolveEffectiveCookieName`       |
+| `Secure` 속성           | `src/gateway/ix-auth-http.ts:64-78` (판정 결과를 그대로 쓴다)          |
+| 읽을 때 두 이름 다 시도 | `src/gateway/ix-auth-principal.ts:21-34` `readIxAuthSessionCookie`     |
+
+읽는 쪽은 설정된 이름으로 먼저 찾고, 없으면 `__Host-` 를 뗀 이름으로 한 번 더 찾는다\
+(`ix-auth-principal.ts:26-33`). 그래서 설정 값 하나로 TLS 배포와 평문 배포가 모두 성립한다.\
+동반 CSRF 쿠키도 세션 쿠키 이름에서 파생되므로 같이 접두사를 잃는다.
+
+보안 컨텍스트로 인정되는 것은 **TLS 종단**, **루프백 주소**, 그리고 **신뢰하는 프록시가 보낸\
+`x-forwarded-proto: https`** 셋뿐이다(`cookie-header.ts:141-150`).\
+`x-forwarded-proto` 는 `gateway.trustedProxies` 에 등록된 주소에서 온 요청에서만 읽는다.\
+등록하지 않으면 아무나 HTTPS 를 자칭해 브라우저가 버릴 `Secure` 쿠키를 유도할 수 있기 때문이다.
+
+#### 대가
+
+이 폴백은 **동작을 살리는 것이지 안전을 만드는 것이 아니다.**
+
+| 손실           | 결과                                                                           |
+| -------------- | ------------------------------------------------------------------------------ |
+| 세션 쿠키 평문 | 같은 LAN 에서 스니핑·ARP 스푸핑으로 쿠키를 가져가면 **그 사람으로 로그인된다** |
+| 자격증명 평문  | 로그인 이메일·비밀번호가 그대로 흐른다                                         |
+| 무결성 없음    | 응답·스크립트 주입을 막을 수단이 없다                                          |
+
+"사내망이라 괜찮다" 는 것은 사내망에 있는 모든 기기를 신뢰한다는 뜻이다.\
+개인 노트북·프린터·게스트 와이파이가 같은 대역에 있으면 그 전제가 성립하지 않는다.
+
+### 11.3 권고: IP SAN 사설 인증서 리버스 프록시
+
+도메인 없이도 TLS 는 가능하다. 인증서의 SAN 에 **IP 주소**를 넣으면 된다.\
+그러면 11.2 의 손실이 사라지고 `__Host-`·`Secure` 도 돌아온다.
+
+#### (가) 인증서 만들기
+
+```bash
+sudo mkdir -p /etc/nginx/tls
+sudo openssl req -x509 -newkey rsa:2048 -nodes -days 398 \
+  -keyout /etc/nginx/tls/gateway.key \
+  -out    /etc/nginx/tls/gateway.crt \
+  -subj   "/CN=192.168.0.8" \
+  -addext "subjectAltName=IP:192.168.0.8" \
+  -addext "basicConstraints=critical,CA:FALSE" \
+  -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+  -addext "extendedKeyUsage=serverAuth"
+sudo chmod 600 /etc/nginx/tls/gateway.key
+
+# 확인: SAN 에 IP 가 들어갔는지
+openssl x509 -in /etc/nginx/tls/gateway.crt -noout -text | grep -A1 "Subject Alternative Name"
+```
+
+`CN` 만으로는 요즘 브라우저가 인정하지 않는다. **SAN 의 `IP:` 항목이 실제로 판정에 쓰인다.**\
+유효기간을 398일로 잡은 것은 그보다 긴 잎 인증서를 거부하는 브라우저가 있기 때문이다.\
+만든 `gateway.crt` 는 사내 PC 에 "신뢰할 수 있는 루트 인증 기관" 으로 배포한다.
+
+#### (나) nginx
+
+```nginx
+# /etc/nginx/conf.d/openclaw.conf
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ""      close;
+}
+
+server {
+  listen 18443 ssl;
+  http2 on;
+  server_name 192.168.0.8;
+
+  ssl_certificate     /etc/nginx/tls/gateway.crt;
+  ssl_certificate_key /etc/nginx/tls/gateway.key;
+  ssl_protocols       TLSv1.2 TLSv1.3;
+
+  # 첨부 업로드가 막히지 않게 넉넉히 잡는다
+  client_max_body_size 100m;
+
+  location / {
+    proxy_pass http://127.0.0.1:18800;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+
+    # Control UI 는 WebSocket 으로 붙는다. 이 두 줄이 없으면 화면이 영원히 연결 중이다
+    proxy_set_header Upgrade    $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+
+    # 대화는 오래 열려 있고 응답은 스트리밍이다
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_buffering    off;
+  }
+}
+```
+
+`map` 블록의 빈 문자열 값은 nginx 문법상 작은따옴표 두 개(`''`)로 적어도 같다.
+
+#### (다) 프록시를 앞에 둘 때 같이 바꾸는 것
+
+```bash
+# chris-local/ixauth.env
+OPENCLAW_PUBLIC_ORIGIN=https://192.168.0.8:18443
+```
+
+```json5
+// ixauth-gateway-config/openclaw.json 의 gateway 아래
+{
+  gateway: {
+    // 프록시가 보낸 x-forwarded-proto 를 읽으려면 그 출처를 등록해야 한다.
+    // 호스트에서 publish 된 포트를 거쳐 들어오면 컨테이너가 보는 주소는 127.0.0.1 이
+    // 아니라 브리지 게이트웨이(172.x.0.1)다. 실제 값은 아래 명령으로 확인한다.
+    trustedProxies: ["172.16.0.0/12", "127.0.0.1"],
+  },
+}
+```
+
+```bash
+# 컨테이너가 실제로 보는 출발 주소 확인
+docker compose --env-file chris-local/ixauth.env \
+  -f chris-local/docker-compose.ixauth.yml logs gateway | tail -50
+
+# 게이트웨이 포트를 프록시가 있는 호스트에서만 열리게 좁힌다 (7절)
+#   ports: - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18800}:18789"
+```
+
+`trustedProxies` 를 비워 두면 프록시를 세워도 게이트웨이는 여전히 평문 접속으로 판정하고\
+접두사 없는 쿠키를 내린다. 동작은 하지만 `__Host-`·`Secure` 는 돌아오지 않는다.
+
+### 11.4 NAS 공유 마운트 절차
+
+에이전트가 NAS 부서 폴더를 보게 하는 3단계다. 설계는 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13절.
+
+#### (가) 호스트에 마운트한다
+
+```bash
+sudo mkdir -p /srv/nas/rnd /srv/nas/qa
+
+# 자격증명은 파일로 뺀다. fstab 에 비밀번호를 적지 않는다
+sudo install -m 600 /dev/null /etc/nas-credentials
+sudo nano /etc/nas-credentials
+#   username=<읽기전용계정>
+#   password=<비밀번호>
+```
+
+```text
+# /etc/fstab - SMB(cifs)
+//<NAS-IP>/rnd  /srv/nas/rnd  cifs  credentials=/etc/nas-credentials,ro,uid=1000,gid=1000,file_mode=0444,dir_mode=0555,vers=3.0,_netdev,nofail  0  0
+
+# /etc/fstab - NFS 를 쓰는 경우
+<NAS-IP>:/volume1/rnd  /srv/nas/rnd  nfs  ro,soft,timeo=100,_netdev,nofail  0  0
+```
+
+```bash
+sudo mount -a
+mount | grep /srv/nas          # ro 로 붙었는지 확인
+touch /srv/nas/rnd/x           # "Read-only file system" 이 나와야 정상
+```
+
+`nofail` 은 NAS 가 꺼져 있을 때 호스트 부팅이 멈추지 않게 한다.\
+`ro` 는 호스트 단계의 1차 방어선이고, NAS 계정 자체를 읽기 전용으로 만드는 것이 더 확실하다.
+
+#### (나) compose 에 넣는다
+
+```bash
+# chris-local/ixauth.env
+OPENCLAW_NAS_ROOT=/srv/nas
+```
+
+`docker-compose.ixauth.yml` 이 그 아래 `rnd`·`qa` 를 `/mnt/nas/rnd`·`/mnt/nas/qa` 로 `:ro` 마운트하고,\
+`start-gateway.sh` 가 이 값이 비어 있지 않을 때만 `rnd-bot`·`qa-bot` 워크스페이스를 그 경로로 바꾼다.\
+값을 비우면 마운트만 남고 워크스페이스는 상태 디렉터리 안의 기본 경로로 돌아간다.
+
+**인사·급여 폴더는 `volumes:` 에 넣지 않는다.** 안 넣은 폴더는 컨테이너 안에 존재하지 않는다.\
+차단 목록을 관리하는 대신 마운트 목록만 관리하는 것이 이 배포의 폴더 통제 전부다.
+
+**워크스페이스 부트스트랩에 주의한다.** `OPENCLAW_NAS_ROOT` 를 켜면 `rnd-bot`·`qa-bot` 의\
+`skipBootstrap` 이 `true` 로 렌더링된다. 읽기 전용 워크스페이스에서는 `AGENTS.md` 발행이\
+`EROFS` 로 실패해 첫 턴이 죽기 때문이다. G 단계에서 에이전트별 키를 추가해 `main` 은 영향을 받지\
+않는다. 근거는 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.7 에 있다.
+
+#### (다) 컨테이너 안에서 확인한다
+
+```bash
+CO="docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml"
+
+$CO up -d
+
+# 마운트가 붙었는지, ro 인지
+$CO exec gateway sh -c "ls /mnt/nas && grep /mnt/nas /proc/mounts"
+
+# 쓰기가 실패하는 것이 정상이다
+$CO exec gateway sh -c "touch /mnt/nas/rnd/x"     # "Read-only file system"
+
+# 인사 폴더는 없어야 한다
+$CO exec gateway sh -c "ls /mnt/nas/hr"           # "No such file or directory"
+
+# 렌더링된 설정에 워크스페이스가 실제로 들어갔는지
+$CO exec gateway sh -c "grep -A2 workspace /home/node/.openclaw/openclaw.json"
+```
+
+#### (라) 마운트가 끊겼을 때
+
+| 증상                                    | 확인                                                                  |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| 에이전트가 "폴더가 비어 있다" 고 답한다 | 호스트에서 `mount` 출력에 `/srv/nas` 줄이 있는지. 없으면 빠진 것이다  |
+| 파일 목록은 나오는데 읽기에서 멈춘다    | NAS 가 응답하지 않는다. 호스트에서 `ls /srv/nas/rnd` 도 멈추는지 본다 |
+| 컨테이너 안 `/mnt/nas/rnd` 가 비었다    | 마운트 시점 문제다. 호스트에서 다시 마운트한 뒤 컨테이너를 재시작한다 |
+| 재부팅 후 사라졌다                      | `/etc/fstab` 항목이 없거나 `_netdev` 가 빠졌다                        |
+
+호스트에서 다시 마운트해도 컨테이너 안 바인드 마운트는 **끊긴 예전 것을 계속 본다.**\
+`mount -a` 뒤에는 게이트웨이 컨테이너를 재시작한다.
+
+### 11.5 사용자 20명을 CSV 로 한 번에 넣기
+
+NAS 로컬 사용자 목록을 계정으로 옮기는 절차다. 화면은 F 단계에서 만든 **설정 > 사용자 관리**\
+(`/settings/users`)의 CSV 가져오기이고, 형식 정본은 [AUTH-USERS.md](AUTH-USERS.md) 6절이다.
+
+#### (가) 형식
+
+```csv
+email,name,roles,departments
+kim@example.com,김철수,MEMBER,dept-rnd
+lee@example.com,이영희,EXECUTIVE,dept-rnd;dept-qa
+park@example.com,박민수,ADMIN,
+```
+
+| 항목     | 규칙                                                                            |
+| -------- | ------------------------------------------------------------------------------- |
+| 헤더     | **필수.** 열 이름으로 매핑한다                                                  |
+| 열 이름  | `email`(필수), `name`/`displayName`, `role`/`roles`, `department`/`departments` |
+| 여러 값  | 역할·부서는 세미콜론 또는 세로줄로 나눈다. 쉼표는 CSV 구분자다                  |
+| 상한     | 500행. 넘으면 신원 서버를 부르기 전에 400 `too_many_rows`                       |
+| 비밀번호 | 만들지 않는다. 전원에게 초대 메일이 나가고 본인이 정한다                        |
+| 실패     | 행 단위. 한 줄이 틀려도 나머지는 들어간다. 결과에 줄 번호와 사유가 나온다       |
+
+부서 열에는 **그룹 코드를 그대로** 적는다. 접두사를 포함한 `dept-rnd` 이지 `rnd` 가 아니다.\
+역할 열에 이 배포가 모르는 코드가 하나라도 있으면 파일 전체가 거절된다.
+
+#### (나) 순서
+
+```text
+1. IX-Auth 콘솔에서 부서 그룹을 먼저 만든다 (3.3). CSV 의 dept- 코드가 이미 있어야 한다
+2. NAS 사용자 목록을 위 4개 열로 옮긴다
+   - email 이 없는 로컬 계정은 만들 수 없다. 사내 메일 주소를 먼저 정한다
+   - 부서는 그 사람이 쓰던 공유 폴더에서 그대로 딴다
+   - 역할은 기본 MEMBER, 임원만 EXECUTIVE, 관리자만 ADMIN
+3. 설정 > 사용자 관리 > CSV 가져오기 로 올린다
+4. 결과의 실패 행(줄 번호와 사유)을 고쳐 그 줄만 다시 올린다
+5. 목록에서 부서 필터로 부서별 인원을 눈으로 확인한다
+6. 부서별 에이전트를 만들고 묶는다 (AUTH-DEPARTMENTS.md 13.6)
+```
+
+메일이 나가지 않는 배포(`IXAUTH_MAIL_TRANSPORT=WEBHOOK`)에서는 초대 링크가 화면에 남는다.\
+20명이면 링크를 하나씩 전달해야 하므로, CSV 가져오기 전에 SMTP 를 먼저 붙이는 편이 낫다(2.1).
+
+부서를 나중에 통째로 바꿀 때도 같은 화면을 쓴다. 목록에서 부서로 거른 뒤 역할·부서를 고치는 편이\
+CSV 를 다시 올리는 것보다 안전하다. CSV 는 **추가**용이다.
+
+### 11.6 어디에 설치할 것인가
+
+**NAS 에 직접 설치하는 것은 PoC 로만 한다.** 상시 운영은 별도 x86 호스트(미니PC 또는 VM)를 권한다.
+
+이 스택은 컨테이너 4개이고, 게이트웨이 하나가 Node 와 Chromium 과 LibreOffice 를 함께 들고 있다.\
+여기에 JVM(신원 서버)과 PostgreSQL 이 붙는다. 저사양 2코어 NAS 에서는 문서 미리보기 한 번에\
+CPU 가 포화되고, 그동안 NAS 본래의 파일 서비스가 같이 느려진다. 요구 사양은 1절에 있다.
+
+NAS 는 **파일 공유 자리로 두고**, 게이트웨이 호스트가 그 공유를 읽기 전용으로 마운트하는 배치가\
+11.4 의 그림이다. 그러면 NAS 부하는 파일 읽기뿐이고, 모델·변환·브라우저는 전부 별도 호스트에 남는다.
