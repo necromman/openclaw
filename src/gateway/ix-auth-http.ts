@@ -10,8 +10,6 @@ import {
   relayIxAuthLogin,
   relayIxAuthLogout,
   relayIxAuthMfaVerify,
-  type IxAuthRelayFailure,
-  type IxAuthRequestMeta,
   type IxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-client.js";
 import { syncIxAuthDepartments } from "../auth/ix-auth/ix-auth-departments.js";
@@ -28,7 +26,7 @@ import {
 } from "../auth/ix-auth/ix-auth-types.js";
 import { revokeIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { ensureProfileForEmail } from "../state/user-profiles.js";
-import { AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET, type AuthRateLimiter } from "./auth-rate-limit.js";
+import { AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET } from "./auth-rate-limit.js";
 import {
   appendGatewayClearCookie,
   appendGatewaySetCookie,
@@ -36,58 +34,32 @@ import {
   serializeGatewaySetCookie,
   type GatewayCookieAttributes,
 } from "./cookie-header.js";
-import { readJsonBody } from "./hooks.js";
 import { sendJson } from "./http-common.js";
 import {
   classifyIxAuthHttpPath,
+  isIxAuthAdminAccountRoute,
+  isIxAuthPublicAccountRoute,
   IX_AUTH_ADMIN_PROXY_BASE_PATH,
   type IxAuthHttpRoute,
 } from "./ix-auth-http-paths.js";
-import { checkBrowserOrigin } from "./origin-check.js";
+import {
+  IX_AUTH_INVALID_CREDENTIALS,
+  mapRelayFailureToResponse,
+  readIxAuthJsonBody,
+  readRequestMeta,
+  rejectDisallowedOrigin,
+  type IxAuthHttpDependencies,
+} from "./ix-auth-http-shared.js";
 import { withSerializedRateLimitAttempt } from "./rate-limit-attempt-serialization.js";
+
+export {
+  isAllowedIxAuthBrowserOrigin,
+  type IxAuthHttpDependencies,
+  type IxAuthSecurityEvent,
+} from "./ix-auth-http-shared.js";
 
 /** Built-in console route, trailing slash included so the page derives its own base. */
 const IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH = `${IX_AUTH_ADMIN_PROXY_BASE_PATH}/`;
-
-/** Login bodies are tiny; anything larger is not a login form. */
-const IX_AUTH_BODY_MAX_BYTES = 4 * 1024;
-
-/** Uniform failure body. Never distinguishes "no such account" from "wrong password". */
-const IX_AUTH_INVALID_CREDENTIALS = {
-  error: "invalid_credentials",
-  message: "The email or password is incorrect.",
-} as const;
-
-export type IxAuthHttpDependencies = {
-  settings: IxAuthRuntimeSettings;
-  /** Origins permitted to drive these routes, from gateway.controlUi.allowedOrigins. */
-  allowedOrigins?: string[];
-  allowHostHeaderOriginFallback?: boolean;
-  /** Real visitor IP resolved by ingress attribution, not the socket address. */
-  clientIp?: string;
-  isLocalClient: boolean;
-  /** True when the browser reached the Gateway over TLS or a loopback secure context. */
-  isSecureContext: boolean;
-  rateLimiter?: AuthRateLimiter;
-  onSecurityEvent?: (event: IxAuthSecurityEvent) => void;
-};
-
-/** Audit-shaped record of one authentication decision on the HTTP line. */
-export type IxAuthSecurityEvent = {
-  action:
-    | "ix-auth.login.succeeded"
-    | "ix-auth.login.failed"
-    | "ix-auth.login.mfa-required"
-    | "ix-auth.logout"
-    | "ix-auth.session.rejected";
-  outcome: "succeeded" | "failed" | "denied";
-  clientIp?: string;
-  profileId?: string;
-  identitySubject?: string;
-  identitySessionId?: string;
-  loginSessionId?: string;
-  reason?: string;
-};
 
 function buildSessionCookieAttributes(params: {
   isSecureContext: boolean;
@@ -181,139 +153,6 @@ function clearIxAuthSessionCookies(params: {
     name: resolveCsrfCookieName(cookieName),
     attributes: { ...attributes, httpOnly: false },
   });
-}
-
-function readRequestMeta(req: IncomingMessage, clientIp: string | undefined): IxAuthRequestMeta {
-  const userAgent = req.headers["user-agent"];
-  const requestId = req.headers["x-request-id"];
-  return {
-    clientIp,
-    userAgent: typeof userAgent === "string" ? userAgent : undefined,
-    requestId: typeof requestId === "string" ? requestId : undefined,
-  };
-}
-
-function readFirstHeaderValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-/**
- * Reject a request whose browser origin is not allowed.
- *
- * Chrome omits `Origin` on same-origin GET requests, so demanding the header outright
- * would reject the very session probe the Control UI makes on every load. The gateway's
- * established rule applies instead: no Origin is acceptable only when the browser
- * declares `Sec-Fetch-Site: same-origin`, which a cross-site caller cannot forge.
- */
-export function isAllowedIxAuthBrowserOrigin(params: {
-  origin?: string;
-  fetchSite?: string;
-  requestHost?: string;
-  allowedOrigins?: string[];
-  allowHostHeaderOriginFallback?: boolean;
-  isLocalClient: boolean;
-}): boolean {
-  const origin = params.origin?.trim();
-  if (!origin) {
-    const fetchSite = params.fetchSite?.trim().toLowerCase();
-    // "same-origin" is set by the browser and cannot be forged by a cross-site page.
-    // "none" is a user-initiated navigation such as typing the address, which is not
-    // an attacker-controlled context either.
-    return fetchSite === "same-origin" || fetchSite === "none";
-  }
-  return checkBrowserOrigin({
-    requestHost: params.requestHost,
-    origin,
-    allowedOrigins: params.allowedOrigins,
-    allowHostHeaderOriginFallback: params.allowHostHeaderOriginFallback,
-    isLocalClient: params.isLocalClient,
-  }).ok;
-}
-
-function rejectDisallowedOrigin(params: {
-  req: IncomingMessage;
-  res: ServerResponse;
-  deps: IxAuthHttpDependencies;
-}): boolean {
-  const allowed = isAllowedIxAuthBrowserOrigin({
-    origin: readFirstHeaderValue(params.req.headers.origin),
-    fetchSite: readFirstHeaderValue(params.req.headers["sec-fetch-site"]),
-    requestHost: readFirstHeaderValue(params.req.headers.host),
-    allowedOrigins: params.deps.allowedOrigins,
-    allowHostHeaderOriginFallback: params.deps.allowHostHeaderOriginFallback,
-    isLocalClient: params.deps.isLocalClient,
-  });
-  if (allowed) {
-    return false;
-  }
-  sendJson(params.res, 403, { error: "origin_not_allowed" });
-  return true;
-}
-
-async function readIxAuthJsonBody(
-  req: IncomingMessage,
-  res: ServerResponse,
-): Promise<Record<string, unknown> | undefined> {
-  const body = await readJsonBody(req, IX_AUTH_BODY_MAX_BYTES);
-  if (!body.ok) {
-    sendJson(res, 400, { error: "invalid_body" });
-    return undefined;
-  }
-  if (body.value === null || typeof body.value !== "object" || Array.isArray(body.value)) {
-    sendJson(res, 400, { error: "invalid_body" });
-    return undefined;
-  }
-  // SAFETY: the guard above rejected null, non-objects, and arrays.
-  return body.value as Record<string, unknown>;
-}
-
-function mapRelayFailureToResponse(res: ServerResponse, failure: IxAuthRelayFailure): void {
-  if (failure.code === "IXAUTH_UNAVAILABLE") {
-    sendJson(res, 503, {
-      error: "identity_unavailable",
-      message: "The identity server is unavailable. Try again shortly.",
-    });
-    return;
-  }
-  if (failure.code === "AUTH_ACCOUNT_LOCKED") {
-    sendJson(res, 423, {
-      error: "account_locked",
-      message: "This account is locked. Contact an administrator.",
-      // Present only for automatic lockouts; an administrator lock has no expiry.
-      lockedUntilMs: failure.lockedUntilMs,
-    });
-    return;
-  }
-  if (failure.code === "AUTH_ACCOUNT_DISABLED") {
-    sendJson(res, 403, { error: "account_disabled", message: "This account is disabled." });
-    return;
-  }
-  if (failure.code === "AUTH_ACCOUNT_PENDING_APPROVAL") {
-    sendJson(res, 403, {
-      error: "account_pending_approval",
-      message: "This account is waiting for administrator approval.",
-    });
-    return;
-  }
-  if (failure.code === "AUTH_ACCOUNT_PENDING") {
-    sendJson(res, 403, {
-      error: "account_pending",
-      message: "Accept the invitation email before signing in.",
-    });
-    return;
-  }
-  // The identity server runs its own per-IP limiter and answers 429 before its account
-  // lockout can trigger. Flattening that into "invalid credentials" would tell a person
-  // their password is wrong when it is not, and hide why retrying keeps failing.
-  if (failure.status === 429 || failure.code === "RATE_LIMITED") {
-    sendJson(res, 429, {
-      error: "rate_limited",
-      message: "Too many attempts. Wait a moment and try again.",
-    });
-    return;
-  }
-  // Everything else, including a wrong password and an unknown account, is uniform.
-  sendJson(res, 401, IX_AUTH_INVALID_CREDENTIALS);
 }
 
 async function completeIxAuthLogin(params: {
@@ -553,8 +392,15 @@ async function handleIxAuthSessionProbeRoute(params: {
   const unauthenticated: {
     authenticated: false;
     authMode: "ix-auth";
+    selfSignupEnabled: boolean;
     adminConsoleUrl?: string;
-  } = { authenticated: false, authMode: "ix-auth" };
+  } = {
+    authenticated: false,
+    authMode: "ix-auth",
+    // Told to every visitor, signed in or not: the sign-in screen needs it before anyone
+    // has an identity, and it says nothing about who exists.
+    selfSignupEnabled: params.deps.settings.selfSignupEnabled,
+  };
   if (!sessionToken) {
     sendJson(params.res, 200, unauthenticated);
     return;
@@ -581,6 +427,7 @@ async function handleIxAuthSessionProbeRoute(params: {
   sendJson(params.res, 200, {
     authenticated: true,
     authMode: "ix-auth",
+    selfSignupEnabled: params.deps.settings.selfSignupEnabled,
     // Withheld from the payload rather than hidden in the browser, so a non-administrator
     // never receives the URL in the first place.
     adminConsoleUrl: canOpenIxAuthAdminConsole(principal.gatewayRole)
@@ -603,61 +450,39 @@ async function handleIxAuthSessionProbeRoute(params: {
   });
 }
 
-const IX_AUTH_POST_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAuthHttpRoute>([
-  "login",
-  "mfa",
-  "logout",
-  "refresh",
+/** Methods each route accepts. Anything else is 405 before any work happens. */
+const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> = new Map<
+  IxAuthHttpRoute,
+  ReadonlySet<string>
+>([
+  ["login", new Set(["POST"])],
+  ["mfa", new Set(["POST"])],
+  ["logout", new Set(["POST"])],
+  ["refresh", new Set(["POST"])],
+  ["me", new Set(["GET"])],
+  ["signup", new Set(["POST"])],
+  ["password-forgot", new Set(["POST"])],
+  ["password-reset", new Set(["POST"])],
+  ["email-verify", new Set(["POST"])],
+  ["invite-accept", new Set(["POST"])],
+  ["mail-hook", new Set(["POST"])],
+  ["admin-invites", new Set(["GET", "POST", "DELETE"])],
+  ["admin-approvals", new Set(["GET", "POST"])],
+  ["admin-departments", new Set(["GET"])],
 ]);
 
 /**
- * Handle one `/auth/*` request.
+ * Run one handler behind the per-IP limiter.
  *
- * Returns false only when the path lies outside the namespace, so the caller falls
- * through to later stages. Every path inside `/auth` is answered here.
+ * Signup, password recovery, and the token-bearing routes share the sign-in bucket on
+ * purpose: they are the same guessing surface reached by a different door, and separate
+ * buckets would let an attacker spend a fresh allowance on each one.
  */
-export async function handleIxAuthHttpRequest(params: {
-  req: IncomingMessage;
+async function withIxAuthRateLimit(params: {
   res: ServerResponse;
-  pathname: string;
   deps: IxAuthHttpDependencies;
-}): Promise<boolean> {
-  const route = classifyIxAuthHttpPath(params.pathname);
-  if (route === "outside") {
-    return false;
-  }
-  params.res.setHeader("Cache-Control", "no-store");
-  if (route === "unknown") {
-    sendJson(params.res, 404, { error: "not_found" });
-    return true;
-  }
-
-  const isPost = IX_AUTH_POST_ROUTES.has(route);
-  if (isPost ? params.req.method !== "POST" : params.req.method !== "GET") {
-    sendJson(params.res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  // Every route here is cookie-bearing, so cross-site callers are rejected outright
-  // rather than relying on SameSite alone.
-  if (rejectDisallowedOrigin({ req: params.req, res: params.res, deps: params.deps })) {
-    return true;
-  }
-
-  if (route === "me") {
-    await handleIxAuthSessionProbeRoute({ ...params, refresh: false });
-    return true;
-  }
-  if (route === "refresh") {
-    await handleIxAuthSessionProbeRoute({ ...params, refresh: true });
-    return true;
-  }
-  if (route === "logout") {
-    await handleIxAuthLogoutRoute(params);
-    return true;
-  }
-
-  // Login and MFA are the brute-force surface. Serialize per IP so parallel guesses
-  // cannot outrun the limiter's own bookkeeping.
+  run: () => Promise<void>;
+}): Promise<void> {
   await withSerializedRateLimitAttempt({
     ip: params.deps.clientIp,
     scope: AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
@@ -676,6 +501,85 @@ export async function handleIxAuthHttpRequest(params: {
         });
         return;
       }
+      await params.run();
+    },
+  });
+}
+
+/**
+ * Handle one `/auth/*` request.
+ *
+ * Returns false only when the path lies outside the namespace, so the caller falls
+ * through to later stages. Every path inside `/auth` is answered here.
+ */
+export async function handleIxAuthHttpRequest(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  pathname: string;
+  deps: IxAuthHttpDependencies;
+}): Promise<boolean> {
+  const route = classifyIxAuthHttpPath(params.pathname);
+  if (route === "outside") {
+    return false;
+  }
+  params.res.setHeader("Cache-Control", "no-store");
+  const allowedMethods = IX_AUTH_ROUTE_METHODS.get(route);
+  if (route === "unknown" || !allowedMethods) {
+    sendJson(params.res, 404, { error: "not_found" });
+    return true;
+  }
+  if (!params.req.method || !allowedMethods.has(params.req.method)) {
+    sendJson(params.res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+  // The mail hook is the one route here no browser reaches. It is authenticated by the
+  // service key instead, so requiring a browser origin would only break it.
+  if (route === "mail-hook") {
+    const accountModule = await import("./ix-auth-account-http.js");
+    await accountModule.handleIxAuthMailHook(params);
+    return true;
+  }
+  // Every remaining route is cookie-bearing, so cross-site callers are rejected outright
+  // rather than relying on SameSite alone.
+  if (rejectDisallowedOrigin({ req: params.req, res: params.res, deps: params.deps })) {
+    return true;
+  }
+
+  if (route === "me") {
+    await handleIxAuthSessionProbeRoute({ ...params, refresh: false });
+    return true;
+  }
+  if (route === "refresh") {
+    await handleIxAuthSessionProbeRoute({ ...params, refresh: true });
+    return true;
+  }
+  if (route === "logout") {
+    await handleIxAuthLogoutRoute(params);
+    return true;
+  }
+  if (isIxAuthAdminAccountRoute(route)) {
+    const adminModule = await import("./ix-auth-admin-http.js");
+    await adminModule.handleIxAuthAdminHttpRequest({ ...params, route });
+    return true;
+  }
+  if (isIxAuthPublicAccountRoute(route)) {
+    const accountModule = await import("./ix-auth-account-http.js");
+    await withIxAuthRateLimit({
+      res: params.res,
+      deps: params.deps,
+      run: async () => {
+        await accountModule.handleIxAuthAccountHttpRequest({ ...params, route });
+      },
+    });
+    return true;
+  }
+
+  // Login and MFA are the brute-force surface. Serialize per IP so parallel guesses
+  // cannot outrun the limiter's own bookkeeping.
+  await withIxAuthRateLimit({
+    res: params.res,
+    deps: params.deps,
+    run: async () => {
       if (route === "login") {
         await handleIxAuthLoginRoute(params);
         return;

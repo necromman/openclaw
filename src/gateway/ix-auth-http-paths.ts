@@ -6,7 +6,49 @@
 /** Route namespace the Gateway owns for IX-Auth relaying. */
 const IX_AUTH_HTTP_BASE_PATH = "/auth";
 
-export type IxAuthHttpRoute = "login" | "mfa" | "logout" | "refresh" | "me" | "outside" | "unknown";
+export type IxAuthHttpRoute =
+  | "login"
+  | "mfa"
+  | "logout"
+  | "refresh"
+  | "me"
+  | "signup"
+  | "password-forgot"
+  | "password-reset"
+  | "email-verify"
+  | "invite-accept"
+  | "mail-hook"
+  | "admin-invites"
+  | "admin-approvals"
+  | "admin-departments"
+  | "outside"
+  | "unknown";
+
+/** Account-lifecycle routes reachable with no session at all. */
+const IX_AUTH_PUBLIC_ACCOUNT_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAuthHttpRoute>([
+  "signup",
+  "password-forgot",
+  "password-reset",
+  "email-verify",
+  "invite-accept",
+]);
+
+/** Routes that require a signed-in administrator rather than an anonymous visitor. */
+const IX_AUTH_ADMIN_ACCOUNT_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAuthHttpRoute>([
+  "admin-invites",
+  "admin-approvals",
+  "admin-departments",
+]);
+
+/** True for the anonymous account-lifecycle routes, which the IP limiter governs. */
+export function isIxAuthPublicAccountRoute(route: IxAuthHttpRoute): boolean {
+  return IX_AUTH_PUBLIC_ACCOUNT_ROUTES.has(route);
+}
+
+/** True for the routes gated on a superadmin or admin session. */
+export function isIxAuthAdminAccountRoute(route: IxAuthHttpRoute): boolean {
+  return IX_AUTH_ADMIN_ACCOUNT_ROUTES.has(route);
+}
 
 /**
  * Classify one request path.
@@ -30,6 +72,26 @@ export function classifyIxAuthHttpPath(pathname: string): IxAuthHttpRoute {
       return "refresh";
     case "/auth/me":
       return "me";
+    case "/auth/signup":
+      return "signup";
+    case "/auth/password/forgot":
+      return "password-forgot";
+    case "/auth/password/reset":
+      return "password-reset";
+    case "/auth/email/verify":
+      return "email-verify";
+    case "/auth/invite/accept":
+      return "invite-accept";
+    // The identity server posts mail it could not send here. Service-key authenticated,
+    // never reached by a browser, which is why it carries no Origin or CSRF requirement.
+    case "/auth/mail-hook":
+      return "mail-hook";
+    case "/auth/admin/invites":
+      return "admin-invites";
+    case "/auth/admin/signup-approvals":
+      return "admin-approvals";
+    case "/auth/admin/departments":
+      return "admin-departments";
     default:
       return "unknown";
   }
