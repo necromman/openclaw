@@ -199,18 +199,20 @@ $C exec gateway openclaw memory search "에탄올 재고" --agent rnd-bot
 
 ### 7.3 주기 실행
 
-게이트웨이 cron 이 셸 명령 잡을 지원한다(`--command` 는 `sh -lc` 로 돈다).
+**납품 스택에서는 호스트 systemd 타이머를 쓴다.** 게이트웨이 cron 자체는 셸 명령 잡을 지원하지만
+(`--command` 는 `sh -lc` 로 돈다), ix-auth 모드에서 컨테이너 안 CLI 는 게이트웨이 RPC 인가가 없어
+등록 자체가 막힌다. 실측(2026-09-08)에서 아래가 그대로 재현된다.
 
 ```bash
-$C exec gateway openclaw cron add \
-  --name knowledge-sync-rnd \
-  --every 30m \
-  --command "openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd --json && openclaw memory index --force --agent rnd-bot"
-
-$C exec gateway openclaw cron list
+$C exec gateway openclaw cron add --name knowledge-sync-rnd --every 30m --command "..."
+# {"ok":false,"error":{"type":"cli_error","message":"unauthorized"}}
 ```
 
-컨테이너 밖에서 돌리고 싶으면 호스트 systemd 타이머도 같은 일을 한다.
+`knowledge sync` 자체는 RPC 를 쓰지 않아 같은 컨테이너에서 잘 돈다. 막히는 것은 cron **등록**뿐이다.
+인가가 있는 세션(관리자 화면)에서 만드는 길도 있지만, 절차서에 남길 것은 사람 손이 필요 없는 쪽이라
+타이머를 정본으로 둔다. ix-auth 를 쓰지 않는 설치에서는 위 `cron add` 가 그대로 동작한다.
+
+호스트에서는 systemd 타이머가 같은 일을 한다.
 
 ```ini
 # /etc/systemd/system/openclaw-knowledge.service
@@ -244,6 +246,23 @@ systemctl list-timers openclaw-knowledge.timer
 
 주기를 정할 때 기준은 **사람이 문서를 올린 뒤 몇 분 안에 찾히길 바라는가**다. 30분이면 최악의 경우 30분 늦는다. 공유가 크면 첫 실행만 오래 걸리고 이후에는 바뀐 파일만 변환한다.
 
+### 7.4 임베딩 없이 색인한다
+
+납품 템플릿은 `memory.search.provider` 를 `"none"` 으로 둔다. 기본값은 `openai` 이고, 그 경우
+`memory index` 가 문서 조각마다 임베딩 API 를 부른다. 외부 키가 없는 사내 배포에서는 색인이
+통째로 실패한다. 실측(2026-09-08)에서 다음이 그대로 나왔다.
+
+```text
+Memory index failed (rnd-bot): openai embeddings failed: 429 ... credit_balance_exhausted
+```
+
+`"none"` 은 내장 FTS 만 쓰는 값이다. 한국어가 검색되는 것은 같은 절에 이미 있던
+`memory.search.store.fts.tokenizer: "trigram"` 덕분이고, 이 두 값이 짝이다. 트라이그램은 형태소
+분석 없이 세 글자씩 잘라 색인하므로 "에탄올 재고" 같은 질의가 조사·띄어쓰기와 무관하게 걸린다.
+
+의미 검색이 필요하면 사내 ollama 임베딩 모델을 붙이고 그때 `provider` 를 바꾼다. 외부 API 키를
+쓰는 선택은 문서가 외부로 나간다는 뜻이므로 납품 기본값으로 두지 않는다.
+
 ## 8. 한계
 
 | 항목                     | 상태                                                                                                    |
@@ -253,6 +272,8 @@ systemctl list-timers openclaw-knowledge.timer
 | 20 MiB 초과 파일         | 건너뛴다. 상한을 올려도 40 MiB 에서 변환기가 거부한다                                                    |
 | 신선도                   | 동기 주기만큼 늦는다. 파일 감시가 아니라 주기 실행이다                                                   |
 | 표의 구조                | 병합 셀·수식·차트는 남지 않는다. 셀 텍스트만 남는다                                                     |
+| xlsx 의 날짜·서식        | 서식을 적용하지 않아 날짜가 일련번호로 남는다(2026-09-01 -> 46266). 날짜로는 검색되지 않는다             |
+| pdf 경유 텍스트          | pdf 텍스트 층을 그대로 읽어 "2026 년" 처럼 벌어진다. trigram 토크나이저라 검색에는 지장이 없다          |
 | xlsx 폴백 상한           | 시트 12개, 시트당 300행, 행당 40열. 넘으면 잘림 안내가 붙는다(`document-extract-html.ts`)                |
 | 사이드카 이름            | `보고.pdf` -> `보고.pdf.md`. 인용 경로에 확장자가 두 번 보인다                                          |
 | 권한                     | 색인 폴더에 들어간 내용은 그 폴더를 `extraPaths` 로 가진 에이전트가 전부 본다. 부서 분리는 폴더 분리로만 |

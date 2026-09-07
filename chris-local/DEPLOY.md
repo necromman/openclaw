@@ -836,19 +836,30 @@ $CO exec gateway openclaw memory index --force --agent rnd-bot
 $CO exec gateway openclaw memory search "에탄올 재고" --agent rnd-bot
 ```
 
-### 12.3 주기 실행
+색인은 임베딩을 부르지 않는다. 납품 템플릿의 `memory.search.provider` 가 `"none"` 이라 내장 FTS 만
+쓰고, 한국어는 같은 절의 `store.fts.tokenizer: "trigram"` 이 받는다. 기본값 `openai` 로 두면 키가
+없는 사내 배포에서 색인이 통째로 실패한다(12.4). 근거와 대안은 KNOWLEDGE.md 7.4.
 
-```bash
-$CO exec gateway openclaw cron add   --name knowledge-sync-rnd --every 30m   --command "openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd && openclaw memory index --force --agent rnd-bot"
+### 12.3 주기 실행은 호스트 타이머로 한다
+
+ix-auth 모드에서 컨테이너 안 CLI 는 게이트웨이 RPC 인가가 없어 `openclaw cron add` 가
+`unauthorized` 로 막힌다(H 단계에서 확인된 제약과 같은 것이다). `knowledge sync` 자체는 RPC 를
+쓰지 않아 잘 돌므로, 잡을 만드는 쪽만 밖으로 뺀다.
+
+```ini
+# /etc/systemd/system/openclaw-knowledge.service  (Type=oneshot)
+ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth.env exec -T gateway \
+  sh -lc 'openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd && openclaw memory index --force --agent rnd-bot'
 ```
 
-컨테이너 밖에서 돌리려면 호스트 systemd 타이머를 쓴다. 유닛 파일 예시는 KNOWLEDGE.md 7.3 에 있다.
+타이머 유닛과 30분 주기 예시는 KNOWLEDGE.md 7.3 에 있다.
 
 ### 12.4 자주 나오는 증상
 
 | 증상                                    | 원인·조치                                                                            |
 | --------------------------------------- | ------------------------------------------------------------------------------------ |
 | 사이드카는 있는데 검색이 빈손이다       | `openclaw memory index --force --agent <id>` 를 안 돌렸다                             |
+| `memory index` 가 429 로 실패한다      | 임베딩 제공자가 openai 인데 키·크레딧이 없다. 납품 템플릿은 `memory.search.provider: "none"`(내장 FTS 전용)이다 |
 | pptx 만 `failed/converter-unavailable`  | 이미지에 LibreOffice 가 없다. D 단계의 빌드 인자를 확인하고 이미지를 다시 만든다      |
 | 스캔 pdf 가 `ignored/empty` 로 남는다   | 텍스트 층이 없는 이미지 pdf 다. OCR 은 범위 밖이다                                    |
 | hwp 가 통째로 빠진다                    | 지원 대상이 아니다(사용자 확정). `ignored/extension` 으로 집계된다                    |

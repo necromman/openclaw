@@ -146,6 +146,7 @@
   "memory": {
     "citations": "on",
     "search": {
+      "provider": "none",
       "store": {
         "fts": {
           "tokenizer": "trigram"
