@@ -129,6 +129,11 @@ const coreCliCommandCatalog = defineCommandDescriptorCatalog([
     hasSubcommands: false,
   },
   {
+    name: "knowledge",
+    description: "Index document folders as Markdown sidecars for memory search",
+    hasSubcommands: true,
+  },
+  {
     name: "sessions",
     description: "List stored conversation sessions",
     hasSubcommands: true,

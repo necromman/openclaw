@@ -711,6 +711,12 @@ export const cliCommandCatalog: readonly CliCommandCatalogEntry[] = [
     policy: { configGuard: "skip", loadPlugins: "never" },
   },
   {
+    // The sidecar index is a file-to-file conversion: it reads a folder, writes a
+    // folder, and never speaks to the Gateway or to a plugin.
+    commandPath: ["knowledge"],
+    policy: { configGuard: "skip", loadPlugins: "never", networkProxy: "bypass" },
+  },
+  {
     commandPath: ["memory"],
     policy: { loadPlugins: "always", pluginRegistry: { scope: "memory" } },
   },
