@@ -56,7 +56,12 @@ import {
   type GatewayIngressTransport,
   type GatewayUnattributableProxyReporter,
 } from "./ingress-attribution.js";
-import { claimsIxAuthHttpRequest, runIxAuthHttpStage } from "./ix-auth-http-stage.js";
+import {
+  claimsIxAuthAdminProxyRequest,
+  claimsIxAuthHttpRequest,
+  runIxAuthAdminProxyStage,
+  runIxAuthHttpStage,
+} from "./ix-auth-http-stage.js";
 import { normalizePluginNodeCapabilityScopedUrl } from "./plugin-node-capability.js";
 import {
   getCachedPluginGatewayAuthBypassPaths,
@@ -473,6 +478,28 @@ export function createGatewayHttpServer(opts: {
             rateLimiter: joinRateLimiter,
             respondNotFound,
           }),
+      );
+
+      // The identity server's admin console. It registers as a plain stage for the same
+      // reason: the console gate is the Gateway session cookie, not the Control UI's
+      // WebSocket admission, and the route must not fall through to a hook or plugin.
+      addRequestStage(
+        claimsIxAuthAdminProxyRequest({
+          authMode: resolvedAuthValue.mode,
+          pathname: scopedRequestPath,
+        }),
+        async () => {
+          await runIxAuthAdminProxyStage({
+            req,
+            res,
+            pathname: scopedRequestPath,
+            config: configSnapshot,
+            trustedProxies,
+            clientIp: ingressAttribution.rateLimit.subject.key,
+            respondNotFound,
+          });
+          return true;
+        },
       );
 
       const devicePairingJoinShortcode = parseDevicePairingJoinRequestPath(scopedRequestPath);

@@ -130,6 +130,23 @@ function readSessionUser(body: Record<string, unknown>): IxAuthSessionUser | und
 }
 
 /**
+ * Resolve the console link the Gateway reported.
+ *
+ * The built-in console route is a Gateway path, so it has to be read relative to the
+ * mount point: a Gateway served under a base path would otherwise send administrators to
+ * the host root. An operator-configured absolute URL is passed through untouched.
+ */
+function resolveAdminConsoleUrl(basePath: string, value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) {
+    return undefined;
+  }
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return value;
+  }
+  return `${basePath.replace(/\/+$/u, "")}${value}`;
+}
+
+/**
  * Ask the Gateway whether this browser already holds a session.
  *
  * Returns an unauthenticated state rather than throwing when the Gateway is not in
@@ -158,8 +175,7 @@ export async function probeIxAuthSession(basePath: string): Promise<IxAuthSessio
     authenticated: body.authenticated === true,
     authMode: "ix-auth",
     user: readSessionUser(body),
-    adminConsoleUrl:
-      typeof body.adminConsoleUrl === "string" ? body.adminConsoleUrl : undefined,
+    adminConsoleUrl: resolveAdminConsoleUrl(basePath, body.adminConsoleUrl),
   };
 }
 

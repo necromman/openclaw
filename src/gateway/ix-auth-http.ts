@@ -36,9 +36,16 @@ import {
 } from "./cookie-header.js";
 import { readJsonBody } from "./hooks.js";
 import { sendJson } from "./http-common.js";
-import { classifyIxAuthHttpPath, type IxAuthHttpRoute } from "./ix-auth-http-paths.js";
+import {
+  classifyIxAuthHttpPath,
+  IX_AUTH_ADMIN_PROXY_BASE_PATH,
+  type IxAuthHttpRoute,
+} from "./ix-auth-http-paths.js";
 import { checkBrowserOrigin } from "./origin-check.js";
 import { withSerializedRateLimitAttempt } from "./rate-limit-attempt-serialization.js";
+
+/** Built-in console route, trailing slash included so the page derives its own base. */
+const IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH = `${IX_AUTH_ADMIN_PROXY_BASE_PATH}/`;
 
 /** Login bodies are tiny; anything larger is not a login form. */
 const IX_AUTH_BODY_MAX_BYTES = 4 * 1024;
@@ -567,7 +574,10 @@ async function handleIxAuthSessionProbeRoute(params: {
     // Withheld from the payload rather than hidden in the browser, so a non-administrator
     // never receives the URL in the first place.
     adminConsoleUrl: canOpenIxAuthAdminConsole(principal.gatewayRole)
-      ? params.deps.settings.adminConsoleUrl
+      ? // The Gateway proxies the console at a route of its own, so the default needs no
+        // configuration and no second host name. `adminConsoleUrl` remains an override
+        // for a deployment that publishes the console separately.
+        (params.deps.settings.adminConsoleUrl ?? IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH)
       : undefined,
     user: {
       profileId: principal.profileId,

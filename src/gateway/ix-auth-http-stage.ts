@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import { isSecureGatewayBrowserContext } from "./cookie-header.js";
-import { classifyIxAuthHttpPath } from "./ix-auth-http-paths.js";
+import { classifyIxAuthHttpPath, isIxAuthAdminProxyPath } from "./ix-auth-http-paths.js";
 import { isLocalDirectRequest, isLoopbackAddress, isTrustedProxyAddress } from "./net.js";
 
 /**
@@ -70,6 +70,74 @@ export async function runIxAuthHttpStage(params: {
         fromTrustedProxy: isTrustedProxyAddress(socket?.remoteAddress, params.trustedProxies),
       }),
       rateLimiter: params.rateLimiter,
+    },
+  });
+}
+
+/** True when this request belongs to the identity server's admin console namespace. */
+export function claimsIxAuthAdminProxyRequest(params: {
+  authMode: string;
+  pathname: string;
+}): boolean {
+  return params.authMode === "ix-auth" && isIxAuthAdminProxyPath(params.pathname);
+}
+
+/**
+ * Answer one `/admin/identity/*` request.
+ *
+ * The session is resolved here rather than inside the proxy so the proxy receives a
+ * principal it cannot construct itself, and so the CSRF digest travels with it: both
+ * come from the same login-session row, and reading them apart would let one drift.
+ */
+export async function runIxAuthAdminProxyStage(params: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  pathname: string;
+  config: OpenClawConfig;
+  trustedProxies: string[];
+  clientIp?: string;
+  respondNotFound: (res: ServerResponse) => void;
+}): Promise<void> {
+  const [proxyModule, principalModule, sessionsModule] = await Promise.all([
+    import("./ix-auth-admin-proxy.js"),
+    import("./ix-auth-principal.js"),
+    import("../auth/ix-auth/ix-auth-sessions.js"),
+  ]);
+  const settings = await principalModule.loadIxAuthGatewaySettings();
+  if (!settings) {
+    params.respondNotFound(params.res);
+    return;
+  }
+  const sessionToken = principalModule.readIxAuthSessionCookie({ req: params.req, settings });
+  const userAgent = params.req.headers["user-agent"];
+  const resolution = sessionToken
+    ? await sessionsModule.resolveIxAuthSessionToken({
+        sessionToken,
+        settings,
+        meta: {
+          clientIp: params.clientIp,
+          userAgent: typeof userAgent === "string" ? userAgent : undefined,
+        },
+        nowMs: Date.now(),
+        // The console is a separate document; sliding the Control UI's idle window from
+        // it would keep an abandoned browser session alive for as long as a tab is open.
+        touch: false,
+      })
+    : undefined;
+  await proxyModule.handleIxAuthAdminProxyRequest({
+    req: params.req,
+    res: params.res,
+    pathname: params.pathname,
+    deps: {
+      settings,
+      ...(resolution?.ok
+        ? { principal: resolution.principal, csrfDigest: resolution.row.csrf_digest }
+        : {}),
+      allowedOrigins: params.config.gateway?.controlUi?.allowedOrigins,
+      allowHostHeaderOriginFallback:
+        params.config.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback === true,
+      clientIp: params.clientIp,
+      isLocalClient: isLocalDirectRequest(params.req, params.trustedProxies),
     },
   });
 }
