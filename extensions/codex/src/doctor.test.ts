@@ -4,6 +4,7 @@ import path from "node:path";
 import type { HealthCheck, OpenClawConfig } from "openclaw/plugin-sdk/health";
 import { describe, expect, it, vi } from "vitest";
 import { CODEX_APP_SERVER_VERSION } from "./app-server/version.js";
+import { CODEX_AGENT_WORKSPACE_BOUNDARY_CHECK_ID } from "./doctor-workspace-boundary.js";
 import {
   CODEX_MANAGED_APP_SERVER_CHECK_ID,
   registerCodexManagedAppServerDoctorChecks,
@@ -74,17 +75,18 @@ function managedDeps(version = CODEX_APP_SERVER_VERSION) {
 }
 
 function createCheck(deps: ReturnType<typeof managedDeps>) {
-  let check: HealthCheck | undefined;
+  const checks = new Map<string, HealthCheck>();
   registerCodexManagedAppServerDoctorChecks(
     {
       pluginRoot: "/candidate/plugin",
-      getHealthCheck: () => check,
+      getHealthCheck: (id) => checks.get(id),
       registerHealthCheck(value) {
-        check = value;
+        checks.set(value.id, value);
       },
     },
     deps,
   );
+  const check = checks.get(CODEX_MANAGED_APP_SERVER_CHECK_ID);
   if (!check) {
     throw new Error("Codex managed health check was not registered");
   }
@@ -92,22 +94,25 @@ function createCheck(deps: ReturnType<typeof managedDeps>) {
 }
 
 describe("managed Codex doctor check", () => {
-  it("registers once in each host registry", () => {
+  it("registers each owned check once in each host registry", () => {
     for (let index = 0; index < 2; index++) {
-      let check: HealthCheck | undefined;
+      const checks = new Map<string, HealthCheck>();
       const host = {
         pluginRoot: "/candidate/plugin",
-        getHealthCheck: () => check,
+        getHealthCheck: (id: string) => checks.get(id),
         registerHealthCheck: vi.fn((value: HealthCheck) => {
-          check = value;
+          checks.set(value.id, value);
         }),
       };
 
       registerCodexManagedAppServerDoctorChecks(host);
       registerCodexManagedAppServerDoctorChecks(host);
 
-      expect(host.registerHealthCheck).toHaveBeenCalledOnce();
-      expect(check?.id).toBe(CODEX_MANAGED_APP_SERVER_CHECK_ID);
+      expect(host.registerHealthCheck).toHaveBeenCalledTimes(2);
+      expect([...checks.keys()]).toEqual([
+        CODEX_MANAGED_APP_SERVER_CHECK_ID,
+        CODEX_AGENT_WORKSPACE_BOUNDARY_CHECK_ID,
+      ]);
     }
   });
 

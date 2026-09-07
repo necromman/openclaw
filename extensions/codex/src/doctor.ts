@@ -13,6 +13,10 @@ import {
   resolveManagedCodexNativeCommand,
 } from "./app-server/managed-binary.js";
 import { CODEX_APP_SERVER_VERSION } from "./app-server/version.js";
+import {
+  CODEX_AGENT_WORKSPACE_BOUNDARY_CHECK_ID,
+  createCodexWorkspaceBoundaryHealthCheck,
+} from "./doctor-workspace-boundary.js";
 
 export const CODEX_MANAGED_APP_SERVER_CHECK_ID = "codex/managed-app-server";
 const CODEX_VERSION_TIMEOUT_MS = 5_000;
@@ -209,10 +213,12 @@ export function registerCodexManagedAppServerDoctorChecks(
   deps?: CodexManagedDoctorDependencies,
 ): void {
   // Lookup and registration must use the same host registry across artifact loaders.
-  if (host.getHealthCheck(CODEX_MANAGED_APP_SERVER_CHECK_ID)) {
-    return;
+  if (!host.getHealthCheck(CODEX_MANAGED_APP_SERVER_CHECK_ID)) {
+    host.registerHealthCheck(
+      createCodexManagedAppServerHealthCheck({ pluginRoot: host.pluginRoot, deps }),
+    );
   }
-  host.registerHealthCheck(
-    createCodexManagedAppServerHealthCheck({ pluginRoot: host.pluginRoot, deps }),
-  );
+  if (!host.getHealthCheck(CODEX_AGENT_WORKSPACE_BOUNDARY_CHECK_ID)) {
+    host.registerHealthCheck(createCodexWorkspaceBoundaryHealthCheck());
+  }
 }
