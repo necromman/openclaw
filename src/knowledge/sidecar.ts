@@ -5,7 +5,11 @@
 // citation points at; the frontmatter and the quoted first line are what carry the
 // reader back to the real file on the share.
 import path from "node:path";
-import { KNOWLEDGE_SIDECAR_SUFFIX, type KnowledgeSidecarMeta } from "./types.js";
+import {
+  KNOWLEDGE_CONVERTER_IDS,
+  KNOWLEDGE_SIDECAR_SUFFIX,
+  type KnowledgeSidecarMeta,
+} from "./types.js";
 
 const FRONTMATTER_FENCE = "---";
 
@@ -128,6 +132,22 @@ function parseValue(raw: string): string | undefined {
 }
 
 /**
+ * Reads the recorded converter id.
+ *
+ * A value this build no longer knows is dropped rather than kept, so the file simply
+ * reconverts. That is the safe direction: a stale id would otherwise be copied straight
+ * back into the refreshed frontmatter.
+ */
+function readConverter(value: string | undefined): KnowledgeSidecarMeta["converter"] | undefined {
+  const known: readonly string[] = KNOWLEDGE_CONVERTER_IDS;
+  if (value === undefined || !known.includes(value)) {
+    return undefined;
+  }
+  // SAFETY: the membership test directly above proves the cast.
+  return value as KnowledgeSidecarMeta["converter"];
+}
+
+/**
  * Reads back the frontmatter this module wrote.
  *
  * Only the fields the incremental comparison needs are typed; a sidecar written by an
@@ -154,6 +174,7 @@ export function parseFrontmatter(content: string): Partial<KnowledgeSidecarMeta>
     }
   }
   const size = Number.parseInt(found.source_size ?? "", 10);
+  const parsedConverter = readConverter(found.converter);
   return {
     ...(found.source_path === undefined ? {} : { sourcePath: found.source_path }),
     ...(found.source_relative === undefined ? {} : { sourceRelative: found.source_relative }),
@@ -161,10 +182,6 @@ export function parseFrontmatter(content: string): Partial<KnowledgeSidecarMeta>
     ...(Number.isSafeInteger(size) && size >= 0 ? { sourceSize: size } : {}),
     ...(found.source_sha256 === undefined ? {} : { sourceSha256: found.source_sha256 }),
     ...(found.converted_at === undefined ? {} : { convertedAt: found.converted_at }),
-    // SAFETY: the value round-trips a union this module wrote; an unknown string only
-    // makes the incremental comparison miss and reconvert, which is the safe direction.
-    ...(found.converter === undefined
-      ? {}
-      : { converter: found.converter as KnowledgeSidecarMeta["converter"] }),
+    ...(parsedConverter === undefined ? {} : { converter: parsedConverter }),
   };
 }

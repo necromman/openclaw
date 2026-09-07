@@ -1,12 +1,15 @@
 // Shared contracts for the knowledge sidecar index (`openclaw knowledge sync`).
 
 /** Which extractor produced a sidecar body. Recorded in frontmatter so a run can be traced. */
-export type KnowledgeConverterId =
-  | "pdf-text"
-  | "docx-html"
-  | "xlsx-html"
-  | "soffice-pdf-text"
-  | "copy";
+export const KNOWLEDGE_CONVERTER_IDS = [
+  "pdf-text",
+  "docx-html",
+  "xlsx-html",
+  "soffice-pdf-text",
+  "copy",
+] as const;
+
+export type KnowledgeConverterId = (typeof KNOWLEDGE_CONVERTER_IDS)[number];
 
 /** Why a source file produced no sidecar. */
 export type KnowledgeIgnoreReason =
