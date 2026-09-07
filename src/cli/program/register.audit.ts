@@ -7,14 +7,57 @@ import {
 } from "../../../packages/gateway-protocol/src/schema/audit-activity.js";
 import { formatDocsLink } from "../../../packages/terminal-core/src/links.js";
 import { theme } from "../../../packages/terminal-core/src/theme.js";
+import { auditUsersCommand, type AuditUsersCommandOptions } from "../../commands/audit-users.js";
 import { auditListCommand, type AuditListCommandOptions } from "../../commands/audit.js";
 import { defaultRuntime } from "../../runtime.js";
 import { formatHumanList } from "../../shared/human-list.js";
+import { USER_ACTIVITY_AUDIT_KINDS } from "../../state/user-activity-audit-schema.js";
 import { runCommandWithRuntime } from "../cli-utils.js";
+
+/**
+ * Register `openclaw audit users`.
+ *
+ * A subcommand of `audit` rather than a command of its own because both read audit
+ * history; they differ in whose history it is.
+ */
+function registerAuditUsersSubcommand(audit: Command): void {
+  audit
+    .command("users")
+    .description("Inspect the person-attributed activity ledger")
+    .option("--email <email>", "Filter by account address")
+    .option("--profile <id>", "Filter by Gateway profile id")
+    .option("--kind <kind>", `Filter by kind (${formatHumanList(USER_ACTIVITY_AUDIT_KINDS)})`)
+    .option("--agent <id>", "Filter by agent id")
+    .option("--session <key>", "Filter by exact session key")
+    .option("--since <timestamp>", "Include records at/after ISO time or Unix milliseconds")
+    .option("--until <timestamp>", "Include records at/before ISO time or Unix milliseconds")
+    .option("--cursor <sequence>", "Continue from a previous result cursor")
+    .option("--limit <count>", "Maximum records (1-500)")
+    .option("--json", "Output a bounded JSON page", false)
+    .action(async (opts) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await auditUsersCommand(
+          {
+            email: opts.email as string | undefined,
+            profileId: opts.profile as string | undefined,
+            kind: opts.kind as AuditUsersCommandOptions["kind"],
+            agentId: opts.agent as string | undefined,
+            sessionKey: opts.session as string | undefined,
+            since: opts.since as string | undefined,
+            until: opts.until as string | undefined,
+            cursor: opts.cursor as string | undefined,
+            limit: opts.limit as string | undefined,
+            json: Boolean(opts.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+}
 
 /** Register the bounded operator audit query command. */
 export function registerAuditCommand(program: Command): void {
-  program
+  const audit = program
     .command("audit")
     .description("Inspect activity records and exact-run identity context")
     .option("--agent <id>", "Filter by agent id")
@@ -62,4 +105,5 @@ export function registerAuditCommand(program: Command): void {
         );
       });
     });
+  registerAuditUsersSubcommand(audit);
 }
