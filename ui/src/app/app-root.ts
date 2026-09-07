@@ -12,17 +12,18 @@ import { renderLazyElementState, renderLazyViewError } from "../components/lazy-
 import { installTitleTooltips } from "../components/tooltip-title.ts";
 import { t } from "../i18n/index.ts";
 import {
-  buildIxAuthLoginProps,
-  clearIxAuthFormSecrets,
   createEmptyIxAuthFormState,
   type IxAuthFormState,
 } from "../features/ix-auth/ix-auth-form-state.ts";
+import { renderIxAuthGate } from "../features/ix-auth/ix-auth-gate-view.ts";
 import {
   probeIxAuthSession,
-  submitIxAuthLogin,
-  submitIxAuthMfaCode,
   type IxAuthSessionState,
 } from "../features/ix-auth/ix-auth-session-api.ts";
+import {
+  findIxAuthSubmitBlocker,
+  runIxAuthSignInStep,
+} from "../features/ix-auth/ix-auth-sign-in-step.ts";
 import { formatUiError } from "../lib/format-error.ts";
 import { normalizeAgentId } from "../lib/sessions/session-key.ts";
 import { isTerminalAvailable } from "../lib/terminal-availability.ts";
@@ -37,7 +38,6 @@ import {
   DESKTOP_PANEL_ELEMENT,
   isOptionalElementDefined,
   LazyCustomElementRequestController,
-  IX_AUTH_LOGIN_ELEMENT,
   LOGIN_GATE_ELEMENT,
   type OptionalCustomElement,
   QUESTION_PAGE_ELEMENT,
@@ -250,53 +250,31 @@ export class OpenClawApp extends OpenClawLightDomElement {
   }
 
   private async submitIxAuthForm(basePath: string): Promise<void> {
-    const form = this.ixAuthForm;
-    if (form.submitting) {
+    if (this.ixAuthForm.submitting) {
       return;
     }
-    if (!form.mfaChallenge && (!form.email.trim() || !form.password)) {
-      this.ixAuthForm = { ...form, errorKey: "missingFields" };
+    const blocker = findIxAuthSubmitBlocker(this.ixAuthForm);
+    if (blocker) {
+      this.ixAuthForm = { ...this.ixAuthForm, errorKey: blocker };
       return;
     }
-    this.ixAuthForm = { ...form, submitting: true, errorKey: undefined };
-    const result = form.mfaChallenge
-      ? await submitIxAuthMfaCode({
-          basePath,
-          challenge: form.mfaChallenge,
-          code: form.mfaCode.trim(),
-        })
-      : await submitIxAuthLogin({
-          basePath,
-          email: form.email.trim(),
-          password: form.password,
-        });
-    if (result.kind === "authenticated") {
-      this.ixAuthForm = clearIxAuthFormSecrets({ ...this.ixAuthForm, mfaChallenge: undefined });
-      this.ixAuthSession = {
-        authenticated: true,
-        authMode: "ix-auth",
-        user: result.user,
-        adminConsoleUrl: this.ixAuthSession?.adminConsoleUrl,
-      };
-      // A fresh probe picks up the admin console link, which login does not return.
-      void this.probeIxAuthSessionState(basePath);
-      // The cookie now exists, so the ordinary connect path can authenticate.
-      this.loginGatePinned = true;
-      this.context?.gateway.connect({ gatewayUrl: this.loginGatewayUrl, token: "", password: "" });
+    this.ixAuthForm = { ...this.ixAuthForm, submitting: true, errorKey: undefined };
+    const step = await runIxAuthSignInStep({ basePath, state: this.ixAuthForm });
+    this.ixAuthForm = step.nextState;
+    if (!step.user) {
       return;
     }
-    if (result.kind === "mfa-required") {
-      this.ixAuthForm = {
-        ...clearIxAuthFormSecrets(this.ixAuthForm),
-        mfaChallenge: result.challenge,
-      };
-      return;
-    }
-    this.ixAuthForm = {
-      ...clearIxAuthFormSecrets(this.ixAuthForm),
-      errorKey: result.errorKey,
-      lockedUntilMs: result.lockedUntilMs,
+    this.ixAuthSession = {
+      authenticated: true,
+      authMode: "ix-auth",
+      user: step.user,
+      adminConsoleUrl: this.ixAuthSession?.adminConsoleUrl,
     };
+    // A fresh probe picks up the admin console link, which sign-in does not return.
+    void this.probeIxAuthSessionState(basePath);
+    // The cookie now exists, so the ordinary connect path can authenticate.
+    this.loginGatePinned = true;
+    this.context?.gateway.connect({ gatewayUrl: this.loginGatewayUrl, token: "", password: "" });
   }
 
   private resetLoginSensitivePresentation() {
@@ -671,42 +649,19 @@ export class OpenClawApp extends OpenClawLightDomElement {
       `;
     }
     if (showLoginGate && this.ixAuthSession?.authMode === "ix-auth") {
-      if (!isOptionalElementDefined(IX_AUTH_LOGIN_ELEMENT)) {
-        const loadState = this.ixAuthLoginLoader.visibleState;
-        if (!loadState) {
-          this.ixAuthLoginLoader.preload(IX_AUTH_LOGIN_ELEMENT, { reportError: true });
-        }
-        return html`<openclaw-tooltip-provider>
-          ${
-            loadState?.status === "error"
-              ? renderLazyViewError({
-                  error: loadState.error,
-                  stale: loadState.stale,
-                  onRetry: () => this.ixAuthLoginLoader.retry(),
-                })
-              : renderConnectingSplash()
-          }
-        </openclaw-tooltip-provider>`;
-      }
       const basePath = context.basePath;
-      return html`
-        <openclaw-tooltip-provider>
-          <openclaw-ix-auth-login
-            .props=${buildIxAuthLoginProps({
-              resourceBasePath: context.resourceBasePath,
-              state: this.ixAuthForm,
-              handlers: {
-                onChange: (next) => {
-                  this.ixAuthForm = next;
-                },
-                onSubmit: () => {
-                  void this.submitIxAuthForm(basePath);
-                },
-              },
-            })}
-          ></openclaw-ix-auth-login>
-        </openclaw-tooltip-provider>
-      `;
+      return renderIxAuthGate({
+        loader: this.ixAuthLoginLoader,
+        resourceBasePath: context.resourceBasePath,
+        state: this.ixAuthForm,
+        onChange: (next) => {
+          this.ixAuthForm = next;
+        },
+        onSubmit: () => {
+          void this.submitIxAuthForm(basePath);
+        },
+        renderPending: () => renderConnectingSplash(),
+      });
     }
     if (showLoginGate && !isOptionalElementDefined(LOGIN_GATE_ELEMENT)) {
       const loadState = this.loginGateLoader.visibleState;

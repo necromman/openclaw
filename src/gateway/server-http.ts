@@ -128,8 +128,6 @@ const getUserProfilesHttpModule = createLazyRuntimeModule(() => import("./user-p
 const getDevicePairingJoinHttpModule = createLazyRuntimeModule(
   () => import("./device-pairing-join-http.js"),
 );
-const getIxAuthHttpModule = createLazyRuntimeModule(() => import("./ix-auth-http.js"));
-const getIxAuthPrincipalModule = createLazyRuntimeModule(() => import("./ix-auth-principal.js"));
 const getPluginNodeCapabilityAuthModule = createLazyRuntimeModule(
   () => import("./server/plugin-node-capability-auth.js"),
 );
@@ -463,16 +461,9 @@ export function createGatewayHttpServer(opts: {
       // plain request stage rather than an admitted one, and ahead of handleHooksRequest
       // so a configured hook base path cannot swallow the auth namespace.
       addRequestStage(
-        claimsIxAuthHttpRequest({
-          authMode: resolvedAuthValue.mode,
-          pathname: scopedRequestPath,
-        }),
-        async () => {
-          const [httpModule, principalModule] = await Promise.all([
-            getIxAuthHttpModule(),
-            getIxAuthPrincipalModule(),
-          ]);
-          return await runIxAuthHttpStage({
+        claimsIxAuthHttpRequest({ authMode: resolvedAuthValue.mode, pathname: scopedRequestPath }),
+        () =>
+          runIxAuthHttpStage({
             req,
             res,
             pathname: scopedRequestPath,
@@ -480,13 +471,8 @@ export function createGatewayHttpServer(opts: {
             trustedProxies,
             clientIp: ingressAttribution.rateLimit.subject.key,
             rateLimiter: joinRateLimiter,
-            modules: {
-              handleIxAuthHttpRequest: httpModule.handleIxAuthHttpRequest,
-              loadIxAuthGatewaySettings: principalModule.loadIxAuthGatewaySettings,
-            },
             respondNotFound,
-          });
-        },
+          }),
       );
 
       const devicePairingJoinShortcode = parseDevicePairingJoinRequestPath(scopedRequestPath);

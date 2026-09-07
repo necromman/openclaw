@@ -22,11 +22,6 @@ export function claimsIxAuthHttpRequest(params: {
   return params.authMode === "ix-auth" && classifyIxAuthHttpPath(params.pathname) !== "outside";
 }
 
-type IxAuthStageModules = {
-  handleIxAuthHttpRequest: typeof import("./ix-auth-http.js").handleIxAuthHttpRequest;
-  loadIxAuthGatewaySettings: typeof import("./ix-auth-principal.js").loadIxAuthGatewaySettings;
-};
-
 /**
  * Answer one `/auth/*` request.
  *
@@ -41,10 +36,15 @@ export async function runIxAuthHttpStage(params: {
   trustedProxies: string[];
   clientIp?: string;
   rateLimiter?: AuthRateLimiter;
-  modules: IxAuthStageModules;
   respondNotFound: (res: ServerResponse) => void;
 }): Promise<boolean> {
-  const settings = await params.modules.loadIxAuthGatewaySettings();
+  // Imported here rather than at module scope so a deployment that never enables this
+  // mode never loads the identity client, its session store, or the JWKS verifier.
+  const [httpModule, principalModule] = await Promise.all([
+    import("./ix-auth-http.js"),
+    import("./ix-auth-principal.js"),
+  ]);
+  const settings = await principalModule.loadIxAuthGatewaySettings();
   if (!settings) {
     // Configured for this mode but unusable. Denying is the only safe answer; startup
     // validation reports the underlying misconfiguration separately.
@@ -52,7 +52,7 @@ export async function runIxAuthHttpStage(params: {
     return true;
   }
   const socket = params.req.socket;
-  return await params.modules.handleIxAuthHttpRequest({
+  return await httpModule.handleIxAuthHttpRequest({
     req: params.req,
     res: params.res,
     pathname: params.pathname,
