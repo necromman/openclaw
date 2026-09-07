@@ -186,6 +186,8 @@ If you see unexpected `cacheWrite` spikes after a config or workspace change, ch
 ## OpenClaw cache-stability guards
 
 - Bundled MCP tool catalogs are sorted deterministically (by server name, then tool name) before tool registration, so `listTools()` order changes do not churn the tools block and bust prompt-cache prefixes.
+- Message-tool action enums are sorted after policy filtering, keeping identical capabilities stable across channel discovery order changes.
+- Native Ollama requests sort tools by name so discovery order changes do not churn the tools prefix.
 - Legacy sessions with persisted image blocks keep the **3 most recent completed turns** intact (counting all completed turns, not just image-bearing ones). Older already-processed image blocks are replaced with a text marker so image-heavy follow-ups do not keep re-sending large stale payloads.
 
 ## Tuning patterns
