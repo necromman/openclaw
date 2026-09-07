@@ -10,6 +10,7 @@ import {
   formatUnsafeGatewayTailscaleNoAuthMessage,
   isUnsafeGatewayTailscaleNoAuth,
 } from "../shared/gateway-tailscale-auth-policy.js";
+import { authenticatesGatewayWithoutSharedSecret } from "./auth-mode-policy.js";
 import {
   assertGatewayAuthConfigured,
   type ResolvedGatewayAuth,
@@ -71,7 +72,11 @@ export function assertGatewayRuntimeSecurityConfig(
   if (tailscaleMode !== "off" && !isLoopbackHost(bindHost)) {
     throw new Error("tailscale serve/funnel requires gateway bind=loopback (127.0.0.1)");
   }
-  if (!isLoopbackHost(bindHost) && !hasSharedSecret && authMode !== "trusted-proxy") {
+  if (
+    !isLoopbackHost(bindHost) &&
+    !hasSharedSecret &&
+    !authenticatesGatewayWithoutSharedSecret(authMode)
+  ) {
     throw new Error(
       `refusing to bind gateway to ${bindHost}:${params.port} without auth (set gateway.auth.token/password, or set OPENCLAW_GATEWAY_TOKEN/OPENCLAW_GATEWAY_PASSWORD; legacy CLAWDBOT_* and MOLTBOT_* environment variables are ignored)`,
     );
