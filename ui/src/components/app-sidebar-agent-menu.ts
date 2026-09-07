@@ -8,6 +8,10 @@ import { pathForAgentPanel } from "../app-route-paths.ts";
 import type { ApplicationNavigationOptions } from "../app/context.ts";
 import type { ThemeMode } from "../app/theme.ts";
 import { BRAND_FEATURES } from "../brand.ts";
+import {
+  isIxAuthSessionActive,
+  signOutIxAuthSession,
+} from "../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../i18n/index.ts";
 import { normalizeAgentLabel } from "../lib/agents/display.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../lib/external-link.ts";
@@ -481,6 +485,9 @@ export function renderSidebarIdentityMenu(params: SidebarIdentityMenuParams) {
           case `${COMMAND_VALUE_PREFIX}retry-connect`:
             params.onRetryConnect?.();
             break;
+          case `${COMMAND_VALUE_PREFIX}sign-out`:
+            void signOutIxAuthSession(params.basePath);
+            break;
         }
       }}
       @keydown=${(event: KeyboardEvent) => {
@@ -564,6 +571,20 @@ export function renderSidebarIdentityMenu(params: SidebarIdentityMenuParams) {
         <span class="sidebar-customize-menu__text">${t("agentChip.help")}</span>
         ${renderIdentityMenuHelpSubmenu()}
       </wa-dropdown-item>
+      ${
+        // Only where identity is delegated to the identity server. The shared-token modes
+        // have no account to sign out of, so the row would end nothing.
+        isIxAuthSessionActive()
+          ? html`<div class="sidebar-customize-menu__separator" role="separator"></div>
+              <wa-dropdown-item
+                class="sidebar-customize-menu__item sidebar-identity-menu__sign-out"
+                value="command:sign-out"
+              >
+                <span slot="icon" class="nav-item__icon" aria-hidden="true">${icons.logOut}</span>
+                <span class="sidebar-customize-menu__text">${t("ixAuth.signOut")}</span>
+              </wa-dropdown-item>`
+          : nothing
+      }
       ${
         params.offline
           ? html`<div class="sidebar-customize-menu__separator" role="separator"></div>

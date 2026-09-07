@@ -375,6 +375,9 @@ export const icons = {
   moreHorizontal: strokeIcon(svg` <circle cx="5" cy="12" r="1" />
     <circle cx="12" cy="12" r="1" />
     <circle cx="19" cy="12" r="1" />`),
+  logOut: strokeIcon(svg` <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />`),
   ...toolIcons,
 } as const;
 

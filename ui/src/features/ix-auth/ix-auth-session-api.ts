@@ -148,6 +148,41 @@ function resolveAdminConsoleUrl(basePath: string, value: unknown): string | unde
   return `${basePath.replace(/\/+$/u, "")}${value}`;
 }
 
+/** Latest probe answer, so the shell can branch on it without probing a second time. */
+let lastIxAuthSession: IxAuthSessionState | undefined;
+
+/**
+ * Record the probe answer and, in this mode, pull in the account copy.
+ *
+ * The identity strings live in a lazily loaded catalog to keep them out of the startup
+ * bundle. The sidebar sign-out row needs them without the sign-in screen ever having
+ * been rendered, so confirming the mode is what loads them.
+ */
+function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState {
+  lastIxAuthSession = session;
+  if (session.authMode === "ix-auth") {
+    void import("../../i18n/locales/en-ix-auth.ts")
+      .then((module) => {
+        module.registerIxAuthEnglish();
+      })
+      .catch(() => {
+        // A failed catalog fetch must not take the shell down with it; the row falls
+        // back to its key until the next load.
+      });
+  }
+  return session;
+}
+
+/**
+ * True once a probe reported a signed-in session on a Gateway in this mode.
+ *
+ * Read by shell surfaces that must not offer a sign-out control in the shared-token
+ * modes, where there is no account to sign out of.
+ */
+export function isIxAuthSessionActive(): boolean {
+  return lastIxAuthSession?.authMode === "ix-auth" && lastIxAuthSession.authenticated;
+}
+
 /**
  * Ask the Gateway whether this browser already holds a session.
  *
@@ -155,6 +190,10 @@ function resolveAdminConsoleUrl(basePath: string, value: unknown): string | unde
  * ix-auth mode, so the caller can fall through to the existing connection screen.
  */
 export async function probeIxAuthSession(basePath: string): Promise<IxAuthSessionState> {
+  return rememberIxAuthSession(await runIxAuthSessionProbe(basePath));
+}
+
+async function runIxAuthSessionProbe(basePath: string): Promise<IxAuthSessionState> {
   let response: Response;
   try {
     response = await fetch(resolveIxAuthEndpoint(basePath, "me"), {
@@ -260,4 +299,16 @@ export async function submitIxAuthLogout(basePath: string): Promise<void> {
     // The page reloads regardless: a failed logout call must not strand the user on a
     // screen that still looks signed in.
   }
+}
+
+/**
+ * End the session and go back to the sign-in screen.
+ *
+ * The full reload is deliberate: it discards every cached list, subscription, and view
+ * that was built for the signed-out user instead of pruning them piecemeal.
+ */
+export async function signOutIxAuthSession(basePath: string): Promise<void> {
+  await submitIxAuthLogout(basePath);
+  lastIxAuthSession = undefined;
+  globalThis.location.assign(basePath || "/");
 }

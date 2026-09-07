@@ -22,7 +22,7 @@ import { renderLearnMoreLink } from "../../components/settings-ui.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import {
   probeIxAuthSession,
-  submitIxAuthLogout,
+  signOutIxAuthSession,
   type IxAuthSessionState,
 } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { isMissingOperatorReadScopeError } from "../../lib/gateway-errors.ts";
@@ -100,12 +100,8 @@ export class ConnectionPage extends OpenClawLightDomElement {
     this.ixAuthSession = await probeIxAuthSession(this.context?.basePath ?? "");
   }
 
-  private async signOutIxAuthSession(): Promise<void> {
-    const basePath = this.context?.basePath ?? "";
-    await submitIxAuthLogout(basePath);
-    // A full reload is deliberate: it discards every cached list, subscription, and
-    // view that was built for the signed-out user instead of pruning them piecemeal.
-    globalThis.location.assign(basePath || "/");
+  private async signOut(): Promise<void> {
+    await signOutIxAuthSession(this.context?.basePath ?? "");
   }
 
   override disconnectedCallback() {
@@ -315,7 +311,7 @@ export class ConnectionPage extends OpenClawLightDomElement {
       onRefresh: () => void this.context.channels.refresh(false),
       ixAuthSession: this.ixAuthSession,
       ixAuthBasePath: this.context?.basePath ?? "",
-      onIxAuthSignOut: () => void this.signOutIxAuthSession(),
+      onIxAuthSignOut: () => void this.signOut(),
     });
     return html`
       <section class="content-header">
