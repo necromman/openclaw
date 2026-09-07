@@ -5,6 +5,7 @@
 // opaque session cookie. Access and refresh tokens stay in this process.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
+import { readIxAuthDepartmentCodes } from "../auth/ix-auth/ix-auth-claims.js";
 import {
   relayIxAuthLogin,
   relayIxAuthLogout,
@@ -13,6 +14,7 @@ import {
   type IxAuthRequestMeta,
   type IxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-client.js";
+import { syncIxAuthDepartments } from "../auth/ix-auth/ix-auth-departments.js";
 import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
 import {
   matchesIxAuthCsrfDigest,
@@ -360,6 +362,14 @@ async function completeIxAuthLogin(params: {
     sendJson(res, 500, { error: "session_persist_failed" });
     return;
   }
+
+  // Projected after the session row exists so a projection failure cannot leave a login
+  // half-finished; the boundary itself reads the token, not this table.
+  const departments = readIxAuthDepartmentCodes({
+    groups: session.claims.groups,
+    prefix: deps.settings.departmentGroupPrefix,
+  });
+  syncIxAuthDepartments({ profileId, departments, nowMs });
 
   writeIxAuthSessionCookies({ res, deps, session });
   deps.onSecurityEvent?.({

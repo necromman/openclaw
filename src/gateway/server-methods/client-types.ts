@@ -63,6 +63,14 @@ export type GatewayClient = {
     syntheticClient?: true;
     /** Host-owned role authority retained separately from an autonomous run principal. */
     operatorRoleActor?: GatewayOperatorRoleActor;
+    /**
+     * Department codes from the verified IX-Auth access token of this connection.
+     *
+     * Minted only from a locally verified token at handshake time, never from wire
+     * params. Absent outside ix-auth mode, which is what keeps every other auth mode on
+     * its existing authorization path.
+     */
+    ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
     /** Overrides persisted sender attribution without changing the authorizing client identity. */
     senderAttribution?: { id: string; name?: string; identity?: TranscriptSenderIdentity };
     /** Trusted session creation provenance; never accepted from Gateway wire params. */
