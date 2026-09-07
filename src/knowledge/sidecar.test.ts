@@ -1,4 +1,5 @@
 // Tests for sidecar naming, frontmatter, and the origin line a citation has to show.
+import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   isSafeRelativePath,
@@ -25,7 +26,8 @@ describe("sidecar paths", () => {
   test("appends the suffix so two formats of one name stay distinct", () => {
     expect(sidecarRelativePath("a/notes.pdf")).toBe("a/notes.pdf.md");
     expect(sidecarRelativePath("a/notes.docx")).toBe("a/notes.docx.md");
-    expect(sidecarRelativePath("a\\notes.txt")).toBe("a/notes.txt.md");
+    // Host separators are normalized; on POSIX a backslash is an ordinary character.
+    expect(sidecarRelativePath(path.join("a", "notes.txt"))).toBe("a/notes.txt.md");
   });
 
   test("maps a sidecar back to its source, and ignores foreign files", () => {
@@ -44,7 +46,7 @@ describe("sidecar paths", () => {
   });
 
   test("normalizes separators without leaving a leading dot segment", () => {
-    expect(toPosixRelative("./a\\b")).toBe("a/b");
+    expect(toPosixRelative(`.${path.sep}a${path.sep}b`)).toBe("a/b");
   });
 });
 
