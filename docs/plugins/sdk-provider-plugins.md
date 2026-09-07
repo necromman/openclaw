@@ -754,6 +754,23 @@ catalog, API-key auth, and dynamic model resolution.
       </Tab>
     </Tabs>
 
+    Set `supportsSystemPromptCacheBoundary: true` on a provider registration
+    only when its `createStreamFn` transport understands the stable/dynamic
+    system-prompt boundary. Use `splitSystemPromptCacheBoundary` from
+    `openclaw/plugin-sdk/provider-transport-runtime` to checkpoint the stable
+    prefix separately, and consume the marker before sending any payload.
+    Use `stripSystemPromptCacheBoundary` when caching is disabled. By default,
+    OpenClaw strips the marker before invoking a custom transport.
+
+    For custom `createStreamFn` transports that accumulate JSON tool arguments,
+    use `createToolArgumentPreviewSchedule()` from `openclaw/plugin-sdk/llm`.
+    Create one schedule per tool call and pass the accumulated raw string's
+    length to it before calling `parseStreamingJson`. The returned function
+    admits preview refreshes at geometric growth checkpoints, so intermediate
+    `arguments` snapshots can remain unchanged while raw fragments arrive.
+    Keep emitting every raw delta and validate the complete arguments at the
+    transport's terminal boundary, even when the last preview was not refreshed.
+
     <Accordion title="Common provider hooks">
       OpenClaw calls hooks in roughly this order for model/provider plugins.
       Most providers only use 2-3. This is not the full `ProviderPlugin`

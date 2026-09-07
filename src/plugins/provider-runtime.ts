@@ -1,3 +1,4 @@
+import { stripSystemPromptCacheBoundary } from "@openclaw/ai/internal/shared";
 // Composes provider plugin runtime hooks with shared provider policy.
 import {
   findNormalizedProviderValue,
@@ -13,6 +14,7 @@ import {
   mergePluginTextTransforms,
 } from "../agents/plugin-text-transforms.js";
 import { unwrapSecretSentinelsForProviderEgress } from "../agents/provider-secret-egress.js";
+import type { StreamFn } from "../agents/runtime/index.js";
 import type { ProviderSystemPromptContribution } from "../agents/system-prompt-contribution.js";
 import type { ModelProviderConfig } from "../config/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -568,12 +570,26 @@ export function resolveProviderStreamFn(params: {
   env?: NodeJS.ProcessEnv;
   allowRuntimePluginLoad?: boolean;
   context: ProviderCreateStreamFnContext;
-}) {
+}): StreamFn | undefined {
+  // Transport families may explicitly ask for a different fallback owner.
   const plugin =
-    params.allowRuntimePluginLoad === false
-      ? resolveLoadedProviderRuntimePlugin(params)
-      : resolveProviderRuntimePlugin(params);
-  return plugin?.createStreamFn?.(params.context) ?? undefined;
+    params.runtimeHandle?.provider === params.provider
+      ? ensureProviderRuntimePluginHandle(params).plugin
+      : params.allowRuntimePluginLoad === false
+        ? resolveLoadedProviderRuntimePlugin(params)
+        : resolveProviderRuntimePlugin(params);
+  const streamFn = plugin?.createStreamFn?.(params.context);
+  if (!streamFn || plugin?.supportsSystemPromptCacheBoundary) {
+    return streamFn ?? undefined;
+  }
+  return (model, context, options) =>
+    streamFn(
+      model,
+      context.systemPrompt
+        ? { ...context, systemPrompt: stripSystemPromptCacheBoundary(context.systemPrompt) }
+        : context,
+      options,
+    );
 }
 
 export function resolveProviderTransportTurnStateWithPlugin(params: {

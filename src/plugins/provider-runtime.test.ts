@@ -806,14 +806,15 @@ describe("provider-runtime", () => {
     });
     setActivePluginRegistry(registry, "startup-registry", "gateway-bindable", "/tmp/workspace");
 
-    expect(
-      getAiTransportHost().plugin.resolveProviderStream({
-        provider: DEMO_PROVIDER_ID,
-        workspaceDir: "/tmp/workspace",
-        allowRuntimePluginLoad: false,
-        context: createDemoResolvedModelContext({}),
-      }),
-    ).toBe(streamFn);
+    const registeredStream = getAiTransportHost().plugin.resolveProviderStream({
+      provider: DEMO_PROVIDER_ID,
+      workspaceDir: "/tmp/workspace",
+      allowRuntimePluginLoad: false,
+      context: createDemoResolvedModelContext({}),
+    });
+    const context = { messages: [] };
+    void registeredStream?.(MODEL, context);
+    expect(streamFn).toHaveBeenCalledWith(MODEL, context, undefined);
     expect(createStreamFn).toHaveBeenCalledOnce();
     expect(resolvePluginProvidersMock).not.toHaveBeenCalled();
   });
@@ -914,8 +915,45 @@ describe("provider-runtime", () => {
       }),
     ).toEqual({ headers: { "x-demo-turn": "turn-1" } });
     expect(resolveTransportTurnState).toHaveBeenCalledOnce();
+    const registeredStream = getAiTransportHost().plugin.resolveProviderStream({
+      provider: DEMO_PROVIDER_ID,
+      allowRuntimePluginLoad: true,
+      context: createDemoResolvedModelContext({ model }),
+    });
+    const context = { messages: [] };
+    void registeredStream?.(model, context);
+    expect(streamFn).toHaveBeenCalledWith(model, context, undefined);
+    expect(
+      getAiTransportHost().plugin.wrapSimpleCompletionStream({
+        provider: DEMO_PROVIDER_ID,
+        context: createDemoResolvedModelContext({ model, streamFn }),
+      }),
+    ).toBe(streamFn);
+    expect(createStreamFn).toHaveBeenCalledOnce();
+    expect(wrapSimpleCompletionStreamFn).toHaveBeenCalledOnce();
     expect(resolvePluginProvidersMock).not.toHaveBeenCalled();
     expect(isPluginProvidersLoadInFlightMock).not.toHaveBeenCalled();
+  });
+
+  it("honors an explicit transport fallback owner over the model's attached handle", () => {
+    const streamFn = vi.fn();
+    registerLoadedProviders([
+      { id: "fallback", label: "Fallback", auth: [], createStreamFn: () => streamFn },
+    ]);
+    const model = attachModelProviderRuntimePluginHandle(MODEL, {
+      provider: DEMO_PROVIDER_ID,
+      modelId: MODEL.id,
+      plugin: { id: DEMO_PROVIDER_ID, label: "Demo", auth: [] },
+    });
+    const registeredStream = getAiTransportHost().plugin.resolveProviderStream({
+      provider: "fallback",
+      allowRuntimePluginLoad: false,
+      context: createDemoResolvedModelContext({ model }),
+    });
+    const context = { messages: [] };
+    void registeredStream?.(model, context);
+    expect(streamFn).toHaveBeenCalledWith(model, context, undefined);
+    expect(resolvePluginProvidersMock).not.toHaveBeenCalled();
   });
 
   it("does not load runtime plugins for transport turn-state hooks when loading is disabled", () => {
