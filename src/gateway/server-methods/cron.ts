@@ -69,6 +69,7 @@ import {
   getCronManagementAuthority,
   withCronManagementGrant,
 } from "../cron-creator-authority-grant.js";
+import { createCronCreatorProfileLookup } from "../cron-creator-profile.js";
 import { authorizeGatewaySessionCreation, operatorSessionCap } from "../operator-role-policy.js";
 import { getGatewayProcessInstanceId } from "../process-instance.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
@@ -201,16 +202,17 @@ function cronAddPayloadWithDeliveryPreview(params: {
   deliveryPreview: CronDeliveryPreview;
 }) {
   const job = "job" in params.result ? params.result.job : params.result;
+  const creatorProfiles = createCronCreatorProfileLookup();
   if ("job" in params.result) {
     return {
       created: params.result.created,
       ...(params.result.updated === undefined ? {} : { updated: params.result.updated }),
-      job: cronJobReadView(job),
+      job: cronJobReadView(job, creatorProfiles),
       deliveryPreview: params.deliveryPreview,
     };
   }
   return {
-    ...cronJobReadView(job),
+    ...cronJobReadView(job, creatorProfiles),
     deliveryPreview: params.deliveryPreview,
   };
 }
@@ -617,7 +619,9 @@ export const cronHandlers: GatewayRequestHandlers = {
       respond(true, { ...page, jobs: page.jobs.map(compactCronListJob) }, undefined);
       return;
     }
-    const jobs = page.jobs.map(cronJobReadView);
+    // One cached lookup per response keeps repeated creators to a single read.
+    const creatorProfiles = createCronCreatorProfileLookup();
+    const jobs = page.jobs.map((job) => cronJobReadView(job, creatorProfiles));
     if (p.includeDeliveryPreviews === false) {
       // Full job rows are the default because editors need their payloads. Delivery
       // previews are independently suppressible so list-only callers avoid per-job I/O
@@ -666,7 +670,7 @@ export const cronHandlers: GatewayRequestHandlers = {
       respondCronJobNotFound(respond, jobId, { preserveCronGetWireMessage: true });
       return;
     }
-    respond(true, cronJobReadView(job), undefined);
+    respond(true, cronJobReadView(job, createCronCreatorProfileLookup()), undefined);
   },
   "cron.scratch.get": async ({ params, respond, context, client }) => {
     if (!assertValidParams(params, validateCronScratchGetParams, "cron.scratch.get", respond)) {
@@ -1164,7 +1168,7 @@ export const cronHandlers: GatewayRequestHandlers = {
       return;
     }
     context.logGateway.info("cron: job updated", { jobId });
-    respond(true, cronJobReadView(job), undefined);
+    respond(true, cronJobReadView(job, createCronCreatorProfileLookup()), undefined);
   },
   "cron.remove": async ({ params, respond, context, client }) => {
     if (!assertValidParams(params, validateCronRemoveParams, "cron.remove", respond)) {

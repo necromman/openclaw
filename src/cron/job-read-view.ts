@@ -1,9 +1,11 @@
 import { resolveCronJobConfigRevision } from "./config-revision.js";
-import { toPublicCronJob } from "./public-job.js";
+import { type CronCreatorProfileLookup, toPublicCronJob } from "./public-job.js";
 import type { CronJob } from "./types.js";
 
-export function cronJobReadView(job: CronJob) {
-  const publicJob = toPublicCronJob(job);
+// The optional lookup stays a caller-injected function so this read view keeps
+// no dependency on gateway profile storage.
+export function cronJobReadView(job: CronJob, creatorProfiles?: CronCreatorProfileLookup) {
+  const publicJob = toPublicCronJob(job, creatorProfiles);
   return {
     ...publicJob,
     configRevision: resolveCronJobConfigRevision(job),
@@ -22,10 +24,13 @@ export function cronJobReadView(job: CronJob) {
 }
 
 // Strip only metadata added by the public read view, never unknown definition fields.
+// createdBy counts as such metadata: it is a projection of the store-only creator
+// stamp, so it must not enter definition comparisons or config revisions.
 // Stored revisions and privacy projection have separate owners and stay unchanged.
 export function cronJobDefinitionFromReadView(view: Partial<ReturnType<typeof cronJobReadView>>) {
   const {
     configRevision: _configRevision,
+    createdBy: _createdBy,
     nextRunAtMs: _nextRunAtMs,
     lastRunAtMs: _lastRunAtMs,
     lastRunStatus: _lastRunStatus,

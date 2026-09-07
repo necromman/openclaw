@@ -518,9 +518,24 @@ const CronJobStatePatchSchema = closedObject({
   streamLastExitAtMs: Type.Optional(CronDateTimestampMsSchema),
 });
 
+/**
+ * Creator projection; the public surface that replaces store-only createdActor.
+ * Profile creators carry their durable id plus best-effort display facts; channel
+ * creators carry only the channel-scoped id the gateway stamped at creation.
+ */
+const CronCreatedBySchema = Type.Union([
+  closedObject({
+    profileId: NonEmptyString,
+    email: Type.Optional(NonEmptyString),
+    displayName: Type.Optional(NonEmptyString),
+  }),
+  closedObject({ source: Type.Literal("channel"), id: NonEmptyString }),
+]);
+
 /** Persisted cron job definition returned by scheduler list/get APIs. */
 export const CronJobSchema = closedObject({
   id: NonEmptyString,
+  createdBy: Type.Optional(CronCreatedBySchema),
   declarationKey: Type.Optional(CronDeclarationKeySchema),
   displayName: Type.Optional(CronDisplayNameSchema),
   owner: Type.Optional(CronOwnerSchema),

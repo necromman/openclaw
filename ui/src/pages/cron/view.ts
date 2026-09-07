@@ -766,6 +766,7 @@ function renderJobsTable(props: CronProps, hasAnyJobsFilters: boolean) {
         <span>${t("cron.jobs.schedule")}</span>
         <span>${t("cron.jobs.nextRun")}</span>
         <span>${t("cron.jobs.lastRun")}</span>
+        <span>${t("cron.jobs.createdBy")}</span>
         ${props.canManage ? html`<span aria-hidden="true"></span>` : nothing}
       </div>
       ${
@@ -869,6 +870,7 @@ function renderJobRow(job: CronJob, props: CronProps) {
       ${renderJobCell("cron-table__schedule", t("cron.jobs.schedule"), formatCronSchedule(job))}
       ${renderJobCell("cron-table__next", t("cron.jobs.nextRun"), nextRun)}
       ${renderJobCell("cron-table__last", t("cron.jobs.lastRun"), renderLastRunCell(job))}
+      ${renderJobCell("cron-table__creator", t("cron.jobs.createdBy"), formatCronCreatedBy(job))}
       ${
         props.canManage
           ? html`
@@ -899,6 +901,19 @@ function renderJobRow(job: CronJob, props: CronProps) {
       }
     </div>
   `;
+}
+
+// Creator identity is a server projection: profile rows prefer the friendliest
+// fact they carry, channel rows only ever expose their channel-scoped id.
+function formatCronCreatedBy(job: CronJob) {
+  const createdBy = job.createdBy;
+  if (!createdBy) {
+    return t("common.na");
+  }
+  if ("source" in createdBy) {
+    return t("cron.jobs.createdByChannel", { id: createdBy.id });
+  }
+  return createdBy.displayName ?? createdBy.email ?? createdBy.profileId;
 }
 
 function renderJobCell(className: string, label: string, value: unknown) {
@@ -1179,6 +1194,14 @@ function renderDetailHeader(props: CronProps, mode: CronPanelMode, selectedJob?:
             ? html`<div class="cron-detail-description" data-test-id="cron-detail-description">
                 <span class="cron-detail-description__label">${t("cron.form.description")}:</span>
                 ${description}
+              </div>`
+            : nothing
+        }
+        ${
+          mode === "job" && selectedJob
+            ? html`<div class="cron-detail-created-by" data-test-id="cron-detail-created-by">
+                <span class="cron-detail-description__label">${t("cron.jobs.createdBy")}:</span>
+                ${formatCronCreatedBy(selectedJob)}
               </div>`
             : nothing
         }

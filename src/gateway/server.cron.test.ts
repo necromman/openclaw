@@ -636,7 +636,11 @@ describe("gateway server cron", () => {
 
       expect(attributed.ok, JSON.stringify(attributed.error ?? null)).toBe(true);
       expect(attributed.payload).not.toHaveProperty("createdActor");
+      // The store-only stamp reaches clients as a createdBy projection; an
+      // unknown profile still yields its durable id, never an error.
+      expect(attributed.payload).toMatchObject({ createdBy: { profileId: "profile-ada" } });
       expect(unattributed.ok, JSON.stringify(unattributed.error ?? null)).toBe(true);
+      expect(unattributed.payload).not.toHaveProperty("createdBy");
       const jobs = (await loadCronStore(cronState.storePath)).jobs;
       expect(jobs.find((job) => job.name === "attributed")).toMatchObject({
         createdActor: { type: "human", source: "profile", id: "profile-ada" },

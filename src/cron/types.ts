@@ -467,6 +467,11 @@ export type CronTriggerEvaluationResult =
   | { kind: "busy" }
   | { kind: "error"; code: CronTriggerFailureCode; error: string };
 
+/** Public creator projection derived from the store-only createdActor stamp. */
+export type CronCreatedBy =
+  | { profileId: string; email?: string; displayName?: string }
+  | { source: "channel"; id: string };
+
 /** Public cron job contract with spec fields and mutable run state. */
 export type CronJob = CronJobBase<
   CronSchedule,
@@ -478,6 +483,11 @@ export type CronJob = CronJobBase<
 > & {
   declarationKey?: string;
   displayName?: string;
+  /**
+   * Creator projection; the public surface that replaces store-only createdActor.
+   * Server-authored only: create and patch inputs must never carry it.
+   */
+  createdBy?: CronCreatedBy;
   owner?: {
     agentId?: string;
     sessionKey?: string;
@@ -527,7 +537,7 @@ type CronJobStateInput = Partial<
 /** Create input accepted by cron APIs before id/timestamps/state are assigned. */
 export type CronJobCreate = Omit<
   CronJob,
-  "id" | "createdAtMs" | "updatedAtMs" | "state" | "scheduledToolPolicy"
+  "id" | "createdAtMs" | "updatedAtMs" | "state" | "scheduledToolPolicy" | "createdBy"
 > & {
   /** Internal callers can reserve a durable id before creation; public cron.add omits this. */
   id?: string;
@@ -546,6 +556,7 @@ export type CronJobPatch = Partial<
     | "failureAlert"
     | "declarationKey"
     | "displayName"
+    | "createdBy"
     | "owner"
     | "scheduledToolPolicy"
     | "pacing"

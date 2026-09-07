@@ -1507,6 +1507,7 @@ export const en: TranslationMap & {
         image: "Image understanding",
       },
       profiles: {
+        readonly: "Read-only",
         minimal: "Minimal",
         coding: "Coding",
         messaging: "Messaging",
@@ -6132,6 +6133,8 @@ export const en: TranslationMap & {
       unconditional: "Unconditional",
       sort: "Sort",
       nextRun: "Next run",
+      createdBy: "Created by",
+      createdByChannel: "Channel {id}",
       recentlyUpdated: "Recently updated",
       name: "Name",
       direction: "Direction",

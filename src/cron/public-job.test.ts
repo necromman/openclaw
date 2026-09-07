@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { makeCronJob } from "./delivery.test-helpers.js";
 import { toPublicCronJob } from "./public-job.js";
 import type { CronStoredJob } from "./types.js";
@@ -80,6 +80,72 @@ describe("toPublicCronJob", () => {
 
     expect(toPublicCronJob(job)).not.toHaveProperty("createdActor");
     expect(job.createdActor).toEqual({ type: "human", source: "profile", id: "profile-ada" });
+  });
+
+  it("projects a profile creator as a bare profile id without a lookup", () => {
+    const job: CronStoredJob = {
+      ...makeCronJob({}),
+      createdActor: { type: "human", source: "profile", id: "profile-ada", label: "Ada" },
+    };
+
+    expect(toPublicCronJob(job).createdBy).toEqual({ profileId: "profile-ada" });
+  });
+
+  it("enriches a profile creator with injected email and display name", () => {
+    const job: CronStoredJob = {
+      ...makeCronJob({}),
+      createdActor: { type: "human", source: "profile", id: "profile-ada" },
+    };
+    const lookup = vi.fn(() => ({ email: "ada@example.com", displayName: "Ada Lovelace" }));
+
+    expect(toPublicCronJob(job, lookup).createdBy).toEqual({
+      profileId: "profile-ada",
+      email: "ada@example.com",
+      displayName: "Ada Lovelace",
+    });
+    expect(lookup).toHaveBeenCalledWith("profile-ada");
+  });
+
+  it("keeps the bare profile id when the lookup cannot resolve the profile", () => {
+    const job: CronStoredJob = {
+      ...makeCronJob({}),
+      createdActor: { type: "human", source: "profile", id: "profile-gone" },
+    };
+
+    expect(toPublicCronJob(job, () => undefined).createdBy).toEqual({
+      profileId: "profile-gone",
+    });
+  });
+
+  it("projects a channel creator without consulting the profile lookup", () => {
+    const job: CronStoredJob = {
+      ...makeCronJob({}),
+      createdActor: { type: "human", source: "channel", id: "slack:U123" },
+    };
+    const lookup = vi.fn(() => ({ email: "ada@example.com" }));
+
+    expect(toPublicCronJob(job, lookup).createdBy).toEqual({
+      source: "channel",
+      id: "slack:U123",
+    });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("omits createdBy for agent, system, unknown-source, and id-less creators", () => {
+    const base = makeCronJob({});
+    const cases: CronStoredJob[] = [
+      { ...base, createdActor: { type: "agent", id: "agent-main" } },
+      { ...base, createdActor: { type: "system", id: "scheduler" } },
+      { ...base, createdActor: { type: "human", source: "unknown", id: "who" } },
+      { ...base, createdActor: { type: "human", source: "profile" } },
+      base,
+    ];
+
+    for (const job of cases) {
+      expect(toPublicCronJob(job, () => ({ email: "ada@example.com" }))).not.toHaveProperty(
+        "createdBy",
+      );
+    }
   });
 
   it("strips private runtime authority without mutating the stored job", () => {

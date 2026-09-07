@@ -59,6 +59,7 @@ export { formatUserProfileAvatarEtag, getProfileAvatar } from "./user-profiles-i
 export {
   getUserProfileDisplay,
   readUserProfileAliases,
+  readUserProfileEmail,
   hasMultipleSessionSharingIdentities,
   listProfiles,
 } from "./user-profile-list.js";

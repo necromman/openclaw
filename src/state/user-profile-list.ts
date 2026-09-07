@@ -174,6 +174,36 @@ export function readUserProfileAliases(
   return aliases;
 }
 
+/**
+ * Reverse-resolves a profile id to its lowest email alias. Merges reassign
+ * aliases to the surviving head, so this reads through the same merge hop the
+ * display lookup uses. Never creates profile storage; an absent table, an
+ * unknown profile, or an alias-free profile all read as undefined.
+ */
+export function readUserProfileEmail(
+  profileId: string,
+  options: OpenClawStateDatabaseOptions = {},
+): string | undefined {
+  return withExistingOpenClawStateDatabaseReadOnly(({ db }) => {
+    if (!tableExists(db, "user_profiles") || !tableExists(db, "user_profile_emails")) {
+      return undefined;
+    }
+    const canonicalId = selectResolvedUserProfileById(db, profileId)?.id;
+    if (!canonicalId) {
+      return undefined;
+    }
+    return executeSqliteQuerySync(
+      db,
+      userProfilesDb(db)
+        .selectFrom("user_profile_emails")
+        .select("email")
+        .where("profile_id", "=", canonicalId)
+        .orderBy("email", "asc")
+        .limit(1),
+    ).rows[0]?.email;
+  }, options);
+}
+
 const userProfileDisplaySelection = [
   "id",
   "display_name",
