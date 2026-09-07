@@ -203,7 +203,20 @@ export function appendUserActivityAuditEvent(
   );
 }
 
-/** Newest-first page over the ledger, filtered to what the caller may read. */
+/** How many rows one scan pass reads while looking for department matches. */
+const USER_ACTIVITY_SCAN_BATCH_ROWS = 500;
+/** Ceiling on how far one page will scan for matches before giving up. */
+const USER_ACTIVITY_MAX_SCAN_ROWS = 20_000;
+
+/**
+ * Newest-first page over the ledger, filtered to what the caller may read.
+ *
+ * Every filter but one is a column, so SQLite applies it. The department set lives inside
+ * a JSON column, so that one is applied while scanning: the page keeps reading batches
+ * until it has a full page of matches or runs out of rows. Filtering a single fetched
+ * page instead would end a listing early - a short page with no cursor reads as "that is
+ * all there is", which for an administrator scoped to one department is wrong.
+ */
 export function listUserActivityAuditEvents(
   params: {
     filters?: UserActivityAuditFilters;
@@ -219,51 +232,69 @@ export function listUserActivityAuditEvents(
     return { entries: [] };
   }
   const filters = params.filters ?? {};
-  let query = activityDb(database.db).selectFrom("audit_user_activity").selectAll();
-  if (params.cursor !== undefined) {
-    query = query.where("sequence", "<", params.cursor);
-  }
-  if (filters.profileId) {
-    query = query.where("profile_id", "=", filters.profileId);
-  }
-  if (filters.email) {
-    query = query.where("email", "=", filters.email);
-  }
-  if (filters.kind) {
-    query = query.where("kind", "=", filters.kind);
-  }
-  if (filters.agentId) {
-    query = query.where("agent_id", "=", filters.agentId);
-  }
-  if (filters.sessionKey) {
-    query = query.where("session_key", "=", filters.sessionKey);
-  }
-  if (filters.from !== undefined) {
-    query = query.where("at", ">=", filters.from);
-  }
-  if (filters.to !== undefined) {
-    query = query.where("at", "<=", filters.to);
-  }
   const departmentScope = filters.departments;
-  const rows = executeSqliteQuerySync(
-    database.db,
-    query
-      .orderBy("sequence", "desc")
-      .limit(departmentScope ? params.limit * 4 + 1 : params.limit + 1),
-  ).rows;
-  // The department set lives inside a JSON column, so the intersection is applied after
-  // the page is read. Over-fetching keeps a filtered page from coming back near-empty.
-  const visible = departmentScope
-    ? rows.filter((row) => {
-        const rowDepartments = parseJsonStringArray(row.departments);
-        return rowDepartments.some((code) => departmentScope.includes(code));
-      })
-    : rows;
-  const hasMore = visible.length > params.limit;
-  const page = hasMore ? visible.slice(0, params.limit) : visible;
+  const matchesScope = (row: UserActivityAuditRow): boolean =>
+    !departmentScope ||
+    parseJsonStringArray(row.departments).some((code) => departmentScope.includes(code));
+  const batchRows = departmentScope
+    ? USER_ACTIVITY_SCAN_BATCH_ROWS
+    : Math.min(params.limit + 1, USER_ACTIVITY_SCAN_BATCH_ROWS);
+  const entries: UserActivityAuditEntry[] = [];
+  let cursor = params.cursor;
+  let scanned = 0;
+  let exhausted = false;
+  while (entries.length < params.limit && scanned < USER_ACTIVITY_MAX_SCAN_ROWS) {
+    let query = activityDb(database.db).selectFrom("audit_user_activity").selectAll();
+    if (cursor !== undefined) {
+      query = query.where("sequence", "<", cursor);
+    }
+    if (filters.profileId) {
+      query = query.where("profile_id", "=", filters.profileId);
+    }
+    if (filters.email) {
+      query = query.where("email", "=", filters.email);
+    }
+    if (filters.kind) {
+      query = query.where("kind", "=", filters.kind);
+    }
+    if (filters.agentId) {
+      query = query.where("agent_id", "=", filters.agentId);
+    }
+    if (filters.sessionKey) {
+      query = query.where("session_key", "=", filters.sessionKey);
+    }
+    if (filters.from !== undefined) {
+      query = query.where("at", ">=", filters.from);
+    }
+    if (filters.to !== undefined) {
+      query = query.where("at", "<=", filters.to);
+    }
+    const rows = executeSqliteQuerySync(
+      database.db,
+      query.orderBy("sequence", "desc").limit(batchRows),
+    ).rows;
+    scanned += rows.length;
+    for (const row of rows) {
+      cursor = row.sequence;
+      if (matchesScope(row)) {
+        entries.push(rowToEntry(row));
+      }
+      if (entries.length >= params.limit) {
+        break;
+      }
+    }
+    if (rows.length < batchRows) {
+      exhausted = true;
+      break;
+    }
+  }
   return {
-    entries: page.map(rowToEntry),
-    ...(hasMore && page.length > 0 ? { nextCursor: page[page.length - 1]!.sequence } : {}),
+    entries,
+    // A cursor is offered only while rows may remain: a page that read the table to its
+    // end must not invite a request that can only come back empty.
+    ...(exhausted || cursor === undefined || entries.length < params.limit
+      ? {}
+      : { nextCursor: cursor }),
   };
 }
 

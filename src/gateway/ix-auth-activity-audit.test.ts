@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IxAuthVerifiedClaims } from "../auth/ix-auth/ix-auth-types.js";
 import type { UserActivityRecordParams } from "../audit/user-activity-audit-recorder.js";
+import type { IxAuthVerifiedClaims } from "../auth/ix-auth/ix-auth-types.js";
 import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
 
 const recorded: UserActivityRecordParams[] = [];
@@ -13,11 +13,8 @@ vi.mock("../audit/user-activity-audit-recorder.js", () => ({
   },
 }));
 
-const {
-  recordIxAuthLoginActivity,
-  recordIxAuthLoginFailureActivity,
-  recordIxAuthLogoutActivity,
-} = await import("./ix-auth-activity-audit.js");
+const { recordIxAuthLoginActivity, recordIxAuthLoginFailureActivity, recordIxAuthLogoutActivity } =
+  await import("./ix-auth-activity-audit.js");
 
 function request(): IncomingMessage {
   return {

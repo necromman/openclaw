@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { scopeUserActivityFilters, type UserActivityAuditReader } from "./user-activity-audit-query.js";
+import {
+  scopeUserActivityFilters,
+  type UserActivityAuditReader,
+} from "./user-activity-audit-query.js";
 
 function ixAuth(params: {
   gatewayRole?: string;

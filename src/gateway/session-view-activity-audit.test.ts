@@ -11,11 +11,8 @@ vi.mock("../audit/user-activity-audit-recorder.js", () => ({
   },
 }));
 
-const {
-  recordAccessDeniedActivity,
-  recordFileDownloadActivity,
-  recordSessionViewActivity,
-} = await import("./session-view-activity-audit.js");
+const { recordAccessDeniedActivity, recordFileDownloadActivity, recordSessionViewActivity } =
+  await import("./session-view-activity-audit.js");
 
 function signedInClient(): GatewayClient {
   return {

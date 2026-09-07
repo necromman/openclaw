@@ -8,7 +8,9 @@ describe("logging.audit.userActivity", () => {
   it("accepts the three declared keys", () => {
     expect(
       OpenClawSchema.safeParse({
-        logging: { audit: { userActivity: { promptText: true, retentionDays: 30, maxRows: 5_000 } } },
+        logging: {
+          audit: { userActivity: { promptText: true, retentionDays: 30, maxRows: 5_000 } },
+        },
       }).success,
     ).toBe(true);
   });
@@ -27,8 +29,7 @@ describe("logging.audit.userActivity", () => {
         .success,
     ).toBe(false);
     expect(
-      OpenClawSchema.safeParse({ logging: { audit: { userActivity: { maxRows: -1 } } } })
-        .success,
+      OpenClawSchema.safeParse({ logging: { audit: { userActivity: { maxRows: -1 } } } }).success,
     ).toBe(false);
   });
 });

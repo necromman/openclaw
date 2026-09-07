@@ -35,9 +35,7 @@ describe("user activity audit store", () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       expect(listUserActivityAuditEvents({ limit: 10 })).toEqual({ entries: [] });
       // A read must not be what installs the ledger, so a prune still finds nothing.
-      expect(
-        pruneUserActivityAuditEvents({ now: 0, retentionMs: DAY_MS, maxRows: 10 }),
-      ).toBe(0);
+      expect(pruneUserActivityAuditEvents({ now: 0, retentionMs: DAY_MS, maxRows: 10 })).toBe(0);
     });
   });
 
@@ -125,6 +123,36 @@ describe("user activity audit store", () => {
         filters: { departments: ["dept-rnd"] },
       });
       expect(page.entries.map((entry) => entry.email)).toEqual(["rnd@example.com"]);
+      expect(page.nextCursor).toBeUndefined();
+    });
+  });
+
+  it("keeps scanning past unmatched rows to fill a department-scoped page", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      // The only matches are the oldest rows. Reading one page and filtering it would
+      // answer "nothing, and no more pages" - which is what the department-scoped
+      // administrator would then be shown.
+      appendLogin({ at: 1, email: "rnd-a@example.com", departments: ["dept-rnd"] });
+      appendLogin({ at: 2, email: "rnd-b@example.com", departments: ["dept-rnd"] });
+      for (let index = 0; index < 40; index += 1) {
+        appendLogin({ at: index + 3, email: `qa${index}@example.com`, departments: ["dept-qa"] });
+      }
+      const page = listUserActivityAuditEvents({
+        limit: 2,
+        filters: { departments: ["dept-rnd"] },
+      });
+      expect(page.entries.map((entry) => entry.email)).toEqual([
+        "rnd-b@example.com",
+        "rnd-a@example.com",
+      ]);
+    });
+  });
+
+  it("offers no cursor once the table has been read to its end", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      appendLogin({ at: 1, email: "a@example.com" });
+      appendLogin({ at: 2, email: "b@example.com" });
+      expect(listUserActivityAuditEvents({ limit: 2 }).nextCursor).toBeUndefined();
     });
   });
 
@@ -133,12 +161,12 @@ describe("user activity audit store", () => {
       const now = 100 * DAY_MS;
       appendLogin({ at: now - 91 * DAY_MS, email: "old@example.com" });
       appendLogin({ at: now - 1_000, email: "new@example.com" });
-      expect(
-        pruneUserActivityAuditEvents({ now, retentionMs: 90 * DAY_MS, maxRows: 1_000 }),
-      ).toBe(1);
-      expect(listUserActivityAuditEvents({ limit: 10 }).entries.map((entry) => entry.email)).toEqual(
-        ["new@example.com"],
+      expect(pruneUserActivityAuditEvents({ now, retentionMs: 90 * DAY_MS, maxRows: 1_000 })).toBe(
+        1,
       );
+      expect(
+        listUserActivityAuditEvents({ limit: 10 }).entries.map((entry) => entry.email),
+      ).toEqual(["new@example.com"]);
     });
   });
 
