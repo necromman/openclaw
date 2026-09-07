@@ -8,7 +8,7 @@
 // anything that is not a GET) followed by the same department scoping the RPC applies, so
 // an administrator's export cannot contain a row their screen would have hidden.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { USER_ACTIVITY_AUDIT_KINDS } from "../state/user-activity-audit-schema.js";
+import { AUDIT_USER_ACTIVITY_KINDS } from "../../packages/gateway-protocol/src/schema/audit-user-activity.js";
 import type { UserActivityAuditFilters } from "../state/user-activity-audit-store.js";
 import type { IxAuthAdminContext } from "./ix-auth-admin-context.js";
 import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
@@ -33,7 +33,7 @@ function readTimestamp(value: string | null): number | undefined {
 
 function readKind(query: URLSearchParams): UserActivityAuditFilters["kind"] {
   const kind = readText(query, "kind");
-  const known: readonly string[] = USER_ACTIVITY_AUDIT_KINDS;
+  const known: readonly string[] = AUDIT_USER_ACTIVITY_KINDS;
   if (!kind || !known.includes(kind)) {
     return undefined;
   }

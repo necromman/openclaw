@@ -1,5 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Generated, Selectable } from "kysely";
+import type {
+  AUDIT_USER_ACTIVITY_ACTOR_SOURCES,
+  AUDIT_USER_ACTIVITY_KINDS,
+} from "../../packages/gateway-protocol/src/schema/audit-user-activity.js";
 import {
   openOpenClawStateDatabase,
   runOpenClawStateWriteTransaction,
@@ -56,30 +60,11 @@ CREATE INDEX IF NOT EXISTS idx_audit_user_activity_session
   ON audit_user_activity(session_key, at DESC, sequence DESC);
 `;
 
-/**
- * What the ledger can record.
- *
- * A closed list, so a later reader can enumerate the kinds instead of discovering them.
- * Free-text detail belongs in `detail`, never in a new kind invented at one call site.
- */
-export const USER_ACTIVITY_AUDIT_KINDS = [
-  "login",
-  "logout",
-  "login_failed",
-  "prompt",
-  "tool_read",
-  "session_view",
-  "file_download",
-  "admin_action",
-  "access_denied",
-] as const;
+// The closed list of kinds is the protocol's, not this table's: what the ledger stores
+// and what the query surface can carry are the same set, and two copies would drift.
+export type UserActivityAuditKind = (typeof AUDIT_USER_ACTIVITY_KINDS)[number];
 
-export type UserActivityAuditKind = (typeof USER_ACTIVITY_AUDIT_KINDS)[number];
-
-/** Where the actor identity came from. Channel senders have no account to attribute. */
-export const USER_ACTIVITY_AUDIT_ACTOR_SOURCES = ["profile", "channel", "operator"] as const;
-
-export type UserActivityAuditActorSource = (typeof USER_ACTIVITY_AUDIT_ACTOR_SOURCES)[number];
+export type UserActivityAuditActorSource = (typeof AUDIT_USER_ACTIVITY_ACTOR_SOURCES)[number];
 
 export type UserActivityAuditDatabase = {
   audit_user_activity: {

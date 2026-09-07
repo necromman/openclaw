@@ -5,14 +5,15 @@ import {
   AUDIT_ACTIVITY_KINDS,
   AUDIT_ACTIVITY_STATUSES,
 } from "../../../packages/gateway-protocol/src/schema/audit-activity.js";
+import { AUDIT_USER_ACTIVITY_KINDS } from "../../../packages/gateway-protocol/src/schema/audit-user-activity.js";
 import { formatDocsLink } from "../../../packages/terminal-core/src/links.js";
 import { theme } from "../../../packages/terminal-core/src/theme.js";
 import { auditUsersCommand, type AuditUsersCommandOptions } from "../../commands/audit-users.js";
 import { auditListCommand, type AuditListCommandOptions } from "../../commands/audit.js";
 import { defaultRuntime } from "../../runtime.js";
 import { formatHumanList } from "../../shared/human-list.js";
-import { USER_ACTIVITY_AUDIT_KINDS } from "../../state/user-activity-audit-schema.js";
 import { runCommandWithRuntime } from "../cli-utils.js";
+import { inheritOptionFromParent } from "../command-options.js";
 
 /**
  * Register `openclaw audit users`.
@@ -26,7 +27,7 @@ function optionalOption(value: unknown): string | undefined {
 
 function auditUsersKind(value: unknown): AuditUsersCommandOptions["kind"] {
   const kind = optionalOption(value);
-  const known: readonly string[] = USER_ACTIVITY_AUDIT_KINDS;
+  const known: readonly string[] = AUDIT_USER_ACTIVITY_KINDS;
   if (!kind || !known.includes(kind)) {
     return undefined;
   }
@@ -40,7 +41,7 @@ function registerAuditUsersSubcommand(audit: Command): void {
     .description("Inspect the person-attributed activity ledger")
     .option("--email <email>", "Filter by account address")
     .option("--profile <id>", "Filter by Gateway profile id")
-    .option("--kind <kind>", `Filter by kind (${formatHumanList(USER_ACTIVITY_AUDIT_KINDS)})`)
+    .option("--kind <kind>", `Filter by kind (${formatHumanList(AUDIT_USER_ACTIVITY_KINDS)})`)
     .option("--agent <id>", "Filter by agent id")
     .option("--session <key>", "Filter by exact session key")
     .option("--since <timestamp>", "Include records at/after ISO time or Unix milliseconds")
@@ -48,20 +49,26 @@ function registerAuditUsersSubcommand(audit: Command): void {
     .option("--cursor <sequence>", "Continue from a previous result cursor")
     .option("--limit <count>", "Maximum records (1-500)")
     .option("--json", "Output a bounded JSON page", false)
-    .action(async (opts) => {
+    .action(async (opts: Record<string, unknown>, command: Command) => {
+      // `--agent`, `--session`, `--kind`, `--limit`, `--cursor` and `--json` exist on
+      // both `audit` and `audit users`, so commander can bind them to either one
+      // depending on where they sit on the line. Read the ancestor's value only when
+      // this leaf's own value is still the default.
+      const shared = (name: string) =>
+        inheritOptionFromParent<string>(command, name) ?? optionalOption(opts[name]);
       await runCommandWithRuntime(defaultRuntime, async () => {
         await auditUsersCommand(
           {
             email: optionalOption(opts.email),
             profileId: optionalOption(opts.profile),
-            kind: auditUsersKind(opts.kind),
-            agentId: optionalOption(opts.agent),
-            sessionKey: optionalOption(opts.session),
+            kind: auditUsersKind(inheritOptionFromParent(command, "kind") ?? opts.kind),
+            agentId: shared("agent"),
+            sessionKey: shared("session"),
             since: optionalOption(opts.since),
             until: optionalOption(opts.until),
-            cursor: optionalOption(opts.cursor),
-            limit: optionalOption(opts.limit),
-            json: Boolean(opts.json),
+            cursor: shared("cursor"),
+            limit: shared("limit"),
+            json: Boolean(inheritOptionFromParent<boolean>(command, "json") ?? opts.json),
           },
           defaultRuntime,
         );
