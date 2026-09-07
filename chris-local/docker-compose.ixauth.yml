@@ -65,6 +65,14 @@ services:
       IXAUTH_ADMIN_PASSWORD: ${IXAUTH_ADMIN_PASSWORD:?set IXAUTH_ADMIN_PASSWORD}
       IXAUTH_ADMIN_NAME: ${IXAUTH_ADMIN_NAME:-관리자}
       IXAUTH_ADMIN_UI_ENABLED: "true"
+      # Self-service signup stays closed; administrators create accounts. The route is
+      # service-key only, so a browser could not reach it anyway, but the default is
+      # OPEN and a default that says "closed" is the one worth writing down.
+      IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
+      # Where mail links would point. There is no SMTP here (transport stays LOG, which
+      # writes the message to the server log), but the base URL is what makes a logged
+      # invitation link usable at all.
+      IXAUTH_MAIL_APP_BASE_URL: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
       # Password policy for seeded and console-created accounts.
       IXAUTH_PASSWORD_MIN_LENGTH: ${IXAUTH_PASSWORD_MIN_LENGTH:-10}
       IXAUTH_LOG_LEVEL: ${IXAUTH_LOG_LEVEL:-INFO}

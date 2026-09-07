@@ -46,6 +46,7 @@
 | `IXAUTH_ADMIN_NAME` | | `관리자` | 콘솔에 보이는 표시 이름 |
 | `IXAUTH_PASSWORD_MIN_LENGTH` | | `10` | 최소 길이. 대문자·숫자·특수문자 각 1개 이상은 서버 기본값으로 항상 요구된다 |
 | `IXAUTH_LOG_LEVEL` | | `INFO` | 신원 서버 로그 수준 |
+| `IXAUTH_ACCOUNT_SIGNUP_MODE` | | `CLOSED` | 자체 가입 모드. 계정은 관리자가 만든다. `OPEN`·`APPROVAL` 은 메일이 먼저 있어야 한다 |
 | `OPENCLAW_GATEWAY_PORT` | | `18800` | 호스트에 여는 포트 |
 | `OPENCLAW_PUBLIC_ORIGIN` | | `http://127.0.0.1:18800` | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다 |
 | `OPENCLAW_TZ` | | `Asia/Seoul` | 컨테이너 시간대 |
