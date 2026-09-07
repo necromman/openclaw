@@ -596,6 +596,7 @@ export class OpenClawApp extends OpenClawLightDomElement {
         resourceBasePath: context.resourceBasePath,
         state: this.ixAuth.form,
         onChange: (next) => this.ixAuth.updateForm(next),
+        onNavigate: (screen) => this.ixAuth.navigate(screen, basePath),
         onSubmit: () => {
           void this.ixAuth.submit(basePath).then((signedIn) => {
             if (signedIn) {

@@ -10,8 +10,11 @@ import {
 describe("createEmptyIxAuthFormState", () => {
   it("starts with nothing typed and nothing in flight", () => {
     expect(createEmptyIxAuthFormState()).toEqual({
+      screen: "sign-in",
       email: "",
       password: "",
+      confirmPassword: "",
+      name: "",
       showPassword: false,
       mfaCode: "",
       submitting: false,
@@ -23,14 +26,17 @@ describe("clearIxAuthFormSecrets", () => {
   it("drops the password and code but keeps the typed email", () => {
     // A password must not outlive the request that used it.
     const cleared = clearIxAuthFormSecrets({
+      ...createEmptyIxAuthFormState(),
       email: "person@example.com",
       password: "hunter2", // pragma: allowlist secret
+      confirmPassword: "hunter2", // pragma: allowlist secret
       showPassword: true,
       mfaCode: "123456",
       submitting: true,
       errorKey: "invalidCredentials",
     });
     expect(cleared.password).toBe("");
+    expect(cleared.confirmPassword).toBe("");
     expect(cleared.mfaCode).toBe("");
     expect(cleared.showPassword).toBe(false);
     expect(cleared.submitting).toBe(false);
@@ -59,7 +65,8 @@ describe("buildIxAuthLoginProps", () => {
     const props = buildIxAuthLoginProps({
       resourceBasePath: "",
       state: { ...base, errorKey: "invalidCredentials" },
-      handlers: { onChange, onSubmit: vi.fn() },
+      selfSignupEnabled: false,
+      handlers: { onChange, onSubmit: vi.fn(), onNavigate: vi.fn() },
     });
     props.onPasswordChange("typed");
     expect(onChange).toHaveBeenCalledWith(
@@ -72,7 +79,8 @@ describe("buildIxAuthLoginProps", () => {
     buildIxAuthLoginProps({
       resourceBasePath: "",
       state: { ...base, showPassword: true },
-      handlers: { onChange, onSubmit: vi.fn() },
+      selfSignupEnabled: false,
+      handlers: { onChange, onSubmit: vi.fn(), onNavigate: vi.fn() },
     }).onTogglePassword();
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ showPassword: false }));
   });
@@ -82,7 +90,8 @@ describe("buildIxAuthLoginProps", () => {
     buildIxAuthLoginProps({
       resourceBasePath: "",
       state: { ...base, mfaChallenge: "challenge", mfaCode: "111111" },
-      handlers: { onChange, onSubmit: vi.fn() },
+      selfSignupEnabled: false,
+      handlers: { onChange, onSubmit: vi.fn(), onNavigate: vi.fn() },
     }).onCancelMfa();
     expect(onChange).toHaveBeenCalledWith(createEmptyIxAuthFormState());
   });
@@ -92,7 +101,8 @@ describe("buildIxAuthLoginProps", () => {
     buildIxAuthLoginProps({
       resourceBasePath: "",
       state: base,
-      handlers: { onChange: vi.fn(), onSubmit },
+      selfSignupEnabled: false,
+      handlers: { onChange: vi.fn(), onSubmit, onNavigate: vi.fn() },
     }).onSubmit();
     expect(onSubmit).toHaveBeenCalledOnce();
   });

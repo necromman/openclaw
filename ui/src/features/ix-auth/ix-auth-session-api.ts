@@ -34,6 +34,8 @@ export type IxAuthSessionState = {
   user?: IxAuthSessionUser;
   /** Only surfaced to users who can actually open it. */
   adminConsoleUrl?: string;
+  /** True when the identity server accepts signups, which decides the signup link. */
+  selfSignupEnabled?: boolean;
 };
 
 export type IxAuthLoginResult =
@@ -176,6 +178,7 @@ export async function probeIxAuthSession(basePath: string): Promise<IxAuthSessio
     authMode: "ix-auth",
     user: readSessionUser(body),
     adminConsoleUrl: resolveAdminConsoleUrl(basePath, body.adminConsoleUrl),
+    selfSignupEnabled: body.selfSignupEnabled === true,
   };
 }
 

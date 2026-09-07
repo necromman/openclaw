@@ -9,6 +9,7 @@ import {
   type LazyCustomElementRequestController,
 } from "../../app/lazy-custom-element.ts";
 import { renderLazyViewError } from "../../components/lazy-view-error.ts";
+import type { IxAuthScreen } from "./ix-auth-account-screen.ts";
 import { buildIxAuthLoginProps, type IxAuthFormState } from "./ix-auth-form-state.ts";
 import type { IxAuthSessionState } from "./ix-auth-session-api.ts";
 
@@ -31,6 +32,7 @@ export type IxAuthGateViewParams = {
   state: IxAuthFormState;
   onChange: (next: IxAuthFormState) => void;
   onSubmit: () => void;
+  onNavigate: (screen: IxAuthScreen) => void;
   /** Shown while the sign-in chunk is still loading. */
   renderPending: () => TemplateResult;
 };
@@ -67,7 +69,14 @@ export function renderIxAuthGate(params: IxAuthGateViewParams): TemplateResult {
         .props=${buildIxAuthLoginProps({
           resourceBasePath: params.resourceBasePath,
           state: params.state,
-          handlers: { onChange: params.onChange, onSubmit: params.onSubmit },
+          // Absent until the probe answers, which is also the window where no screen is
+          // rendered yet, so a default of false never reaches a visible form.
+          selfSignupEnabled: params.session?.selfSignupEnabled === true,
+          handlers: {
+            onChange: params.onChange,
+            onSubmit: params.onSubmit,
+            onNavigate: params.onNavigate,
+          },
         })}
       ></openclaw-ix-auth-login>
     </openclaw-tooltip-provider>

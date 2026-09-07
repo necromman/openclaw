@@ -15,6 +15,7 @@ import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-
 import { t } from "../../i18n/index.ts";
 import { formatRelativeTimestamp } from "../../lib/format.ts";
 import { renderIxAuthAccountSection } from "./ix-auth-account-section.ts";
+import "./ix-auth-invite-section.ts";
 import { renderSystemSection } from "./system-section.ts";
 
 type ConnectionProps = {
@@ -33,6 +34,8 @@ type ConnectionProps = {
   /** Identity-server session, when the Gateway delegates identity. */
   ixAuthSession?: IxAuthSessionState;
   onIxAuthSignOut?: () => void;
+  /** Mount point for the invitation controls, which call Gateway routes of their own. */
+  ixAuthBasePath?: string;
   onSessionKeyChange: (next: string) => void;
   onToggleGatewayTokenVisibility: () => void;
   onToggleGatewayPasswordVisibility: () => void;
@@ -187,6 +190,14 @@ export function renderConnection(props: ConnectionProps) {
           session: props.ixAuthSession,
           onSignOut: () => props.onIxAuthSignOut?.(),
         })
+      : "",
+    // The console link is present only for the roles the Gateway judged administrators,
+    // so it doubles as the signal that these controls are worth mounting.
+    props.ixAuthSession?.adminConsoleUrl
+      ? html`<openclaw-ix-auth-invites
+          .basePath=${props.ixAuthBasePath ?? ""}
+          .canManage=${true}
+        ></openclaw-ix-auth-invites>`
       : "",
     renderSettingsSection(
       { title: t("connection.access.title"), description: t("connection.access.subtitle") },

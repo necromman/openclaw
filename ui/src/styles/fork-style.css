@@ -154,3 +154,28 @@ wa-select.settings-select::part(combobox) {
 .settings-value {
   align-items: center;
 }
+
+/* ── 6. Invitation link list ──
+ *
+ * An invitation link is one long unbreakable token. Without an explicit wrap it
+ * widens its row until the settings page scrolls sideways, which section 1 of
+ * this file exists to prevent. The list itself carries no bullets or indent so
+ * it reads as rows of the settings page rather than prose. */
+.ix-auth-invite-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ix-auth-invite-list li {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.ix-auth-invite-link {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}

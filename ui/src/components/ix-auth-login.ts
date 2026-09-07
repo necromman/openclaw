@@ -1,39 +1,28 @@
-// Control UI account sign-in screen shown when the Gateway delegates identity to an
-// identity server. It replaces the Gateway URL and token form entirely: in this mode a
-// person signs in, and the connection details are not theirs to configure.
-import { html, nothing } from "lit";
+// Control UI pre-connection screens for identity-server mode. They replace the Gateway
+// URL and token form entirely: in this mode a person signs in, follows an invitation, or
+// recovers a password, and the connection details are not theirs to configure.
+import { html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { normalizeBasePath } from "../app-route-paths.ts";
 import { controlUiPublicAssetPath } from "../app/public-assets.ts";
 import { BRAND_NAME } from "../brand.ts";
+import { ixAuthScreenNeedsToken } from "../features/ix-auth/ix-auth-account-screen.ts";
+import type { IxAuthLoginProps } from "../features/ix-auth/ix-auth-form-state.ts";
 import { t } from "../i18n/index.ts";
 import { registerIxAuthEnglish } from "../i18n/locales/en-ix-auth.ts";
 import "../lib/toast.ts";
 import { OpenClawLightDomContentsElement } from "../lit/openclaw-element.ts";
-import { icons } from "./icons.ts";
+import {
+  renderIxAuthAccountFields,
+  renderIxAuthScreenLinks,
+  renderIxAuthSignInLinks,
+  resolveIxAuthScreenCopy,
+} from "./ix-auth-account-form.ts";
+import { renderIxAuthSecretField, renderIxAuthTextField } from "./ix-auth-form-fields.ts";
 
 registerIxAuthEnglish();
 
-export type IxAuthLoginProps = {
-  resourceBasePath: string;
-  email: string;
-  password: string;
-  showPassword: boolean;
-  /** Set once the identity server asked for a second factor. */
-  mfaChallenge?: string;
-  mfaCode: string;
-  submitting: boolean;
-  /** Key under `ixAuth.error.*`, or undefined when nothing failed yet. */
-  errorKey?: string;
-  /** Formatted wall-clock time an automatic lockout expires, when known. */
-  lockedUntilLabel?: string;
-  onEmailChange: (value: string) => void;
-  onPasswordChange: (value: string) => void;
-  onTogglePassword: () => void;
-  onMfaCodeChange: (value: string) => void;
-  onSubmit: () => void;
-  onCancelMfa: () => void;
-};
+export type { IxAuthLoginProps };
 
 function resolveErrorMessage(props: IxAuthLoginProps): string | undefined {
   if (!props.errorKey) {
@@ -42,68 +31,35 @@ function resolveErrorMessage(props: IxAuthLoginProps): string | undefined {
   if (props.errorKey === "accountLocked" && props.lockedUntilLabel) {
     return t("ixAuth.error.accountLockedUntil", { time: props.lockedUntilLabel });
   }
-  return t(`ixAuth.error.${props.errorKey}`);
+  // A password-policy refusal is the one case where the identity server knows something
+  // this screen does not: the configured rules. Its wording is appended, not replaced.
+  const base = t(`ixAuth.error.${props.errorKey}`);
+  return props.errorDetail ? `${base} ${props.errorDetail}` : base;
 }
 
 function renderIxAuthCredentialFields(props: IxAuthLoginProps) {
-  const submitOnEnter = (event: KeyboardEvent) => {
-    if (event.key === "Enter") {
-      props.onSubmit();
-    }
-  };
   return html`
-    <label class="field">
-      <span>${t("ixAuth.email")}</span>
-      <input
-        type="email"
-        inputmode="email"
-        autocapitalize="none"
-        autocorrect="off"
-        spellcheck="false"
-        autocomplete="username"
-        enterkeyhint="next"
-        .value=${props.email}
-        placeholder=${t("ixAuth.emailPlaceholder")}
-        ?disabled=${props.submitting}
-        @input=${(e: Event) => {
-          // SAFETY: this listener is bound to the input element on this template line.
-          props.onEmailChange((e.target as HTMLInputElement).value);
-        }}
-        @keydown=${submitOnEnter}
-      />
-    </label>
-    <label class="field">
-      <span>${t("ixAuth.password")}</span>
-      <span class="settings-secret">
-        <input
-          type=${props.showPassword ? "text" : "password"}
-          autocomplete="current-password"
-          spellcheck="false"
-          enterkeyhint="go"
-          .value=${props.password}
-          ?disabled=${props.submitting}
-          @input=${(e: Event) => {
-            // SAFETY: this listener is bound to the input element on this template line.
-            props.onPasswordChange((e.target as HTMLInputElement).value);
-          }}
-          @keydown=${submitOnEnter}
-        />
-        <openclaw-tooltip
-          .content=${props.showPassword ? t("ixAuth.hidePassword") : t("ixAuth.showPassword")}
-        >
-          <button
-            type="button"
-            class="settings-secret__toggle"
-            aria-label=${props.showPassword ? t("ixAuth.hidePassword") : t("ixAuth.showPassword")}
-            @click=${() => {
-              props.onTogglePassword();
-            }}
-          >
-            ${props.showPassword ? icons.eyeOff : icons.eye}
-          </button>
-        </openclaw-tooltip>
-      </span>
-    </label>
+    ${renderIxAuthTextField({
+      label: t("ixAuth.email"),
+      value: props.email,
+      disabled: props.submitting,
+      type: "email",
+      inputMode: "email",
+      autocomplete: "username",
+      placeholder: t("ixAuth.emailPlaceholder"),
+      onInput: props.onEmailChange,
+      onEnter: props.onSubmit,
+    })}
+    ${renderIxAuthSecretField({
+      label: t("ixAuth.password"),
+      value: props.password,
+      visible: props.showPassword,
+      disabled: props.submitting,
+      autocomplete: "current-password",
+      onInput: props.onPasswordChange,
+      onToggleVisible: props.onTogglePassword,
+      onEnter: props.onSubmit,
+    })}
   `;
 }
 
@@ -134,11 +90,48 @@ function renderIxAuthMfaField(props: IxAuthLoginProps) {
   `;
 }
 
+/** Heading and button label for whichever screen is showing. */
+function resolveScreenCopy(props: IxAuthLoginProps): {
+  subtitle: string;
+  submit: string;
+} {
+  if (props.screen !== "sign-in") {
+    const copy = resolveIxAuthScreenCopy(props.screen);
+    return { subtitle: copy.subtitle, submit: copy.submit };
+  }
+  if (props.mfaChallenge) {
+    return { subtitle: t("ixAuth.totp.title"), submit: t("ixAuth.totp.submit") };
+  }
+  return { subtitle: t("ixAuth.subtitle"), submit: t("ixAuth.submit") };
+}
+
+/**
+ * True when the submit button has nothing left to do.
+ *
+ * A finished token screen keeps its notice on screen and drops the button: the token is
+ * spent, so a second press could only fail.
+ */
+function isScreenFinished(props: IxAuthLoginProps): boolean {
+  return props.noticeKey !== undefined && props.screen !== "sign-in";
+}
+
+function renderScreenBody(props: IxAuthLoginProps): TemplateResult | typeof nothing {
+  if (props.screen === "sign-in") {
+    return props.mfaChallenge ? renderIxAuthMfaField(props) : renderIxAuthCredentialFields(props);
+  }
+  if (ixAuthScreenNeedsToken(props.screen) && !props.token) {
+    return html`<div class="callout danger" role="alert">${t("ixAuth.error.missingToken")}</div>`;
+  }
+  return renderIxAuthAccountFields(props);
+}
+
 export function renderIxAuthLogin(props: IxAuthLoginProps) {
   const resourceBasePath = normalizeBasePath(props.resourceBasePath);
   const faviconSrc = controlUiPublicAssetPath("favicon.svg", resourceBasePath);
   const errorMessage = resolveErrorMessage(props);
-  const inMfaStep = Boolean(props.mfaChallenge);
+  const copy = resolveScreenCopy(props);
+  const finished = isScreenFinished(props);
+  const hasToken = !ixAuthScreenNeedsToken(props.screen) || Boolean(props.token);
 
   return html`
     <div class="login-gate">
@@ -147,35 +140,38 @@ export function renderIxAuthLogin(props: IxAuthLoginProps) {
         <div class="login-gate__header">
           <img class="login-gate__logo" src=${faviconSrc} alt=${BRAND_NAME} />
           <div class="login-gate__title">${BRAND_NAME}</div>
-          <div class="login-gate__sub">
-            ${inMfaStep ? t("ixAuth.totp.title") : t("ixAuth.subtitle")}
-          </div>
+          <div class="login-gate__sub">${copy.subtitle}</div>
         </div>
         <div class="login-gate__form">
-          ${inMfaStep ? renderIxAuthMfaField(props) : renderIxAuthCredentialFields(props)}
+          ${finished ? nothing : renderScreenBody(props)}
+          ${
+            props.noticeKey
+              ? html`<div class="callout" role="status">
+                  ${t(`ixAuth.notice.${props.noticeKey}`)}
+                </div>`
+              : nothing
+          }
           ${
             errorMessage
               ? html`<div class="callout danger" role="alert">${errorMessage}</div>`
               : nothing
           }
-          <button
-            type="button"
-            class="btn primary login-gate__connect"
-            ?disabled=${props.submitting}
-            @click=${() => {
-              props.onSubmit();
-            }}
-          >
-            ${
-              props.submitting
-                ? t("ixAuth.submitting")
-                : inMfaStep
-                  ? t("ixAuth.totp.submit")
-                  : t("ixAuth.submit")
-            }
-          </button>
           ${
-            inMfaStep
+            finished || !hasToken
+              ? nothing
+              : html`<button
+                  type="button"
+                  class="btn primary login-gate__connect"
+                  ?disabled=${props.submitting}
+                  @click=${() => {
+                    props.onSubmit();
+                  }}
+                >
+                  ${props.submitting ? t("ixAuth.submitting") : copy.submit}
+                </button>`
+          }
+          ${
+            props.screen === "sign-in" && props.mfaChallenge
               ? html`<button
                   type="button"
                   class="btn"
@@ -187,6 +183,13 @@ export function renderIxAuthLogin(props: IxAuthLoginProps) {
                   ${t("ixAuth.totp.back")}
                 </button>`
               : nothing
+          }
+          ${
+            props.screen === "sign-in"
+              ? props.mfaChallenge
+                ? nothing
+                : renderIxAuthSignInLinks(props)
+              : renderIxAuthScreenLinks(props)
           }
         </div>
       </div>

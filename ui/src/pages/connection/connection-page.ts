@@ -314,6 +314,7 @@ export class ConnectionPage extends OpenClawLightDomElement {
       onConnect: () => this.connect(),
       onRefresh: () => void this.context.channels.refresh(false),
       ixAuthSession: this.ixAuthSession,
+      ixAuthBasePath: this.context?.basePath ?? "",
       onIxAuthSignOut: () => void this.signOutIxAuthSession(),
     });
     return html`
