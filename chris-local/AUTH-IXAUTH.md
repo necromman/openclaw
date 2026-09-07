@@ -196,7 +196,7 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 | 부서 접근 강제(`department-access`)        | **해결(B 단계).** `tools.sessions.visibility: "department"` 로 켠다                                                | 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md)                                   |
 | `departments` / `department_agents` 테이블 | **해결(B 단계).** feature-local DDL 3표, 스키마 버전 유지                                                          | AUTH-DEPARTMENTS.md 6절                                                           |
 | 세션 목록·이벤트·`agents.list` 부서 필터   | **해결(B 단계).** 목록·직접 열람·전사·이벤트·에이전트 선택·생성 게이트                                             | AUTH-DEPARTMENTS.md 7절                                                           |
-| 초대장 가입 플로우 화면 3개                | 미구현                                                                                                             | 6.2                                                                               |
+| 초대장 가입 플로우 화면                    | **해결(C 단계).** 초대 수락·가입 신청·이메일 인증·비밀번호 찾기·재설정 + 관리자 초대·승인 화면                     | 정본 [AUTH-SIGNUP.md](AUTH-SIGNUP.md)                                             |
 | 포크 감사 원장 해시 체인                   | 미구현. 인증 사건은 IX-Auth 원장에 남는다                                                                          | 6.3                                                                               |
 | TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다                                                                        | IX-Auth 콘솔에서 등록. **콘솔 접근 경로가 A 단계에서 열렸다**(`/admin/identity/`) |
 | 관리 콘솔 접근 경로                        | **해결(A 단계).** 게이트웨이 BFF `/admin/identity/` 가 superadmin·admin 에게만 중계한다                            | -                                                                                 |
@@ -213,11 +213,13 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 2. 스키마 승인 - 감독자 승인 근거를 AUTH-DEPARTMENTS.md 6.1 에 남겼다.
 3. 훅 회귀 - `department-access.test.ts` 21건 + 기존 sharing·visibility 회귀 통과.
 
-### 6.2 초대장 가입 진입 조건
+### 6.2 초대장 가입 (C 단계에서 완료)
 
-1. SMTP 확정. 없으면 `IXAUTH_MAIL_TRANSPORT=LOG` 로 링크를 로그에서 꺼내는 운영이 된다.
-2. `IXAUTH_ACCOUNT_SIGNUP_MODE` 를 `APPROVAL` 로 올릴지 `CLOSED` + 초대장만 쓸지 결정.
-3. 포크가 `/reset-password`, `/accept-invite`, `/verify-email` 도착 화면 3개를 만든다(로직 없는 토큰 중계).
+세 진입 조건이 모두 해소돼 구현했다. 정본은 [AUTH-SIGNUP.md](AUTH-SIGNUP.md).
+
+1. SMTP 는 선택으로 확정했다. 없는 배포는 `IXAUTH_MAIL_TRANSPORT=WEBHOOK` 으로 초대 링크가 게이트웨이에 넘어오고 관리자 화면이 그것을 보여준다. 로그를 뒤질 필요가 없어졌다.
+2. `IXAUTH_ACCOUNT_SIGNUP_MODE` 한 값이 IX-Auth 의 가입 모드와 게이트웨이의 가입 화면 노출을 동시에 정한다. 기본은 `CLOSED` + 초대장 전용.
+3. 도착 화면 3개(`/reset-password`·`/accept-invite`·`/verify-email`)와 `/signup`·`/forgot-password` 를 만들었다. 토큰 판정은 전부 IX-Auth 가 한다.
 
 ### 6.3 감사 원장 진입 조건
 

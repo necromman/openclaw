@@ -36,21 +36,49 @@
 
 `chris-local/ixauth.env.example` 을 `chris-local/ixauth.env` 로 복사해 채운다. 이 파일은 `.gitignore` 에 들어 있다 (`chris-local/ixauth.env`).
 
-| 변수                         | 필수   | 기본값                   | 설명                                                                                                                            |
-| ---------------------------- | ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `IXAUTH_DB_NAME`             |        | `ixauth`                 | PostgreSQL 데이터베이스 이름                                                                                                    |
-| `IXAUTH_DB_USERNAME`         |        | `ixauth`                 | DB 사용자                                                                                                                       |
-| `IXAUTH_DB_PASSWORD`         | **예** |                          | DB 비밀번호. `openssl rand -base64 24`                                                                                          |
-| `IXAUTH_SERVICE_KEY`         | **예** |                          | 게이트웨이와 신원 서버의 공유 비밀. **32자 이상**이어야 서버가 뜬다. `openssl rand -base64 36`. 브라우저에는 절대 나가지 않는다 |
-| `IXAUTH_ADMIN_EMAIL`         | **예** |                          | 최초 관리자 이메일. 첫 부팅에만 시드되고 `SUPERADMIN` 을 받는다                                                                 |
-| `IXAUTH_ADMIN_PASSWORD`      | **예** |                          | 최초 관리자 비밀번호. 아래 비밀번호 정책을 만족해야 한다                                                                        |
-| `IXAUTH_ADMIN_NAME`          |        | `관리자`                 | 콘솔에 보이는 표시 이름                                                                                                         |
-| `IXAUTH_PASSWORD_MIN_LENGTH` |        | `10`                     | 최소 길이. 대문자·숫자·특수문자 각 1개 이상은 서버 기본값으로 항상 요구된다                                                     |
-| `IXAUTH_LOG_LEVEL`           |        | `INFO`                   | 신원 서버 로그 수준                                                                                                             |
-| `IXAUTH_ACCOUNT_SIGNUP_MODE` |        | `CLOSED`                 | 자체 가입 모드. 계정은 관리자가 만든다. `OPEN`·`APPROVAL` 은 메일이 먼저 있어야 한다                                            |
-| `OPENCLAW_GATEWAY_PORT`      |        | `18800`                  | 호스트에 여는 포트                                                                                                              |
-| `OPENCLAW_PUBLIC_ORIGIN`     |        | `http://127.0.0.1:18800` | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다                |
-| `OPENCLAW_TZ`                |        | `Asia/Seoul`             | 컨테이너 시간대                                                                                                                 |
+| 변수                                    | 필수   | 기본값                                | 설명                                                                                                                            |
+| --------------------------------------- | ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `IXAUTH_DB_NAME`                        |        | `ixauth`                              | PostgreSQL 데이터베이스 이름                                                                                                    |
+| `IXAUTH_DB_USERNAME`                    |        | `ixauth`                              | DB 사용자                                                                                                                       |
+| `IXAUTH_DB_PASSWORD`                    | **예** |                                       | DB 비밀번호. `openssl rand -base64 24`                                                                                          |
+| `IXAUTH_SERVICE_KEY`                    | **예** |                                       | 게이트웨이와 신원 서버의 공유 비밀. **32자 이상**이어야 서버가 뜬다. `openssl rand -base64 36`. 브라우저에는 절대 나가지 않는다 |
+| `IXAUTH_ADMIN_EMAIL`                    | **예** |                                       | 최초 관리자 이메일. 첫 부팅에만 시드되고 `SUPERADMIN` 을 받는다                                                                 |
+| `IXAUTH_ADMIN_PASSWORD`                 | **예** |                                       | 최초 관리자 비밀번호. 아래 비밀번호 정책을 만족해야 한다                                                                        |
+| `IXAUTH_ADMIN_NAME`                     |        | `관리자`                              | 콘솔에 보이는 표시 이름                                                                                                         |
+| `IXAUTH_PASSWORD_MIN_LENGTH`            |        | `10`                                  | 최소 길이. 대문자·숫자·특수문자 각 1개 이상은 서버 기본값으로 항상 요구된다                                                     |
+| `IXAUTH_LOG_LEVEL`                      |        | `INFO`                                | 신원 서버 로그 수준                                                                                                             |
+| `IXAUTH_ACCOUNT_SIGNUP_MODE`            |        | `CLOSED`                              | 자체 가입 모드. 계정은 관리자가 만든다. `OPEN`·`APPROVAL` 은 메일이 먼저 있어야 한다                                            |
+| `IXAUTH_ACCOUNT_SIGNUP_VERIFICATION`    |        | `EMAIL`                               | 가입 본인확인. `EMAIL` 인증 메일 / `NONE` 생략 / `PASS` 별도 연동                                                               |
+| `IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS` |        | (없음)                                | 가입 허용 도메인. 쉼표로 구분. 비우면 제한 없음. 초대에는 적용되지 않는다                                                       |
+| `IXAUTH_ACCOUNT_INVITE_TOKEN_TTL`       |        | `72h`                                 | 초대 링크 수명. 원본 기본값 `7d` 에서 줄였다                                                                                    |
+| `IXAUTH_MAIL_TRANSPORT`                 |        | `WEBHOOK`                             | `WEBHOOK` 게이트웨이가 초대 링크를 보관 / `SMTP` 실제 발송 / `LOG` 개발용. 자세한 것은 AUTH-SIGNUP.md 6.1                       |
+| `IXAUTH_MAIL_WEBHOOK_URL`               |        | `http://gateway:18789/auth/mail-hook` | WEBHOOK 일 때만 읽는다. 컴포즈 네트워크 주소이지 브라우저 오리진이 아니다                                                       |
+| `IXAUTH_MAIL_FROM`                      |        | `no-reply@localhost`                  | 보내는 사람                                                                                                                     |
+| `IXAUTH_MAIL_PRODUCT_NAME`              |        | `Chris Agent`                         | 메일 제목·본문에 쓰는 제품명                                                                                                    |
+| `IXAUTH_MAIL_SMTP_HOST`                 |        |                                       | SMTP 서버. `IXAUTH_MAIL_TRANSPORT=SMTP` 일 때만 읽는다                                                                          |
+| `IXAUTH_MAIL_SMTP_PORT`                 |        | `587`                                 | SMTP 포트                                                                                                                       |
+| `IXAUTH_MAIL_SMTP_USERNAME`             |        |                                       | 비우면 인증 없이 보낸다                                                                                                         |
+| `IXAUTH_MAIL_SMTP_PASSWORD`             |        |                                       | 위와 같다                                                                                                                       |
+| `IXAUTH_MAIL_SMTP_STARTTLS`             |        | `true`                                | STARTTLS 사용 여부                                                                                                              |
+| `MAILPIT_UI_PORT`                       |        | `18025`                               | 개발용 수신함(`--profile mail`)의 호스트 포트                                                                                   |
+| `OPENCLAW_GATEWAY_PORT`                 |        | `18800`                               | 호스트에 여는 포트                                                                                                              |
+| `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다                |
+| `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                 |
+
+`gateway.auth.ixAuth.selfSignup` 도 **환경변수가 아니다.** `start-gateway.sh` 가 `IXAUTH_ACCOUNT_SIGNUP_MODE` 에서 유도한다(`OPEN`·`APPROVAL` 이면 가입 화면이 열린다). 두 곳을 손으로 맞추면 "가입 화면은 있는데 누르면 거부" 가 생긴다.
+
+### 2.1 초대·가입 운영
+
+| 하고 싶은 것        | 방법                                                                        |
+| ------------------- | --------------------------------------------------------------------------- |
+| 계정 하나 만들기    | 설정 -> 연결 -> 초대. 이메일·역할·부서를 넣고 발급                          |
+| 초대 링크 전달      | SMTP 가 없으면 화면에 링크가 뜬다. 직접 전달하고 목록에서 삭제. 72시간 만료 |
+| 자기 가입 열기      | `IXAUTH_ACCOUNT_SIGNUP_MODE=APPROVAL` + SMTP 설정 후 재기동                 |
+| 가입 승인·거절      | 설정 -> 연결 -> 가입 승인                                                   |
+| 도메인 제한         | `IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS`                                     |
+| 메일 흐름 실물 확인 | `docker compose --profile mail ... up -d` 후 `http://127.0.0.1:18025`       |
+
+상세는 [AUTH-SIGNUP.md](AUTH-SIGNUP.md).
 
 `issuer` 와 `audience` 는 **환경변수가 아니다.** compose 와 게이트웨이 설정 파일에 같은 리터럴(`openclaw-ix-auth` / `openclaw-gateway`)로 박아 두었다. 이 두 값을 양쪽에서 따로 맞추다 틀리는 것이 이 모드의 1번 함정이라 손댈 수 없게 한 것이다.
 

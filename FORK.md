@@ -760,6 +760,7 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | [chris-local/AUTH-IXAUTH.md](chris-local/AUTH-IXAUTH.md)               | **연동 정본.** 구조·시퀀스·설정 키·역할 매핑·운영 절차·되돌리기·라이브 검증 기록                   |
 | [chris-local/AUTH-DEPARTMENTS.md](chris-local/AUTH-DEPARTMENTS.md)     | **부서 접근 강제 정본.** 규칙·역할 직교표·스키마와 승인 근거·강제 지점·동기화·운영 절차            |
+| [chris-local/AUTH-SIGNUP.md](chris-local/AUTH-SIGNUP.md)               | **초대장·가입 플로우 정본.** 두 경로 시퀀스·설정 키·화면 목록·이메일 열거 방지·부서 접점·운영 절차 |
 | [chris-local/DEPLOY.md](chris-local/DEPLOY.md)                         | **납품 설치 절차서.** 요구사항·`.env` 항목표·기동·백업·업그레이드·되돌리기·포트·라이선스 확인 항목 |
 | [chris-local/AUTH-IXAUTH-OPTION.md](chris-local/AUTH-IXAUTH-OPTION.md) | 자체 구현안 대비 채택 근거 비교                                                                    |
 | [chris-local/AUTH-PLAN.md](chris-local/AUTH-PLAN.md)                   | v2 결정 요약 + 폐기된 자체 구현 계획(부록)                                                         |
