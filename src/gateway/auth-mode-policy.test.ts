@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import {
   assertExplicitGatewayAuthModeWhenBothConfigured,
+  authenticatesGatewayWithoutSharedSecret,
   hasAmbiguousGatewayAuthModeConfig,
 } from "./auth-mode-policy.js";
 
@@ -74,4 +75,23 @@ describe("gateway auth mode policy", () => {
       /gateway\.auth\.mode is unset/u,
     );
   });
+});
+
+describe("authenticatesGatewayWithoutSharedSecret", () => {
+  it.each(["trusted-proxy", "ix-auth"])(
+    "treats %s as authenticated without a shared secret",
+    (mode) => {
+      // The startup guard refuses a non-loopback bind when nothing authenticates callers.
+      // Both modes identify every caller without one, and a container bind is never
+      // loopback, so counting them as authless blocks the deployment outright.
+      expect(authenticatesGatewayWithoutSharedSecret(mode)).toBe(true);
+    },
+  );
+
+  it.each(["token", "password", "none", undefined])(
+    "still requires a shared secret for %s",
+    (mode) => {
+      expect(authenticatesGatewayWithoutSharedSecret(mode)).toBe(false);
+    },
+  );
 });

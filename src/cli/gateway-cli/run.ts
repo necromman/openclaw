@@ -23,6 +23,7 @@ import { CONFIG_PATH, normalizeStateDirEnv, resolveGatewayPort } from "../../con
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { hasConfiguredSecretInput } from "../../config/types.secrets.js";
 import { GATEWAY_SERVICE_RUNTIME_PID_ENV } from "../../daemon/constants.js";
+import { authenticatesGatewayWithoutSharedSecret } from "../../gateway/auth-mode-policy.js";
 import {
   createConfiguredGatewayLocalProbe,
   normalizeGatewayHttpProbeHost,
@@ -242,7 +243,7 @@ function shouldBlockGatewayBindWithoutExplicitAuth(params: {
   return (
     !isLoopbackHost(params.bindHost) &&
     !params.hasSharedSecret &&
-    params.resolvedAuthMode !== "trusted-proxy"
+    !authenticatesGatewayWithoutSharedSecret(params.resolvedAuthMode)
   );
 }
 
