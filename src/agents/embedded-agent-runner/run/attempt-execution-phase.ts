@@ -92,6 +92,7 @@ export async function runEmbeddedAttemptExecutionPhase(
     sessionManager,
     sessionAgentId: input.setup.sessionAgentId,
     cacheTrace,
+    contextGuards: sessionRuntime.contextGuards,
     allCustomTools,
     systemPromptText: sessionRuntimeState.systemPromptText,
     transcriptPolicy,

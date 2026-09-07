@@ -86,6 +86,7 @@ export function installEmbeddedAttemptStreamGuards(input: {
   session: AgentSession;
   sessionAgentId: string;
   cacheTrace: CacheTrace;
+  contextGuards: { recordCacheTouch: (startedAt: number) => void };
   allCustomTools: Array<{ name?: string; description?: string; parameters?: unknown }>;
   systemPromptText: string;
   transcriptPolicy: TranscriptPolicy;
@@ -392,6 +393,7 @@ export function installEmbeddedAttemptStreamGuards(input: {
     contentCapture: resolveDiagnosticModelContentCapturePolicy(attempt.config),
     nextCallId: () => `${attempt.runId}:model:${(diagnosticModelCallSeq += 1)}`,
     ownerGeneration: input.diagnosticOwner.generation,
+    onSucceeded: input.contextGuards.recordCacheTouch,
     onStarted: () => {
       attempt.onExecutionPhase?.({
         phase: "model_call_started",
