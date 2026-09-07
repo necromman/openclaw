@@ -24,9 +24,9 @@ import {
 import { resolveRuntimeServiceBuildId, resolveRuntimeServiceVersion } from "../../../version.js";
 import { verifyAgentRuntimeIdentityToken } from "../../agent-runtime-identity-token.js";
 import { buildAuthenticatedPresenceUser } from "../../authenticated-presence-user.js";
-import { departmentHandshakeFacts } from "../../department-access.js";
 import { shouldUseGatewayOwnerProfile } from "../../gateway-owner-profile.js";
 import { createAuthenticatedGitHubIdentitySync } from "../../github-user-identity.js";
+import { ixAuthConnectionFacts } from "../../ix-auth-audit-actor.js";
 import {
   attachGatewayLocalUserIngress,
   prepareGatewayLocalUserIngress,
@@ -393,7 +393,7 @@ export async function attachAuthenticatedGatewayConnect(
     ...(isTrustedApprovalRuntime ? { approvalRuntime: true } : {}),
     ...(trustedAgentRuntimeIdentity ? { agentRuntimeIdentity: trustedAgentRuntimeIdentity } : {}),
     ...(sharedSecretOperatorOwner ? { operatorRoleActor: { kind: "system" as const } } : {}),
-    ...departmentHandshakeFacts(ixAuthPrincipal),
+    ...ixAuthConnectionFacts(ixAuthPrincipal),
   };
   const prepareLocalUserIngress = (profile = authenticatedUserProfile) =>
     prepareGatewayLocalUserIngress({

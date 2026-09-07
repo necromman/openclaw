@@ -43,6 +43,7 @@ import {
   prepareGatewayIngressAttribution,
   PROXY_ATTRIBUTION_REQUIRED_REASON,
 } from "./ingress-attribution.js";
+import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
 import {
   ADMIN_SCOPE,
   CLI_DEFAULT_OPERATOR_SCOPES,
@@ -87,6 +88,8 @@ export type AuthorizedGatewayHttpRequest = {
   operatorRoleActor?: { kind: "system" };
   /** Verified IX-Auth department facts; absent outside ix-auth mode. */
   ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+  /** Attribution-only identity from the same verified token; never read by authorization. */
+  ixAuthAuditActor?: IxAuthAuditActor;
   controlUiPluginGrants?: ControlUiPluginTabAuthGrant[];
   controlUiPluginGrant?: ControlUiPluginTabAuthGrant;
 };
@@ -576,6 +579,7 @@ async function checkGatewayHttpRequestAuthWith(
         ? { operatorRoleActor: { kind: "system" as const } }
         : {}),
       ...(authResult.ixAuthDepartments ? { ixAuthDepartments: authResult.ixAuthDepartments } : {}),
+      ...(authResult.ixAuthAuditActor ? { ixAuthAuditActor: authResult.ixAuthAuditActor } : {}),
       ...authenticatedProfile,
     },
   };

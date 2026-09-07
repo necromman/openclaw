@@ -47,6 +47,10 @@ import {
   loadGatewaySessionEntryReadOnly,
   resolveSessionModelRef,
 } from "../session-utils.js";
+import {
+  recordAccessDeniedActivity,
+  recordSessionViewActivity,
+} from "../session-view-activity-audit.js";
 import { resolveSessionKeyFromResolveParams } from "../sessions-resolve.js";
 import { prepareSessionWorkspaceIcon } from "../workspace-icon-http.js";
 import {
@@ -220,14 +224,30 @@ async function handleChatHistoryRequest({
   // as well: hiding a session from the list while its history stays readable by key
   // would not be a boundary at all.
   const departmentGate = prepareDepartmentGate({ cfg, client });
+  const transcriptOwnedByCaller = prepareSessionSharing({ cfg, client }).isCreator(
+    entry?.createdActor,
+  );
   if (departmentGate) {
     const access = departmentGate.agentAccess(sessionAgentId);
-    const ownedByCaller = prepareSessionSharing({ cfg, client }).isCreator(entry?.createdActor);
-    if (access === "denied" || (access === "creator-only" && !ownedByCaller)) {
+    if (access === "denied" || (access === "creator-only" && !transcriptOwnedByCaller)) {
+      recordAccessDeniedActivity({
+        client,
+        sessionKey: canonicalKey,
+        agentId: sessionAgentId,
+        reason: access === "denied" ? "department" : "creator-only",
+        surface: method,
+      });
       respond(false, undefined, hiddenSessionNotFound(canonicalKey));
       return;
     }
   }
+  recordSessionViewActivity({
+    client,
+    sessionKey: canonicalKey,
+    agentId: sessionAgentId,
+    ownedByCaller: transcriptOwnedByCaller,
+    surface: method,
+  });
   if (requestedSessionId) {
     const transcriptSessionKey = resolveTranscriptSessionKeyBySessionId({
       agentId: sessionAgentId,

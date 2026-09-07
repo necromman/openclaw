@@ -22,6 +22,7 @@ export type IxAuthHttpRoute =
   | "admin-approvals"
   | "admin-departments"
   | "admin-users"
+  | "admin-audit-export"
   | "outside"
   | "unknown";
 
@@ -40,6 +41,7 @@ const IX_AUTH_ADMIN_ACCOUNT_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAut
   "admin-approvals",
   "admin-departments",
   "admin-users",
+  "admin-audit-export",
 ]);
 
 /** Path prefix owning every user-management route. */
@@ -155,6 +157,8 @@ export function classifyIxAuthHttpPath(pathname: string): IxAuthHttpRoute {
       return "admin-approvals";
     case "/auth/admin/departments":
       return "admin-departments";
+    case "/auth/admin/audit/export.csv":
+      return "admin-audit-export";
     default:
       // The only sub-tree in this namespace: user management addresses one account per
       // path, so it cannot be an exact match like every route above it.

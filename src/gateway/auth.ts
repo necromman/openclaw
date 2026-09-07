@@ -19,6 +19,8 @@ import {
   type GatewayIngressAttribution,
   type VerifiedTailscaleIngressIdentity,
 } from "./ingress-attribution.js";
+import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
+import { ixAuthAuditActorFacts } from "./ix-auth-audit-actor.js";
 import {
   isLocalDirectRequest,
   isLoopbackAddress,
@@ -54,6 +56,8 @@ export type GatewayAuthResult = {
    * from the same verified principal the WebSocket handshake uses.
    */
   ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+  /** Attribution-only identity from the same verified token; never read by authorization. */
+  ixAuthAuditActor?: IxAuthAuditActor;
   reason?: string;
   /** Present when the request was blocked by the rate limiter. */
   rateLimited?: boolean;
@@ -557,6 +561,7 @@ async function authorizeGatewayConnectCore(
           departments: resolved.principal.departments,
           isSuperAdmin: resolved.principal.isSuperAdmin,
         },
+        ...ixAuthAuditActorFacts(resolved.principal),
       };
     }
     // Loopback password stays available so local recovery and CLI bootstrap keep working

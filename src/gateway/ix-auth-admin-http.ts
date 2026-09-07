@@ -318,6 +318,12 @@ export async function handleIxAuthAdminHttpRequest(params: {
     await handleApprovalsRoute({ ...params, admin });
     return;
   }
+  if (params.route === "admin-audit-export") {
+    // Loaded on demand: nothing else in this namespace reads the activity ledger.
+    const exportModule = await import("./ix-auth-admin-audit-http.js");
+    exportModule.handleIxAuthAdminAuditExport({ ...params, admin });
+    return;
+  }
   if (params.route === "admin-users") {
     // Loaded on demand: the user-management surface is the largest part of this
     // namespace and no other route needs it.

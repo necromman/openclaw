@@ -7,6 +7,7 @@ export * from "./schema/artifacts.js";
 export * from "./schema/approvals.js";
 export * from "./schema/audit-activity.js";
 export * from "./schema/audit-run.js";
+export * from "./schema/audit-user-activity.js";
 export * from "./schema/audit.js";
 export * from "./schema/board.js";
 export * from "./schema/canvas.js";

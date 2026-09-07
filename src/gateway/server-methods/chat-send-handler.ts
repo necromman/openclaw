@@ -22,6 +22,7 @@ import { extractTextFromChatContent } from "../../shared/chat-content.js";
 import type { SkillWorkshopProposalRevisionConstraint } from "../../skills/workshop/types.js";
 import { isOperatorUiClient } from "../../utils/message-channel.js";
 import { discardPreparedInboundMedia } from "../chat-attachments.js";
+import { recordChatSendActivity } from "../chat-send-activity-audit.js";
 import { authorizeGatewaySessionCreation, resolveCreatorSandbox } from "../operator-role-policy.js";
 import type { ChatRunTiming } from "../server-chat-state.js";
 import { SessionMutationAuthorizationChangedError } from "../session-sharing.js";
@@ -98,7 +99,17 @@ async function handleChatSendWithOptions(
     sessionKey,
     sessionRoutingChanged,
     selectedAgent,
+    agentId: sessionAgentId,
   } = preparedSession.value;
+  // Recorded once the send is admitted and the session, agent, and caller are all
+  // resolved. Gateway-authored input is not a person asking, so it stays out.
+  recordChatSendActivity({
+    client,
+    sessionKey,
+    agentId: sessionAgentId,
+    message: p.message,
+    trustedSystemInput: options?.trustedSystemInput === true,
+  });
   const {
     activeRunAbort,
     admittedSessionId,

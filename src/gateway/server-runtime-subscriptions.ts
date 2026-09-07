@@ -11,6 +11,7 @@ import { configureExecutionIdentityAdmissionSink } from "../audit/execution-iden
 import { configureMessageActionDecisionSink } from "../audit/message-action-decision.js";
 import { onTrustedMessageAuditEvent } from "../audit/message-audit-events.js";
 import { configureRuntimeActionDecisionSink } from "../audit/runtime-action-decision.js";
+import { recordToolReadActivity } from "../audit/user-activity-tool-reads.js";
 import {
   configureChannelAdmissionDecisionSink,
   configureChannelAdmissionEvidenceCollection,
@@ -145,6 +146,12 @@ export function startGatewayEventSubscriptions(params: {
     : undefined;
   const unsubscribeToolAuditEvents = auditEnabled
     ? onTrustedToolExecutionEvent(auditRecorder.recordTool)
+    : undefined;
+  // Separate subscription from the metadata recorder above: this one writes the
+  // person-attributed ledger, which stores the paths a read revealed rather than a
+  // content-free summary of them.
+  const unsubscribeToolReadActivity = auditEnabled
+    ? onTrustedToolExecutionEvent(recordToolReadActivity)
     : undefined;
   const unsubscribeMessageAuditEvents =
     auditEnabled && auditMessageMode !== "off"
@@ -481,6 +488,7 @@ export function startGatewayEventSubscriptions(params: {
     sessionObserver.dispose();
     unsubscribePrivateAuditEvents?.();
     unsubscribeToolAuditEvents?.();
+    unsubscribeToolReadActivity?.();
     unsubscribeMessageAuditEvents?.();
     clearExecutionDecisionWorkSink();
     clearExecutionIdentityAdmissionSink();

@@ -145,6 +145,7 @@ const CORE_GATEWAY_METHOD_SPECS = [
   ["board.event", "board", "operator.write", "<=2026.7"],
   ["audit.list", "audit", "operator.read", "2026.7"],
   ["audit.activity.list", "audit", "operator.read", "2026.7"],
+  ["audit.userActivity.list", "audit-user-activity", "operator.read", "2026.9"],
   ["users.list", "users", "operator.read", "<=2026.7"],
   ["users.self", "users", "operator.read", "<=2026.7"],
   ["users.linkEmail", "users", "operator.admin", "<=2026.7"],

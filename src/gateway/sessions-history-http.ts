@@ -44,13 +44,21 @@ import {
   resolveCursorSeq,
   SessionHistorySseState,
 } from "./session-history-state.js";
-import { createSessionListEntryFilter, resolveSessionSharingTarget } from "./session-sharing.js";
+import {
+  createSessionListEntryFilter,
+  prepareSessionSharing,
+  resolveSessionSharingTarget,
+} from "./session-sharing.js";
 import { resolveTranscriptPathForComparison } from "./session-transcript-path.js";
 import {
   resolveCanonicalSessionEntryFromStoreKeys,
   resolveGatewaySessionStoreTargetWithStore,
   resolveSessionTranscriptCandidates,
 } from "./session-utils.js";
+import {
+  recordAccessDeniedActivity,
+  recordSessionViewActivity,
+} from "./session-view-activity-audit.js";
 
 const log = createSubsystemLogger("gateway/sessions-history-sse");
 
@@ -131,8 +139,17 @@ function resolveSessionHistoryHttpClient(
     authenticatedUserProfile: requestAuth.authenticatedUserProfile,
     // Without this the transcript route would authorize as a department-less caller and
     // hand a foreign department's history to anyone holding the session key.
-    ...(requestAuth.ixAuthDepartments
-      ? { internal: { ixAuthDepartments: requestAuth.ixAuthDepartments } }
+    ...(requestAuth.ixAuthDepartments || requestAuth.ixAuthAuditActor
+      ? {
+          internal: {
+            ...(requestAuth.ixAuthDepartments
+              ? { ixAuthDepartments: requestAuth.ixAuthDepartments }
+              : {}),
+            ...(requestAuth.ixAuthAuditActor
+              ? { ixAuthAuditActor: requestAuth.ixAuthAuditActor }
+              : {}),
+          },
+        }
       : {}),
   };
 }
@@ -200,17 +217,7 @@ export async function handleSessionHistoryHttpRequest(
     return true;
   }
   const historyClient = resolveSessionHistoryHttpClient(requestAuth, operatorScopes);
-  if (
-    !entry?.sessionId ||
-    !isDepartmentVisibleSession({
-      cfg,
-      client: historyClient,
-      agentId: target.agentId,
-      createdActor: entry.createdActor,
-    }) ||
-    createSessionListEntryFilter({ cfg, client: historyClient })?.(target.canonicalKey, entry) ===
-      false
-  ) {
+  const sessionNotFound = () => {
     sendJson(res, 404, {
       ok: false,
       error: {
@@ -219,7 +226,44 @@ export async function handleSessionHistoryHttpRequest(
       },
     });
     return true;
+  };
+  if (!entry?.sessionId) {
+    return sessionNotFound();
   }
+  if (
+    !isDepartmentVisibleSession({
+      cfg,
+      client: historyClient,
+      agentId: target.agentId,
+      createdActor: entry.createdActor,
+    })
+  ) {
+    // The caller is answered with a plain not-found, so the refusal leaves no other
+    // trace of who asked for which transcript.
+    recordAccessDeniedActivity({
+      client: historyClient,
+      sessionKey: target.canonicalKey,
+      agentId: target.agentId,
+      reason: "department",
+      surface: "transcript-http",
+    });
+    return sessionNotFound();
+  }
+  if (
+    createSessionListEntryFilter({ cfg, client: historyClient })?.(target.canonicalKey, entry) ===
+    false
+  ) {
+    return sessionNotFound();
+  }
+  recordSessionViewActivity({
+    client: historyClient,
+    sessionKey: target.canonicalKey,
+    agentId: target.agentId,
+    ownedByCaller: prepareSessionSharing({ cfg, client: historyClient }).isCreator(
+      entry.createdActor,
+    ),
+    surface: "transcript-http",
+  });
   const limitResult = resolveLimit(req);
   if (!limitResult.ok) {
     sendInvalidRequest(res, limitResult.error);

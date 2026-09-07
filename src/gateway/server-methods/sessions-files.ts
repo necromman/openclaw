@@ -34,6 +34,7 @@ import {
   type SessionTranscriptReadScope,
 } from "../session-transcript-readers.js";
 import { loadGatewaySessionEntryReadOnly } from "../session-utils.js";
+import { recordFileDownloadActivity } from "../session-view-activity-audit.js";
 import { resolveSessionWorkspaceRoots } from "../session-workspace-roots.js";
 import {
   execOpenPath,
@@ -896,7 +897,7 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
       ...result,
     });
   },
-  "sessions.files.get": async ({ params, respond, context }) => {
+  "sessions.files.get": async ({ params, respond, context, client }) => {
     if (!assertValidParams(params, validateSessionsFilesGetParams, "sessions.files.get", respond)) {
       return;
     }
@@ -934,6 +935,15 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
       respondSessionFileTooLarge(respond, result.file, params.path);
       return;
     }
+    // Recorded after the read succeeded: an answered request is the moment the person
+    // actually saw the file, and a miss reveals nothing.
+    recordFileDownloadActivity({
+      client,
+      sessionKey: params.sessionKey,
+      agentId,
+      path: result.file.workspacePath ?? result.file.path,
+      preview: params.documentPreview === true,
+    });
     respond(true, {
       sessionKey: params.sessionKey,
       ...result,

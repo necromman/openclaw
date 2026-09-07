@@ -17,6 +17,7 @@ import {
   type TrustedSessionCreation,
 } from "./server-methods/session-creation-provenance.js";
 import type { GatewayClient, GatewayOperatorRoleActor } from "./server-methods/shared-types.js";
+import { recordAccessDeniedActivity } from "./session-view-activity-audit.js";
 
 const operatorRoleLog = createSubsystemLogger("gateway/operator-roles");
 const MAX_OPERATOR_ROLE_ASSIGNMENTS = 1_024;
@@ -177,6 +178,12 @@ export function authorizeGatewaySessionCreation(
     ...(params.departments ? { identity: params.departments } : {}),
   });
   if (departmentError) {
+    recordAccessDeniedActivity({
+      client: "client" in params ? (params.client ?? null) : null,
+      agentId: params.agentId,
+      reason: "department",
+      surface: "session-create",
+    });
     return departmentError;
   }
   const actor =

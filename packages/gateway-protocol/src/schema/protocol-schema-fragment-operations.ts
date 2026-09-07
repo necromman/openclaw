@@ -1,5 +1,6 @@
 import * as auditActivity from "./audit-activity.js";
 import * as auditRun from "./audit-run.js";
+import * as auditUserActivity from "./audit-user-activity.js";
 import * as audit from "./audit.js";
 import * as config from "./config.js";
 import * as humanMentions from "./human-mentions.js";
@@ -30,6 +31,9 @@ export const OperationsProtocolSchemas = {
   AuditEvent: audit.AuditEventSchema,
   AuditListParams: audit.AuditListParamsSchema,
   AuditListResult: audit.AuditListResultSchema,
+  AuditUserActivityEvent: auditUserActivity.AuditUserActivityEventSchema,
+  AuditUserActivityListParams: auditUserActivity.AuditUserActivityListParamsSchema,
+  AuditUserActivityListResult: auditUserActivity.AuditUserActivityListResultSchema,
   UserProfileAuthLink: users.UserProfileAuthLinkSchema,
   UserModelAccount: users.UserModelAccountSchema,
   UsersListModelAccountsParams: users.UsersListModelAccountsParamsSchema,

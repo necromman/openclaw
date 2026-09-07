@@ -36,6 +36,11 @@ import {
 } from "./cookie-header.js";
 import { sendJson } from "./http-common.js";
 import {
+  recordIxAuthLoginActivity,
+  recordIxAuthLoginFailureActivity,
+  recordIxAuthLogoutActivity,
+} from "./ix-auth-activity-audit.js";
+import {
   classifyIxAuthHttpPath,
   isIxAuthAdminAccountRoute,
   isIxAuthPublicAccountRoute,
@@ -220,6 +225,14 @@ async function completeIxAuthLogin(params: {
     identitySessionId: session.claims.identitySessionId,
     loginSessionId: session.sessionId,
   });
+  recordIxAuthLoginActivity({
+    req: params.req,
+    deps,
+    profileId,
+    claims: session.claims,
+    departments,
+    settings: deps.settings,
+  });
   sendJson(res, 200, {
     authenticated: true,
     csrfToken: session.csrfToken,
@@ -278,6 +291,12 @@ async function handleIxAuthLoginRoute(params: {
       clientIp: params.deps.clientIp,
       reason: relay.code,
     });
+    recordIxAuthLoginFailureActivity({
+      req: params.req,
+      deps: params.deps,
+      email,
+      reason: relay.code,
+    });
     mapRelayFailureToResponse(params.res, relay);
     return;
   }
@@ -317,6 +336,9 @@ async function handleIxAuthMfaRoute(params: {
       clientIp: params.deps.clientIp,
       reason: relay.code,
     });
+    // The address never reaches this route - the challenge stands in for it - so the row
+    // records the refusal without naming an account.
+    recordIxAuthLoginFailureActivity({ req: params.req, deps: params.deps, reason: relay.code });
     sendJson(params.res, 401, { error: "invalid_code", message: "That code is not valid." });
     return;
   }
@@ -378,6 +400,12 @@ async function handleIxAuthLogoutRoute(params: {
       identitySubject: resolution.row.identity_subject,
       identitySessionId: resolution.row.identity_session_id,
       loginSessionId: resolution.row.id,
+    });
+    recordIxAuthLogoutActivity({
+      req: params.req,
+      deps: params.deps,
+      profileId: resolution.row.profile_id,
+      email: resolution.principal.claims.email,
     });
   }
   sendJson(params.res, 200, { authenticated: false });
@@ -474,6 +502,7 @@ const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> =
   ["admin-approvals", new Set(["GET", "POST"])],
   ["admin-departments", new Set(["GET"])],
   ["admin-users", new Set(["GET", "POST", "PATCH", "PUT", "DELETE"])],
+  ["admin-audit-export", new Set(["GET"])],
 ]);
 
 /**

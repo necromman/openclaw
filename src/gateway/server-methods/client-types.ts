@@ -4,6 +4,7 @@ import type { PluginSubagentRequesterContext } from "../../plugins/runtime/subag
 import type { RuntimePluginToolGrant } from "../../plugins/runtime/tool-grant.js";
 import type { AgentRuntimeIdentity } from "../agent-runtime-identity-token.js";
 import type { AuthenticatedGitHubIdentitySync } from "../github-user-identity.js";
+import type { IxAuthAuditActor } from "../ix-auth-audit-actor-type.js";
 import type { GatewayOperatorRoleActor } from "../operator-role-actor.js";
 import type { PluginNodeCapabilitySurface } from "../plugin-node-capability.js";
 import type { TrustedSessionCreation } from "./session-creation-provenance.js";
@@ -71,6 +72,13 @@ export type GatewayClient = {
      * its existing authorization path.
      */
     ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+    /**
+     * Who the verified IX-Auth token says this connection is, for the activity ledger.
+     *
+     * Attribution only. Authorization reads `ixAuthDepartments` and the connection
+     * scopes; nothing may widen access because of a name or a role label found here.
+     */
+    ixAuthAuditActor?: IxAuthAuditActor;
     /** Overrides persisted sender attribution without changing the authorizing client identity. */
     senderAttribution?: { id: string; name?: string; identity?: TranscriptSenderIdentity };
     /** Trusted session creation provenance; never accepted from Gateway wire params. */

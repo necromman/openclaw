@@ -6,11 +6,11 @@
 // work (DELIVERY-PLAN stage H) has to answer for the whole deployment, not just for
 // identity.
 //
-// Until that ledger exists there is nothing to write to, so this reports through the
-// diagnostic channels the Gateway already has: the security-event callback the rest of
-// the authentication namespace uses, and a verbose log line. Routing every action through
-// one function now means stage H adds a single call here rather than hunting for the
-// dozen call sites that would otherwise have grown.
+// That ledger now exists, so this writes one `admin_action` row per call in addition to
+// the diagnostic channels it already used: the security-event callback the rest of the
+// authentication namespace uses, and a verbose log line. Routing every action through one
+// function is what made this a single edit rather than a dozen.
+import { recordUserActivity } from "../audit/user-activity-audit-recorder.js";
 import { logVerbose } from "../globals.js";
 import type { IxAuthAdminContext } from "./ix-auth-admin-context.js";
 import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
@@ -52,6 +52,23 @@ export function recordIxAuthAdminAction(params: {
     identitySubject: principal.claims.subject,
     loginSessionId: principal.loginSessionId,
     reason: params.action,
+  });
+  recordUserActivity({
+    kind: "admin_action",
+    actor: {
+      source: "profile",
+      profileId: principal.profileId,
+      email: principal.claims.email,
+      ...(principal.claims.displayName ? { displayName: principal.claims.displayName } : {}),
+      ...(principal.gatewayRole ? { gatewayRole: principal.gatewayRole } : {}),
+      departments: principal.departments,
+    },
+    detail: {
+      action: params.action,
+      ...(params.targetUserId ? { targetUserId: params.targetUserId } : {}),
+      ...params.detail,
+    },
+    ...(params.deps.clientIp ? { remoteIp: params.deps.clientIp } : {}),
   });
   logVerbose(
     `[ix-auth] admin action=${params.action} actor=${principal.claims.email} target=${
