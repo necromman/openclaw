@@ -5,7 +5,7 @@ import type { RouteId } from "./app-route-paths.ts";
 import type { NativeDeviceSettingsCapability } from "./app/native-device-settings.ts";
 import { BRAND_NAME } from "./brand.ts";
 import type { IconName } from "./components/icons.ts";
-import { canManageIxAuthUsers } from "./features/ix-auth/ix-auth-session-api.ts";
+import { canManageIxAuthUsers } from "./features/ix-auth/ix-auth-admin-access.ts";
 import { i18n, t } from "./i18n/index.ts";
 
 export type NavigationRouteId = RouteId;

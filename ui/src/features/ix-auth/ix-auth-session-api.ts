@@ -3,6 +3,7 @@
 // The browser never sees an identity-server token: it posts credentials here and the
 // Gateway returns only a session cookie. Everything below therefore uses
 // `credentials: "same-origin"` and carries no bearer token of its own.
+import { setIxAuthAdminAccess } from "./ix-auth-admin-access.ts";
 
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
 const IX_AUTH_CSRF_HEADER = "x-openclaw-csrf";
@@ -160,6 +161,14 @@ let lastIxAuthSession: IxAuthSessionState | undefined;
  */
 function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState {
   lastIxAuthSession = session;
+  // The Gateway withholds the console URL from anyone it does not judge an administrator,
+  // so its presence is the same signal the Gateway itself acts on. Recorded here so the
+  // sidebar, the identity menu, and the page never invent their own role test.
+  setIxAuthAdminAccess(
+    session.authMode === "ix-auth" &&
+      session.authenticated &&
+      session.adminConsoleUrl !== undefined,
+  );
   if (session.authMode === "ix-auth") {
     void import("../../i18n/locales/en-ix-auth.ts")
       .then((module) => {
@@ -181,17 +190,6 @@ function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState 
  */
 export function isIxAuthSessionActive(): boolean {
   return lastIxAuthSession?.authMode === "ix-auth" && lastIxAuthSession.authenticated;
-}
-
-/**
- * True when the signed-in account may open the user-management screen.
- *
- * The Gateway withholds the console URL from anyone it does not judge an administrator,
- * so its presence is the same signal the Gateway itself acts on. Reading it here keeps
- * the sidebar, the identity menu, and the page from each inventing their own role test.
- */
-export function canManageIxAuthUsers(): boolean {
-  return isIxAuthSessionActive() && lastIxAuthSession?.adminConsoleUrl !== undefined;
 }
 
 /** The probe answer the shell already has, for screens that must not probe again. */
@@ -326,5 +324,6 @@ export async function submitIxAuthLogout(basePath: string): Promise<void> {
 export async function signOutIxAuthSession(basePath: string): Promise<void> {
   await submitIxAuthLogout(basePath);
   lastIxAuthSession = undefined;
+  setIxAuthAdminAccess(false);
   globalThis.location.assign(basePath || "/");
 }

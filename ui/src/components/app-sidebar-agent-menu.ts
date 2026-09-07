@@ -8,8 +8,8 @@ import { pathForAgentPanel } from "../app-route-paths.ts";
 import type { ApplicationNavigationOptions } from "../app/context.ts";
 import type { ThemeMode } from "../app/theme.ts";
 import { BRAND_FEATURES } from "../brand.ts";
+import { canManageIxAuthUsers } from "../features/ix-auth/ix-auth-admin-access.ts";
 import {
-  canManageIxAuthUsers,
   isIxAuthSessionActive,
   signOutIxAuthSession,
 } from "../features/ix-auth/ix-auth-session-api.ts";
