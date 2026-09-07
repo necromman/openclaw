@@ -9,51 +9,51 @@
 
 ## 0. 실측으로 확인한 것 (2026-09-07 20:30~21:10)
 
-| 항목 | 결과 | 근거 |
-| --- | --- | --- |
-| 로그인 후 기기 자동 인증 | **이미 동작.** compose 스택(18800) 새 브라우저 컨텍스트에서 로그인 즉시 `/chat/main` 진입, 게이트웨이 로그 `[ws] authenticated user connected user=admin@deploy.local`, 페어링 요청·기기 토큰 미생성 | `src/gateway/server/ws-connection/connect-policy.ts:39-46` (`identity-session`), 지역성 조건 없음 |
-| 로그아웃 | BFF `POST /auth/logout` 은 있음. **UI 신원 메뉴에 항목 없음.** 서버는 열린 WS 를 끊지 않고 화면 리로드에 의존 | `src/gateway/ix-auth-http.ts:327-372`, `ui/src/features/ix-auth/ix-auth-session-api.ts:251-260` |
-| 관리자 사용자 관리 | 앱 안에는 초대 발급·가입 승인·부서 조회만(설정 > 연결). 목록·삭제·역할 변경은 `/admin/identity/` 로 중계되는 IX-Auth 콘솔인데 **별도 로그인 화면이 한 번 더 뜬다** | `ui/src/pages/connection/ix-auth-invite-section.ts`, IX-Auth `UserAdminController` (목록·상세·생성·PATCH·삭제·password-reset·invite·unlock·mfa-reset·roles·sessions 전부 있음) |
-| 역할 | superadmin / admin / moderator / member 4단계. **임원 없음.** UI 는 역할 코드를 날것으로 표시 | `src/auth/ix-auth/ix-auth-role-map.ts:13-50` |
-| 문서 미리보기 | 로컬 WSL 은 soffice 있음. **납품 컨테이너에 soffice 없음** → PDF 정상, docx·xlsx 는 이미지 없는 HTML 폴백, pptx·doc·xls·ppt 는 실패. 안내문 영어뿐 | `chris-local/docker-compose.ixauth.yml:110` (폰트만), `src/gateway/document-convert.ts:110-121` |
-| 납품 스택 모델 | "사용 가능한 모델 없음". DEPLOY.md 에 모델·API 키 항목 없음 | 라이브 화면, `chris-local/DEPLOY.md` |
-| 기본 에이전트 미지정 | `cron.list` → "Agent-less cron job has no resolvable owner", `talk.catalog` → `AGENT_SELECTION_REQUIRED` | 게이트웨이 로그 20:36:07 |
+| 항목                     | 결과                                                                                                                                                                                                 | 근거                                                                                                                                                                           |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 로그인 후 기기 자동 인증 | **이미 동작.** compose 스택(18800) 새 브라우저 컨텍스트에서 로그인 즉시 `/chat/main` 진입, 게이트웨이 로그 `[ws] authenticated user connected user=admin@deploy.local`, 페어링 요청·기기 토큰 미생성 | `src/gateway/server/ws-connection/connect-policy.ts:39-46` (`identity-session`), 지역성 조건 없음                                                                              |
+| 로그아웃                 | BFF `POST /auth/logout` 은 있음. **UI 신원 메뉴에 항목 없음.** 서버는 열린 WS 를 끊지 않고 화면 리로드에 의존                                                                                        | `src/gateway/ix-auth-http.ts:327-372`, `ui/src/features/ix-auth/ix-auth-session-api.ts:251-260`                                                                                |
+| 관리자 사용자 관리       | 앱 안에는 초대 발급·가입 승인·부서 조회만(설정 > 연결). 목록·삭제·역할 변경은 `/admin/identity/` 로 중계되는 IX-Auth 콘솔인데 **별도 로그인 화면이 한 번 더 뜬다**                                   | `ui/src/pages/connection/ix-auth-invite-section.ts`, IX-Auth `UserAdminController` (목록·상세·생성·PATCH·삭제·password-reset·invite·unlock·mfa-reset·roles·sessions 전부 있음) |
+| 역할                     | superadmin / admin / moderator / member 4단계. **임원 없음.** UI 는 역할 코드를 날것으로 표시                                                                                                        | `src/auth/ix-auth/ix-auth-role-map.ts:13-50`                                                                                                                                   |
+| 문서 미리보기            | 로컬 WSL 은 soffice 있음. **납품 컨테이너에 soffice 없음** → PDF 정상, docx·xlsx 는 이미지 없는 HTML 폴백, pptx·doc·xls·ppt 는 실패. 안내문 영어뿐                                                   | `chris-local/docker-compose.ixauth.yml:110` (폰트만), `src/gateway/document-convert.ts:110-121`                                                                                |
+| 납품 스택 모델           | "사용 가능한 모델 없음". DEPLOY.md 에 모델·API 키 항목 없음                                                                                                                                          | 라이브 화면, `chris-local/DEPLOY.md`                                                                                                                                           |
+| 기본 에이전트 미지정     | `cron.list` → "Agent-less cron job has no resolvable owner", `talk.catalog` → `AGENT_SELECTION_REQUIRED`                                                                                             | 게이트웨이 로그 20:36:07                                                                                                                                                       |
 
 ## 1. 제안서 요구 대비 현황
 
-| 제안서 요구 (장) | 현재 | 결손 | 단계 |
-| --- | --- | --- | --- |
-| 웹 화면, 사내 주소 접속 (3) | 완료 | - | - |
-| 채팅(카카오톡·텔레그램처럼) (3) | 텔레그램 확장 있음. 카카오톡 확장 없음 | 텔레그램 발신자와 IX-Auth 계정 연결 장치 없음. 부서 경계는 에이전트 바인딩으로만 적용 | 문서화(I), 연결은 후속 |
-| 자료 찾기·근거 인용 (2·3·6) | `memory.search.extraPaths` 로 워크스페이스 밖 폴더 인덱스 가능, 인용 `path#L12-L30` 지원 | **인덱서가 `.md` 만 수집.** pdf·docx·xlsx·pptx 는 인덱스 대상이 아님. 한글 FTS 토크나이저 기본값 부적합 | **I** (대), D(설정) |
-| 문서 초안·요약 (3) | 에이전트 기본 능력 | - | - |
-| 반복 확인·알림 (3) | cron 5종 + 텔레그램 전달 + 타임존 | 생성자 정보가 공개 응답에서 제거됨(관리자가 누가 만든 스케줄인지 못 봄) | G(소) |
-| 읽기 전용 원칙 (3) | 세션 `permissionMode: read-only` 와 도구 deny 목록으로 가능 | **config 로 "이 에이전트는 항상 읽기 전용" 선언 불가.** `readonly` 도구 프로필 없음. `tools.fs.workspaceOnly` 기본 false | **G** (중) |
-| 폴더 단위 접근 범위 (4) | 에이전트 1개 = 워크스페이스 루트 1개 | 다중 폴더 허용목록 없음. 부서 = 에이전트 = 폴더 구조로 대응 | G(문서·설정), allowRoots 는 후속 |
-| 사람마다 다른 자료 범위 (4) | 부서 경계(B 단계) + 역할 상한 | **임원 역할 없음** | **E** |
-| 누가 무엇을 물었고 어떤 자료를 봤는지 기록 (4) | `audit_events` 는 메타데이터 전용. actor 가 사람이 아님. 질문 본문·파일 경로·로그인 미기록. 30일/10만행 고정 | **AUTH-PLAN M4 전량 미착수** | **H** (대) |
-| 외부 접속 개폐 (4) | bind 5모드 + `controlUi.enabled` + 단일 포트 | - (DEPLOY.md 7절) | - |
-| NAS 안 모델 (4·5) | ollama 등 6종, 임베딩까지 사내 완결 | DEPLOY.md 에 모델 설정 절차 없음 | D(문서) |
-| 로그인 = 기기 인증 (지시) | 완료 | 로그아웃 시 서버측 WS 종료 없음 | D |
-| 로그아웃 (지시) | API 만 | 메뉴 항목 | **D** |
-| 관리자 사용자 관리 (지시) | IX-Auth 콘솔(이중 로그인) | 앱 내 화면 | **F** |
-| 관리자·임원·직원 (지시) | 4역할, 임원 없음 | 임원 역할 + 한국어 역할명 | **E** |
-| PDF·MS Office 미리보기 (지시) | 로컬만 완전 | 납품 이미지에 soffice 없음, 안내문 영어 | **D** |
+| 제안서 요구 (장)                               | 현재                                                                                                         | 결손                                                                                                                     | 단계                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| 웹 화면, 사내 주소 접속 (3)                    | 완료                                                                                                         | -                                                                                                                        | -                                |
+| 채팅(카카오톡·텔레그램처럼) (3)                | 텔레그램 확장 있음. 카카오톡 확장 없음                                                                       | 텔레그램 발신자와 IX-Auth 계정 연결 장치 없음. 부서 경계는 에이전트 바인딩으로만 적용                                    | 문서화(I), 연결은 후속           |
+| 자료 찾기·근거 인용 (2·3·6)                    | `memory.search.extraPaths` 로 워크스페이스 밖 폴더 인덱스 가능, 인용 `path#L12-L30` 지원                     | **인덱서가 `.md` 만 수집.** pdf·docx·xlsx·pptx 는 인덱스 대상이 아님. 한글 FTS 토크나이저 기본값 부적합                  | **I** (대), D(설정)              |
+| 문서 초안·요약 (3)                             | 에이전트 기본 능력                                                                                           | -                                                                                                                        | -                                |
+| 반복 확인·알림 (3)                             | cron 5종 + 텔레그램 전달 + 타임존                                                                            | 생성자 정보가 공개 응답에서 제거됨(관리자가 누가 만든 스케줄인지 못 봄)                                                  | G(소)                            |
+| 읽기 전용 원칙 (3)                             | 세션 `permissionMode: read-only` 와 도구 deny 목록으로 가능                                                  | **config 로 "이 에이전트는 항상 읽기 전용" 선언 불가.** `readonly` 도구 프로필 없음. `tools.fs.workspaceOnly` 기본 false | **G** (중)                       |
+| 폴더 단위 접근 범위 (4)                        | 에이전트 1개 = 워크스페이스 루트 1개                                                                         | 다중 폴더 허용목록 없음. 부서 = 에이전트 = 폴더 구조로 대응                                                              | G(문서·설정), allowRoots 는 후속 |
+| 사람마다 다른 자료 범위 (4)                    | 부서 경계(B 단계) + 역할 상한                                                                                | **임원 역할 없음**                                                                                                       | **E**                            |
+| 누가 무엇을 물었고 어떤 자료를 봤는지 기록 (4) | `audit_events` 는 메타데이터 전용. actor 가 사람이 아님. 질문 본문·파일 경로·로그인 미기록. 30일/10만행 고정 | **AUTH-PLAN M4 전량 미착수**                                                                                             | **H** (대)                       |
+| 외부 접속 개폐 (4)                             | bind 5모드 + `controlUi.enabled` + 단일 포트                                                                 | - (DEPLOY.md 7절)                                                                                                        | -                                |
+| NAS 안 모델 (4·5)                              | ollama 등 6종, 임베딩까지 사내 완결                                                                          | DEPLOY.md 에 모델 설정 절차 없음                                                                                         | D(문서)                          |
+| 로그인 = 기기 인증 (지시)                      | 완료                                                                                                         | 로그아웃 시 서버측 WS 종료 없음                                                                                          | D                                |
+| 로그아웃 (지시)                                | API 만                                                                                                       | 메뉴 항목                                                                                                                | **D**                            |
+| 관리자 사용자 관리 (지시)                      | IX-Auth 콘솔(이중 로그인)                                                                                    | 앱 내 화면                                                                                                               | **F**                            |
+| 관리자·임원·직원 (지시)                        | 4역할, 임원 없음                                                                                             | 임원 역할 + 한국어 역할명                                                                                                | **E**                            |
+| PDF·MS Office 미리보기 (지시)                  | 로컬만 완전                                                                                                  | 납품 이미지에 soffice 없음, 안내문 영어                                                                                  | **D**                            |
 
 ## 2. 감독이 정한 기본값 (사용자가 뒤집을 수 있음)
 
-| 항목 | 채택 | 이유 · 대안 |
-| --- | --- | --- |
-| 임원 역할 구현 방식 | IX-Auth `EXECUTIVE` → 게이트웨이 `executive`. 세션 타인 열람 상한 `view`, 스코프는 member 와 같음. **전 부서 열람은 부서 경계 코드를 고치지 않고 IX-Auth 에서 전 `dept-*` 그룹에 소속시켜 얻는다.** 초대 화면에서 역할이 임원이면 부서를 전체 선택으로 기본 채운다 | 부서 경계에 "전 부서 읽기 전용" 상태를 새로 넣으면 약 36개 파일 재설계·횡단 유출 위험(캐시 키). "부서는 상한을 넓히지 않고 좁히기만 한다" 원칙을 그대로 쓰는 편이 안전하다. 대안: 후속 단계에서 `crossDepartmentViewRoles` 별도 키 |
-| 역할 한국어 표기 | superadmin 시스템 관리자 / admin 관리자 / executive 임원 / moderator 중재자 / member 직원 | 초대·사용자 관리 화면의 선택지는 직원·임원·관리자 3개(+ 시스템 관리자는 superadmin 만). moderator 는 설정 호환용으로 남기되 선택지에서 뺀다 |
-| 관리자가 임원을 초대할 수 있는가 | 가능 | admin 은 자기 부서만 보지만 사용자 관리는 admin 의 책무. 다만 superadmin 승격은 기존대로 차단 |
-| 로그아웃 | 신원 메뉴 항목 + 계정 화면 버튼. 서버는 `/auth/logout` 에서 그 프로필의 열린 WS 를 끊는다 | 클라이언트 리로드 의존 제거 |
-| 사용자 관리 화면 위치 | 신원 메뉴 "사용자 관리" → `/settings/users` (superadmin·admin 만 링크·라우트) | 라우트 추가 비용은 있으나 설정 페이지 안의 블록으로는 목록·상세를 담기 어렵다. IX-Auth 콘솔 링크는 superadmin 에게만 "고급" 으로 남긴다 |
-| 미리보기 변환기 | compose 빌드 인자에 `libreoffice-writer libreoffice-calc libreoffice-impress fonts-nanum` 추가 | 이미지 약 +580MiB. FILE-PREVIEW.md 예시와 일치시킨다. hwp 는 범위 밖(사용자 확정) |
-| 읽기 전용 | `readonly` 도구 프로필 신설 + `agents.entries.<id>.tools.permissionMode` 기본값 키. 납품 config 는 `tools.fs.workspaceOnly: true` | deny 목록 수작업은 신규 도구 추가 시 누락 위험 |
-| 감사 원장 범위 | 사람 귀속 원장 `audit_user_activity`: 로그인·로그아웃, 질문 본문(설정으로 on), 도구 파일 읽기 경로, 관리자 행위(초대·역할 변경·삭제), 세션 열람. 보존기간 설정 키. 조회 API·CLI·관리자 화면. **해시 체인은 넣지 않는다**(외부 SIEM 정본 권고 유지) | AUTH-PLAN M4 의 축소판. 계약서에 "내장 원장은 보존기간 내 조회용" 명시 |
-| 문서 인덱싱 | 게이트웨이 안에 변환 단계를 두지 않고, **`openclaw knowledge sync` CLI + cron** 이 NAS 폴더의 pdf·docx·xlsx·pptx 를 `.md` 사이드카(원본 경로·수정시각 frontmatter)로 뽑아 인덱스 폴더에 쓴다. `extraPaths` 는 그 폴더를 가리킨다 | 인덱서(`memory-host-sdk`)를 건드리면 업스트림 리베이스 비용이 크다. 기존 `document-convert.ts`·`document-extract-html.ts`·`clawpdf` 재사용 |
-| 텔레그램 | 부서당 봇 계정·에이전트 분리를 운영 규칙으로 문서화. 발신자-계정 연결은 후속 | 코드 전수 확인 결과 연결 장치 없음 |
+| 항목                             | 채택                                                                                                                                                                                                                                                               | 이유 · 대안                                                                                                                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 임원 역할 구현 방식              | IX-Auth `EXECUTIVE` → 게이트웨이 `executive`. 세션 타인 열람 상한 `view`, 스코프는 member 와 같음. **전 부서 열람은 부서 경계 코드를 고치지 않고 IX-Auth 에서 전 `dept-*` 그룹에 소속시켜 얻는다.** 초대 화면에서 역할이 임원이면 부서를 전체 선택으로 기본 채운다 | 부서 경계에 "전 부서 읽기 전용" 상태를 새로 넣으면 약 36개 파일 재설계·횡단 유출 위험(캐시 키). "부서는 상한을 넓히지 않고 좁히기만 한다" 원칙을 그대로 쓰는 편이 안전하다. 대안: 후속 단계에서 `crossDepartmentViewRoles` 별도 키 |
+| 역할 한국어 표기                 | superadmin 시스템 관리자 / admin 관리자 / executive 임원 / moderator 중재자 / member 직원                                                                                                                                                                          | 초대·사용자 관리 화면의 선택지는 직원·임원·관리자 3개(+ 시스템 관리자는 superadmin 만). moderator 는 설정 호환용으로 남기되 선택지에서 뺀다                                                                                        |
+| 관리자가 임원을 초대할 수 있는가 | 가능                                                                                                                                                                                                                                                               | admin 은 자기 부서만 보지만 사용자 관리는 admin 의 책무. 다만 superadmin 승격은 기존대로 차단                                                                                                                                      |
+| 로그아웃                         | 신원 메뉴 항목 + 계정 화면 버튼. 서버는 `/auth/logout` 에서 그 프로필의 열린 WS 를 끊는다                                                                                                                                                                          | 클라이언트 리로드 의존 제거                                                                                                                                                                                                        |
+| 사용자 관리 화면 위치            | 신원 메뉴 "사용자 관리" → `/settings/users` (superadmin·admin 만 링크·라우트)                                                                                                                                                                                      | 라우트 추가 비용은 있으나 설정 페이지 안의 블록으로는 목록·상세를 담기 어렵다. IX-Auth 콘솔 링크는 superadmin 에게만 "고급" 으로 남긴다                                                                                            |
+| 미리보기 변환기                  | compose 빌드 인자에 `libreoffice-writer libreoffice-calc libreoffice-impress fonts-nanum` 추가                                                                                                                                                                     | 이미지 약 +580MiB. FILE-PREVIEW.md 예시와 일치시킨다. hwp 는 범위 밖(사용자 확정)                                                                                                                                                  |
+| 읽기 전용                        | `readonly` 도구 프로필 신설 + `agents.entries.<id>.tools.permissionMode` 기본값 키. 납품 config 는 `tools.fs.workspaceOnly: true`                                                                                                                                  | deny 목록 수작업은 신규 도구 추가 시 누락 위험                                                                                                                                                                                     |
+| 감사 원장 범위                   | 사람 귀속 원장 `audit_user_activity`: 로그인·로그아웃, 질문 본문(설정으로 on), 도구 파일 읽기 경로, 관리자 행위(초대·역할 변경·삭제), 세션 열람. 보존기간 설정 키. 조회 API·CLI·관리자 화면. **해시 체인은 넣지 않는다**(외부 SIEM 정본 권고 유지)                 | AUTH-PLAN M4 의 축소판. 계약서에 "내장 원장은 보존기간 내 조회용" 명시                                                                                                                                                             |
+| 문서 인덱싱                      | 게이트웨이 안에 변환 단계를 두지 않고, **`openclaw knowledge sync` CLI + cron** 이 NAS 폴더의 pdf·docx·xlsx·pptx 를 `.md` 사이드카(원본 경로·수정시각 frontmatter)로 뽑아 인덱스 폴더에 쓴다. `extraPaths` 는 그 폴더를 가리킨다                                   | 인덱서(`memory-host-sdk`)를 건드리면 업스트림 리베이스 비용이 크다. 기존 `document-convert.ts`·`document-extract-html.ts`·`clawpdf` 재사용                                                                                         |
+| 텔레그램                         | 부서당 봇 계정·에이전트 분리를 운영 규칙으로 문서화. 발신자-계정 연결은 후속                                                                                                                                                                                       | 코드 전수 확인 결과 연결 장치 없음                                                                                                                                                                                                 |
 
 ## 3. 단계
 
@@ -132,11 +132,11 @@ IX-Auth UNLICENSED 법무, 고객 SMTP·도메인·TLS·약관, 부서 기밀 �
 
 ## 5. 진행 기록
 
-| 단계 | 상태 | 브랜치 | 머지 커밋 | 비고 |
-| --- | --- | --- | --- | --- |
-| D | 진행 중 | `chris/delivery-d` | - | 2026-09-07 21:10 착수 |
-| E | 대기 | | | |
-| F | 대기 | | | |
-| G | 대기 | | | |
-| H | 대기 | | | |
-| I | 대기 | | | |
+| 단계 | 상태    | 브랜치             | 머지 커밋 | 비고                  |
+| ---- | ------- | ------------------ | --------- | --------------------- |
+| D    | 진행 중 | `chris/delivery-d` | -         | 2026-09-07 21:10 착수 |
+| E    | 대기    |                    |           |                       |
+| F    | 대기    |                    |           |                       |
+| G    | 대기    |                    |           |                       |
+| H    | 대기    |                    |           |                       |
+| I    | 대기    |                    |           |                       |
