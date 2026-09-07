@@ -1,9 +1,10 @@
 // Invitation and signup-approval controls for administrators.
 //
-// It lives on the connection page beside the account block because in this mode the
-// connection is the account. Nothing here is a permission check: the Gateway refuses
-// these routes for anyone but a superadmin or admin, and this element only decides
-// whether it is worth rendering.
+// Both live on the user-management screen, each drawn on its own: inviting is something
+// an administrator reaches for deliberately, so it opens from a button, while the
+// approval queue is standing work and sits in the page. Nothing here is a permission
+// check: the Gateway refuses these routes for anyone but a superadmin or admin, and this
+// element only decides whether it is worth rendering.
 import { html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { renderSettingsRow, renderSettingsSection } from "../../components/settings-ui.ts";
@@ -63,6 +64,11 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
    * only keeps an offer off the screen that would always be answered with 403.
    */
   @property({ attribute: false }) canGrantSuperAdmin = false;
+  /**
+   * Which half to draw. The two halves share one element because they share the
+   * department list and the reload that keeps both honest after an invitation lands.
+   */
+  @property() section: "invite" | "approvals" | "both" = "both";
 
   @state() private departments: IxAuthDepartmentOption[] = [];
   @state() private invites: IxAuthInviteLink[] = [];
@@ -420,16 +426,21 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
     if (!this.canManage) {
       return nothing;
     }
-    return html`
-      ${renderSettingsSection(
-        { title: t("ixAuth.invites.title"), description: t("ixAuth.invites.description") },
-        this.renderInviteRows(),
-      )}
-      ${renderSettingsSection(
-        { title: t("ixAuth.approvals.title"), description: t("ixAuth.approvals.description") },
-        [renderSettingsRow({ title: "", stacked: true, control: this.renderApprovals() })],
-      )}
-    `;
+    const invites =
+      this.section === "approvals"
+        ? nothing
+        : renderSettingsSection(
+            { title: t("ixAuth.invites.title"), description: t("ixAuth.invites.description") },
+            this.renderInviteRows(),
+          );
+    const approvals =
+      this.section === "invite"
+        ? nothing
+        : renderSettingsSection(
+            { title: t("ixAuth.approvals.title"), description: t("ixAuth.approvals.description") },
+            [renderSettingsRow({ title: "", stacked: true, control: this.renderApprovals() })],
+          );
+    return html`${invites}${approvals}`;
   }
 }
 

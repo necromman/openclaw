@@ -5,6 +5,7 @@ import type { RouteId } from "./app-route-paths.ts";
 import type { NativeDeviceSettingsCapability } from "./app/native-device-settings.ts";
 import { BRAND_NAME } from "./brand.ts";
 import type { IconName } from "./components/icons.ts";
+import { canManageIxAuthUsers } from "./features/ix-auth/ix-auth-session-api.ts";
 import { i18n, t } from "./i18n/index.ts";
 
 export type NavigationRouteId = RouteId;
@@ -199,7 +200,15 @@ const SETTINGS_NAVIGATION_GROUPS = [
   { labelKey: "nav.settingsGroupDevice", routes: ["device", "device-permissions"] },
   {
     labelKey: "nav.settingsGroupConnections",
-    routes: ["connection", "channels", "communications", "talk", "devices", "cloud-workers"],
+    routes: [
+      "connection",
+      "users",
+      "channels",
+      "communications",
+      "talk",
+      "devices",
+      "cloud-workers",
+    ],
   },
   {
     labelKey: "nav.settingsGroupAgents",
@@ -220,7 +229,7 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
   { labelKey: "nav.settingsGroupDevice", routes: ["device", "device-permissions"] },
   {
     labelKey: "nav.settingsGroupConnections",
-    routes: ["connection", "channels", "talk", "devices"],
+    routes: ["connection", "users", "channels", "talk", "devices"],
   },
   {
     labelKey: "nav.settingsGroupAgents",
@@ -243,6 +252,11 @@ export function isSettingsNavigationRouteVisible(
   }
   if (routeId === "updates") {
     return canAdmin || nativeDeviceSettings !== null;
+  }
+  // User management exists only where identity is delegated, and only for the accounts
+  // the Gateway judged administrators. Gateway operator scopes are a different question.
+  if (routeId === "users") {
+    return canManageIxAuthUsers();
   }
   return (
     canAdmin ||
@@ -303,6 +317,9 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   worktrees: ["folder", "tabs.worktrees", "subtitles.worktrees"],
   channels: ["link", "tabs.channels", "subtitles.channels"],
   connection: ["radio", "tabs.connection", "subtitles.connection"],
+  // Identity-server copy: the item only appears for a session that has one, and the
+  // catalog is registered by the probe that decides that.
+  users: ["users", "ixAuth.users.navTitle", "ixAuth.users.navSubtitle"],
   sessions: ["fileText", "tabs.sessions", "subtitles.sessions"],
   usage: ["coins", "tabs.usage", "subtitles.usage"],
   cron: ["calendarClock", "tabs.cron", "subtitles.cron"],

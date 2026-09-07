@@ -33,7 +33,7 @@ type ConnectionProps = {
   /** Identity-server session, when the Gateway delegates identity. */
   ixAuthSession?: IxAuthSessionState;
   onIxAuthSignOut?: () => void;
-  /** Mount point for the invitation controls, which call Gateway routes of their own. */
+  /** Mount point the account block builds its user-management link from. */
   ixAuthBasePath?: string;
   onSessionKeyChange: (next: string) => void;
   onToggleGatewayTokenVisibility: () => void;
@@ -58,23 +58,6 @@ function renderSecretRow(params: {
     title: label,
     control: renderSettingsSecretInput({ ...secret, ariaLabel: label }),
   });
-}
-
-let ixAuthInviteSectionRequested = false;
-
-/**
- * Register the invitation controls the first time an administrator sees this page.
- *
- * The element upgrades when its module lands, so the tag can be rendered before the
- * import resolves; the alternative is shipping the whole administration surface to every
- * signed-in person who opens the connection page.
- */
-function ensureIxAuthInviteSection(): void {
-  if (ixAuthInviteSectionRequested) {
-    return;
-  }
-  ixAuthInviteSectionRequested = true;
-  void import("./ix-auth-invite-section.ts");
 }
 
 export function renderConnection(props: ConnectionProps) {
@@ -204,20 +187,13 @@ export function renderConnection(props: ConnectionProps) {
     props.ixAuthSession
       ? renderIxAuthAccountSection({
           session: props.ixAuthSession,
+          basePath: props.ixAuthBasePath ?? "",
           onSignOut: () => props.onIxAuthSignOut?.(),
         })
       : "",
     // The console link is present only for the roles the Gateway judged administrators,
     // so it doubles as the signal that these controls are worth mounting. The module is
     // fetched only then, which keeps it out of the bundle every other visitor loads.
-    props.ixAuthSession?.adminConsoleUrl
-      ? (ensureIxAuthInviteSection(),
-        html`<openclaw-ix-auth-invites
-          .basePath=${props.ixAuthBasePath ?? ""}
-          .canManage=${true}
-          .canGrantSuperAdmin=${props.ixAuthSession?.user?.isSuperAdmin === true}
-        ></openclaw-ix-auth-invites>`)
-      : "",
     renderSettingsSection(
       { title: t("connection.access.title"), description: t("connection.access.subtitle") },
       accessRows,

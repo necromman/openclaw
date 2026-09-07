@@ -9,6 +9,7 @@ import type { ApplicationNavigationOptions } from "../app/context.ts";
 import type { ThemeMode } from "../app/theme.ts";
 import { BRAND_FEATURES } from "../brand.ts";
 import {
+  canManageIxAuthUsers,
   isIxAuthSessionActive,
   signOutIxAuthSession,
 } from "../features/ix-auth/ix-auth-session-api.ts";
@@ -485,6 +486,9 @@ export function renderSidebarIdentityMenu(params: SidebarIdentityMenuParams) {
           case `${COMMAND_VALUE_PREFIX}retry-connect`:
             params.onRetryConnect?.();
             break;
+          case `${COMMAND_VALUE_PREFIX}manage-users`:
+            params.onNavigate("users");
+            break;
           case `${COMMAND_VALUE_PREFIX}sign-out`:
             void signOutIxAuthSession(params.basePath);
             break;
@@ -571,6 +575,20 @@ export function renderSidebarIdentityMenu(params: SidebarIdentityMenuParams) {
         <span class="sidebar-customize-menu__text">${t("agentChip.help")}</span>
         ${renderIdentityMenuHelpSubmenu()}
       </wa-dropdown-item>
+      ${
+        // Administration lives in this app rather than behind a second sign-in at the
+        // identity server, so it is reachable from the same menu as the account itself.
+        canManageIxAuthUsers()
+          ? html`<div class="sidebar-customize-menu__separator" role="separator"></div>
+              <wa-dropdown-item
+                class="sidebar-customize-menu__item sidebar-identity-menu__manage-users"
+                value="command:manage-users"
+              >
+                <span slot="icon" class="nav-item__icon" aria-hidden="true">${icons.users}</span>
+                <span class="sidebar-customize-menu__text">${t("ixAuth.manageUsers")}</span>
+              </wa-dropdown-item>`
+          : nothing
+      }
       ${
         // Only where identity is delegated to the identity server. The shared-token modes
         // have no account to sign out of, so the row would end nothing.

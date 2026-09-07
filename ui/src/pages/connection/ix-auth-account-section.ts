@@ -4,6 +4,7 @@
 // This lives on the connection page because in this mode the connection is the account:
 // there is no Gateway URL or shared token for a person to configure.
 import { html, nothing, type TemplateResult } from "lit";
+import { pathForRoute } from "../../app-route-paths.ts";
 import {
   renderSettingsRow,
   renderSettingsSection,
@@ -13,7 +14,6 @@ import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
-import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
 
 // The connection page can be the first view to need these strings, so it registers the
 // catalog itself rather than relying on the lazy sign-in screen having been shown.
@@ -21,6 +21,8 @@ registerIxAuthEnglish();
 
 export type IxAuthAccountSectionProps = {
   session: IxAuthSessionState;
+  /** Where the Control UI is mounted, so the management link survives a base path. */
+  basePath: string;
   onSignOut: () => void;
 };
 
@@ -53,16 +55,14 @@ export function renderIxAuthAccountSection(
         })
       : nothing,
     // The console link is only present in the payload for users the Gateway judged
-    // administrators, so no client-side role check gates it here.
+    // administrators, so it doubles as the signal that this row is worth drawing. The
+    // link itself now points at this app's own screen: the console is a second sign-in
+    // and stays an advanced escape hatch, offered there rather than here.
     session.adminConsoleUrl
       ? renderSettingsRow({
           title: t("ixAuth.manageUsers"),
           control: html`
-            <a
-              class="btn"
-              href=${session.adminConsoleUrl}
-              target=${EXTERNAL_LINK_TARGET}
-              rel=${buildExternalLinkRel()}
+            <a class="btn" href=${pathForRoute("users", props.basePath)}
               >${t("ixAuth.manageUsers")}</a
             >
           `,
