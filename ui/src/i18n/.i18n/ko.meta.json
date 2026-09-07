@@ -71,10 +71,10 @@
     "subtitles.lobsterdex",
     "tabs.lobsterdex"
   ],
-  "generatedAt": "2026-09-07T17:03:50.368Z",
+  "generatedAt": "2026-09-07T21:17:34.888Z",
   "locale": "ko",
-  "sourceHash": "8072c43026e9a27120de557ed94ed450977f19686a8ba1dc659acf647bc5d3b8",
-  "totalKeys": 6551,
-  "translatedKeys": 6481,
+  "sourceHash": "8d2d5e57b2ddc035ce8dfbe77c84e9a5231e37a543eeac7e37efe89e0eecfce0",
+  "totalKeys": 6585,
+  "translatedKeys": 6515,
   "workflow": 1
 }
