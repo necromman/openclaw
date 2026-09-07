@@ -12,21 +12,10 @@ import { renderLazyElementState, renderLazyViewError } from "../components/lazy-
 import { installTitleTooltips } from "../components/tooltip-title.ts";
 import { t } from "../i18n/index.ts";
 import {
-  createEmptyIxAuthFormState,
-  type IxAuthFormState,
-} from "../features/ix-auth/ix-auth-form-state.ts";
-import {
   renderIxAuthGate,
   shouldRenderIxAuthGate,
 } from "../features/ix-auth/ix-auth-gate-view.ts";
-import {
-  probeIxAuthSession,
-  type IxAuthSessionState,
-} from "../features/ix-auth/ix-auth-session-api.ts";
-import {
-  findIxAuthSubmitBlocker,
-  runIxAuthSignInStep,
-} from "../features/ix-auth/ix-auth-sign-in-step.ts";
+import { IxAuthSessionController } from "../features/ix-auth/ix-auth-session-controller.ts";
 import { formatUiError } from "../lib/format-error.ts";
 import { normalizeAgentId } from "../lib/sessions/session-key.ts";
 import { isTerminalAvailable } from "../lib/terminal-availability.ts";
@@ -89,10 +78,6 @@ export class OpenClawApp extends OpenClawLightDomElement {
   @state() private loginPassword = "";
   @state() private loginShowGatewayToken = false;
   @state() private loginShowGatewayPassword = false;
-  // Identity-server sign-in state. `undefined` means the session probe has not
-  // answered yet, which is distinct from "answered: not signed in".
-  @state() private ixAuthSession: IxAuthSessionState | undefined;
-  @state() private ixAuthForm: IxAuthFormState = createEmptyIxAuthFormState();
   @state() private pendingGatewayUrl: string | null = null;
   @state() private onboarding = resolveOnboardingMode(globalThis.location?.search ?? "");
   @state() private focusDashboardRoute: FocusDashboardRouteState = { kind: "loading" };
@@ -107,6 +92,7 @@ export class OpenClawApp extends OpenClawLightDomElement {
   private focusDashboardAbort: AbortController | null = null;
   private readonly loginGateLoader = new LazyCustomElementRequestController(this);
   private readonly ixAuthLoginLoader = new LazyCustomElementRequestController(this);
+  private readonly ixAuth = new IxAuthSessionController(this);
   private readonly lazyCustomElements = new LazyCustomElementRequestController(this, () =>
     this.closeDocument(this.context?.basePath ?? ""),
   );
@@ -172,7 +158,7 @@ export class OpenClawApp extends OpenClawLightDomElement {
     // Ask the Gateway about an existing browser session before the WebSocket attempt
     // decides what to render. Without this, a signed-in reload would flash the
     // connection screen on its way to the shell.
-    void this.probeIxAuthSessionState(context.basePath);
+    void this.ixAuth.probe(context.basePath);
     this.pendingGatewayUrl = this.runtime.pendingGatewayConnection?.gatewayUrl ?? null;
     // Context identity changes only across a full app-tree connection epoch;
     // descendants reconnect and rebuild their controller-owned state afterward.
@@ -241,43 +227,6 @@ export class OpenClawApp extends OpenClawLightDomElement {
     this.loginGatewayUrl = connection.gatewayUrl;
     this.loginToken = connection.token;
     this.loginPassword = connection.password;
-  }
-
-  /** Ask the Gateway whether this browser already holds an identity-server session. */
-  private async probeIxAuthSessionState(basePath: string): Promise<void> {
-    const session = await probeIxAuthSession(basePath);
-    this.ixAuthSession = session;
-    if (!session.authenticated) {
-      this.ixAuthForm = createEmptyIxAuthFormState();
-    }
-  }
-
-  private async submitIxAuthForm(basePath: string): Promise<void> {
-    if (this.ixAuthForm.submitting) {
-      return;
-    }
-    const blocker = findIxAuthSubmitBlocker(this.ixAuthForm);
-    if (blocker) {
-      this.ixAuthForm = { ...this.ixAuthForm, errorKey: blocker };
-      return;
-    }
-    this.ixAuthForm = { ...this.ixAuthForm, submitting: true, errorKey: undefined };
-    const step = await runIxAuthSignInStep({ basePath, state: this.ixAuthForm });
-    this.ixAuthForm = step.nextState;
-    if (!step.user) {
-      return;
-    }
-    this.ixAuthSession = {
-      authenticated: true,
-      authMode: "ix-auth",
-      user: step.user,
-      adminConsoleUrl: this.ixAuthSession?.adminConsoleUrl,
-    };
-    // A fresh probe picks up the admin console link, which sign-in does not return.
-    void this.probeIxAuthSessionState(basePath);
-    // The cookie now exists, so the ordinary connect path can authenticate.
-    this.loginGatePinned = true;
-    this.context?.gateway.connect({ gatewayUrl: this.loginGatewayUrl, token: "", password: "" });
   }
 
   private resetLoginSensitivePresentation() {
@@ -642,18 +591,25 @@ export class OpenClawApp extends OpenClawLightDomElement {
     // Identity-server mode owns the pre-connection screen. A person signs in with an
     // account; the Gateway URL and shared token are not theirs to enter, and falling
     // back to that form after a failed sign-in would offer a way around the login.
-    if (showLoginGate && shouldRenderIxAuthGate(this.ixAuthSession)) {
+    if (showLoginGate && shouldRenderIxAuthGate(this.ixAuth.session)) {
       const basePath = context.basePath;
       return renderIxAuthGate({
-        session: this.ixAuthSession,
+        session: this.ixAuth.session,
         loader: this.ixAuthLoginLoader,
         resourceBasePath: context.resourceBasePath,
-        state: this.ixAuthForm,
-        onChange: (next) => {
-          this.ixAuthForm = next;
-        },
+        state: this.ixAuth.form,
+        onChange: (next) => this.ixAuth.updateForm(next),
         onSubmit: () => {
-          void this.submitIxAuthForm(basePath);
+          void this.ixAuth.submit(basePath).then((signedIn) => {
+            if (signedIn) {
+              this.loginGatePinned = true;
+              context.gateway.connect({
+                gatewayUrl: this.loginGatewayUrl,
+                token: "",
+                password: "",
+              });
+            }
+          });
         },
         renderPending: () => renderConnectingSplash(gatewayStartupStatus),
       });
