@@ -118,13 +118,7 @@
         "skipBootstrap": "__OPENCLAW_NAS_SKIP_BOOTSTRAP__",
         "tools": {
           "profile": "readonly",
-          "permissionMode": "read-only",
-          "fs": {
-            "workspaceOnly": true
-          },
-          "exec": {
-            "mode": "deny"
-          }
+          "permissionMode": "read-only"
         }
       },
       "qa-bot": {
@@ -134,13 +128,7 @@
         "skipBootstrap": "__OPENCLAW_NAS_SKIP_BOOTSTRAP__",
         "tools": {
           "profile": "readonly",
-          "permissionMode": "read-only",
-          "fs": {
-            "workspaceOnly": true
-          },
-          "exec": {
-            "mode": "deny"
-          }
+          "permissionMode": "read-only"
         }
       }
     }
