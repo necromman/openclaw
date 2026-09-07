@@ -119,6 +119,8 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
         issuer: "https://gateway.example", // IX-Auth 의 IXAUTH_JWT_ISSUER 와 정확히 같아야 한다
         audience: "openclaw", // IXAUTH_JWT_AUDIENCE 와 같아야 한다
         cookieName: "__Host-openclaw-session", // 기본값
+        // 생략하면 게이트웨이가 중계하는 내장 경로 "/admin/identity/" 가 쓰인다.
+        // 콘솔을 별도 호스트에 띄우는 배포만 절대 URL 로 덮어쓴다
         adminConsoleUrl: "https://ixauth-admin.example/admin-ui",
         roleMap: {
           SUPERADMIN: "superadmin",
@@ -166,6 +168,8 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 | `gateway.mode` 누락                    | `Gateway start blocked: existing config is missing gateway.mode` | `"mode": "local"` 을 넣는다                                                       |
 | `roles.definitions.<role>.agents` 누락 | `gateway.roles.definitions.admin.agents: Invalid input`          | 각 역할에 `agents` 를 명시한다(`"*"` 또는 에이전트 ID 배열)                       |
 
+**배포 스택에서는 함정 1이 구조적으로 제거돼 있다.** `chris-local/docker-compose.ixauth.yml` 과 `chris-local/ixauth-gateway-config/openclaw.json` 이 `issuer`/`audience` 를 같은 리터럴(`openclaw-ix-auth` / `openclaw-gateway`)로 박아 두어 운영자가 두 곳을 맞출 일이 없다. 설치 절차는 [DEPLOY.md](DEPLOY.md).
+
 `gateway.auth.token` 과 상호배타다. 둘 다 있으면 기동을 거부한다 - 공유 비밀이 있으면 1인 로그인을 우회하는 길이 생기기 때문이다.
 
 ## 5. 역할 매핑표
@@ -182,7 +186,7 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 
 - **여러 역할을 가지면 가장 높은 것**을 취한다(superadmin > admin > moderator > member). 매핑 목록에 없는 이름은 모든 알려진 이름보다 낮게 정렬된다.
 - **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
-- 관리 콘솔 링크는 `superadmin`·`admin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다.
+- 관리 콘솔 링크는 `superadmin`·`admin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다.
 - 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. **이번 단계는 매핑 데이터만 준비하고 강제하지 않는다** (6절).
 
 ## 6. 이번 단계에서 하지 않은 것
@@ -194,7 +198,10 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 | 세션 목록·이벤트·`agents.list` 부서 필터   | 미구현                                        | 6.1                   |
 | 초대장 가입 플로우 화면 3개                | 미구현                                        | 6.2                   |
 | 포크 감사 원장 해시 체인                   | 미구현. 인증 사건은 IX-Auth 원장에 남는다     | 6.3                   |
-| TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다   | IX-Auth 콘솔에서 등록 |
+| TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다   | IX-Auth 콘솔에서 등록. **콘솔 접근 경로가 A 단계에서 열렸다**(`/admin/identity/`) |
+| 관리 콘솔 접근 경로                        | **해결(A 단계).** 게이트웨이 BFF `/admin/identity/` 가 superadmin·admin 에게만 중계한다 | -                     |
+| 역할 4단계 시드                            | **해결(A 단계).** IX-Auth 마이그레이션 `V14` 가 만든다. 콘솔에서 손으로 만들 필요가 없다 | -                     |
+| 무인 배포                                  | **해결(A 단계).** `docker compose up -d` 한 번으로 마이그레이션·역할 시드·superadmin 부트스트랩·설정 주입이 끝난다 | 절차는 [DEPLOY.md](DEPLOY.md) |
 
 **대신 지금 넣은 완화책**: `tools.sessions.visibility` 를 이 모드의 배포 설정에서 `"self"` 로 좁혀 둔다. 부서 강제가 없는 동안 모델의 sessions 도구가 남의 세션을 훑지 못하게 하는 최소 방어다.
 
@@ -224,13 +231,17 @@ docker compose --env-file chris-local/ixauth.env \
   -f chris-local/docker-compose.ixauth.yml up -d
 ```
 
-`IXAUTH_ADMIN_EMAIL` / `IXAUTH_ADMIN_PASSWORD` 로 최초 관리자 1명이 **첫 부팅에만** 시드된다. 첫 로그인 후 비밀번호를 바꾼다.
+`IXAUTH_ADMIN_EMAIL` / `IXAUTH_ADMIN_PASSWORD` 로 최초 관리자 1명이 **첫 부팅에만** 시드되고 `SUPERADMIN` 역할을 받는다. IX-Auth 에는 "첫 로그인 시 비밀번호 변경 강제" 기능이 없으므로, 첫 로그인 후 콘솔에서 비밀번호를 바꾸는 것은 **운영 지시**다.
+
+요구사항·`.env` 항목표·백업·되돌리기·라이선스 확인 항목은 [DEPLOY.md](DEPLOY.md).
 
 ### 7.2 사용자 추가
 
-관리 콘솔(`/admin-ui`)에서 한다. 포크에는 사용자 관리 화면이 없다.
+관리 콘솔에서 한다. 포크에는 사용자 관리 화면이 없다.
 
-기본 역할은 `ADMIN` 과 `USER` 둘뿐이다. `roleMap` 이 기대하는 `MEMBER`·`MODERATOR`·`SUPERADMIN` 은 콘솔에서 만들거나, `roleMap` 을 IX-Auth 의 실제 역할 코드에 맞춘다. **둘 중 하나를 반드시 해야 한다** - 매핑되지 않은 사용자는 `gateway.roles.default` 로 떨어진다.
+콘솔은 게이트웨이가 **`/admin/identity/` 에서 중계**한다. 신원 서버는 포트를 열지 않는다(설계 불변식 4). 계정 화면의 "사용자 관리" 링크가 그 경로이고, superadmin·admin 만 통과한다. 콘솔은 자체 로그인을 유지한다 - 게이트웨이 세션만 훔쳐서는 사용자 관리를 할 수 없게 하는 이중 방어다.
+
+역할 `SUPERADMIN`·`ADMIN`·`MODERATOR`·`MEMBER` 4종은 IX-Auth 마이그레이션 `V14` 가 기동 시 시드한다. 원본 기본 역할이 `ADMIN`/`USER` 뿐이라 `roleMap` 이 비어 떨어지던 문제는 없어졌다. 고객이 자기 역할 코드를 쓰면 `roleMap` 을 그쪽에 맞춘다.
 
 ### 7.3 즉시 차단
 
@@ -292,7 +303,11 @@ docker compose --env-file chris-local/ixauth.env \
 | `ui/src/components/ix-auth-login.ts`                 | 로그인 화면 (지연 로드)                              |
 | `ui/src/pages/connection/ix-auth-account-section.ts` | 계정 표시·로그아웃·콘솔 링크                         |
 | `ui/src/i18n/locales/en-ix-auth.ts`                  | i18n 카탈로그                                        |
+| `src/gateway/ix-auth-admin-proxy.ts`                 | 관리 콘솔 BFF 프록시 (`/admin/identity/*`)           |
 | `chris-local/docker-compose.ixauth.yml`              | 배포 정의                                            |
+| `chris-local/ixauth-gateway-config/openclaw.json`    | 배포 설정 정본 (시크릿은 env SecretRef)              |
+| `chris-local/ixauth-gateway-config/start-gateway.sh` | 설정 렌더링 + 기동                                   |
+| `chris-local/DEPLOY.md`                              | 납품 설치 절차서                                     |
 | `chris-local/ixauth-verify.sh`                       | 로컬 검증 스택                                       |
 
 ### 9.2 수정 (훅 지점만)

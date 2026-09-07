@@ -759,6 +759,7 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 | 문서                                                                   | 내용                                                                             |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | [chris-local/AUTH-IXAUTH.md](chris-local/AUTH-IXAUTH.md)               | **연동 정본.** 구조·시퀀스·설정 키·역할 매핑·운영 절차·되돌리기·라이브 검증 기록 |
+| [chris-local/DEPLOY.md](chris-local/DEPLOY.md)                         | **납품 설치 절차서.** 요구사항·`.env` 항목표·기동·백업·업그레이드·되돌리기·포트·라이선스 확인 항목 |
 | [chris-local/AUTH-IXAUTH-OPTION.md](chris-local/AUTH-IXAUTH-OPTION.md) | 자체 구현안 대비 채택 근거 비교                                                  |
 | [chris-local/AUTH-PLAN.md](chris-local/AUTH-PLAN.md)                   | v2 결정 요약 + 폐기된 자체 구현 계획(부록)                                       |
 | [ix-auth/VENDOR.md](ix-auth/VENDOR.md)                                 | `ix-auth/` 벤더 복사본의 출처·제외 목록·재동기화·되돌리기                        |
