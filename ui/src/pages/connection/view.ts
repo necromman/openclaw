@@ -15,7 +15,6 @@ import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-
 import { t } from "../../i18n/index.ts";
 import { formatRelativeTimestamp } from "../../lib/format.ts";
 import { renderIxAuthAccountSection } from "./ix-auth-account-section.ts";
-import "./ix-auth-invite-section.ts";
 import { renderSystemSection } from "./system-section.ts";
 
 type ConnectionProps = {
@@ -59,6 +58,23 @@ function renderSecretRow(params: {
     title: label,
     control: renderSettingsSecretInput({ ...secret, ariaLabel: label }),
   });
+}
+
+let ixAuthInviteSectionRequested = false;
+
+/**
+ * Register the invitation controls the first time an administrator sees this page.
+ *
+ * The element upgrades when its module lands, so the tag can be rendered before the
+ * import resolves; the alternative is shipping the whole administration surface to every
+ * signed-in person who opens the connection page.
+ */
+function ensureIxAuthInviteSection(): void {
+  if (ixAuthInviteSectionRequested) {
+    return;
+  }
+  ixAuthInviteSectionRequested = true;
+  void import("./ix-auth-invite-section.ts");
 }
 
 export function renderConnection(props: ConnectionProps) {
@@ -192,12 +208,14 @@ export function renderConnection(props: ConnectionProps) {
         })
       : "",
     // The console link is present only for the roles the Gateway judged administrators,
-    // so it doubles as the signal that these controls are worth mounting.
+    // so it doubles as the signal that these controls are worth mounting. The module is
+    // fetched only then, which keeps it out of the bundle every other visitor loads.
     props.ixAuthSession?.adminConsoleUrl
-      ? html`<openclaw-ix-auth-invites
+      ? (ensureIxAuthInviteSection(),
+        html`<openclaw-ix-auth-invites
           .basePath=${props.ixAuthBasePath ?? ""}
           .canManage=${true}
-        ></openclaw-ix-auth-invites>`
+        ></openclaw-ix-auth-invites>`)
       : "",
     renderSettingsSection(
       { title: t("connection.access.title"), description: t("connection.access.subtitle") },

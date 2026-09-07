@@ -2,14 +2,7 @@
 //
 // Kept out of the application shell so the rules of these forms (what clears, what
 // carries over, when a session exists) can be read and tested without the whole app tree.
-import {
-  submitIxAuthEmailVerify,
-  submitIxAuthInviteAccept,
-  submitIxAuthPasswordForgot,
-  submitIxAuthPasswordReset,
-  submitIxAuthSignup,
-  type IxAuthAccountResult,
-} from "./ix-auth-account-api.ts";
+import type { IxAuthAccountResult } from "./ix-auth-account-api.ts";
 import { clearIxAuthFormSecrets, type IxAuthFormState } from "./ix-auth-form-state.ts";
 import {
   submitIxAuthLogin,
@@ -32,12 +25,26 @@ const IX_AUTH_SCREEN_NOTICES: Readonly<Record<string, string>> = Object.freeze({
   "accept-invite": "inviteAccepted",
 });
 
+/**
+ * Submit one of the account screens.
+ *
+ * The client is loaded on demand: signing in is the common path and never reaches these
+ * routes, so keeping them out of the startup bundle costs nothing to the person who is
+ * only signing in.
+ */
 async function runAccountScreen(params: {
   basePath: string;
   state: IxAuthFormState;
 }): Promise<IxAuthAccountResult> {
   const { state } = params;
   const token = state.token ?? "";
+  const {
+    submitIxAuthEmailVerify,
+    submitIxAuthInviteAccept,
+    submitIxAuthPasswordForgot,
+    submitIxAuthPasswordReset,
+    submitIxAuthSignup,
+  } = await import("./ix-auth-account-api.ts");
   switch (state.screen) {
     case "signup":
       return await submitIxAuthSignup({
