@@ -499,6 +499,7 @@ export async function dispatchEmbeddedRunAttempt(input: {
     forceHeartbeatTool: params.forceHeartbeatTool,
     requireExplicitMessageTarget: params.requireExplicitMessageTarget,
     internalEvents: params.internalEvents,
+    runtimeContextFragments: params.runtimeContextFragments,
     bootstrapPromptWarningSignaturesSeen: input.bootstrapPromptWarningSignaturesSeen,
     bootstrapPromptWarningSignature:
       input.bootstrapPromptWarningSignaturesSeen[

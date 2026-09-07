@@ -226,6 +226,7 @@ export async function runEmbeddedAttemptPromptPhase(input: {
           )
         : undefined;
     const promptContext = prepareEmbeddedAttemptPromptContext({
+      sessionVersion: sessionManager.getHeader()?.version,
       attempt,
       ...(heartbeatOutcomeContext ? { heartbeatOutcomeContext } : {}),
       messages: activeSession.messages,

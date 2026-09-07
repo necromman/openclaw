@@ -112,6 +112,7 @@ function createFixture() {
     },
   };
   const sessionManager = {
+    getHeader: () => ({ version: 3 }),
     appendCustomEntry: vi.fn(),
     getEntries: vi.fn(() => []),
   };
