@@ -7,7 +7,7 @@ plugins {
 
 allprojects {
     group = "team.prost"
-    version = "0.1.0-SNAPSHOT+openclaw.1"
+    version = "0.1.0-SNAPSHOT+openclaw.2"
 
     repositories {
         // 1순위: GitLab 그룹 Package Registry (사내 캐시)

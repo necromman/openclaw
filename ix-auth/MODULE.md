@@ -77,7 +77,8 @@ IX-Auth 는 포크의 **신원 공급자**다. 포크(OpenClaw Gateway)는 BFF �
 | `db/migration/{postgresql,mariadb,mysql}/V14__openclaw_role_tiers.sql` | 신규. 역할 `SUPERADMIN`·`MODERATOR`·`MEMBER` 시드 + SUPERADMIN 에 `ixauth:*:*` 부여 | 원본 기본 역할은 `ADMIN`/`USER` 뿐이라 포크의 4단계 `roleMap` 이 비어 떨어진다. 무인 설치 한 번으로 권한 구분이 서야 한다 | 역할 계층은 포크 고유 정책이라 원본 반영 대상이 아니다. 원본이 역할 정의 API 를 열면 그쪽으로 옮긴다 |
 | `config/BootstrapRunner.java` | 최초 관리자에게 `SUPERADMIN` 을 먼저 찾아 부여(없으면 종전대로 `ADMIN`) | 위 시드가 없는 원본 스키마에서도 동작이 같고, 있는 곳에서는 무인 설치 직후 superadmin 이 1명 생긴다 | 제안 가치 있음. 원본에 역할 계층이 생기면 함께 올린다 |
 | `admin-ui/index.html` | fetch 3곳에 `forkCsrfHeaders()` 추가 | 게이트웨이 BFF(`/admin/identity/`) 뒤에서 열릴 때 세션 CSRF 토큰을 함께 보낸다. 쿠키가 없으면 헤더가 붙지 않아 독립 실행 동작은 그대로다 | 원본에는 무의미한 델타. 재동기화 때 다시 얹는다 |
-| `build.gradle.kts` | `version` 에 `+openclaw.1` | 8절 표기 규칙 | 해당 없음 |
+| `db/migration/{postgresql,mariadb,mysql}/V15__openclaw_executive_role.sql` | 신규. 역할 `EXECUTIVE` 시드(권한 부여 없음) | 포크가 임원 단계를 더해 5단계가 됐다. V14 는 고치지 않고 새 버전으로만 얹는다(2.2 규칙). 임원의 전 부서 열람은 역할이 아니라 `dept-` 그룹 전체 소속에서 나온다 | V14 와 같은 이유로 원본 반영 대상이 아니다 |
+| `build.gradle.kts` | `version` 에 `+openclaw.2` | 8절 표기 규칙 | 해당 없음 |
 
 ## 7. 설계 불변식 4개와 포크의 준수 상태
 
@@ -138,7 +139,7 @@ version = "0.1.0-SNAPSHOT+openclaw.1"
 
 `+openclaw.N` 은 SemVer 빌드 메타데이터라 버전 비교에 영향을 주지 않으면서 "원본 0.1.0-SNAPSHOT 에 포크 델타 N 개가 얹힌 빌드" 임을 드러낸다. 6절 표에 델타를 추가할 때 N 을 올린다.
 
-현재 값은 `0.1.0-SNAPSHOT+openclaw.1` 이다 (6절 델타 1묶음).
+현재 값은 `0.1.0-SNAPSHOT+openclaw.2` 이다 (6절 델타 2묶음).
 
 ## 9. 빌드 산출물
 
