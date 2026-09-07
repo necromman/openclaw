@@ -59,6 +59,7 @@ write_gateway_config() {
         "roleMap": {
           "SUPERADMIN": "superadmin",
           "ADMIN": "admin",
+          "EXECUTIVE": "executive",
           "MODERATOR": "moderator",
           "MEMBER": "member"
         },
@@ -72,6 +73,10 @@ write_gateway_config() {
         "admin": {
           "sessions": { "others": "write" },
           "scopes": ["operator.read", "operator.write", "operator.approvals", "operator.questions"]
+        },
+        "executive": {
+          "sessions": { "others": "view" },
+          "scopes": ["operator.read", "operator.write", "operator.questions"]
         },
         "moderator": {
           "sessions": { "others": "suggest" },

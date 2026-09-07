@@ -44,6 +44,17 @@
             "operator.questions"
           ]
         },
+        "executive": {
+          "sessions": {
+            "others": "view"
+          },
+          "agents": "*",
+          "scopes": [
+            "operator.read",
+            "operator.write",
+            "operator.questions"
+          ]
+        },
         "moderator": {
           "sessions": {
             "others": "suggest"
