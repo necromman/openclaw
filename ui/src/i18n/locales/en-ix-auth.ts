@@ -99,8 +99,6 @@ const enIxAuth = {
       empty: "No invitation links are waiting.",
     },
     users: {
-      navTitle: "Users",
-      navSubtitle: "Invite people, set roles and departments, and end sessions.",
       title: "User management",
       description: "Everyone with an account on this deployment.",
       forbidden: "Only an administrator can manage users.",

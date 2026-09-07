@@ -136,8 +136,6 @@
     "ixAuth.users.mfaOff",
     "ixAuth.users.mfaOn",
     "ixAuth.users.mfaReset",
-    "ixAuth.users.navSubtitle",
-    "ixAuth.users.navTitle",
     "ixAuth.users.passwordReset",
     "ixAuth.users.passwordResetHelp",
     "ixAuth.users.passwordResetSent",
@@ -159,11 +157,13 @@
     "quickSettings.appearance.lobsterSounds",
     "quickSettings.appearance.lobsterVisits",
     "subtitles.lobsterdex",
-    "tabs.lobsterdex"
+    "subtitles.users",
+    "tabs.lobsterdex",
+    "tabs.users"
   ],
-  "generatedAt": "2026-09-07T15:02:02.799Z",
+  "generatedAt": "2026-09-07T15:21:46.993Z",
   "locale": "vi",
-  "sourceHash": "e4a93ef6eb349ba24ca617a1fa4f53de3c04fadfd3a78c8854bf7435abf21d73",
+  "sourceHash": "b022af6aee96cd48228dac4a4d1e0888f89f5520ded084c5aa0c9e7a1827ddd0",
   "totalKeys": 6547,
   "translatedKeys": 6387,
   "workflow": 1

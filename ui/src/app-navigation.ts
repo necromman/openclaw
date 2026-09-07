@@ -317,9 +317,7 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   worktrees: ["folder", "tabs.worktrees", "subtitles.worktrees"],
   channels: ["link", "tabs.channels", "subtitles.channels"],
   connection: ["radio", "tabs.connection", "subtitles.connection"],
-  // Identity-server copy: the item only appears for a session that has one, and the
-  // catalog is registered by the probe that decides that.
-  users: ["users", "ixAuth.users.navTitle", "ixAuth.users.navSubtitle"],
+  users: ["users", "tabs.users", "subtitles.users"],
   sessions: ["fileText", "tabs.sessions", "subtitles.sessions"],
   usage: ["coins", "tabs.usage", "subtitles.usage"],
   cron: ["calendarClock", "tabs.cron", "subtitles.cron"],
