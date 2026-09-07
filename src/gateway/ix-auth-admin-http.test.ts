@@ -550,6 +550,188 @@ describe("granting a department with an invitation", () => {
   });
 });
 
+describe("inviting an executive", () => {
+  it("grants the role and fills in every department when none was named", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    captureIxAuthInviteLink({
+      email: "chief@example.test",
+      link: "https://gw/invite?token=abc",
+      nowMs: Date.now(),
+    });
+    const calls = stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 51 } }, 201),
+      "/admin/groups": () =>
+        jsonResponse({
+          data: [
+            { id: 7, code: "dept-rnd", name: "Research" },
+            { id: 8, code: "dept-qa", name: "Quality" },
+            // Not a department: an executive must not be swept into ordinary groups.
+            { id: 9, code: "on-call", name: "On call" },
+          ],
+        }),
+      "/admin/groups/7/members": () => jsonResponse({ data: { added: true } }),
+      "/admin/groups/8/members": () => jsonResponse({ data: { added: true } }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "chief@example.test", role: "EXECUTIVE", departments: [] },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(
+      JSON.parse(calls.find((call) => call.path === "/admin/users")?.body ?? "{}").roles,
+    ).toEqual(["EXECUTIVE"]);
+    // The list comes from the identity server, never from the request body, so an empty
+    // post cannot be talked into placing somebody nowhere or somewhere invented.
+    expect(JSON.parse(answer.body())).toMatchObject({
+      departments: ["dept-rnd", "dept-qa"],
+      departmentFailed: false,
+    });
+    expect(calls.some((call) => call.path === "/admin/groups/9/members")).toBe(false);
+  });
+
+  it("obeys a narrowed list instead of widening it back to everything", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 52 } }, 201),
+      "/admin/groups": () =>
+        jsonResponse({
+          data: [
+            { id: 7, code: "dept-rnd", name: "Research" },
+            { id: 8, code: "dept-qa", name: "Quality" },
+          ],
+        }),
+      "/admin/groups/8/members": () => jsonResponse({ data: { added: true } }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "chief@example.test", role: "EXECUTIVE", departments: ["dept-qa"] },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toMatchObject({ departments: ["dept-qa"] });
+    expect(calls.some((call) => call.path === "/admin/groups/7/members")).toBe(false);
+  });
+
+  it("leaves an ordinary invitation with no department when none was named", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 53 } }, 201),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "staff@example.test", role: "MEMBER", departments: [] },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toMatchObject({ departments: [], departmentFailed: false });
+    // Filling in every department is the executive rule alone, so nothing is even listed.
+    expect(calls.some((call) => call.path === "/admin/groups")).toBe(false);
+  });
+});
+
+describe("granting several departments at once", () => {
+  it("places one account into each department it was invited into", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 61 } }, 201),
+      "/admin/groups": () =>
+        jsonResponse({
+          data: [
+            { id: 7, code: "dept-rnd", name: "Research" },
+            { id: 8, code: "dept-qa", name: "Quality" },
+          ],
+        }),
+      "/admin/groups/7/members": () => jsonResponse({ data: { added: true } }),
+      "/admin/groups/8/members": () => jsonResponse({ data: { added: true } }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "liaison@example.test", departments: ["dept-rnd", "dept-qa"] },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toMatchObject({
+      departments: ["dept-rnd", "dept-qa"],
+      // The single field stays beside the list for a screen that only reads one.
+      department: "dept-rnd",
+      departmentFailed: false,
+    });
+    // One listing call covers every placement rather than one per department.
+    expect(calls.filter((call) => call.path === "/admin/groups")).toHaveLength(1);
+  });
+
+  it("keeps the departments that exist and reports the one that does not", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 62 } }, 201),
+      "/admin/groups": () =>
+        jsonResponse({ data: [{ id: 7, code: "dept-rnd", name: "Research" }] }),
+      "/admin/groups/7/members": () => jsonResponse({ data: { added: true } }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "liaison@example.test", departments: ["dept-rnd", "dept-nowhere"] },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toMatchObject({
+      departments: ["dept-rnd"],
+      departmentFailed: true,
+    });
+  });
+
+  it("refuses to place an invitation into a group that is not a department", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 63 } }, 201),
+      "/admin/groups": () => jsonResponse({ data: [{ id: 9, code: "on-call", name: "On call" }] }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "liaison@example.test", departments: ["on-call"] },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toMatchObject({ departments: [], departmentFailed: true });
+    expect(calls.some((call) => call.path.endsWith("/members"))).toBe(false);
+  });
+
+  it("still reads the older single-value field on its own", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    stubIdentityServer({
+      "/admin/users": () => jsonResponse({ data: { id: 64 } }, 201),
+      "/admin/groups": () =>
+        jsonResponse({ data: [{ id: 7, code: "dept-rnd", name: "Research" }] }),
+      "/admin/groups/7/members": () => jsonResponse({ data: { added: true } }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+      body: { email: "liaison@example.test", department: "dept-rnd" },
+    });
+
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toMatchObject({
+      departments: ["dept-rnd"],
+      department: "dept-rnd",
+    });
+  });
+});
+
 describe("signup approvals", () => {
   it("maps the waiting accounts onto the shape the screen reads", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });

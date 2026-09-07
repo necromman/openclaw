@@ -21,13 +21,21 @@ import { sharingPolicyClient } from "./session-sharing.test-utils.js";
 
 afterEach(() => closeOpenClawAgentDatabasesForTest());
 
-/** The four roles the ix-auth role map produces, orthogonal to department membership. */
+/**
+ * The roles the ix-auth role map produces, orthogonal to department membership.
+ *
+ * `executive` is deliberately outside the matrix below. Its whole point is that it holds
+ * every department at once, which is membership rather than a new kind of boundary, so
+ * running it through a one-department matrix would prove nothing about it. Its own
+ * describe block near the end of this file covers it.
+ */
 const ROLES = ["superadmin", "admin", "moderator", "member"] as const;
-type Role = (typeof ROLES)[number];
+type Role = (typeof ROLES)[number] | "executive";
 
 const SESSION_CAP_BY_ROLE: Record<Role, "write" | "suggest" | "view"> = {
   superadmin: "write",
   admin: "write",
+  executive: "view",
   moderator: "suggest",
   member: "view",
 };
@@ -39,7 +47,7 @@ function departmentConfig(): OpenClawConfig {
       roles: {
         default: "member",
         definitions: Object.fromEntries(
-          ROLES.map((role) => [
+          [...ROLES, "executive" as const].map((role) => [
             role,
             {
               sessions: { others: SESSION_CAP_BY_ROLE[role] },
@@ -386,6 +394,72 @@ describe("callers without a Gateway client", () => {
           },
         }),
       ).toBe(true);
+    });
+  });
+});
+
+describe("an executive reaches every department through membership", () => {
+  it("opens each department it belongs to and still reads other people at the role cap", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      bindAgents();
+      const cfg = departmentConfig();
+      // The reach is granted in the identity server by putting the person in every
+      // dept- group, not by a special case in the boundary code. From here it is an
+      // ordinary multi-department session.
+      const executive = departmentClient({
+        role: "executive",
+        departments: ["rnd", "qa"],
+        label: "exec",
+      });
+      const gate = prepareDepartmentGate({ cfg, client: executive });
+      // Not a super administrator: the fence is still built, it simply lets both through.
+      expect(gate).toBeDefined();
+      expect(gate?.agentAccess("rnd-bot")).toBe("open");
+      expect(gate?.agentAccess("qa-bot")).toBe("open");
+      expect(gate?.agentAccess("main")).toBe("open");
+      expect(gate?.allowsAgent("rnd-bot")).toBe(true);
+      expect(gate?.allowsAgent("qa-bot")).toBe(true);
+      expect(authorizeDepartmentAgent({ cfg, client: executive, agentId: "qa-bot" })).toBeUndefined();
+      expect(departmentCacheKeyPart({ cfg, client: executive })).toBe("dept:qa,rnd");
+
+      // Reading is the whole grant. The role cap keeps another person's session read-only
+      // in both departments, so widening the reach never widened the write surface.
+      const stranger = ensureProfileForEmail("exec-stranger@department.test");
+      for (const agentId of ["rnd-bot", "qa-bot"]) {
+        const target = sessionTarget({ agentId, creatorProfileId: stranger.id });
+        expect(resolveSessionSharingRole({ cfg, client: executive, target })).toBe("viewer");
+        expect(
+          authorizeSessionSharingTarget({ cfg, client: executive, target })?.details,
+        ).toMatchObject({ code: "SESSION_PARTICIPATION_REQUIRED" });
+      }
+      // Their own session is theirs to work in, exactly like any other role.
+      const ownProfileId = executive.authenticatedUserProfile?.profileId ?? "";
+      expect(
+        resolveSessionSharingRole({
+          cfg,
+          client: executive,
+          target: sessionTarget({ agentId: "rnd-bot", creatorProfileId: ownProfileId }),
+        }),
+      ).toBe("owner");
+    });
+  });
+
+  it("sees only the departments it was actually put into", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      bindAgents();
+      const cfg = departmentConfig();
+      // An executive whose group membership was never completed is not a back door.
+      const partial = departmentClient({
+        role: "executive",
+        departments: ["rnd"],
+        label: "exec-partial",
+      });
+      const gate = prepareDepartmentGate({ cfg, client: partial });
+      expect(gate?.agentAccess("rnd-bot")).toBe("open");
+      expect(gate?.agentAccess("qa-bot")).toBe("denied");
+      expect(authorizeDepartmentAgent({ cfg, client: partial, agentId: "qa-bot" })?.code).toBe(
+        "FORBIDDEN",
+      );
     });
   });
 });
