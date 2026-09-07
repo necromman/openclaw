@@ -1278,6 +1278,7 @@ export const ToolsInvokeParamsSchema = closedObject({
 /** Tool profile shown in catalog views. */
 export const ToolCatalogProfileSchema = closedObject({
   id: Type.Union([
+    Type.Literal("readonly"),
     Type.Literal("minimal"),
     Type.Literal("coding"),
     Type.Literal("messaging"),
@@ -1300,6 +1301,7 @@ export const ToolCatalogEntrySchema = closedObject({
   tags: Type.Optional(Type.Array(NonEmptyString)),
   defaultProfiles: Type.Array(
     Type.Union([
+      Type.Literal("readonly"),
       Type.Literal("minimal"),
       Type.Literal("coding"),
       Type.Literal("messaging"),

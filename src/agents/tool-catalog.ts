@@ -26,7 +26,7 @@ import {
 import { AUTOMATIONS_TOOL_NAME } from "./tools/automations-tool-name.js";
 
 /** Built-in tool profile ids exposed in config and UI. */
-export type ToolProfileId = "minimal" | "coding" | "messaging" | "full";
+export type ToolProfileId = "readonly" | "minimal" | "coding" | "messaging" | "full";
 
 /** Allow/deny policy generated from a built-in tool profile. */
 type ToolProfilePolicy = {
@@ -71,7 +71,7 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     id: "read",
     description: "Read file contents",
     sectionId: "fs",
-    profiles: ["coding"],
+    profiles: ["readonly", "coding"],
   },
   {
     id: "write",
@@ -121,14 +121,14 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     id: "web_search",
     description: "Search the web",
     sectionId: "web",
-    profiles: ["coding"],
+    profiles: ["readonly", "coding"],
     includeInOpenClawGroup: true,
   },
   {
     id: "web_fetch",
     description: "Fetch web content",
     sectionId: "web",
-    profiles: ["coding"],
+    profiles: ["readonly", "coding"],
     includeInOpenClawGroup: true,
   },
   {
@@ -142,14 +142,14 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     id: "memory_search",
     description: "Semantic search",
     sectionId: "memory",
-    profiles: ["coding"],
+    profiles: ["readonly", "coding"],
     includeInOpenClawGroup: true,
   },
   {
     id: "memory_get",
     description: "Read memory files",
     sectionId: "memory",
-    profiles: ["coding"],
+    profiles: ["readonly", "coding"],
     includeInOpenClawGroup: true,
   },
   {
@@ -254,7 +254,7 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     id: "session_status",
     description: SESSION_STATUS_TOOL_DISPLAY_SUMMARY,
     sectionId: "sessions",
-    profiles: ["minimal", "coding", "messaging"],
+    profiles: ["readonly", "minimal", "coding", "messaging"],
     includeInOpenClawGroup: true,
   },
   {
@@ -421,7 +421,7 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     id: "view_image",
     description: "Image understanding",
     sectionId: "media",
-    profiles: ["coding"],
+    profiles: ["readonly", "coding"],
     includeInOpenClawGroup: true,
   },
   {
@@ -472,6 +472,12 @@ function listCoreToolIdsForProfile(profile: ToolProfileId): string[] {
 }
 
 const CORE_TOOL_PROFILES: Record<ToolProfileId, ToolProfilePolicy> = {
+  // Strict allowlist: a tool reaches this profile only by naming "readonly" in its
+  // definition above, so every tool added later is excluded until someone opts it in.
+  // No "bundle-mcp" entry either: an MCP bundle can carry writing tools.
+  readonly: {
+    allow: listCoreToolIdsForProfile("readonly"),
+  },
   minimal: {
     allow: listCoreToolIdsForProfile("minimal"),
   },
@@ -508,6 +514,7 @@ export const CORE_TOOL_GROUPS = buildCoreToolGroupMap();
 
 /** Profile options shown in model/tool configuration UIs. */
 export const PROFILE_OPTIONS = [
+  { id: "readonly", label: "Read-only" },
   { id: "minimal", label: "Minimal" },
   { id: "coding", label: "Coding" },
   { id: "messaging", label: "Messaging" },

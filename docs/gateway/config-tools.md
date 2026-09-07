@@ -22,12 +22,20 @@ Local onboarding defaults new local configs to `tools.profile: "coding"` when un
 
 | Profile     | Includes                                                                                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readonly`  | `read`, `web_search`, `web_fetch`, `memory_search`, `memory_get`, `view_image`, `session_status`                                                                                                                                                        |
 | `minimal`   | `session_status` only                                                                                                                                                                                                                                   |
 | `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`, `get_goal`, `create_goal`, `update_goal`, `progress_card`, `ask_user`, `skill_workshop`, `image`, `image_generate`, `music_generate`, `video_generate`              |
 | `messaging` | `group:messaging`, `sessions`, `sessions_list`, `sessions_history`, `sessions_search`, `conversations_list`, `conversations_send`, `conversations_turn`, `sessions_send`, `sessions_spawn`, `sessions_yield`, `subagents`, `session_status`, `ask_user` |
 | `full`      | No restriction (same as unset)                                                                                                                                                                                                                          |
 
 `coding` and `messaging` also implicitly allow `bundle-mcp` (configured MCP servers).
+
+`readonly` is a strict allowlist for read-only surfaces such as a document-lookup agent
+over a shared folder. Its members are named one by one in the tool catalog, so a tool
+added to OpenClaw later is excluded until someone opts it in, and `bundle-mcp` is left
+out because an MCP bundle can carry writing tools. Pair it with `tools.fs.workspaceOnly:
+true` and an exec policy that denies the shell; on its own, a profile only shapes the
+tool list offered to the model.
 
 ### Tool groups
 

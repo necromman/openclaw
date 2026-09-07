@@ -156,7 +156,7 @@ export type MediaToolsConfig = {
   video?: MediaUnderstandingCapabilityConfig;
 };
 
-export type ToolProfileId = "minimal" | "coding" | "messaging" | "full";
+export type ToolProfileId = "readonly" | "minimal" | "coding" | "messaging" | "full";
 
 export type ToolLoopDetectionConfig = {
   /** Enable tool-loop protection (default: false). */

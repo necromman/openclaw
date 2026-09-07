@@ -115,6 +115,52 @@ describe("tool-catalog", () => {
     expect(requirePolicyAllow("minimal")).toEqual(["session_status"]);
   });
 
+  it("keeps the readonly profile to lookup tools and excludes bundle MCP", () => {
+    expect(requirePolicyAllow("readonly")).toEqual([
+      "read",
+      "web_search",
+      "web_fetch",
+      "memory_search",
+      "memory_get",
+      "session_status",
+      "view_image",
+    ]);
+  });
+
+  it("omits every mutating tool from the readonly profile", () => {
+    const allow = new Set(requirePolicyAllow("readonly"));
+    for (const denied of [
+      "write",
+      "edit",
+      "apply_patch",
+      "exec",
+      "process",
+      "code_execution",
+      "secrets",
+      "terminal",
+      "browser",
+      "computer",
+      "message",
+      "automations",
+      "gateway",
+      "sessions_send",
+      "sessions_spawn",
+      "image_generate",
+      "bundle-mcp",
+    ]) {
+      expect(allow.has(denied), `readonly must not allow ${denied}`).toBe(false);
+    }
+  });
+
+  it("keeps the readonly profile an opt-in allowlist so later tools stay out", () => {
+    // Guards the profile against silent growth: a tool joins only by naming
+    // "readonly" in its catalog entry, so a new catalog row is excluded by default.
+    const allow = new Set(requirePolicyAllow("readonly"));
+    const codingOnly = requirePolicyAllow("coding").filter((id) => !allow.has(id));
+    expect(codingOnly.length).toBeGreaterThan(0);
+    expect(allow.size).toBeLessThan(requirePolicyAllow("coding").length);
+  });
+
   it("full profile uses wildcard to grant all tools (#76507)", () => {
     const policy = requireCoreToolProfilePolicy("full");
     expect(policy.allow).toEqual(["*"]);

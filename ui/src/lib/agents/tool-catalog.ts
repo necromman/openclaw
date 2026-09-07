@@ -97,6 +97,7 @@ function fallbackToolDescriptionId(toolId: string): string {
 // Canonical UI tool-profile list; Security and Agents surfaces share it so
 // labels stay translated and consistent.
 export const PROFILE_OPTIONS = [
+  { id: "readonly", labelKey: "agents.toolCatalog.profiles.readonly" },
   { id: "minimal", labelKey: "agents.toolCatalog.profiles.minimal" },
   { id: "coding", labelKey: "agents.toolCatalog.profiles.coding" },
   { id: "messaging", labelKey: "agents.toolCatalog.profiles.messaging" },
