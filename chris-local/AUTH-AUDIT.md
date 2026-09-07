@@ -52,6 +52,8 @@
 
 기록 지점 넷은 F 단계가 남긴 훅(`recordIxAuthAdminAction`) 하나와, 사람 신원이 살아 있는 경계 셋이다.
 
+`sessions.send`·`sessions.steer` 는 별도 경로처럼 보이지만 같은 `chat.send` 핸들러로 들어간다(`sessions-messaging.ts:188`). 텔레그램 같은 채널 수신도 같은 핸들러를 지나며, 그때 클라이언트에 실린 발신자 정보로 `actor_source=channel` 행이 된다.
+
 ### 3.1 사람은 어디서 오나
 
 - **HTTP**: 검증된 principal 이 그 자리에 있다.
