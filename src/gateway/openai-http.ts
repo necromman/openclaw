@@ -972,6 +972,11 @@ export async function handleOpenAiHttpRequest(
     ...(handled.requestAuth.operatorRoleActor
       ? { actor: handled.requestAuth.operatorRoleActor }
       : { profileId: handled.requestAuth.authenticatedUserProfile?.profileId }),
+    // This surface never builds a Gateway client, so the department boundary has to
+    // travel with the request auth or it would be the one way around the fence.
+    ...(handled.requestAuth.ixAuthDepartments
+      ? { departments: handled.requestAuth.ixAuthDepartments }
+      : {}),
     agentId,
   });
   if (creationAuth) {

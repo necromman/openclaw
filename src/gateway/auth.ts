@@ -47,6 +47,13 @@ export type GatewayAuthResult = {
   user?: string;
   /** Full verified Tailscale identity; present only after header + WhoIs agreement. */
   tailscaleIdentity?: VerifiedTailscaleIdentity;
+  /**
+   * Department facts from the verified IX-Auth token on this request.
+   *
+   * Carried here rather than re-derived downstream so every HTTP surface authorizes
+   * from the same verified principal the WebSocket handshake uses.
+   */
+  ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
   reason?: string;
   /** Present when the request was blocked by the rate limiter. */
   rateLimited?: boolean;
@@ -542,7 +549,15 @@ async function authorizeGatewayConnectCore(
       if (originResult) {
         return originResult;
       }
-      return { ok: true, method: "ix-auth", user: resolved.principal.claims.email };
+      return {
+        ok: true,
+        method: "ix-auth",
+        user: resolved.principal.claims.email,
+        ixAuthDepartments: {
+          departments: resolved.principal.departments,
+          isSuperAdmin: resolved.principal.isSuperAdmin,
+        },
+      };
     }
     // Loopback password stays available so local recovery and CLI bootstrap keep working
     // when the identity server is down. It is not reachable from a browser off-host.

@@ -503,6 +503,11 @@ export async function handleOpenResponsesHttpRequest(
     ...(handled.requestAuth.operatorRoleActor
       ? { actor: handled.requestAuth.operatorRoleActor }
       : { profileId: handled.requestAuth.authenticatedUserProfile?.profileId }),
+    // Same reason as the chat-completions surface: no Gateway client exists here, so the
+    // verified departments have to be carried in explicitly.
+    ...(handled.requestAuth.ixAuthDepartments
+      ? { departments: handled.requestAuth.ixAuthDepartments }
+      : {}),
     agentId,
   });
   if (creationAuth) {

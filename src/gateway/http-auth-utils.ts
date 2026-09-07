@@ -85,6 +85,8 @@ export type AuthorizedGatewayHttpRequest = {
   authenticatedUserProfile?: GatewayClient["authenticatedUserProfile"];
   operatorRolePolicy?: GatewayOperatorRoleDefinition;
   operatorRoleActor?: { kind: "system" };
+  /** Verified IX-Auth department facts; absent outside ix-auth mode. */
+  ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
   controlUiPluginGrants?: ControlUiPluginTabAuthGrant[];
   controlUiPluginGrant?: ControlUiPluginTabAuthGrant;
 };
@@ -573,6 +575,7 @@ async function checkGatewayHttpRequestAuthWith(
       ...(usesSharedSecretGatewayMethod(authResult.method)
         ? { operatorRoleActor: { kind: "system" as const } }
         : {}),
+      ...(authResult.ixAuthDepartments ? { ixAuthDepartments: authResult.ixAuthDepartments } : {}),
       ...authenticatedProfile,
     },
   };

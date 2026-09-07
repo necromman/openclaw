@@ -20,6 +20,7 @@ import {
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import type { ResolvedGatewayAuth } from "./auth.js";
 import { DEFAULT_CHAT_HISTORY_TEXT_MAX_CHARS } from "./chat-display-projection.js";
+import { isDepartmentVisibleSession } from "./department-access.js";
 import {
   sendInvalidRequest,
   sendJson,
@@ -128,6 +129,11 @@ function resolveSessionHistoryHttpClient(
       scopes,
     },
     authenticatedUserProfile: requestAuth.authenticatedUserProfile,
+    // Without this the transcript route would authorize as a department-less caller and
+    // hand a foreign department's history to anyone holding the session key.
+    ...(requestAuth.ixAuthDepartments
+      ? { internal: { ixAuthDepartments: requestAuth.ixAuthDepartments } }
+      : {}),
   };
 }
 
@@ -196,6 +202,12 @@ export async function handleSessionHistoryHttpRequest(
   const historyClient = resolveSessionHistoryHttpClient(requestAuth, operatorScopes);
   if (
     !entry?.sessionId ||
+    !isDepartmentVisibleSession({
+      cfg,
+      client: historyClient,
+      agentId: target.agentId,
+      createdActor: entry.createdActor,
+    }) ||
     createSessionListEntryFilter({ cfg, client: historyClient })?.(target.canonicalKey, entry) ===
       false
   ) {
@@ -433,6 +445,12 @@ export async function handleSessionHistoryHttpRequest(
     });
     return (
       currentTarget !== null &&
+      isDepartmentVisibleSession({
+        cfg: cfgLocal,
+        client: currentClient,
+        agentId: currentTarget.agentId,
+        createdActor: currentTarget.entry.createdActor,
+      }) &&
       createSessionListEntryFilter({ cfg: cfgLocal, client: currentClient })?.(
         currentTarget.canonicalKey,
         currentTarget.entry,
