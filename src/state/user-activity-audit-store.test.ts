@@ -156,6 +156,28 @@ describe("user activity audit store", () => {
     });
   });
 
+  it("offers a cursor while rows remain and withholds it at the end", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      appendLogin({ at: 1, email: "a@example.com" });
+      appendLogin({ at: 2, email: "b@example.com" });
+      appendLogin({ at: 3, email: "c@example.com" });
+      const seen: string[] = [];
+      let cursor: number | undefined;
+      for (let page = 0; page < 3; page += 1) {
+        const result = listUserActivityAuditEvents({
+          limit: 1,
+          ...(cursor !== undefined ? { cursor } : {}),
+        });
+        seen.push(...result.entries.map((entry) => entry.email ?? ""));
+        // Reaching the last row is the only thing that ends the walk; a page is never
+        // allowed to stop short without saying more may remain.
+        expect(result.nextCursor === undefined).toBe(page === 2);
+        cursor = result.nextCursor;
+      }
+      expect(seen).toEqual(["c@example.com", "b@example.com", "a@example.com"]);
+    });
+  });
+
   it("deletes rows past the retention window", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const now = 100 * DAY_MS;

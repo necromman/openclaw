@@ -288,13 +288,12 @@ export function listUserActivityAuditEvents(
       break;
     }
   }
+  // Reaching the end of the table is the only proof that nothing remains. A short page
+  // is not: a department scan that stopped at the row ceiling has more to find, and
+  // withholding the cursor there would truncate the listing without saying so.
   return {
     entries,
-    // A cursor is offered only while rows may remain: a page that read the table to its
-    // end must not invite a request that can only come back empty.
-    ...(exhausted || cursor === undefined || entries.length < params.limit
-      ? {}
-      : { nextCursor: cursor }),
+    ...(exhausted || cursor === undefined ? {} : { nextCursor: cursor }),
   };
 }
 
