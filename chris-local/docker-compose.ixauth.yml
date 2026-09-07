@@ -147,6 +147,11 @@ services:
       # directories and the mounts are only there to be looked at. One variable decides
       # both, so a bind mount can never disagree with the workspace it is meant to be.
       OPENCLAW_NAS_ROOT: ${OPENCLAW_NAS_ROOT:-}
+      # Parent directory of the Markdown sidecar indexes on the host, empty by default.
+      # When it is set, start-gateway.sh points each department agent's
+      # memory.search.extraPaths at its index below. The indexes are host local on
+      # purpose: the share is mounted read only and stays that way.
+      OPENCLAW_KNOWLEDGE_ROOT: ${OPENCLAW_KNOWLEDGE_ROOT:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       # Declarative config: the tracked template is copied over the state copy on every
@@ -169,6 +174,13 @@ services:
       # is an open door.
       - ${OPENCLAW_NAS_ROOT:-./nas-sample}/rnd:/mnt/nas/rnd:ro
       - ${OPENCLAW_NAS_ROOT:-./nas-sample}/qa:/mnt/nas/qa:ro
+      # Markdown sidecar indexes, writable. "openclaw knowledge sync" reads a share above
+      # and writes its sidecars here; the agent searches here, never the share. The two
+      # directions are what keep the share read only while its pdf, docx, xlsx and pptx
+      # files still answer queries. One index per department, mounted separately, so the
+      # department boundary that the share mounts draw is drawn again on the index.
+      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/rnd:/mnt/knowledge/rnd
+      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/qa:/mnt/knowledge/qa
     ports:
       # The Gateway is the only service the browser ever reaches.
       - "${OPENCLAW_GATEWAY_PORT:-18800}:18789"

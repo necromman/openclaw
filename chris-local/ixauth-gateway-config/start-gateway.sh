@@ -3,11 +3,12 @@
 #
 # The template is the single source of truth for this deployment: it is copied over the
 # state copy on every start, so an edit here always takes effect on the next restart.
-# Five placeholders are substituted: the browser origin, the signup switch, the two
-# department agent workspaces, and the bootstrap switch those workspaces require. They
-# are the values that cannot be known when the file is written and are not secrets
-# (secrets ride in as env SecretRefs such as "${IXAUTH_SERVICE_KEY}", which the Gateway
-# resolves itself). The template itself stays valid JSON so it can be read and checked.
+# Seven placeholders are substituted: the browser origin, the signup switch, the two
+# department agent workspaces, the bootstrap switch those workspaces require, and the two
+# knowledge index folders those agents search. They are the values that cannot be known
+# when the file is written and are not secrets (secrets ride in as env SecretRefs such as
+# "${IXAUTH_SERVICE_KEY}", which the Gateway resolves itself). The template itself stays
+# valid JSON so it can be read and checked.
 set -eu
 
 origin="${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}"
@@ -51,12 +52,28 @@ else
   skip_bootstrap="false"
 fi
 
+# Knowledge index folders. A department share holds pdf, docx, xlsx and pptx files, and
+# the memory indexer collects only Markdown, so a share is searchable only through the
+# Markdown sidecars "openclaw knowledge sync" writes beside it. The sidecars live on host
+# local disk, never on the share, and the agent reaches them through extraPaths. Unset
+# means "no index here": the agents get an empty list and search only their own memory,
+# which is exactly what they did before this switch existed. See chris-local/KNOWLEDGE.md.
+if [ -n "${OPENCLAW_KNOWLEDGE_ROOT:-}" ]; then
+  rnd_knowledge='["/mnt/knowledge/rnd"]'
+  qa_knowledge='["/mnt/knowledge/qa"]'
+else
+  rnd_knowledge='[]'
+  qa_knowledge='[]'
+fi
+
 mkdir -p /home/node/.openclaw
 sed -e "s|__OPENCLAW_PUBLIC_ORIGIN__|${origin}|g" \
     -e "s|\"__OPENCLAW_SELF_SIGNUP__\"|${self_signup}|g" \
     -e "s|__OPENCLAW_RND_WORKSPACE__|${rnd_workspace}|g" \
     -e "s|__OPENCLAW_QA_WORKSPACE__|${qa_workspace}|g" \
-    -e "s|\"__OPENCLAW_NAS_SKIP_BOOTSTRAP__\"|${skip_bootstrap}|g" /config/openclaw.json \
+    -e "s|\"__OPENCLAW_NAS_SKIP_BOOTSTRAP__\"|${skip_bootstrap}|g" \
+    -e "s|\"__OPENCLAW_RND_KNOWLEDGE_PATHS__\"|${rnd_knowledge}|g" \
+    -e "s|\"__OPENCLAW_QA_KNOWLEDGE_PATHS__\"|${qa_knowledge}|g" /config/openclaw.json \
   > /home/node/.openclaw/openclaw.json
 
 exec node dist/index.js gateway --bind lan --port 18789

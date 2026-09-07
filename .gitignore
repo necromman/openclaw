@@ -251,3 +251,7 @@ chris-local/ixauth.env
 
 # Local-only infra notes copied from chris-server (contain plaintext credentials; never commit).
 chris-local/infra/local/
+
+# Generated Markdown sidecars for the sample knowledge index (chris-local/KNOWLEDGE.md).
+# The two department folders and their README stay tracked; their contents do not.
+chris-local/knowledge-index/*/*

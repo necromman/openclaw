@@ -116,6 +116,11 @@
         "description": "Department agent for R&D",
         "workspace": "__OPENCLAW_RND_WORKSPACE__",
         "skipBootstrap": "__OPENCLAW_NAS_SKIP_BOOTSTRAP__",
+        "memory": {
+          "search": {
+            "extraPaths": "__OPENCLAW_RND_KNOWLEDGE_PATHS__"
+          }
+        },
         "tools": {
           "profile": "readonly",
           "permissionMode": "read-only"
@@ -126,6 +131,11 @@
         "description": "Department agent for QA",
         "workspace": "__OPENCLAW_QA_WORKSPACE__",
         "skipBootstrap": "__OPENCLAW_NAS_SKIP_BOOTSTRAP__",
+        "memory": {
+          "search": {
+            "extraPaths": "__OPENCLAW_QA_KNOWLEDGE_PATHS__"
+          }
+        },
         "tools": {
           "profile": "readonly",
           "permissionMode": "read-only"
