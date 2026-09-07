@@ -345,7 +345,10 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
     if [ -n "$OPENCLAW_INSTALL_BROWSER" ]; then \
       apt-get update && \
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb && \
-      mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" && \
+      # `mkdir -p` here would create /home/node/.cache as root and the chown below
+      # only reaches the leaf, so the runtime cannot fall back to a cache directory
+      # under HOME and the gateway exits with "Unable to create fallback temp dir".
+      install -d -m 0755 -o node -g node /home/node/.cache "$PLAYWRIGHT_BROWSERS_PATH" && \
       node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
       chown -R node:node "$PLAYWRIGHT_BROWSERS_PATH"; \
     fi

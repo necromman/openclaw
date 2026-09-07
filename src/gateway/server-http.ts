@@ -56,12 +56,7 @@ import {
   type GatewayIngressTransport,
   type GatewayUnattributableProxyReporter,
 } from "./ingress-attribution.js";
-import {
-  claimsIxAuthAdminProxyRequest,
-  claimsIxAuthHttpRequest,
-  runIxAuthAdminProxyStage,
-  runIxAuthHttpStage,
-} from "./ix-auth-http-stage.js";
+import { planIxAuthHttpStages } from "./ix-auth-http-stage.js";
 import { normalizePluginNodeCapabilityScopedUrl } from "./plugin-node-capability.js";
 import {
   getCachedPluginGatewayAuthBypassPaths,
@@ -462,45 +457,23 @@ export function createGatewayHttpServer(opts: {
         }),
       );
 
-      // The Gateway's own /auth/* routes run before login exists, so they register as a
-      // plain request stage rather than an admitted one, and ahead of handleHooksRequest
-      // so a configured hook base path cannot swallow the auth namespace.
-      addRequestStage(
-        claimsIxAuthHttpRequest({ authMode: resolvedAuthValue.mode, pathname: scopedRequestPath }),
-        () =>
-          runIxAuthHttpStage({
-            req,
-            res,
-            pathname: scopedRequestPath,
-            config: configSnapshot,
-            trustedProxies,
-            clientIp: ingressAttribution.rateLimit.subject.key,
-            rateLimiter: joinRateLimiter,
-            respondNotFound,
-          }),
-      );
-
-      // The identity server's admin console. It registers as a plain stage for the same
-      // reason: the console gate is the Gateway session cookie, not the Control UI's
-      // WebSocket admission, and the route must not fall through to a hook or plugin.
-      addRequestStage(
-        claimsIxAuthAdminProxyRequest({
-          authMode: resolvedAuthValue.mode,
-          pathname: scopedRequestPath,
-        }),
-        async () => {
-          await runIxAuthAdminProxyStage({
-            req,
-            res,
-            pathname: scopedRequestPath,
-            config: configSnapshot,
-            trustedProxies,
-            clientIp: ingressAttribution.rateLimit.subject.key,
-            respondNotFound,
-          });
-          return true;
-        },
-      );
+      // The Gateway's own /auth/* routes and the identity server's admin console run
+      // before the Control UI is admitted, so they register as plain request stages, and
+      // ahead of handleHooksRequest so a configured hook base path cannot swallow either
+      // namespace. The planner returns only the stages whose namespace claims this path.
+      for (const stage of planIxAuthHttpStages({
+        authMode: resolvedAuthValue.mode,
+        req,
+        res,
+        pathname: scopedRequestPath,
+        config: configSnapshot,
+        trustedProxies,
+        clientIp: ingressAttribution.rateLimit.subject.key,
+        rateLimiter: joinRateLimiter,
+        respondNotFound,
+      })) {
+        addRequestStage(true, stage);
+      }
 
       const devicePairingJoinShortcode = parseDevicePairingJoinRequestPath(scopedRequestPath);
       if (devicePairingJoinShortcode !== null) {

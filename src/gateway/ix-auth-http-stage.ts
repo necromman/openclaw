@@ -15,7 +15,7 @@ import { isLocalDirectRequest, isLoopbackAddress, isTrustedProxyAddress } from "
  * Checked before the stage runs so the modules below stay unloaded on every deployment
  * that does not use this mode.
  */
-export function claimsIxAuthHttpRequest(params: { authMode: string; pathname: string }): boolean {
+function claimsIxAuthHttpRequest(params: { authMode: string; pathname: string }): boolean {
   return params.authMode === "ix-auth" && classifyIxAuthHttpPath(params.pathname) !== "outside";
 }
 
@@ -25,7 +25,7 @@ export function claimsIxAuthHttpRequest(params: { authMode: string; pathname: st
  * Returns true whenever the request was handled, including the not-found case: a path
  * inside the authentication namespace must never fall through to a plugin or hook.
  */
-export async function runIxAuthHttpStage(params: {
+async function runIxAuthHttpStage(params: {
   req: IncomingMessage;
   res: ServerResponse;
   pathname: string;
@@ -75,7 +75,7 @@ export async function runIxAuthHttpStage(params: {
 }
 
 /** True when this request belongs to the identity server's admin console namespace. */
-export function claimsIxAuthAdminProxyRequest(params: {
+function claimsIxAuthAdminProxyRequest(params: {
   authMode: string;
   pathname: string;
 }): boolean {
@@ -89,7 +89,7 @@ export function claimsIxAuthAdminProxyRequest(params: {
  * principal it cannot construct itself, and so the CSRF digest travels with it: both
  * come from the same login-session row, and reading them apart would let one drift.
  */
-export async function runIxAuthAdminProxyStage(params: {
+async function runIxAuthAdminProxyStage(params: {
   req: IncomingMessage;
   res: ServerResponse;
   pathname: string;
@@ -140,4 +140,37 @@ export async function runIxAuthAdminProxyStage(params: {
       isLocalClient: isLocalDirectRequest(params.req, params.trustedProxies),
     },
   });
+}
+
+/**
+ * Pick the request stages this path belongs to, in order.
+ *
+ * Returning stages instead of exporting the two predicates keeps `server-http.ts` free of
+ * the namespace rules: it registers whatever comes back and never learns which paths this
+ * mode owns. An empty array is the normal case for every other request.
+ */
+export function planIxAuthHttpStages(params: {
+  authMode: string;
+  req: IncomingMessage;
+  res: ServerResponse;
+  pathname: string;
+  config: OpenClawConfig;
+  trustedProxies: string[];
+  clientIp?: string;
+  rateLimiter?: AuthRateLimiter;
+  respondNotFound: (res: ServerResponse) => void;
+}): Array<() => Promise<boolean>> {
+  const { authMode: _authMode, ...stageParams } = params;
+  if (claimsIxAuthHttpRequest({ authMode: params.authMode, pathname: params.pathname })) {
+    return [() => runIxAuthHttpStage(stageParams)];
+  }
+  if (claimsIxAuthAdminProxyRequest({ authMode: params.authMode, pathname: params.pathname })) {
+    return [
+      async () => {
+        await runIxAuthAdminProxyStage(stageParams);
+        return true;
+      },
+    ];
+  }
+  return [];
 }
