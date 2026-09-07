@@ -119,7 +119,7 @@ export async function callIxAuthEndpoint(params: {
   path: string;
   body?: Record<string, unknown>;
   meta: IxAuthRequestMeta;
-  method?: "GET" | "POST" | "DELETE";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   /** Bearer token for `/admin/*`. Omitted for service-key routes. */
   accessToken?: string;
 }): Promise<IxAuthEndpointSuccess | IxAuthRelayFailure> {

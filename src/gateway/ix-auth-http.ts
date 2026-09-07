@@ -473,6 +473,7 @@ const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> =
   ["admin-invites", new Set(["GET", "POST", "DELETE"])],
   ["admin-approvals", new Set(["GET", "POST"])],
   ["admin-departments", new Set(["GET"])],
+  ["admin-users", new Set(["GET", "POST", "PATCH", "PUT", "DELETE"])],
 ]);
 
 /**

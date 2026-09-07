@@ -64,7 +64,9 @@ export type IxAuthSecurityEvent = {
     | "ix-auth.invite.issued"
     | "ix-auth.invite.accepted"
     | "ix-auth.signup.decided"
-    | "ix-auth.admin.denied";
+    | "ix-auth.admin.denied"
+    // One administrator action against one account. `reason` names which action it was.
+    | "ix-auth.admin.action";
   outcome: "succeeded" | "failed" | "denied";
   clientIp?: string;
   profileId?: string;

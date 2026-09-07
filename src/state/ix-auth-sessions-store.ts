@@ -153,6 +153,46 @@ export function revokeIxAuthSessionsForProfile(
 }
 
 /**
+ * Revoke every live Gateway session belonging to one identity address.
+ *
+ * The user-management screen acts on identity-server accounts, which the Gateway knows
+ * only by email until that person has signed in at least once. Reporting the profile ids
+ * back lets the caller close their WebSocket connections too: revoking the row stops the
+ * next request, but an already admitted socket keeps its scopes until something closes
+ * it.
+ */
+export function revokeIxAuthSessionsForIdentityEmail(
+  params: { email: string; revokedAt: number; reason: string },
+  options: OpenClawStateDatabaseOptions = {},
+): string[] {
+  ensureIxAuthSessionsSchema(options);
+  return runOpenClawStateWriteTransaction(
+    ({ db }) => {
+      const kysely = ixAuthSessionsDb(db);
+      const live = executeSqliteQuerySync(
+        db,
+        kysely
+          .selectFrom("ix_auth_login_sessions")
+          .select(["profile_id"])
+          .where("identity_email", "=", params.email)
+          .where("revoked_at", "is", null),
+      );
+      executeSqliteQuerySync(
+        db,
+        kysely
+          .updateTable("ix_auth_login_sessions")
+          .set({ revoked_at: params.revokedAt, revoke_reason: params.reason })
+          .where("identity_email", "=", params.email)
+          .where("revoked_at", "is", null),
+      );
+      return [...new Set(live.rows.map((row) => row.profile_id))];
+    },
+    options,
+    { operationLabel: "ix-auth.sessions.revoke-email" },
+  );
+}
+
+/**
  * Delete rows whose absolute lifetime ended well in the past.
  *
  * Revoked rows are kept for the same window so an operator can still correlate a

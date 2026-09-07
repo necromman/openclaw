@@ -21,6 +21,7 @@ export type IxAuthHttpRoute =
   | "admin-invites"
   | "admin-approvals"
   | "admin-departments"
+  | "admin-users"
   | "outside"
   | "unknown";
 
@@ -38,7 +39,69 @@ const IX_AUTH_ADMIN_ACCOUNT_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAut
   "admin-invites",
   "admin-approvals",
   "admin-departments",
+  "admin-users",
 ]);
+
+/** Path prefix owning every user-management route. */
+const IX_AUTH_ADMIN_USERS_PATH = "/auth/admin/users";
+
+/** What one `/auth/admin/users*` path names, once its shape is known. */
+export type IxAuthAdminUsersTarget =
+  | { kind: "collection" }
+  | { kind: "bulk" }
+  | { kind: "user"; userId: string }
+  | { kind: "action"; userId: string; action: IxAuthAdminUserAction };
+
+/** Per-account operations, each its own path segment. */
+export type IxAuthAdminUserAction =
+  | "roles"
+  | "departments"
+  | "password-reset"
+  | "invite"
+  | "unlock"
+  | "mfa-reset"
+  | "sessions";
+
+const IX_AUTH_ADMIN_USER_ACTIONS: ReadonlySet<string> = new Set([
+  "roles",
+  "departments",
+  "password-reset",
+  "invite",
+  "unlock",
+  "mfa-reset",
+  "sessions",
+]);
+
+/**
+ * Classify one user-management path.
+ *
+ * Returns undefined for a path inside the namespace that names nothing, so the caller
+ * answers 404 rather than forwarding an attacker-chosen segment to the identity server.
+ * The account id stays opaque here: it is percent-decoded and re-encoded by the relay,
+ * and the identity server is the only thing that decides whether it names a row.
+ */
+export function parseIxAuthAdminUsersPath(pathname: string): IxAuthAdminUsersTarget | undefined {
+  if (pathname === IX_AUTH_ADMIN_USERS_PATH) {
+    return { kind: "collection" };
+  }
+  if (!pathname.startsWith(`${IX_AUTH_ADMIN_USERS_PATH}/`)) {
+    return undefined;
+  }
+  const segments = pathname.slice(IX_AUTH_ADMIN_USERS_PATH.length + 1).split("/");
+  const first = segments[0] ? decodeURIComponent(segments[0]) : "";
+  if (first.length === 0 || first.includes("..") || first.includes("/")) {
+    return undefined;
+  }
+  if (segments.length === 1) {
+    return first === "bulk" ? { kind: "bulk" } : { kind: "user", userId: first };
+  }
+  const action = segments.length === 2 ? segments[1] : undefined;
+  if (action === undefined || !IX_AUTH_ADMIN_USER_ACTIONS.has(action)) {
+    return undefined;
+  }
+  // SAFETY: the membership test directly above proves the cast.
+  return { kind: "action", userId: first, action: action as IxAuthAdminUserAction };
+}
 
 /** True for the anonymous account-lifecycle routes, which the IP limiter governs. */
 export function isIxAuthPublicAccountRoute(route: IxAuthHttpRoute): boolean {
@@ -93,7 +156,12 @@ export function classifyIxAuthHttpPath(pathname: string): IxAuthHttpRoute {
     case "/auth/admin/departments":
       return "admin-departments";
     default:
-      return "unknown";
+      // The only sub-tree in this namespace: user management addresses one account per
+      // path, so it cannot be an exact match like every route above it.
+      return pathname === IX_AUTH_ADMIN_USERS_PATH ||
+        pathname.startsWith(`${IX_AUTH_ADMIN_USERS_PATH}/`)
+        ? "admin-users"
+        : "unknown";
   }
 }
 
