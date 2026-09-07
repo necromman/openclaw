@@ -101,21 +101,30 @@ type CapturedResponse = {
   res: ServerResponse;
   status: () => number;
   body: () => string;
+  headers: ReadonlyMap<string, string | string[]>;
 };
 
 function buildResponse(): CapturedResponse {
   let body = "";
+  // Cookie clearing reads back what it already wrote, so this stub has to remember
+  // headers rather than swallow them.
+  const headers = new Map<string, string | string[]>();
   const res = {
     statusCode: 0,
-    setHeader() {},
+    getHeader(name: string) {
+      return headers.get(name.toLowerCase());
+    },
+    setHeader(name: string, value: string | string[]) {
+      headers.set(name.toLowerCase(), value);
+    },
     end(chunk?: string | Buffer) {
       if (chunk !== undefined) {
         body = typeof chunk === "string" ? chunk : chunk.toString("utf8");
       }
     },
-    // SAFETY: the logout handler touches only statusCode, setHeader, and end.
+    // SAFETY: the logout handler touches only statusCode, the header pair, and end.
   } as unknown as ServerResponse;
-  return { res, status: () => res.statusCode, body: () => body };
+  return { res, status: () => res.statusCode, body: () => body, headers };
 }
 
 function buildRequest(headers: Record<string, string>): IncomingMessage {
@@ -209,6 +218,8 @@ describe("logout", () => {
     expect(JSON.parse(answer.body())).toEqual({ authenticated: false });
     expect(disconnected).toEqual([PROFILE_ID]);
     expect(readRevokedAt()).toBeTruthy();
+    // The browser has to lose the cookie too, or the next probe would look signed in.
+    expect(String(answer.headers.get("set-cookie"))).toContain(SETTINGS.cookieName);
   });
 
   it("leaves the connections alone when the CSRF header does not match", async () => {
