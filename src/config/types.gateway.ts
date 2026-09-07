@@ -215,6 +215,15 @@ export type GatewayIxAuthConfig = {
   departmentGroupPrefix?: string;
   /** Absolute URL of the IX-Auth admin console, surfaced to admins in the Control UI. */
   adminConsoleUrl?: string;
+  /**
+   * Offer the self-service signup screen. Set this only where the identity server's own
+   * `account.signup-mode` is open and its mail transport actually delivers; with it off
+   * the Control UI states that an invitation is the way in, rather than showing a form
+   * the identity server would refuse.
+   *
+   * @default false
+   */
+  selfSignup?: boolean;
   /** Login session lifetime policy. */
   session?: {
     /** Idle expiry in minutes. @default 30 */

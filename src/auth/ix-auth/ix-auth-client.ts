@@ -96,19 +96,45 @@ function readRelayFailure(status: number, body: unknown): IxAuthRelayFailure {
   };
 }
 
-async function callIxAuthEndpoint(params: {
+/** One relayed call, with the response envelope already unwrapped. */
+export type IxAuthEndpointSuccess = {
+  ok: true;
+  status: number;
+  /** `data` when the identity server returned an object, otherwise empty. */
+  data: Record<string, unknown>;
+  /** `data` when the identity server returned a list, otherwise undefined. */
+  items?: unknown[];
+};
+
+/**
+ * Call one identity-server endpoint.
+ *
+ * Two authentication shapes exist and both are reachable here. `/auth/*` routes take the
+ * service key, which never leaves this process. `/admin/*` routes take the signed-in
+ * administrator's own access token, so the identity server's audit trail names the real
+ * actor rather than the Gateway.
+ */
+export async function callIxAuthEndpoint(params: {
   settings: IxAuthRuntimeSettings;
   path: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
   meta: IxAuthRequestMeta;
-}): Promise<{ ok: true; status: number; data: Record<string, unknown> } | IxAuthRelayFailure> {
+  method?: "GET" | "POST" | "DELETE";
+  /** Bearer token for `/admin/*`. Omitted for service-key routes. */
+  accessToken?: string;
+}): Promise<IxAuthEndpointSuccess | IxAuthRelayFailure> {
   const url = new URL(params.path, `${params.settings.baseUrl.replace(/\/+$/u, "")}/`);
+  const method = params.method ?? "POST";
+  const headers = buildIxAuthHeaders({ settings: params.settings, meta: params.meta });
+  if (params.accessToken) {
+    headers.authorization = `Bearer ${params.accessToken}`;
+  }
   let response: Response;
   try {
     response = await fetch(url, {
-      method: "POST",
-      headers: buildIxAuthHeaders({ settings: params.settings, meta: params.meta }),
-      body: JSON.stringify(params.body),
+      method,
+      headers,
+      body: method === "GET" ? undefined : JSON.stringify(params.body ?? {}),
       signal: AbortSignal.timeout(IX_AUTH_REQUEST_TIMEOUT_MS),
     });
   } catch {
@@ -149,6 +175,11 @@ async function callIxAuthEndpoint(params: {
   // yields undefined rather than a wrong value.
   // SAFETY: parsed came from JSON.parse of a response the server marked successful.
   const envelope = parsed as Record<string, unknown>;
+  if (Array.isArray(envelope.data)) {
+    // List endpoints answer with a bare array under `data`. Kept apart from the object
+    // shape so a caller cannot read array indices as if they were named fields.
+    return { ok: true, status: response.status, data: {}, items: envelope.data };
+  }
   const data =
     envelope.data !== null && typeof envelope.data === "object"
       // SAFETY: the preceding typeof guard proves data is a non-null object.

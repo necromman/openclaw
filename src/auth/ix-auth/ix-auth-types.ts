@@ -85,6 +85,8 @@ export type IxAuthRuntimeSettings = {
   departmentClaim: string;
   departmentGroupPrefix: string;
   adminConsoleUrl?: string;
+  /** True when the Control UI may offer a signup form rather than invitation-only entry. */
+  selfSignupEnabled: boolean;
   idleTimeoutMs: number;
   absoluteTimeoutMs: number;
 };

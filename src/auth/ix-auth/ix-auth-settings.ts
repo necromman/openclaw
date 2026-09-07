@@ -97,6 +97,9 @@ export async function resolveIxAuthRuntimeSettings(params: {
       normalizeOptionalString(ixAuth.departmentClaim) ?? IX_AUTH_DEFAULT_DEPARTMENT_CLAIM,
     departmentGroupPrefix: resolveIxAuthDepartmentPrefix(ixAuth.departmentGroupPrefix),
     adminConsoleUrl: normalizeOptionalString(ixAuth.adminConsoleUrl),
+    // Defaults closed: an installation that has not said its identity server accepts
+    // signups must not advertise a form that would be refused.
+    selfSignupEnabled: ixAuth.selfSignup === true,
     idleTimeoutMs:
       (ixAuth.session?.idleTimeoutMinutes ?? IX_AUTH_DEFAULT_IDLE_MINUTES) * 60_000,
     absoluteTimeoutMs:

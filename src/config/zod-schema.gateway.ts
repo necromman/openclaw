@@ -164,6 +164,7 @@ export const GatewayConfigSchema = z
             departmentClaim: z.string().min(1).optional(),
             departmentGroupPrefix: z.string().optional(),
             adminConsoleUrl: z.string().min(1).optional(),
+            selfSignup: z.boolean().optional(),
             session: z
               .strictObject({
                 idleTimeoutMinutes: z.number().int().min(1).optional(),
