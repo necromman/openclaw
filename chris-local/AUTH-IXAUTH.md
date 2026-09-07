@@ -320,3 +320,34 @@ docker compose --env-file chris-local/ixauth.env \
 | 발급자·대상 위조 | `ix-auth-claims.ts` iss/aud 대조 | `ix-auth-claims.test.ts` |
 | 로그 비밀 배제 | 감사 이벤트에 토큰·비밀번호를 싣지 않는다 | 코드 리뷰 |
 | 부서 누출 | **미구현** (6.1) | - |
+
+## 11. 라이브 검증 기록 (2026-09-07, WSL 로컬)
+
+검증 구성: PostgreSQL 16(사용자 권한 바이너리, 15432) + IX-Auth jar(19100) + 별도 게이트웨이 프로파일(`~/openclaw-ixauth`, 18791). 상시 인스턴스는 건드리지 않았다. Docker 는 WSL 에 없어 컨테이너 대신 프로세스로 띄웠다.
+
+| # | 시나리오 | 결과 |
+| --- | --- | --- |
+| 1 | 콘솔 API 로 사용자 2명 생성 (`admin@verify.local`=ADMIN, `member@verify.local`=MEMBER) | 통과. 기본 역할이 ADMIN/USER 뿐이라 MEMBER 역할을 먼저 만들었다 |
+| 2 | Windows Chrome 격리 프로필에서 로그인 | 통과. 계정 화면이 뜨고, 토큰·페어링 없이 `/chat/main` 진입, 채팅 1건 전송 확인 |
+| 3 | member 로 로그인 시 관리 메뉴 미노출 | 통과. `/auth/me` 응답에 `adminConsoleUrl` 자체가 없다 |
+| 4 | 로그아웃 | 통과. 세션 행 `revoke_reason=user-logout`, 쿠키 2개 만료, 로그인 화면 복귀 |
+| 5 | 잘못된 비밀번호 반복 | 통과. 5회에 IX-Auth 가 계정 잠금(`status=LOCKED`), 11회에 게이트웨이 IP 리미터 429. 잠긴 계정에 올바른 비밀번호를 넣으면 423 `account_locked` + `lockedUntilMs`, UI 는 "Too many attempts" 로 표시 |
+| 6 | 두 번째 브라우저(모바일 에뮬레이션)에서 admin 로그인 | 통과. 페어링 요구 없이 진입, 이쪽만 "Manage users" 노출 |
+| 7 | 감사 조회 | 통과. IX-Auth 원장에 `LOGIN_SUCCESS`/`LOGIN_FAILURE`/`ACCOUNT_LOCKED`, **실방문자 IP 와 실제 브라우저 User-Agent** 가 기록됐다(게이트웨이 것이 아니다). 게이트웨이 세션 표는 digest 32바이트만 저장하고 원본 세션 토큰은 없다 |
+
+스크린샷: `D:\PROJECT\chris-server\analysis\2026-09-07-openclaw-auth\ixauth-01..08-*.png`
+
+### 11.1 실측으로 잡은 결함 4건
+
+| # | 증상 | 원인 | 수정 |
+| --- | --- | --- | --- |
+| 1 | 로그인 화면 대신 구 토큰 화면이 떴다 | Chrome 은 동일 출처 GET 에 `Origin` 을 보내지 않는데 헤더를 무조건 요구했다 | `Sec-Fetch-Site: same-origin`/`none` 을 허용 |
+| 2 | 비밀번호가 맞는데 "틀렸다" 고 나왔다 | IX-Auth 의 분당 리미터 429 를 `invalid_credentials` 로 뭉갰다 | 429 를 `rate_limited` 로 전달 |
+| 3 | 설정 화면에 `IXAUTH.TITLE` 같은 키가 날것으로 보였다 | 계정 섹션이 i18n 카탈로그를 등록하지 않았다 | 섹션이 직접 등록 |
+| 4 | 키 회전 직후 60초 동안 인증이 깨질 수 있었다 | 최초 JWKS 적재를 "회전 재조회" 로 세어 쿨다운을 소모했다 | 최초 적재는 재조회로 세지 않는다 |
+
+### 11.2 검증 중 확인한 운영 함정
+
+- `openclaw.mjs` 는 `dist/` 가 있으면 **소스가 아니라 빌드 산출물**을 실행한다. 서버 코드를 고친 뒤 `pnpm build` 없이 재시작하면 옛 동작이 그대로 남는다(이 검증에서 실제로 15분을 잃었다).
+- `chris-local/auto-deploy.sh` 타이머가 `origin/chris/main` 을 따라가므로, 기능 브랜치로 로컬 검증할 때는 `systemctl --user stop openclaw-auto-deploy.timer` 로 멈춰야 한다.
+- `pkill -f openclaw-gateway` 는 자기 자신의 셸 명령줄까지 매칭해 죽인다. 포트로 PID 를 찾아 죽인다.
