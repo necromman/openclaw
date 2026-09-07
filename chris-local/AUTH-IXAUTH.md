@@ -125,6 +125,7 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
         roleMap: {
           SUPERADMIN: "superadmin",
           ADMIN: "admin",
+          EXECUTIVE: "executive",
           MODERATOR: "moderator",
           MEMBER: "member",
         },
@@ -142,6 +143,11 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
           sessions: { others: "write" },
           agents: "*",
           scopes: ["operator.read", "operator.write", "operator.approvals", "operator.questions"],
+        },
+        executive: {
+          sessions: { others: "view" },
+          agents: "*",
+          scopes: ["operator.read", "operator.write", "operator.questions"],
         },
         moderator: {
           sessions: { others: "suggest" },
@@ -174,17 +180,20 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 
 ## 5. 역할 매핑표
 
-| IX-Auth 역할 코드 | 게이트웨이 역할 | 세션 타인 열람               | 스코프                            | 관리 콘솔 링크 |
-| ----------------- | --------------- | ---------------------------- | --------------------------------- | -------------- |
-| `SUPERADMIN`      | `superadmin`    | write                        | `operator.admin`                  | 보인다         |
-| `ADMIN`           | `admin`         | write                        | read, write, approvals, questions | 보인다         |
-| `MODERATOR`       | `moderator`     | suggest                      | read, write, approvals, questions | 안 보인다      |
-| `MEMBER`          | `member`        | view                         | read, write, questions            | 안 보인다      |
-| 매핑 없음         | (없음)          | `gateway.roles.default` 적용 | 그 역할의 상한                    | 안 보인다      |
+| IX-Auth 역할 코드 | 게이트웨이 역할 | 한국어 표기   | 세션 타인 열람               | 스코프                            | 관리 콘솔 링크 |
+| ----------------- | --------------- | ------------- | ---------------------------- | --------------------------------- | -------------- |
+| `SUPERADMIN`      | `superadmin`    | 시스템 관리자 | write                        | `operator.admin`                  | 보인다         |
+| `ADMIN`           | `admin`         | 관리자        | write                        | read, write, approvals, questions | 보인다         |
+| `EXECUTIVE`       | `executive`     | 임원          | view                         | read, write, questions            | 안 보인다      |
+| `MODERATOR`       | `moderator`     | 중재자        | suggest                      | read, write, approvals, questions | 안 보인다      |
+| `MEMBER`          | `member`        | 직원          | view                         | read, write, questions            | 안 보인다      |
+| 매핑 없음         | (없음)          | 설정한 이름   | `gateway.roles.default` 적용 | 그 역할의 상한                    | 안 보인다      |
 
 규칙:
 
-- **여러 역할을 가지면 가장 높은 것**을 취한다(superadmin > admin > moderator > member). 매핑 목록에 없는 이름은 모든 알려진 이름보다 낮게 정렬된다.
+- **여러 역할을 가지면 가장 높은 것**을 취한다(superadmin > admin > executive > moderator > member). 매핑 목록에 없는 이름은 모든 알려진 이름보다 낮게 정렬된다.
+- **`executive` 는 계급이 아니라 도달 범위다.** 스코프와 세션 상한은 `member` 와 같고, 다른 점은 전 부서를 읽는다는 것뿐이다. 그 열람은 이 역할이 주는 것이 아니라 IX-Auth 에서 모든 `dept-` 그룹에 넣어서 얻는다 - 부서 경계 코드에는 임원을 위한 예외가 없다([AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 3절). 그래서 `admin` 보다 아래에 정렬한다. 위에 두면 임원을 겸한 관리자가 강등된다.
+- **한국어 표기는 UI 카탈로그 한 곳**(`ui/src/features/ix-auth/ix-auth-role-labels.ts` + `ixAuth.roles.*`)에서 나온다. 역할 코드와 게이트웨이 역할 이름 둘 다 같은 라벨로 옮겨지므로 화면이 날것의 코드를 보이지 않는다. 매핑에 없는 이름은 설정한 그대로 보인다.
 - **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
 - 관리 콘솔 링크는 `superadmin`·`admin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다.
 - 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. A 단계는 매핑 데이터만 준비했고, **B 단계가 강제를 붙였다** - 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).

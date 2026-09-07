@@ -14,7 +14,7 @@
 | #   | 가정                                                                                                              | 바꾸려면                                                                                                                                      |
 | --- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | 관리 콘솔은 **외부에 포트를 열지 않는다.** 게이트웨이 경로 `/admin/identity/` 로만 superadmin·admin 에게 중계한다 | 별도 호스트명으로 띄우려면 `gateway.auth.ixAuth.adminConsoleUrl` 에 절대 URL 을 넣는다. 그때는 IP allowlist 나 VPN 이 반드시 앞에 있어야 한다 |
-| 2   | 역할 4단계 `SUPERADMIN`/`ADMIN`/`MODERATOR`/`MEMBER` 를 **기동 시 마이그레이션으로 시드**한다                     | 고객이 자기 역할 체계를 쓰면 `gateway.auth.ixAuth.roleMap` 을 그 코드에 맞춘다                                                                |
+| 2   | 역할 5단계 `SUPERADMIN`/`ADMIN`/`EXECUTIVE`/`MODERATOR`/`MEMBER` 를 **기동 시 마이그레이션으로 시드**한다         | 고객이 자기 역할 체계를 쓰면 `gateway.auth.ixAuth.roleMap` 을 그 코드에 맞춘다                                                                |
 | 3   | DB 는 **PostgreSQL 16**                                                                                           | MariaDB·MySQL 8 도 서버가 지원한다. `IXAUTH_DB_URL` 을 바꾸고 compose 의 `ix-auth-db` 를 교체한다                                             |
 | 4   | 한국어 로케일은 `pnpm ui:i18n:sync` 로 채운다                                                                     | 다른 언어를 쓰면 브라우저 언어 설정을 따른다. ko 외 로케일은 아직 영어 폴백이다 (7절)                                                         |
 | 5   | 호스트 포트는 **18800**                                                                                           | `.env` 의 `OPENCLAW_GATEWAY_PORT` 와 `OPENCLAW_PUBLIC_ORIGIN` 을 함께 바꾼다                                                                  |
@@ -101,8 +101,8 @@ docker compose --env-file chris-local/ixauth.env \
 `up -d` 한 번으로 다음이 사람 개입 없이 끝난다.
 
 1. PostgreSQL 초기화 (`ix-auth-db` 가 `pg_isready` 로 건강해질 때까지 다음 단계가 기다린다)
-2. Flyway 마이그레이션 (`V1`~`V14`)
-3. **역할 4종 시드** (`V14`. `SUPERADMIN` 에는 `ixauth:*:*` 권한도 함께 준다)
+2. Flyway 마이그레이션 (`V1`~`V15`)
+3. **역할 5종 시드** (`V14` 가 4종, `V15` 가 `EXECUTIVE`. `SUPERADMIN` 에는 `ixauth:*:*` 권한도 함께 준다)
 4. 서명 키 생성 + **최초 관리자 1명 시드**(`SUPERADMIN` 부여)
 5. 게이트웨이가 `ixauth-gateway-config/openclaw.json` 을 상태 볼륨에 렌더링하고 `--bind lan` 으로 기동
 
@@ -117,19 +117,24 @@ IX-Auth 에는 "첫 로그인 시 비밀번호 변경 강제" 기능이 **없다
 1. `IXAUTH_ADMIN_EMAIL` / `IXAUTH_ADMIN_PASSWORD` 로 로그인한다.
 2. 계정 화면의 **사용자 관리**(`/admin/identity/`)로 들어가 콘솔에 다시 로그인한다. 콘솔이 자체 로그인을 유지하는 것은 이중 방어이며 의도한 동작이다.
 3. 관리자 비밀번호를 바꾼다.
-4. 실제 사용자를 만든다. 역할은 `SUPERADMIN`·`ADMIN`·`MODERATOR`·`MEMBER` 중에서 고른다.
+4. 실제 사용자를 만든다. 역할은 `SUPERADMIN`·`ADMIN`·`EXECUTIVE`·`MEMBER` 중에서 고른다(`MODERATOR` 도 받지만 권하지 않는다).
 5. `.env` 의 `IXAUTH_ADMIN_PASSWORD` 를 지운다. 첫 부팅에만 쓰이므로 이후에는 아무 효과가 없다.
 
 ### 3.2 사용자 추가
 
 관리 콘솔에서 한다. 게이트웨이에는 사용자 관리 화면이 없다.
 
-| 게이트웨이 역할 | 세션 타인 열람 | 사용자 관리 링크 |
-| --------------- | -------------- | ---------------- |
-| `superadmin`    | 쓰기           | 보인다           |
-| `admin`         | 쓰기           | 보인다           |
-| `moderator`     | 제안           | 안 보인다        |
-| `member`        | 보기           | 안 보인다        |
+| 게이트웨이 역할 | 한국어 표기   | 세션 타인 열람 | 사용자 관리 링크 |
+| --------------- | ------------- | -------------- | ---------------- |
+| `superadmin`    | 시스템 관리자 | 쓰기           | 보인다           |
+| `admin`         | 관리자        | 쓰기           | 보인다           |
+| `executive`     | 임원          | 보기           | 안 보인다        |
+| `moderator`     | 중재자        | 제안           | 안 보인다        |
+| `member`        | 직원          | 보기           | 안 보인다        |
+
+임원은 **전 부서를 읽기만** 한다. 그 열람은 역할이 아니라 모든 `dept-` 그룹 소속에서 나오므로,
+초대 화면에서 역할을 임원으로 고르면 부서가 전체 체크된 채로 뜬다(해제 가능). 부서를 하나도
+남기지 않으면 게이트웨이가 전 부서를 채운다. 자세한 규칙은 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 3절.
 
 링크는 감추는 것이 아니라 **응답 본문에 싣지 않는다.** 주소를 직접 입력해도 403 이다.
 
