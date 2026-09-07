@@ -1,11 +1,11 @@
 import type { IncomingMessage } from "node:http";
 import type { WebSocket } from "ws";
-import type { IxAuthPrincipal } from "../../../auth/ix-auth/ix-auth-types.js";
 import type {
   ConnectParams,
   RequestFrame,
   errorShape,
 } from "../../../../packages/gateway-protocol/src/index.js";
+import type { IxAuthPrincipal } from "../../../auth/ix-auth/ix-auth-types.js";
 import type { OpenClawConfig } from "../../../config/types.openclaw.js";
 import type { DeviceAuthToken } from "../../../infra/device-pairing.types.js";
 import type { createSubsystemLogger } from "../../../logging/subsystem.js";

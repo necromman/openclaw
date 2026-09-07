@@ -20,7 +20,10 @@ import {
   resolveIxAuthSessionToken,
   verifyIxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-sessions.js";
-import { IX_AUTH_CSRF_HEADER_NAME, type IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
+import {
+  IX_AUTH_CSRF_HEADER_NAME,
+  type IxAuthRuntimeSettings,
+} from "../auth/ix-auth/ix-auth-types.js";
 import { revokeIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET, type AuthRateLimiter } from "./auth-rate-limit.js";
@@ -402,7 +405,11 @@ async function handleIxAuthLoginRoute(params: {
         outcome: "denied",
         clientIp: params.deps.clientIp,
       });
-      sendJson(params.res, 200, { authenticated: false, mfaRequired: true, challenge: relay.mfaChallenge });
+      sendJson(params.res, 200, {
+        authenticated: false,
+        mfaRequired: true,
+        challenge: relay.mfaChallenge,
+      });
       return;
     }
     params.deps.rateLimiter?.recordFailure(
@@ -484,7 +491,10 @@ async function handleIxAuthLogoutRoute(params: {
     // CSRF applies to logout too: a forced logout is a real denial-of-service.
     const presented = params.req.headers[IX_AUTH_CSRF_HEADER_NAME];
     const csrfToken = typeof presented === "string" ? presented : undefined;
-    if (!csrfToken || !matchesIxAuthCsrfDigest({ presented: csrfToken, storedDigest: resolution.row.csrf_digest })) {
+    if (
+      !csrfToken ||
+      !matchesIxAuthCsrfDigest({ presented: csrfToken, storedDigest: resolution.row.csrf_digest })
+    ) {
       sendJson(params.res, 403, { error: "csrf_mismatch" });
       return;
     }

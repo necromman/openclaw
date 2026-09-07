@@ -6,14 +6,7 @@
 /** Route namespace the Gateway owns for IX-Auth relaying. */
 const IX_AUTH_HTTP_BASE_PATH = "/auth";
 
-export type IxAuthHttpRoute =
-  | "login"
-  | "mfa"
-  | "logout"
-  | "refresh"
-  | "me"
-  | "outside"
-  | "unknown";
+export type IxAuthHttpRoute = "login" | "mfa" | "logout" | "refresh" | "me" | "outside" | "unknown";
 
 /**
  * Classify one request path.

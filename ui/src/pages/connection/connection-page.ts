@@ -19,12 +19,12 @@ import {
   type UiSettings,
 } from "../../app/settings.ts";
 import { renderLearnMoreLink } from "../../components/settings-ui.ts";
+import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import {
   probeIxAuthSession,
   submitIxAuthLogout,
   type IxAuthSessionState,
 } from "../../features/ix-auth/ix-auth-session-api.ts";
-import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import { isMissingOperatorReadScopeError } from "../../lib/gateway-errors.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import { PollController } from "../../lit/poll-controller.ts";

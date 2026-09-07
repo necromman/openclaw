@@ -11,9 +11,7 @@ describe("isAllowedIxAuthBrowserOrigin", () => {
   it("accepts a same-origin fetch that carries no Origin header", () => {
     // Chrome omits Origin on same-origin GET requests. Demanding it would reject the
     // session probe the Control UI makes on every page load.
-    expect(
-      isAllowedIxAuthBrowserOrigin({ ...LOOPBACK, fetchSite: "same-origin" }),
-    ).toBe(true);
+    expect(isAllowedIxAuthBrowserOrigin({ ...LOOPBACK, fetchSite: "same-origin" })).toBe(true);
   });
 
   it("accepts a user-initiated navigation", () => {
@@ -30,9 +28,9 @@ describe("isAllowedIxAuthBrowserOrigin", () => {
   });
 
   it("accepts a matching loopback Origin", () => {
-    expect(
-      isAllowedIxAuthBrowserOrigin({ ...LOOPBACK, origin: "http://127.0.0.1:18791" }),
-    ).toBe(true);
+    expect(isAllowedIxAuthBrowserOrigin({ ...LOOPBACK, origin: "http://127.0.0.1:18791" })).toBe(
+      true,
+    );
   });
 
   it("rejects a foreign Origin even when the fetch site claims same-origin", () => {

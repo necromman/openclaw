@@ -10,12 +10,9 @@ import "../components/github-link-hovercard-registration.ts";
 import "../components/openclaw-mascot.ts";
 import { renderLazyElementState, renderLazyViewError } from "../components/lazy-view-error.ts";
 import { installTitleTooltips } from "../components/tooltip-title.ts";
-import { t } from "../i18n/index.ts";
-import {
-  renderIxAuthGate,
-  shouldRenderIxAuthGate,
-} from "../features/ix-auth/ix-auth-gate-view.ts";
+import { renderIxAuthGate, shouldRenderIxAuthGate } from "../features/ix-auth/ix-auth-gate-view.ts";
 import { IxAuthSessionController } from "../features/ix-auth/ix-auth-session-controller.ts";
+import { t } from "../i18n/index.ts";
 import { formatUiError } from "../lib/format-error.ts";
 import { normalizeAgentId } from "../lib/sessions/session-key.ts";
 import { isTerminalAvailable } from "../lib/terminal-availability.ts";

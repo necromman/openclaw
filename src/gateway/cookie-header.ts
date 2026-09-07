@@ -16,9 +16,7 @@ export type GatewayCookieAttributes = {
 };
 
 /** Split a Cookie header into name/value pairs, keeping the first value per name. */
-export function readRequestCookieMap(
-  header: string | string[] | undefined,
-): Map<string, string> {
+export function readRequestCookieMap(header: string | string[] | undefined): Map<string, string> {
   const raw = Array.isArray(header) ? header.join(";") : header;
   const cookies = new Map<string, string>();
   for (const part of raw?.split(";") ?? []) {

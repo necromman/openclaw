@@ -72,9 +72,9 @@ describe("evaluateMissingDeviceIdentity with ix-auth", () => {
   });
 
   it("keeps a device-bearing client on the existing allow path", () => {
-    expect(
-      evaluateMissingDeviceIdentity({ ...baseParams, hasDeviceIdentity: true }),
-    ).toEqual({ kind: "allow" });
+    expect(evaluateMissingDeviceIdentity({ ...baseParams, hasDeviceIdentity: true })).toEqual({
+      kind: "allow",
+    });
   });
 });
 

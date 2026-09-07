@@ -15,10 +15,7 @@ import { isLocalDirectRequest, isLoopbackAddress, isTrustedProxyAddress } from "
  * Checked before the stage runs so the modules below stay unloaded on every deployment
  * that does not use this mode.
  */
-export function claimsIxAuthHttpRequest(params: {
-  authMode: string;
-  pathname: string;
-}): boolean {
+export function claimsIxAuthHttpRequest(params: { authMode: string; pathname: string }): boolean {
   return params.authMode === "ix-auth" && classifyIxAuthHttpPath(params.pathname) !== "outside";
 }
 

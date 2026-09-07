@@ -80,7 +80,9 @@ describe("serializeGatewaySetCookie", () => {
       value: "abc",
       attributes: { ...baseAttributes, maxAgeSeconds: 3600 },
     });
-    expect(cookie).toBe("openclaw-session=abc; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600");
+    expect(cookie).toBe(
+      "openclaw-session=abc; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600",
+    );
   });
 
   it("forces Secure and Path=/ for a __Host- prefixed cookie", () => {
@@ -119,9 +121,9 @@ describe("serializeGatewaySetCookie", () => {
     ["newline in value", "a", "bad\nvalue"],
     ["semicolon in name", "bad;name", "v"],
   ])("refuses header injection through %s", (_label, name, value) => {
-    expect(() =>
-      serializeGatewaySetCookie({ name, value, attributes: baseAttributes }),
-    ).toThrow(/unsupported character/u);
+    expect(() => serializeGatewaySetCookie({ name, value, attributes: baseAttributes })).toThrow(
+      /unsupported character/u,
+    );
   });
 });
 

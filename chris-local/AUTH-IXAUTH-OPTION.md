@@ -22,27 +22,27 @@
 
 ### 1.1 인증 방식 3종
 
-| 대상 | 방식 | 헤더 |
-| --- | --- | --- |
-| 앱(포크 게이트웨이) -> jar | 공유 시크릿 | `X-IxAuth-Key: <ixauth.service-key>` |
-| 사용자 컨텍스트 필요 | access token | `Authorization: Bearer <jwt>` |
-| 공개 | 없음 | `/health`, `/.well-known/jwks.json` |
+| 대상                       | 방식         | 헤더                                 |
+| -------------------------- | ------------ | ------------------------------------ |
+| 앱(포크 게이트웨이) -> jar | 공유 시크릿  | `X-IxAuth-Key: <ixauth.service-key>` |
+| 사용자 컨텍스트 필요       | access token | `Authorization: Bearer <jwt>`        |
+| 공개                       | 없음         | `/health`, `/.well-known/jwks.json`  |
 
 **설계 불변식 4: jar 는 외부에 노출되지 않는다.** 브라우저는 jar 를 직접 호출하지 않고 앱이 중계(BFF)하며 **앱 도메인 쿠키**로 심는다. 포크가 BFF 가 되어야 하는 이유가 이것이다.
 
 ### 1.2 포크가 부를 엔드포인트
 
-| 메서드 | 경로 | 인증 | 쓰임 |
-| --- | --- | --- | --- |
-| POST | `/auth/login` | 서비스 키 | 로그인 중계. 본문 `{email, password, userAgent, ip, captchaToken?}` |
-| POST | `/auth/refresh` | 서비스 키 | 회전 + 재사용 탐지. 본문 `{refreshToken}`, IP 는 `X-Forwarded-For` 헤더로 |
-| POST | `/auth/logout` | 서비스 키 | 본문 `{refreshToken}` 또는 `{sessionId}` -> 204 |
-| GET | `/auth/me` | access token | 표시용. **매 요청 호출 금지** (토큰에 같은 정보가 있다) |
-| GET | `/.well-known/jwks.json` | 없음 | 공개키. `Cache-Control: public, max-age=3600` |
-| POST | `/auth/mfa/verify` | 서비스 키 | 로그인 2/2 (TOTP 켠 계정) |
-| POST | `/auth/password/reset`, `/auth/invite/accept`, `/auth/email/verify` | 서비스 키 | **메일 링크 도착 화면 3개**가 중계 |
-| GET/DELETE | `/auth/sessions`, `/auth/sessions/{id}` | access token | 내 세션 목록·해지 |
-| GET | `/authz/permission-map` | 서비스 키 | L1 권한 맵 캐시 (쓸 경우) |
+| 메서드     | 경로                                                                | 인증         | 쓰임                                                                      |
+| ---------- | ------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------- |
+| POST       | `/auth/login`                                                       | 서비스 키    | 로그인 중계. 본문 `{email, password, userAgent, ip, captchaToken?}`       |
+| POST       | `/auth/refresh`                                                     | 서비스 키    | 회전 + 재사용 탐지. 본문 `{refreshToken}`, IP 는 `X-Forwarded-For` 헤더로 |
+| POST       | `/auth/logout`                                                      | 서비스 키    | 본문 `{refreshToken}` 또는 `{sessionId}` -> 204                           |
+| GET        | `/auth/me`                                                          | access token | 표시용. **매 요청 호출 금지** (토큰에 같은 정보가 있다)                   |
+| GET        | `/.well-known/jwks.json`                                            | 없음         | 공개키. `Cache-Control: public, max-age=3600`                             |
+| POST       | `/auth/mfa/verify`                                                  | 서비스 키    | 로그인 2/2 (TOTP 켠 계정)                                                 |
+| POST       | `/auth/password/reset`, `/auth/invite/accept`, `/auth/email/verify` | 서비스 키    | **메일 링크 도착 화면 3개**가 중계                                        |
+| GET/DELETE | `/auth/sessions`, `/auth/sessions/{id}`                             | access token | 내 세션 목록·해지                                                         |
+| GET        | `/authz/permission-map`                                             | 서비스 키    | L1 권한 맵 캐시 (쓸 경우)                                                 |
 
 응답 봉투는 성공 `{ "data": {...} }`, 실패 `{ "error": { code, message, traceId } }`.\
 로그인 응답: `{ accessToken, refreshToken, expiresIn(900), user{id,email,name,roles,groups}, mfaSetupRequired, termsAgreementRequired }`.
@@ -55,26 +55,32 @@ access token = **RS256 서명 JWT**, TTL 기본 15분. refresh token = **불투�
 
 ```json
 {
-  "iss": "...", "sub": "1042", "aud": "openclaw", "exp": 0, "iat": 0, "jti": "...",
-  "email": "chris@prost.team", "name": "이대훈",
-  "ixauth_roles":  ["ADMIN", "PM"],
+  "iss": "...",
+  "sub": "1042",
+  "aud": "openclaw",
+  "exp": 0,
+  "iat": 0,
+  "jti": "...",
+  "email": "chris@prost.team",
+  "name": "이대훈",
+  "ixauth_roles": ["ADMIN", "PM"],
   "ixauth_groups": ["dev-team"],
-  "ixauth_sid":    "9b1d...",
-  "ixauth_pv":     1786230000,
-  "ixauth_idp":    "nexus-hub",
+  "ixauth_sid": "9b1d...",
+  "ixauth_pv": 1786230000,
+  "ixauth_idp": "nexus-hub",
   "act": { "sub": "1", "email": "admin@example.com" }
 }
 ```
 
-| 클레임 | 포크에서의 쓰임 |
-| --- | --- |
-| `sub` | IX-Auth `users.id`. 포크 `user_profiles` 와 1:1 로 묶을 안정 키 |
-| `email`, `name` | 프로필 표시 |
-| `ixauth_roles` | **역할 코드 배열.** `gateway.roles.definitions` 이름으로 매핑 |
-| `ixauth_groups` | **그룹 코드 배열.** 부서 코드를 여기에 실어 보낼 수 있다 (2.4) |
-| `ixauth_sid` | IX-Auth 세션 ID. 포크 감사 줄에 실어 두 원장을 대조 |
-| `ixauth_pv` | permission-map 캐시 무효화 (L1 을 쓸 때만) |
-| `act` | 관리자 대리 중. 포크 UI 에 "대리 중" 배너, 감사에 실제 조작자 기록 |
+| 클레임          | 포크에서의 쓰임                                                    |
+| --------------- | ------------------------------------------------------------------ |
+| `sub`           | IX-Auth `users.id`. 포크 `user_profiles` 와 1:1 로 묶을 안정 키    |
+| `email`, `name` | 프로필 표시                                                        |
+| `ixauth_roles`  | **역할 코드 배열.** `gateway.roles.definitions` 이름으로 매핑      |
+| `ixauth_groups` | **그룹 코드 배열.** 부서 코드를 여기에 실어 보낼 수 있다 (2.4)     |
+| `ixauth_sid`    | IX-Auth 세션 ID. 포크 감사 줄에 실어 두 원장을 대조                |
+| `ixauth_pv`     | permission-map 캐시 무효화 (L1 을 쓸 때만)                         |
+| `act`           | 관리자 대리 중. 포크 UI 에 "대리 중" 배너, 감사에 실제 조작자 기록 |
 
 **유효 역할 = 직접 부여분 U 소속 그룹의 역할** 을 IX-Auth 가 발급 시점에 계산해 넣는다. 포크는 그룹 -> 역할 매핑을 몰라도 된다.
 
@@ -150,13 +156,13 @@ API: `login/refresh/logout/verifyMfa/magicLinkVerify/socialCallback`, `verifyTok
 
 ### 2.1 세션 표현 (두 선택지)
 
-| | (A) 토큰 직접 쿠키 | (B) 불투명 세션 ID + 서버 저장 |
-| --- | --- | --- |
-| 쿠키 내용 | `__Host-oc_at`=access JWT, `__Host-oc_rt`=refresh 불투명값 | `__Host-oc_sid`=난수, DB 에 digest + refresh token |
-| WS 핸드셰이크 | 쿠키의 JWT 를 바로 로컬 검증. **jar 호출 0** | 세션 조회 후 보관한 JWT 검증 |
-| 로그아웃 즉시성 | refresh 는 즉시 죽지만 access 는 **최대 15분 남는다** | 세션 행 폐기로 즉시. 열린 WS 도 즉시 종료 |
-| 브라우저에 나가는 것 | refresh token 이 브라우저까지 나간다 | 불투명 ID 만 |
-| 신규 테이블 | 없음 | `ixauth_login_sessions` 1개 |
+|                      | (A) 토큰 직접 쿠키                                         | (B) 불투명 세션 ID + 서버 저장                     |
+| -------------------- | ---------------------------------------------------------- | -------------------------------------------------- |
+| 쿠키 내용            | `__Host-oc_at`=access JWT, `__Host-oc_rt`=refresh 불투명값 | `__Host-oc_sid`=난수, DB 에 digest + refresh token |
+| WS 핸드셰이크        | 쿠키의 JWT 를 바로 로컬 검증. **jar 호출 0**               | 세션 조회 후 보관한 JWT 검증                       |
+| 로그아웃 즉시성      | refresh 는 즉시 죽지만 access 는 **최대 15분 남는다**      | 세션 행 폐기로 즉시. 열린 WS 도 즉시 종료          |
+| 브라우저에 나가는 것 | refresh token 이 브라우저까지 나간다                       | 불투명 ID 만                                       |
+| 신규 테이블          | 없음                                                       | `ixauth_login_sessions` 1개                        |
 
 **권고: (B).** (A)는 로그아웃·정지 후에도 최대 15분간 열린 WS 가 살아 있고, 그 창은 자체 계획이 명시적으로 막기로 한 지점이다(계획서 2.5 "세션 만료"·"기기 토큰 우회 차단"). refresh token 이 브라우저에 나가지 않는 이점도 (B) 쪽이다.
 
@@ -205,20 +211,20 @@ IX-Auth 는 내장 관리 콘솔(`/admin-ui`)을 갖고 있고 사용자 CRUD·�
 
 **다만 그 콘솔은 "애초에 외부에 노출하지 않는 것이 전제" 다**(`config.md:464`, `:514`, 설계 불변식 4). 재사용하려면 의도적으로 노출해야 한다.
 
-| 방식 | 평가 |
-| --- | --- |
-| Traefik 으로 별도 호스트명 + 사내 IP allowlist | 권고. 콘솔 자체 로그인이 있으므로 이중 방어 |
-| 포크 게이트웨이가 `/admin-ui` 를 프록시 | 비권고. 서비스 키 경로와 관리 콘솔 경로가 한 오리진에 섞인다 |
-| VPN(Headscale) 안에서만 접근 | 사내 배포면 가장 단순 |
+| 방식                                           | 평가                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| Traefik 으로 별도 호스트명 + 사내 IP allowlist | 권고. 콘솔 자체 로그인이 있으므로 이중 방어                  |
+| 포크 게이트웨이가 `/admin-ui` 를 프록시        | 비권고. 서비스 키 경로와 관리 콘솔 경로가 한 오리진에 섞인다 |
+| VPN(Headscale) 안에서만 접근                   | 사내 배포면 가장 단순                                        |
 
 **결정 항목이다.** 노출하지 않기로 하면 사용자 관리 UI 를 포크가 다시 만들어야 하고, 그 순간 절감분의 상당 부분이 되돌아온다(3.2 의 X1).
 
 ### 2.6 감사는 두 원장으로 나뉜다
 
-| 사건 | 정본 |
-| --- | --- |
+| 사건                                                                                | 정본                                                               |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | 로그인 성공·실패·로그아웃·비밀번호 변경·MFA·역할/그룹 변경·계정 상태 변경·대리 시작 | **IX-Auth** (append-only, CSV 내보내기, 기간 필터, 보존 정리 배치) |
-| 세션 열람·에이전트 실행·설정 변경·부서 접근 거부·파일 접근 | **포크** `audit_security_events` (해시 체인 유지) |
+| 세션 열람·에이전트 실행·설정 변경·부서 접근 거부·파일 접근                          | **포크** `audit_security_events` (해시 체인 유지)                  |
 
 두 원장을 잇는 키는 `ixauth_sid` + `sub` 다. 포크 감사 줄에 이 둘을 실으면 사후 대조가 된다. **해시 체인과 `security-audit-*.ts` 3파일은 그대로 필요하다.** 포크 쪽 사건에 대해서다.
 
@@ -228,31 +234,31 @@ IX-Auth 는 내장 관리 콘솔(`/admin-ui`)을 갖고 있고 사용자 CRUD·�
 
 ### 3.1 파일·줄수
 
-| 구분 | 자체 구현 (AUTH-PLAN) | IX-Auth 안 | 차이 |
-| --- | --- | --- | --- |
-| 신규 파일 | **34개 / 약 8,400줄** | **약 17개 / 약 3,500줄** | **-17개 / -4,900줄 (-58%)** |
-| 수정 기존 파일 | **28개 / 훅 52곳** | **약 24개 / 훅 44곳** | -4개 / -8곳 (-15%) |
-| 신규 SQLite 테이블 | 13개 | **4개** (`ixauth_login_sessions`, `departments`, `department_agents`, `audit_security_events`) | -9개 |
-| 신규 npm 의존성 | argon2 계열 1개 (신규 도입) | **0개** (JWKS 검증 자체 구현) | 유리 |
-| 새 런타임 인프라 | 없음 (SQLite 만) | **IX-Auth jar + RDB 1개** | 불리 |
+| 구분               | 자체 구현 (AUTH-PLAN)       | IX-Auth 안                                                                                     | 차이                        |
+| ------------------ | --------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------- |
+| 신규 파일          | **34개 / 약 8,400줄**       | **약 17개 / 약 3,500줄**                                                                       | **-17개 / -4,900줄 (-58%)** |
+| 수정 기존 파일     | **28개 / 훅 52곳**          | **약 24개 / 훅 44곳**                                                                          | -4개 / -8곳 (-15%)          |
+| 신규 SQLite 테이블 | 13개                        | **4개** (`ixauth_login_sessions`, `departments`, `department_agents`, `audit_security_events`) | -9개                        |
+| 신규 npm 의존성    | argon2 계열 1개 (신규 도입) | **0개** (JWKS 검증 자체 구현)                                                                  | 유리                        |
+| 새 런타임 인프라   | 없음 (SQLite 만)            | **IX-Auth jar + RDB 1개**                                                                      | 불리                        |
 
 신규 파일 내역 (IX-Auth 안):
 
-| 파일 | 역할 | 자체 계획 대비 |
-| --- | --- | --- |
-| `src/auth/ix-auth/client.ts` | login/refresh/logout 중계, 서비스 키, IP·UA 전달 | `service.ts` 자리, 훨씬 얇다 |
-| `src/auth/ix-auth/jwks.ts` | JWKS 캐시·kid 재조회 제한·RS256 로컬 검증 | 신규 |
-| `src/auth/ix-auth/claims.ts` | 클레임 파싱, `IxAuthPrincipal` 계약 | `types.ts` 대체 |
-| `src/auth/ix-auth/role-map.ts` | `ixauth_roles` -> `gateway.roles` | 신규(소형) |
-| `src/auth/ix-auth/sessions.ts` | 불투명 세션 ID·서버측 갱신 루프·폐기 | `sessions.ts` 유지 + 갱신 루프 추가 |
-| `src/auth/ix-auth/csrf.ts` | 세션 결합 CSRF | **그대로 유지** |
-| `src/gateway/cookie-header.ts` | 쿠키 파서 승격(`control-ui-plugin-auth-cookie.ts:45`) | **그대로 유지** |
-| `src/gateway/ix-auth-http.ts` + `-paths.ts` | `/auth/*` BFF 라우트 | `builtin-user-http.ts` 축소판 |
-| `src/gateway/ix-auth-principal.ts` | 요청 컨텍스트 결선 | **그대로 유지** |
-| `src/gateway/department-access.ts` + `-session-filter.ts` | 부서 경계 | **그대로 유지 (약 670줄)** |
-| `src/state/ix-auth-schema.ts` + `ix-auth-sessions.ts` + `departments.ts` | 저장소 | 6개 -> 3개 |
-| `src/audit/security-audit-{events,store,chain}.ts` | 포크 사건 원장 | **그대로 유지** (`query` 는 IX-Auth CSV 로 일부 대체) |
-| `src/cli/ix-auth-cli.ts` | `openclaw ixauth doctor/whoami`, `departments` | `users` 관리 CLI 대부분 소멸 |
+| 파일                                                                     | 역할                                                  | 자체 계획 대비                                        |
+| ------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------- |
+| `src/auth/ix-auth/client.ts`                                             | login/refresh/logout 중계, 서비스 키, IP·UA 전달      | `service.ts` 자리, 훨씬 얇다                          |
+| `src/auth/ix-auth/jwks.ts`                                               | JWKS 캐시·kid 재조회 제한·RS256 로컬 검증             | 신규                                                  |
+| `src/auth/ix-auth/claims.ts`                                             | 클레임 파싱, `IxAuthPrincipal` 계약                   | `types.ts` 대체                                       |
+| `src/auth/ix-auth/role-map.ts`                                           | `ixauth_roles` -> `gateway.roles`                     | 신규(소형)                                            |
+| `src/auth/ix-auth/sessions.ts`                                           | 불투명 세션 ID·서버측 갱신 루프·폐기                  | `sessions.ts` 유지 + 갱신 루프 추가                   |
+| `src/auth/ix-auth/csrf.ts`                                               | 세션 결합 CSRF                                        | **그대로 유지**                                       |
+| `src/gateway/cookie-header.ts`                                           | 쿠키 파서 승격(`control-ui-plugin-auth-cookie.ts:45`) | **그대로 유지**                                       |
+| `src/gateway/ix-auth-http.ts` + `-paths.ts`                              | `/auth/*` BFF 라우트                                  | `builtin-user-http.ts` 축소판                         |
+| `src/gateway/ix-auth-principal.ts`                                       | 요청 컨텍스트 결선                                    | **그대로 유지**                                       |
+| `src/gateway/department-access.ts` + `-session-filter.ts`                | 부서 경계                                             | **그대로 유지 (약 670줄)**                            |
+| `src/state/ix-auth-schema.ts` + `ix-auth-sessions.ts` + `departments.ts` | 저장소                                                | 6개 -> 3개                                            |
+| `src/audit/security-audit-{events,store,chain}.ts`                       | 포크 사건 원장                                        | **그대로 유지** (`query` 는 IX-Auth CSV 로 일부 대체) |
+| `src/cli/ix-auth-cli.ts`                                                 | `openclaw ixauth doctor/whoami`, `departments`        | `users` 관리 CLI 대부분 소멸                          |
 
 **소멸하는 자체 구현 파일 (17개):** `password.ts`, `totp.ts`, `mail.ts`, `mail-templates.ts`, `rate-limit.ts`, `bootstrap.ts`, `builtin-user-accounts.ts`, `builtin-user-mail.ts`, `builtin-auth-rate-limits.ts`, `server-methods/directory.ts`, `security-audit-query.ts`(축소), UI `register/`·`account/`·`users/`·`audit/`(축소)·`verify-email`(축소)·`reset-password`(축소).
 
@@ -268,30 +274,30 @@ IX-Auth 는 내장 관리 콘솔(`/admin-ui`)을 갖고 있고 사용자 CRUD·�
 
 전제는 계획서와 같다(서버 1명 + UI 1명 + 보안/QA 파트타임, 1인 단독이면 x1.7).
 
-| 마일스톤 | 자체 구현 | IX-Auth 안 | 차이 | 근거 |
-| --- | --- | --- | --- | --- |
-| M0 계약 확정 | 1주 | **1주** | 0 | 권한 매트릭스·부서 모델·위협 모델은 그대로 필요. IX-Auth 배치·노출 정책 결정이 추가된다 |
-| M1 디렉터리+로그인+세션+WS | 3주 | **1.5주** | **-1.5주** | 계정·해시·부트스트랩 소멸. BFF 중계·JWKS 검증·WS 훅·CSRF·쿠키 세션은 유지 |
-| M2 가입·메일·승인·재설정 | 2주 | **0.5주** | **-1.5주** | 전부 IX-Auth. 포크는 메일 링크 도착 화면 3개만 |
-| M3 역할·부서 + 관리 UI | 3주 | **2.5주** | -0.5주 | **부서 격리는 그대로.** `/settings/users` 만 IX-Auth 콘솔로 대체 |
-| M4 감사 원장·조회·보존 | 2주 | **1.5주** | -0.5주 | 인증 사건은 IX-Auth. 포크 사건 원장·해시 체인·부서 제한 조회는 유지 |
-| M5 2FA·강화·침투·문서 | 2주 | **1주** | **-1주** | TOTP·백업코드·잠금·CAPTCHA 소멸. 침투 점검·문서는 유지 |
-| (신규) 토큰 갱신 루프·WS 재검증 | 0 | **+0.5주** | +0.5주 | 15분 TTL 대응. 자체 계획에 없던 항목 |
-| **합계** | **13주** | **8.5주** | **-4.5주 (-35%)** | 1인 단독 환산 22주 -> **14.5주** |
+| 마일스톤                        | 자체 구현 | IX-Auth 안 | 차이              | 근거                                                                                    |
+| ------------------------------- | --------- | ---------- | ----------------- | --------------------------------------------------------------------------------------- |
+| M0 계약 확정                    | 1주       | **1주**    | 0                 | 권한 매트릭스·부서 모델·위협 모델은 그대로 필요. IX-Auth 배치·노출 정책 결정이 추가된다 |
+| M1 디렉터리+로그인+세션+WS      | 3주       | **1.5주**  | **-1.5주**        | 계정·해시·부트스트랩 소멸. BFF 중계·JWKS 검증·WS 훅·CSRF·쿠키 세션은 유지               |
+| M2 가입·메일·승인·재설정        | 2주       | **0.5주**  | **-1.5주**        | 전부 IX-Auth. 포크는 메일 링크 도착 화면 3개만                                          |
+| M3 역할·부서 + 관리 UI          | 3주       | **2.5주**  | -0.5주            | **부서 격리는 그대로.** `/settings/users` 만 IX-Auth 콘솔로 대체                        |
+| M4 감사 원장·조회·보존          | 2주       | **1.5주**  | -0.5주            | 인증 사건은 IX-Auth. 포크 사건 원장·해시 체인·부서 제한 조회는 유지                     |
+| M5 2FA·강화·침투·문서           | 2주       | **1주**    | **-1주**          | TOTP·백업코드·잠금·CAPTCHA 소멸. 침투 점검·문서는 유지                                  |
+| (신규) 토큰 갱신 루프·WS 재검증 | 0         | **+0.5주** | +0.5주            | 15분 TTL 대응. 자체 계획에 없던 항목                                                    |
+| **합계**                        | **13주**  | **8.5주**  | **-4.5주 (-35%)** | 1인 단독 환산 22주 -> **14.5주**                                                        |
 
 ### 3.3 정성 비교
 
-| 항목 | 자체 구현 | IX-Auth 안 |
-| --- | --- | --- |
-| 비밀번호·2FA·메일 보안 책임 | **포크가 진다** (argon2 파라미터·열거 방지·타이밍·잠금) | IX-Auth 가 진다. 적합성 검사 84건 중 78 통과·0 실패 |
-| 계획서 2.5 보안 체크리스트 20항 | 20항 전부 포크 | **9항이 IX-Auth 로 이동** (비밀번호 저장·무차별 대입·이메일 열거·메일·세션 고정 일부 등) |
-| 업스트림 리베이스 부담 | 신규 34파일 + 훅 52곳 | 신규 17파일 + 훅 44곳. **WS 라인 훅은 동일** |
-| 배포 단위 | 게이트웨이 1개 (SQLite) | 게이트웨이 + jar + RDB. **폐쇄망이면 이미지·JDBC 반입 필요** |
-| 역할 변경 즉시성 | 즉시 (DB 직행) | **최대 15분** 또는 콘솔 세션 종료로 전파 |
-| jar 장애 시 | 해당 없음 | **이미 로그인한 사용자는 계속 동작**(로컬 검증). 신규 로그인·갱신만 막힘 |
-| 부서 격리 | 포크 소유 | **포크 소유 (동일)** |
-| 관리 콘솔 | 포크가 제작 | IX-Auth 내장. 단 노출 정책 결정 필요 |
-| 납품 시 라이선스·소유권 | 포크 코드 100% | IX-Auth 는 사내 산출물(`UNLICENSED`). 진바이오테크 재배포 조건 **확인 필요** |
+| 항목                            | 자체 구현                                               | IX-Auth 안                                                                               |
+| ------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 비밀번호·2FA·메일 보안 책임     | **포크가 진다** (argon2 파라미터·열거 방지·타이밍·잠금) | IX-Auth 가 진다. 적합성 검사 84건 중 78 통과·0 실패                                      |
+| 계획서 2.5 보안 체크리스트 20항 | 20항 전부 포크                                          | **9항이 IX-Auth 로 이동** (비밀번호 저장·무차별 대입·이메일 열거·메일·세션 고정 일부 등) |
+| 업스트림 리베이스 부담          | 신규 34파일 + 훅 52곳                                   | 신규 17파일 + 훅 44곳. **WS 라인 훅은 동일**                                             |
+| 배포 단위                       | 게이트웨이 1개 (SQLite)                                 | 게이트웨이 + jar + RDB. **폐쇄망이면 이미지·JDBC 반입 필요**                             |
+| 역할 변경 즉시성                | 즉시 (DB 직행)                                          | **최대 15분** 또는 콘솔 세션 종료로 전파                                                 |
+| jar 장애 시                     | 해당 없음                                               | **이미 로그인한 사용자는 계속 동작**(로컬 검증). 신규 로그인·갱신만 막힘                 |
+| 부서 격리                       | 포크 소유                                               | **포크 소유 (동일)**                                                                     |
+| 관리 콘솔                       | 포크가 제작                                             | IX-Auth 내장. 단 노출 정책 결정 필요                                                     |
+| 납품 시 라이선스·소유권         | 포크 코드 100%                                          | IX-Auth 는 사내 산출물(`UNLICENSED`). 진바이오테크 재배포 조건 **확인 필요**             |
 
 ---
 
@@ -316,15 +322,15 @@ IX-Auth 는 내장 관리 콘솔(`/admin-ui`)을 갖고 있고 사용자 CRUD·�
 
 ## 5. 결정 필요 항목
 
-| # | 항목 | 선택지 | 미결 시 영향 |
-| --- | --- | --- | --- |
-| X1 | IX-Auth 관리 콘솔을 사내에 노출하는가 | Traefik + IP allowlist / VPN 전용 / 미노출 | **미노출이면 사용자 관리 UI 를 포크가 다시 만든다(+1.5주).** 절감분의 3분의 1이 사라진다 |
-| X2 | 세션 표현 (A) 토큰 쿠키 vs (B) 불투명 ID | (B) 권고 | (A)면 로그아웃·정지가 최대 15분 늦다 |
-| X3 | 부서를 `ixauth_groups` 로 전달할지 | 전달 시 `department_members` 테이블·UI 소멸 | 전달 권고 |
-| X4 | IX-Auth DB 를 어디에 두는가 | 별도 Postgres 컨테이너 / 기존 RDB 스키마 분리 | 폐쇄망 반입 목록에 영향 |
-| X5 | 진바이오테크 납품 시 IX-Auth 재배포·라이선스 조건 | 사내 산출물, `UNLICENSED` | **법무·영업 확인 필요.** 불가면 자체 구현으로 되돌아간다 |
-| X6 | 역할 변경 최대 15분 지연을 계약 문구로 수용하는가 | 수용 / `ixauth.jwt.access-ttl` 단축 | 수용 + 콘솔 세션종료 전파 문서화 |
-| X7 | `jose` 의존성 추가 vs `node:crypto` 자체 검증 | 자체 검증 권고 | 자체 검증 |
+| #   | 항목                                              | 선택지                                        | 미결 시 영향                                                                             |
+| --- | ------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| X1  | IX-Auth 관리 콘솔을 사내에 노출하는가             | Traefik + IP allowlist / VPN 전용 / 미노출    | **미노출이면 사용자 관리 UI 를 포크가 다시 만든다(+1.5주).** 절감분의 3분의 1이 사라진다 |
+| X2  | 세션 표현 (A) 토큰 쿠키 vs (B) 불투명 ID          | (B) 권고                                      | (A)면 로그아웃·정지가 최대 15분 늦다                                                     |
+| X3  | 부서를 `ixauth_groups` 로 전달할지                | 전달 시 `department_members` 테이블·UI 소멸   | 전달 권고                                                                                |
+| X4  | IX-Auth DB 를 어디에 두는가                       | 별도 Postgres 컨테이너 / 기존 RDB 스키마 분리 | 폐쇄망 반입 목록에 영향                                                                  |
+| X5  | 진바이오테크 납품 시 IX-Auth 재배포·라이선스 조건 | 사내 산출물, `UNLICENSED`                     | **법무·영업 확인 필요.** 불가면 자체 구현으로 되돌아간다                                 |
+| X6  | 역할 변경 최대 15분 지연을 계약 문구로 수용하는가 | 수용 / `ixauth.jwt.access-ttl` 단축           | 수용 + 콘솔 세션종료 전파 문서화                                                         |
+| X7  | `jose` 의존성 추가 vs `node:crypto` 자체 검증     | 자체 검증 권고                                | 자체 검증                                                                                |
 
 ---
 

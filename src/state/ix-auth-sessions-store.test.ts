@@ -1,11 +1,6 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
-import { tableExists } from "./openclaw-state-db-schema-helpers.js";
-import {
-  closeOpenClawStateDatabaseForTest,
-  openOpenClawStateDatabase,
-} from "./openclaw-state-db.js";
 import { ensureIxAuthSessionsSchema } from "./ix-auth-sessions-schema.js";
 import {
   insertIxAuthLoginSession,
@@ -16,6 +11,11 @@ import {
   touchIxAuthLoginSession,
   updateIxAuthSessionTokens,
 } from "./ix-auth-sessions-store.js";
+import { tableExists } from "./openclaw-state-db-schema-helpers.js";
+import {
+  closeOpenClawStateDatabaseForTest,
+  openOpenClawStateDatabase,
+} from "./openclaw-state-db.js";
 
 const tempDirs = useAutoCleanupTempDirTracker((cleanup) => {
   afterEach(() => {
@@ -121,8 +121,14 @@ describe("ix-auth login session store", () => {
     const options = stateOptions();
     const row = buildRow();
     insertIxAuthLoginSession(row, options);
-    revokeIxAuthLoginSession({ sessionId: row.id, revokedAt: NOW + 1, reason: "user-logout" }, options);
-    revokeIxAuthLoginSession({ sessionId: row.id, revokedAt: NOW + 2, reason: "idle-expired" }, options);
+    revokeIxAuthLoginSession(
+      { sessionId: row.id, revokedAt: NOW + 1, reason: "user-logout" },
+      options,
+    );
+    revokeIxAuthLoginSession(
+      { sessionId: row.id, revokedAt: NOW + 2, reason: "idle-expired" },
+      options,
+    );
     expect(readIxAuthLoginSessionByDigest(row.token_digest, options)).toMatchObject({
       revoked_at: NOW + 1,
       revoke_reason: "user-logout",
@@ -150,7 +156,9 @@ describe("ix-auth login session store", () => {
       options,
     );
     expect(readIxAuthLoginSessionByDigest(mine.token_digest, options)?.revoked_at).toBe(NOW + 5);
-    expect(readIxAuthLoginSessionByDigest(alsoMine.token_digest, options)?.revoked_at).toBe(NOW + 5);
+    expect(readIxAuthLoginSessionByDigest(alsoMine.token_digest, options)?.revoked_at).toBe(
+      NOW + 5,
+    );
     expect(readIxAuthLoginSessionByDigest(other.token_digest, options)?.revoked_at).toBeNull();
   });
 
