@@ -17,6 +17,7 @@
 - 홈랩(Proxmox·claw01·ai01·docker01·Traefik·Cloudflare·Authentik·docs 포털)·회사 서버(IDC·GitLab·LiteLLM)·접속 정보·시크릿 위치는 **이 저장소에 없다.** 반드시 `D:\PROJECT\chris-server\CLAUDE.md` 를 먼저 읽고 그 인덱스가 가리키는 정본(`homelab/README.md`, `homelab/homelab-access.md`, `knowledge/infrastructure/server-inventory.md`, `homelab/openclaw/README.md`)을 따라간다.
 - 그 저장소의 필수 지침(서버 명령은 `logs/command-log.md` 기록, 서버 설정 변경은 사용자 명시 요청 없이 금지, root 접속 규칙, Traefik 등록 방법)은 서버를 만질 때 그대로 적용한다.
 - 시크릿 값은 이 포크 저장소에 절대 복사하지 않는다(환경변수·`.env` 자리표시자만).
+- 납품처(진바이오테크) NAS·서버 정보의 **로컬 사본**은 `chris-local/infra/local/`(git 제외)에 있고 안내는 `chris-local/infra/README.md`. 실측 전 정본과 diff 한다.
 
 ## 작업 규칙 (요약, 상세는 FORK.md)
 
