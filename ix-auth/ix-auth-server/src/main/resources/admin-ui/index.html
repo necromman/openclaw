@@ -917,11 +917,27 @@ function show(el, text, ok) {
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// OPENCLAW-FORK-DELTA (ix-auth/MODULE.md 6절): 게이트웨이 BFF(/admin/identity/) 뒤에서
+// 열렸을 때만 세션 CSRF 토큰을 함께 보낸다. jar 를 직접 여는 독립 실행에서는 그 쿠키가
+// 없어 헤더가 붙지 않고, 서버는 모르는 헤더를 무시하므로 원본과 동작이 같다.
+function forkCsrfHeaders() {
+  for (const part of document.cookie.split(';')) {
+    const i = part.indexOf('=');
+    if (i <= 0) continue;
+    const name = part.slice(0, i).trim();
+    if (name.endsWith('-csrf') && name.includes('openclaw-session')) {
+      return { 'x-openclaw-csrf': part.slice(i + 1).trim() };
+    }
+  }
+  return {};
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {
     ...opts,
     headers: { 'Content-Type': 'application/json',
                ...(token ? { Authorization: 'Bearer ' + token } : {}),
+               ...forkCsrfHeaders(),
                ...(opts.headers || {}) }
   });
   if (res.status === 204) return null;
@@ -946,7 +962,8 @@ let mfaChallenge = '';
 
 async function post(path, body) {
   const res = await fetch(BASE + path, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...forkCsrfHeaders() },
     body: JSON.stringify(body)
   });
   const b = await res.json().catch(() => ({}));
@@ -1459,7 +1476,8 @@ async function bulkImport() {
     // CSV 는 JSON 이 아니므로 본문을 그대로 보낸다 — api() 는 JSON 을 전제한다
     const res = await fetch(API + '/admin/users/bulk?invite=' + bulkInvite.value, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/csv', Authorization: 'Bearer ' + token },
+      headers: { 'Content-Type': 'text/csv', Authorization: 'Bearer ' + token,
+                 ...forkCsrfHeaders() },
       body: csv
     });
     const body = await res.json().catch(() => ({}));

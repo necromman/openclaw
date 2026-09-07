@@ -49,7 +49,14 @@ public class BootstrapRunner implements ApplicationRunner {
 
         var admin = new User(email, properties.getAdmin().getName(),
                 passwordEncoder.encode(properties.getAdmin().getPassword()));
-        roleRepository.findByCode("ADMIN").ifPresent(admin.getRoles()::add);
+        // OPENCLAW-FORK-DELTA (MODULE.md 6절): 최고 등급을 먼저 찾는다.
+        // 포크는 SUPERADMIN/ADMIN/MODERATOR/MEMBER 4단계를 쓰고(V14 마이그레이션),
+        // 최초 관리자에게 ADMIN 만 주면 superadmin 전용 권한을 가진 사람이 아무도 없어
+        // 무인 설치 직후 운영 관리를 시작할 수 없다. SUPERADMIN 이 없는 원본 스키마
+        // 에서는 종전대로 ADMIN 으로 떨어진다.
+        roleRepository.findByCode("SUPERADMIN")
+                .or(() -> roleRepository.findByCode("ADMIN"))
+                .ifPresent(admin.getRoles()::add);
         userRepository.save(admin);
 
         log.info("초기 관리자 계정을 생성했습니다 — {}", email);
