@@ -216,7 +216,7 @@ const SETTINGS_NAVIGATION_GROUPS = [
   },
   {
     labelKey: "nav.settingsGroupSecurity",
-    routes: ["security", "secrets", "approvals"],
+    routes: ["security", "secrets", "audit", "approvals"],
   },
   {
     labelKey: "nav.settingsGroupSystem",
@@ -255,7 +255,7 @@ export function isSettingsNavigationRouteVisible(
   }
   // User management exists only where identity is delegated, and only for the accounts
   // the Gateway judged administrators. Gateway operator scopes are a different question.
-  if (routeId === "users") {
+  if (routeId === "users" || routeId === "audit") {
     return canManageIxAuthUsers();
   }
   return (
@@ -318,6 +318,7 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   channels: ["link", "tabs.channels", "subtitles.channels"],
   connection: ["radio", "tabs.connection", "subtitles.connection"],
   users: ["users", "tabs.users", "subtitles.users"],
+  audit: ["fileText", "tabs.audit", "subtitles.audit"],
   sessions: ["fileText", "tabs.sessions", "subtitles.sessions"],
   usage: ["coins", "tabs.usage", "subtitles.usage"],
   cron: ["calendarClock", "tabs.cron", "subtitles.cron"],

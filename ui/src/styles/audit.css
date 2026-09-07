@@ -1,0 +1,99 @@
+/* Activity ledger: a filter bar and one wide, scannable table.
+ *
+ * Loaded with the page, not from the shared sheet, so a deployment without an
+ * identity server never downloads it. Everything here uses the shared tokens; the
+ * radius cap in fork-style.css applies as it does everywhere else. */
+
+.audit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.audit-toolbar__field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.audit-toolbar__field--grow {
+  flex: 1 1 220px;
+}
+
+.audit-toolbar__label {
+  font-size: var(--control-ui-text-xs);
+  color: var(--muted);
+}
+
+.audit-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+/* The ledger is genuinely tabular, so it is a table. It scrolls inside its own box
+ * rather than widening the page, which section 1 of fork-style.css forbids. */
+.audit-table-scroll {
+  overflow-x: auto;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--control-ui-text-sm);
+}
+
+.audit-table th,
+.audit-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.audit-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.audit-table tbody tr {
+  border-top: 1px solid var(--border);
+}
+
+/* The summary is the only column allowed to be long, so it is the only one that
+ * wraps; without this a single file path would set the width of every row. */
+.audit-table__summary {
+  white-space: normal;
+  max-width: 32rem;
+  word-break: break-word;
+}
+
+.audit-table__expand {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+
+.audit-detail {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--control-ui-text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--muted);
+}
+
+.audit-pager {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}

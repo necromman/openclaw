@@ -31,6 +31,7 @@ import { page as activityPage } from "./pages/activity/route.ts";
 import { page as agentsPage } from "./pages/agents/route.ts";
 import { page as approvalsPage } from "./pages/approvals/route.ts";
 import { page as appsPage } from "./pages/apps/route.ts";
+import { page as auditPage } from "./pages/audit/route.ts";
 import { page as channelsPage } from "./pages/channels/route.ts";
 import { pages as chatPages } from "./pages/chat/route.ts";
 import { page as cloudWorkersPage } from "./pages/cloud-workers/route.ts";
@@ -99,6 +100,7 @@ const APP_ROUTE_TREE = [
   cloudWorkersPage,
   connectionPage,
   usersPage,
+  auditPage,
   labsPage,
   aboutPage,
   lobsterdexPage,
