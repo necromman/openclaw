@@ -301,7 +301,7 @@ describe("cron view list pane", () => {
     expect(loadedEmpty.querySelector('[data-test-id="cron-jobs-loading"]')).toBeNull();
     const empty = getElement(loadedEmpty, ".cron-empty-state", HTMLDivElement);
     expect(empty.textContent).toContain("No automations yet");
-    expect(empty.textContent).toContain("Describe what OpenClaw should do");
+    expect(empty.textContent).toContain("Describe what Chris Agent should do");
     expect(
       getElement(loadedEmpty, ".cron-table", HTMLDivElement).getAttribute("aria-busy"),
     ).toBeNull();
@@ -388,6 +388,39 @@ describe("cron view list pane", () => {
     const activity = renderView({ listTab: "activity" });
     expect(activity.querySelector(".cron-table")).toBeNull();
     expect(activity.querySelector(".cron-activity")).not.toBeNull();
+  });
+
+  it("shows the creator column with the friendliest fact each job carries", () => {
+    const named = { profileId: "p-1", email: "ada@x.io", displayName: "Ada" };
+    const container = renderView({
+      jobs: [
+        createJob("job-1", { createdBy: named }),
+        createJob("job-2", { createdBy: { profileId: "p-2", email: "grace@x.io" } }),
+        createJob("job-3", { createdBy: { profileId: "p-3" } }),
+        createJob("job-4", { createdBy: { source: "channel", id: "slack:U123" } }),
+        createJob("job-5"),
+      ],
+    });
+
+    const headers = Array.from(container.querySelectorAll(".cron-table__head span"), (cell) =>
+      cell.textContent?.trim(),
+    );
+    const creators = Array.from(
+      container.querySelectorAll(".cron-table__creator .cron-table__cell-value"),
+      (cell) => cell.textContent?.trim(),
+    );
+
+    expect(headers).toContain("Created by");
+    expect(creators).toEqual(["Ada", "grace@x.io", "p-3", "Channel slack:U123", "n/a"]);
+  });
+
+  it("repeats the creator on the detail header", () => {
+    const job = createJob("job-1", { createdBy: { profileId: "p-1", displayName: "Ada" } });
+    const container = renderView({ jobs: [job], editingJob: job });
+    const creator = container.querySelector('[data-test-id="cron-detail-created-by"]');
+
+    expect(creator?.textContent).toContain("Created by");
+    expect(creator?.textContent).toContain("Ada");
   });
 
   it("renders shared manual list tabs with active state and selection", () => {
