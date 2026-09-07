@@ -41,12 +41,23 @@ import { readIxAuthSessionCookie } from "./ix-auth-principal.js";
 const IX_AUTH_INVITABLE_ROLE_CODES: ReadonlySet<string> = new Set([
   "SUPERADMIN",
   "ADMIN",
+  "EXECUTIVE",
   "MODERATOR",
   "MEMBER",
 ]);
 
 /** The role an invitation grants when the form does not say. */
 const IX_AUTH_DEFAULT_INVITE_ROLE_CODE = "MEMBER";
+
+/**
+ * Role codes whose invitation covers every department when none is named.
+ *
+ * An executive reads across the whole company, and that reach is membership in every
+ * department group rather than a hole in the boundary code. Filling the list in here,
+ * from the identity server's own groups, is what keeps it honest: a browser that posts
+ * an empty list gets the real departments, never a list it invented.
+ */
+const IX_AUTH_ALL_DEPARTMENT_ROLE_CODES: ReadonlySet<string> = new Set(["EXECUTIVE"]);
 
 /** One resolved administrator, ready to act against the identity server. */
 type IxAuthAdminContext = {
@@ -141,16 +152,98 @@ function isDepartmentGroupCode(code: string, prefix: string): boolean {
   return prefix.length > 0 && code.startsWith(prefix);
 }
 
-async function resolveDepartmentGroupId(params: {
+type DepartmentGroup = { groupId: string; code: string; name: string };
+
+type DepartmentListing =
+  | { ok: true; departments: DepartmentGroup[] }
+  | { ok: false; failure: IxAuthRelayFailure };
+
+/**
+ * The departments the identity server knows about, in one relay call.
+ *
+ * Every surface below reads departments through here, so the list an administrator is
+ * shown and the memberships an invitation grants can never come from different sources.
+ */
+async function listDepartmentGroups(params: {
+  deps: IxAuthHttpDependencies;
   admin: IxAuthAdminContext;
-  departmentCode: string;
-}): Promise<{ ok: true; groupId: string } | { ok: false; failure?: IxAuthRelayFailure }> {
+}): Promise<DepartmentListing> {
   const groups = await listIxAuthGroups(params.admin.call);
   if (!groups.ok) {
     return { ok: false, failure: groups };
   }
-  const match = groups.groups.find((group) => group.code === params.departmentCode);
-  return match ? { ok: true, groupId: match.groupId } : { ok: false };
+  const prefix = params.deps.settings.departmentGroupPrefix;
+  return {
+    ok: true,
+    departments: groups.groups.filter((group) => isDepartmentGroupCode(group.code, prefix)),
+  };
+}
+
+/** Read the departments a request asks for, still accepting the single-value field. */
+function readRequestedDepartments(body: Record<string, unknown>): string[] {
+  const listed = Array.isArray(body.departments) ? body.departments : [];
+  const codes: string[] = [];
+  for (const entry of listed) {
+    const code = normalizeOptionalString(entry);
+    if (code) {
+      codes.push(code);
+    }
+  }
+  const single = normalizeOptionalString(body.department);
+  if (single) {
+    codes.push(single);
+  }
+  return [...new Set(codes)];
+}
+
+type DepartmentGrant = { granted: string[]; failed: boolean };
+
+/**
+ * Put one account into the departments it was invited into.
+ *
+ * A code naming no department is reported rather than obeyed, and a code outside the
+ * department prefix is not a department at all: neither may quietly place someone into
+ * an ordinary group. Nothing is rolled back over a failed placement, because the account
+ * exists by then and its link has already gone out.
+ */
+async function grantDepartments(params: {
+  deps: IxAuthHttpDependencies;
+  admin: IxAuthAdminContext;
+  userId: string;
+  requested: readonly string[];
+  fillAllWhenEmpty: boolean;
+}): Promise<DepartmentGrant> {
+  if (params.requested.length === 0 && !params.fillAllWhenEmpty) {
+    return { granted: [], failed: false };
+  }
+  const listing = await listDepartmentGroups({ deps: params.deps, admin: params.admin });
+  if (!listing.ok) {
+    return { granted: [], failed: true };
+  }
+  const wanted =
+    params.requested.length > 0
+      ? params.requested
+      : listing.departments.map((department) => department.code);
+  const granted: string[] = [];
+  let failed = false;
+  for (const code of wanted) {
+    const match = listing.departments.find((department) => department.code === code);
+    if (!match) {
+      failed = true;
+      continue;
+    }
+    const added = await addIxAuthGroupMember({
+      ...params.admin.call,
+      groupId: match.groupId,
+      userId: params.userId,
+    });
+    if (added.ok) {
+      granted.push(code);
+    } else {
+      failed = true;
+    }
+  }
+  return { granted, failed };
 }
 
 async function handleListDepartments(params: {
@@ -158,16 +251,13 @@ async function handleListDepartments(params: {
   deps: IxAuthHttpDependencies;
   admin: IxAuthAdminContext;
 }): Promise<void> {
-  const groups = await listIxAuthGroups(params.admin.call);
-  if (!groups.ok) {
-    sendRelayFailure(params.res, groups);
+  const listing = await listDepartmentGroups({ deps: params.deps, admin: params.admin });
+  if (!listing.ok) {
+    sendRelayFailure(params.res, listing.failure);
     return;
   }
-  const prefix = params.deps.settings.departmentGroupPrefix;
   sendJson(params.res, 200, {
-    departments: groups.groups
-      .filter((group) => isDepartmentGroupCode(group.code, prefix))
-      .map((group) => ({ code: group.code, name: group.name })),
+    departments: listing.departments.map((group) => ({ code: group.code, name: group.name })),
   });
 }
 
@@ -214,7 +304,7 @@ async function handleIssueInvite(params: {
     sendJson(params.res, 403, { error: "forbidden" });
     return;
   }
-  const department = normalizeOptionalString(body.department);
+  const requested = readRequestedDepartments(body);
   const created = await createIxAuthInvitedUser({
     ...params.admin.call,
     email,
@@ -227,23 +317,15 @@ async function handleIssueInvite(params: {
     sendRelayFailure(params.res, created);
     return;
   }
-  // The department is granted here rather than at first sign-in, so the invited person
-  // lands inside their department instead of appearing unassigned until someone notices.
-  let departmentGranted = false;
-  if (department) {
-    const group = await resolveDepartmentGroupId({
-      admin: params.admin,
-      departmentCode: department,
-    });
-    if (group.ok) {
-      const added = await addIxAuthGroupMember({
-        ...params.admin.call,
-        groupId: group.groupId,
-        userId: created.userId,
-      });
-      departmentGranted = added.ok;
-    }
-  }
+  // Departments are granted here rather than at first sign-in, so the invited person
+  // lands inside them instead of appearing unassigned until someone notices.
+  const grant = await grantDepartments({
+    deps: params.deps,
+    admin: params.admin,
+    userId: created.userId,
+    requested,
+    fillAllWhenEmpty: IX_AUTH_ALL_DEPARTMENT_ROLE_CODES.has(role.roleCode),
+  });
   params.deps.onSecurityEvent?.({
     action: "ix-auth.invite.issued",
     outcome: "succeeded",
@@ -256,8 +338,10 @@ async function handleIssueInvite(params: {
   sendJson(params.res, 200, {
     email,
     userId: created.userId,
-    department: departmentGranted ? department : undefined,
-    departmentFailed: Boolean(department) && !departmentGranted,
+    departments: grant.granted,
+    // Kept beside the list so a screen that only knows one department still reads one.
+    department: grant.granted[0],
+    departmentFailed: grant.failed,
     // Present only when the identity server handed the mail back instead of sending it.
     // Its absence is the signal that the invitation was actually mailed.
     inviteLink,
@@ -353,22 +437,17 @@ async function handleApprovalsRoute(params: {
     sendRelayFailure(params.res, outcome);
     return;
   }
-  let departmentGranted = false;
-  const department = decision === "approve" ? normalizeOptionalString(body.department) : undefined;
-  if (department) {
-    const group = await resolveDepartmentGroupId({
-      admin: params.admin,
-      departmentCode: department,
-    });
-    if (group.ok) {
-      const added = await addIxAuthGroupMember({
-        ...params.admin.call,
-        groupId: group.groupId,
-        userId,
-      });
-      departmentGranted = added.ok;
-    }
-  }
+  const grant =
+    decision === "approve"
+      ? await grantDepartments({
+          deps: params.deps,
+          admin: params.admin,
+          userId,
+          requested: readRequestedDepartments(body),
+          // Approving a signup chooses no role, so there is nothing to fill in.
+          fillAllWhenEmpty: false,
+        })
+      : { granted: [], failed: false };
   params.deps.onSecurityEvent?.({
     action: "ix-auth.signup.decided",
     outcome: "succeeded",
@@ -381,8 +460,9 @@ async function handleApprovalsRoute(params: {
   sendJson(params.res, 200, {
     userId,
     decision,
-    department: departmentGranted ? department : undefined,
-    departmentFailed: Boolean(department) && !departmentGranted,
+    departments: grant.granted,
+    department: grant.granted[0],
+    departmentFailed: grant.failed,
   });
 }
 
