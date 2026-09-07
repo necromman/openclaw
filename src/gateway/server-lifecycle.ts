@@ -134,7 +134,7 @@ export async function prepareGatewayLifecycle(params: {
       if (change.availabilityChanged) {
         workerPlacementRuntime?.runnerAvailability.markChanged();
       }
-      if (change.inventoryChanged) {
+      if (change.inventoryChanged || change.availabilityChanged) {
         void workerPlacementRuntime?.scheduleNodeWorkspaceRetention(nodeId);
       }
     },
