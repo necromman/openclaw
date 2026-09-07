@@ -51,6 +51,7 @@ import {
   resolveLocalPairingApproval,
   resolvePairingApprovalPlan,
 } from "./connect-pairing-approval-plan.js";
+import { controlUiPairingKindAuthorizesSession } from "./connect-policy.js";
 import type {
   AuthenticatedGatewayConnect,
   DeviceAuthorizedGatewayConnect,
@@ -480,7 +481,7 @@ export async function authorizeGatewayConnectDevice(
       return undefined;
     }
     const pairingRecordDoesNotAuthorizeSession =
-      skipLocalBackendSelfPairing || controlUiPairingKind === "auth-none";
+      skipLocalBackendSelfPairing || controlUiPairingKindAuthorizesSession(controlUiPairingKind);
     if (pairingRecordDoesNotAuthorizeSession) {
       if (isPaired) {
         // Locality plus auth mode authorizes this session; the pairing row only
@@ -491,7 +492,7 @@ export async function authorizeGatewayConnectDevice(
         hasServerApprovedDeviceTokenBaseline = true;
         await updatePairedDeviceMetadata(device.id, clientAccessMetadata);
       } else if (
-        controlUiPairingKind === "auth-none" ||
+        controlUiPairingKindAuthorizesSession(controlUiPairingKind) ||
         (skipLocalBackendSelfPairing && authMethod !== "device-token")
       ) {
         hasServerApprovedDeviceTokenBaseline = true;

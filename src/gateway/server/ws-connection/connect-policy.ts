@@ -3,7 +3,7 @@ import type { ConnectParams } from "../../../../packages/gateway-protocol/src/in
 import type { GatewayRole } from "../../role-policy.js";
 import { roleCanSkipDeviceIdentity } from "../../role-policy.js";
 
-export type ControlUiPairingKind = "tailscale-device" | "auth-none" | null;
+export type ControlUiPairingKind = "tailscale-device" | "auth-none" | "identity-session" | null;
 
 export function shouldSkipControlUiPairing(params: {
   isControlUi: boolean;
@@ -30,7 +30,31 @@ export function shouldSkipControlUiPairing(params: {
   if (params.isControlUi && params.role === "operator" && params.authMode === "none") {
     return "auth-none";
   }
+  // An identity-server session already names the person, on every request, from a cookie
+  // the Gateway minted itself. Pairing would ask them to approve a device as well, which
+  // is the friction this mode exists to remove: "signed in from any PC, no pairing".
+  // Without this the exemption only held for loopback clients, where local self-pairing
+  // covered it, so the very deployment this mode is for (a container behind a port) asked
+  // every signed-in person to approve a device that nobody can approve yet.
+  if (
+    params.isControlUi &&
+    params.role === "operator" &&
+    params.authMode === "ix-auth" &&
+    params.authMethod === "ix-auth"
+  ) {
+    return "identity-session";
+  }
   return null;
+}
+
+/**
+ * True when the session is authorized by something other than the pairing record.
+ *
+ * The pairing row still exists for diagnostics and durable grants; it just does not decide
+ * whether this connection may proceed.
+ */
+export function controlUiPairingKindAuthorizesSession(kind: ControlUiPairingKind): boolean {
+  return kind === "auth-none" || kind === "identity-session";
 }
 
 /**

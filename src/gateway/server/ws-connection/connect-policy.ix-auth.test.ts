@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { ConnectParams } from "../../../../packages/gateway-protocol/src/index.js";
 import {
+  controlUiPairingKindAuthorizesSession,
   evaluateMissingDeviceIdentity,
   isIxAuthControlUiOperatorAuth,
   isTrustedProxyControlUiOperatorAuth,
   shouldClearUnboundScopesForMissingDeviceIdentity,
+  shouldSkipControlUiPairing,
 } from "./connect-policy.js";
 
 const CONTROL_UI_IX_AUTH = {
@@ -132,5 +135,41 @@ describe("isTrustedProxyControlUiOperatorAuth regression", () => {
         authMethod: "ix-auth",
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldSkipControlUiPairing with an identity-server session", () => {
+  const base = {
+    isControlUi: true,
+    device: { id: "device-1" } as ConnectParams["device"],
+    role: "operator" as const,
+    authMode: "ix-auth",
+    authMethod: "ix-auth",
+  };
+
+  it("exempts a signed-in Control UI operator from device pairing", () => {
+    // The mode's promise is "signed in from any PC, no pairing". Before this, the
+    // exemption only held for loopback clients, where local self-pairing covered it, so a
+    // containerized deployment asked every signed-in person to approve a device instead.
+    expect(shouldSkipControlUiPairing(base)).toBe("identity-session");
+    expect(controlUiPairingKindAuthorizesSession("identity-session")).toBe(true);
+  });
+
+  it("does not exempt a node-role connection", () => {
+    expect(shouldSkipControlUiPairing({ ...base, role: "node" })).toBeNull();
+  });
+
+  it("does not exempt a client that is not the Control UI", () => {
+    expect(shouldSkipControlUiPairing({ ...base, isControlUi: false })).toBeNull();
+  });
+
+  it("does not exempt a session authenticated some other way", () => {
+    expect(shouldSkipControlUiPairing({ ...base, authMethod: "device-token" })).toBeNull();
+    expect(shouldSkipControlUiPairing({ ...base, authMode: "token" })).toBeNull();
+  });
+
+  it("leaves the pairing record in charge for every other kind", () => {
+    expect(controlUiPairingKindAuthorizesSession(null)).toBe(false);
+    expect(controlUiPairingKindAuthorizesSession("tailscale-device")).toBe(false);
   });
 });
