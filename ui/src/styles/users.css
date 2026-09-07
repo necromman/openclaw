@@ -1,0 +1,145 @@
+/* User management: a directory table and the panel that edits one row.
+ *
+ * Loaded with the page, not from the shared sheet, so a deployment without an
+ * identity server never downloads it. Everything here uses the shared tokens; the
+ * radius cap in fork-style.css applies as it does everywhere else. */
+
+.users-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.users-toolbar__field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.users-toolbar__field--grow {
+  flex: 1 1 220px;
+}
+
+.users-toolbar__label {
+  font-size: var(--control-ui-text-xs);
+  color: var(--muted);
+}
+
+.users-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+/* The directory is genuinely tabular, so it is a table. It scrolls inside its own
+ * box rather than widening the page, which section 1 of fork-style.css forbids. */
+.users-table-scroll {
+  overflow-x: auto;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--control-ui-text-sm);
+}
+
+.users-table th,
+.users-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.users-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+  border-bottom: 1px solid var(--border);
+}
+
+.users-table tbody tr {
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
+.users-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.users-table__row {
+  cursor: default;
+}
+
+.users-table__row[aria-selected="true"] {
+  background: var(--surface-2, var(--surface));
+}
+
+.users-table__name {
+  display: grid;
+  gap: 2px;
+}
+
+.users-table__email {
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.users-table__select {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.users-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--control-ui-text-xs);
+}
+
+.users-status--disabled,
+.users-status--locked {
+  color: var(--danger, var(--text));
+  border-color: var(--danger, var(--border));
+}
+
+.users-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--control-ui-text-sm);
+  color: var(--muted);
+}
+
+.users-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.users-import__preview {
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: var(--control-ui-text-xs);
+  white-space: pre;
+}
+
+.users-import__results {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--control-ui-text-sm);
+}

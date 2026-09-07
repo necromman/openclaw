@@ -184,6 +184,22 @@ export function isIxAuthSessionActive(): boolean {
 }
 
 /**
+ * True when the signed-in account may open the user-management screen.
+ *
+ * The Gateway withholds the console URL from anyone it does not judge an administrator,
+ * so its presence is the same signal the Gateway itself acts on. Reading it here keeps
+ * the sidebar, the identity menu, and the page from each inventing their own role test.
+ */
+export function canManageIxAuthUsers(): boolean {
+  return isIxAuthSessionActive() && lastIxAuthSession?.adminConsoleUrl !== undefined;
+}
+
+/** The probe answer the shell already has, for screens that must not probe again. */
+export function readIxAuthSessionSnapshot(): IxAuthSessionState | undefined {
+  return lastIxAuthSession;
+}
+
+/**
  * Ask the Gateway whether this browser already holds a session.
  *
  * Returns an unauthenticated state rather than throwing when the Gateway is not in
