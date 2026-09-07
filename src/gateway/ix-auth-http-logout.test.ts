@@ -161,7 +161,9 @@ function buildDeps(overrides?: Partial<IxAuthHttpDependencies>): IxAuthHttpDepen
   return {
     settings: SETTINGS,
     isLocalClient: true,
-    isSecureContext: false,
+    // A `__Host-` cookie only exists in a secure context; over plain HTTP the routes
+    // fall back to the unprefixed name and would never see the cookie below.
+    isSecureContext: true,
     clientIp: "203.0.113.7",
     ...overrides,
   };
