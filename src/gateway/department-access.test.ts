@@ -419,7 +419,9 @@ describe("an executive reaches every department through membership", () => {
       expect(gate?.agentAccess("main")).toBe("open");
       expect(gate?.allowsAgent("rnd-bot")).toBe(true);
       expect(gate?.allowsAgent("qa-bot")).toBe(true);
-      expect(authorizeDepartmentAgent({ cfg, client: executive, agentId: "qa-bot" })).toBeUndefined();
+      expect(
+        authorizeDepartmentAgent({ cfg, client: executive, agentId: "qa-bot" }),
+      ).toBeUndefined();
       expect(departmentCacheKeyPart({ cfg, client: executive })).toBe("dept:qa,rnd");
 
       // Reading is the whole grant. The role cap keeps another person's session read-only
