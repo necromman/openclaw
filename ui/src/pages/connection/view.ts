@@ -215,6 +215,7 @@ export function renderConnection(props: ConnectionProps) {
         html`<openclaw-ix-auth-invites
           .basePath=${props.ixAuthBasePath ?? ""}
           .canManage=${true}
+          .canGrantSuperAdmin=${props.ixAuthSession?.user?.isSuperAdmin === true}
         ></openclaw-ix-auth-invites>`)
       : "",
     renderSettingsSection(

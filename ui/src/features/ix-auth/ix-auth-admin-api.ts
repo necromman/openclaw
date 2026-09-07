@@ -27,7 +27,8 @@ export type IxAuthPendingSignup = {
 export type IxAuthInviteResult = {
   email: string;
   userId: string;
-  department?: string;
+  /** Departments actually granted. Empty when none was asked for or none took. */
+  departments: string[];
   departmentFailed: boolean;
   /** Present only when there is no mail server and the Gateway kept the link. */
   inviteLink?: string;
@@ -60,7 +61,7 @@ async function callAdminRoute(params: {
   basePath: string;
   route: string;
   method: "GET" | "POST" | "DELETE";
-  body?: Record<string, string | undefined>;
+  body?: Record<string, string | string[] | undefined>;
 }): Promise<{ kind: "ok"; body: Record<string, unknown> } | IxAuthAdminFailure> {
   const csrfToken = readIxAuthCsrfToken();
   let response: Response;
@@ -99,6 +100,15 @@ async function callAdminRoute(params: {
   return { kind: "ok", body };
 }
 
+function readStringListField(record: unknown, key: string): string[] {
+  if (record === null || typeof record !== "object") {
+    return [];
+  }
+  // SAFETY: the null and typeof guard directly above proves this is an object.
+  const value = (record as Record<string, unknown>)[key];
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
+}
+
 function readStringField(record: unknown, key: string): string | undefined {
   if (record === null || typeof record !== "object") {
     return undefined;
@@ -133,7 +143,8 @@ export async function issueIxAuthInvite(params: {
   email: string;
   name?: string;
   role?: string;
-  department?: string;
+  /** Empty for an executive means "every department", filled in by the Gateway. */
+  departments?: readonly string[];
 }): Promise<IxAuthInviteResult | IxAuthAdminFailure> {
   const result = await callAdminRoute({
     basePath: params.basePath,
@@ -143,7 +154,7 @@ export async function issueIxAuthInvite(params: {
       email: params.email,
       name: params.name,
       role: params.role,
-      department: params.department,
+      departments: [...(params.departments ?? [])],
     },
   });
   if (result.kind === "failed") {
@@ -152,7 +163,7 @@ export async function issueIxAuthInvite(params: {
   return {
     email: readStringField(result.body, "email") ?? params.email,
     userId: readStringField(result.body, "userId") ?? "",
-    department: readStringField(result.body, "department"),
+    departments: readStringListField(result.body, "departments"),
     departmentFailed: result.body.departmentFailed === true,
     inviteLink: readStringField(result.body, "inviteLink"),
   };
@@ -238,7 +249,7 @@ export async function decideIxAuthSignup(params: {
   userId: string;
   decision: "approve" | "reject";
   reason?: string;
-  department?: string;
+  departments?: readonly string[];
 }): Promise<{ kind: "ok" } | IxAuthAdminFailure> {
   const result = await callAdminRoute({
     basePath: params.basePath,
@@ -248,7 +259,7 @@ export async function decideIxAuthSignup(params: {
       userId: params.userId,
       decision: params.decision,
       reason: params.reason,
-      department: params.department,
+      departments: [...(params.departments ?? [])],
     },
   });
   return result.kind === "failed" ? result : { kind: "ok" };

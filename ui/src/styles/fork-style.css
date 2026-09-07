@@ -179,3 +179,20 @@ wa-select.settings-select::part(combobox) {
   overflow-wrap: anywhere;
   word-break: break-all;
 }
+
+/* ── 7. Department checklist ──
+ *
+ * An invitation can reach several departments at once, so the choice is a list of
+ * checkboxes rather than one select. The list wraps instead of stretching its row,
+ * which keeps section 1's promise that a settings page never scrolls sideways. */
+.ix-auth-department-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.ix-auth-department-list label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

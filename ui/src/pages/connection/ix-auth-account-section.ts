@@ -9,6 +9,7 @@ import {
   renderSettingsSection,
   renderSettingsValue,
 } from "../../components/settings-ui.ts";
+import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
@@ -35,11 +36,16 @@ export function renderIxAuthAccountSection(
     return nothing;
   }
   const user = session.user;
+  // The Gateway resolved one rank out of however many identity roles the account holds,
+  // so that is the one worth showing; the codes behind it are an implementation detail.
+  const roleLabel = user.gatewayRole
+    ? ixAuthRoleLabel(user.gatewayRole)
+    : user.roles.map((role) => ixAuthRoleLabel(role)).join(", ");
   return renderSettingsSection({ title: t("ixAuth.title") }, [
     renderSettingsRow({
       title: t("ixAuth.signedInAs", { email: user.email }),
       description: user.displayName,
-      control: renderSettingsValue(user.gatewayRole ?? user.roles.join(", ")),
+      control: renderSettingsValue(roleLabel),
     }),
     user.impersonatedBy
       ? renderSettingsRow({

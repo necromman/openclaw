@@ -18,19 +18,33 @@ import {
   type IxAuthInviteLink,
   type IxAuthPendingSignup,
 } from "../../features/ix-auth/ix-auth-admin-api.ts";
+import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { OpenClawLightDomContentsElement } from "../../lit/openclaw-element.ts";
 
 registerIxAuthEnglish();
 
-/** Roles an invitation may grant, in the order an administrator reads them. */
-const IX_AUTH_INVITE_ROLES: readonly string[] = Object.freeze([
-  "MEMBER",
-  "MODERATOR",
-  "ADMIN",
-  "SUPERADMIN",
-]);
+/**
+ * Roles an invitation offers, least privileged first.
+ *
+ * `MODERATOR` is missing on purpose: the Gateway still accepts it so an existing account
+ * or a hand-written config keeps working, but nobody staffing a company picks it, and a
+ * choice nobody should make does not belong in a list of four.
+ */
+const IX_AUTH_INVITE_ROLES: readonly string[] = Object.freeze(["MEMBER", "EXECUTIVE", "ADMIN"]);
+
+/**
+ * The role whose invitation covers the whole company.
+ *
+ * Checking every box for it is a starting point, not a rule: the administrator can clear
+ * any of them, and the Gateway fills the list itself when none is left rather than
+ * trusting whatever the form posts.
+ */
+const IX_AUTH_ALL_DEPARTMENT_ROLE = "EXECUTIVE";
+
+/** Only a super administrator may hand out their own rank. */
+const IX_AUTH_SUPER_ADMIN_INVITE_ROLE = "SUPERADMIN";
 
 function isAdminFailure(value: unknown): value is { kind: "failed"; errorKey: string } {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -44,6 +58,11 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
   @property({ attribute: false }) basePath = "";
   /** True only for a session the Gateway already reported carries an admin role. */
   @property({ attribute: false }) canManage = false;
+  /**
+   * True for a super-admin session. The Gateway refuses the promotion either way; this
+   * only keeps an offer off the screen that would always be answered with 403.
+   */
+  @property({ attribute: false }) canGrantSuperAdmin = false;
 
   @state() private departments: IxAuthDepartmentOption[] = [];
   @state() private invites: IxAuthInviteLink[] = [];
@@ -51,7 +70,7 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
   @state() private email = "";
   @state() private name = "";
   @state() private inviteRole = "MEMBER";
-  @state() private department = "";
+  @state() private selectedDepartments: string[] = [];
   @state() private busy = false;
   @state() private errorKey: string | undefined;
   @state() private mailedTo: string | undefined;
@@ -89,6 +108,27 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
     }
   }
 
+  /** Roles to offer this administrator, widest rank last. */
+  private inviteRoleOptions(): readonly string[] {
+    return this.canGrantSuperAdmin
+      ? [...IX_AUTH_INVITE_ROLES, IX_AUTH_SUPER_ADMIN_INVITE_ROLE]
+      : IX_AUTH_INVITE_ROLES;
+  }
+
+  private selectRole(role: string): void {
+    this.inviteRole = role;
+    // Switching to the company-wide role fills the list in; switching away leaves the
+    // administrator's own choice alone, because they may have meant it.
+    if (role === IX_AUTH_ALL_DEPARTMENT_ROLE) {
+      this.selectedDepartments = this.departments.map((item) => item.code);
+    }
+  }
+
+  private toggleDepartment(code: string, checked: boolean): void {
+    const remaining = this.selectedDepartments.filter((item) => item !== code);
+    this.selectedDepartments = checked ? [...remaining, code] : remaining;
+  }
+
   private async invite(): Promise<void> {
     const email = this.email.trim();
     if (!email || this.busy) {
@@ -102,7 +142,7 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
       email,
       name: this.name.trim() || undefined,
       role: this.inviteRole,
-      department: this.department || undefined,
+      departments: this.selectedDepartments,
     });
     this.busy = false;
     if (isAdminFailure(result)) {
@@ -137,7 +177,7 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
       basePath: this.basePath,
       userId,
       decision,
-      department: decision === "approve" ? this.department || undefined : undefined,
+      departments: decision === "approve" ? this.selectedDepartments : [],
     });
     this.busy = false;
     if (isAdminFailure(result)) {
@@ -185,35 +225,42 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
         ?disabled=${this.busy}
         @change=${(e: Event) => {
           // SAFETY: this listener is bound to the select element on this template line.
-          this.inviteRole = (e.target as HTMLSelectElement).value;
+          this.selectRole((e.target as HTMLSelectElement).value);
         }}
       >
-        ${IX_AUTH_INVITE_ROLES.map(
+        ${this.inviteRoleOptions().map(
           (code) =>
-            html`<option value=${code} ?selected=${code === this.inviteRole}>${code}</option>`,
+            html`<option value=${code} ?selected=${code === this.inviteRole}>
+              ${ixAuthRoleLabel(code)}
+            </option>`,
         )}
       </select>
     `;
   }
 
-  private renderDepartmentSelect(): TemplateResult {
+  private renderDepartmentChecklist(): TemplateResult {
+    if (this.departments.length === 0) {
+      return html`<span class="muted">${t("ixAuth.invites.departmentsEmpty")}</span>`;
+    }
     return html`
-      <select
-        class="settings-select"
-        ?disabled=${this.busy}
-        @change=${(e: Event) => {
-          // SAFETY: this listener is bound to the select element on this template line.
-          this.department = (e.target as HTMLSelectElement).value;
-        }}
-      >
-        <option value="">${t("ixAuth.invites.departmentNone")}</option>
+      <div class="ix-auth-department-list">
         ${this.departments.map(
-          (item) =>
-            html`<option value=${item.code} ?selected=${item.code === this.department}>
-              ${item.name}
-            </option>`,
+          (item) => html`
+            <label>
+              <input
+                type="checkbox"
+                ?disabled=${this.busy}
+                .checked=${this.selectedDepartments.includes(item.code)}
+                @change=${(e: Event) => {
+                  // SAFETY: bound to the checkbox on this template line.
+                  this.toggleDepartment(item.code, (e.target as HTMLInputElement).checked);
+                }}
+              />
+              <span>${item.name}</span>
+            </label>
+          `,
         )}
-      </select>
+      </div>
     `;
   }
 
@@ -325,8 +372,13 @@ class IxAuthInvites extends OpenClawLightDomContentsElement {
         control: this.renderRoleSelect(),
       }),
       renderSettingsRow({
-        title: t("ixAuth.invites.departmentLabel"),
-        control: this.renderDepartmentSelect(),
+        title: t("ixAuth.invites.departmentsLabel"),
+        description:
+          this.inviteRole === IX_AUTH_ALL_DEPARTMENT_ROLE
+            ? t("ixAuth.invites.departmentsExecutiveHint")
+            : undefined,
+        stacked: true,
+        control: this.renderDepartmentChecklist(),
       }),
       renderSettingsRow({
         title: "",

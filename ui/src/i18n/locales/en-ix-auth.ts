@@ -20,6 +20,14 @@ const enIxAuth = {
     signOut: "Sign out",
     signedInAs: "Signed in as {email}",
     manageUsers: "Manage users",
+    // One label per rank the Gateway resolves, so no screen prints a raw role code.
+    roles: {
+      superadmin: "System administrator",
+      admin: "Administrator",
+      executive: "Executive",
+      moderator: "Moderator",
+      member: "Staff",
+    },
     impersonating: "Viewing as this user. Administrator: {admin}",
     // Shown in place of a signup link where the identity server refuses signups, so
     // nobody hunts for a form that does not exist.
@@ -75,8 +83,10 @@ const enIxAuth = {
       emailLabel: "Email",
       nameLabel: "Display name",
       roleLabel: "Role",
-      departmentLabel: "Department",
-      departmentNone: "No department",
+      departmentsLabel: "Departments",
+      departmentsEmpty: "No departments have been created yet.",
+      departmentsExecutiveHint:
+        "An executive is placed in every department. Clear any that should not apply.",
       submit: "Invite",
       submitting: "Inviting",
       linkTitle: "Invitation link",
