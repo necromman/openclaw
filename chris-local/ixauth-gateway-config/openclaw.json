@@ -15,18 +15,26 @@
       }
     },
     "controlUi": {
-      "allowedOrigins": ["__OPENCLAW_PUBLIC_ORIGIN__"]
+      "allowedOrigins": [
+        "__OPENCLAW_PUBLIC_ORIGIN__"
+      ]
     },
     "roles": {
       "default": "member",
       "definitions": {
         "superadmin": {
-          "sessions": { "others": "write" },
+          "sessions": {
+            "others": "write"
+          },
           "agents": "*",
-          "scopes": ["operator.admin"]
+          "scopes": [
+            "operator.admin"
+          ]
         },
         "admin": {
-          "sessions": { "others": "write" },
+          "sessions": {
+            "others": "write"
+          },
           "agents": "*",
           "scopes": [
             "operator.read",
@@ -36,7 +44,9 @@
           ]
         },
         "moderator": {
-          "sessions": { "others": "suggest" },
+          "sessions": {
+            "others": "suggest"
+          },
           "agents": "*",
           "scopes": [
             "operator.read",
@@ -46,14 +56,39 @@
           ]
         },
         "member": {
-          "sessions": { "others": "view" },
+          "sessions": {
+            "others": "view"
+          },
           "agents": "*",
-          "scopes": ["operator.read", "operator.write", "operator.questions"]
+          "scopes": [
+            "operator.read",
+            "operator.write",
+            "operator.questions"
+          ]
         }
       }
     }
   },
   "tools": {
-    "sessions": { "visibility": "self" }
+    "sessions": {
+      "visibility": "department"
+    }
+  },
+  "agents": {
+    "ownership": "explicit",
+    "entries": {
+      "main": {
+        "name": "Shared Assistant",
+        "description": "Shared agent with no department binding"
+      },
+      "rnd-bot": {
+        "name": "R&D Bot",
+        "description": "Department agent for R&D"
+      },
+      "qa-bot": {
+        "name": "QA Bot",
+        "description": "Department agent for QA"
+      }
+    }
   }
 }

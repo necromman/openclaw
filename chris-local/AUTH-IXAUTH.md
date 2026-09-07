@@ -187,15 +187,15 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 - **여러 역할을 가지면 가장 높은 것**을 취한다(superadmin > admin > moderator > member). 매핑 목록에 없는 이름은 모든 알려진 이름보다 낮게 정렬된다.
 - **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
 - 관리 콘솔 링크는 `superadmin`·`admin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다.
-- 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. **이번 단계는 매핑 데이터만 준비하고 강제하지 않는다** (6절).
+- 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. A 단계는 매핑 데이터만 준비했고, **B 단계가 강제를 붙였다** - 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).
 
 ## 6. 이번 단계에서 하지 않은 것
 
 | 항목                                       | 상태                                                                                                               | 다음 단계 조건                                                                    |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| 부서 접근 강제(`department-access`)        | **미구현.** 부서 코드는 principal 까지만 온다                                                                      | 아래 6.1                                                                          |
-| `departments` / `department_agents` 테이블 | 미구현                                                                                                             | 6.1                                                                               |
-| 세션 목록·이벤트·`agents.list` 부서 필터   | 미구현                                                                                                             | 6.1                                                                               |
+| 부서 접근 강제(`department-access`)        | **해결(B 단계).** `tools.sessions.visibility: "department"` 로 켠다                                                | 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md)                                   |
+| `departments` / `department_agents` 테이블 | **해결(B 단계).** feature-local DDL 3표, 스키마 버전 유지                                                          | AUTH-DEPARTMENTS.md 6절                                                           |
+| 세션 목록·이벤트·`agents.list` 부서 필터   | **해결(B 단계).** 목록·직접 열람·전사·이벤트·에이전트 선택·생성 게이트                                             | AUTH-DEPARTMENTS.md 7절                                                           |
 | 초대장 가입 플로우 화면 3개                | 미구현                                                                                                             | 6.2                                                                               |
 | 포크 감사 원장 해시 체인                   | 미구현. 인증 사건은 IX-Auth 원장에 남는다                                                                          | 6.3                                                                               |
 | TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다                                                                        | IX-Auth 콘솔에서 등록. **콘솔 접근 경로가 A 단계에서 열렸다**(`/admin/identity/`) |
@@ -203,13 +203,15 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 | 역할 4단계 시드                            | **해결(A 단계).** IX-Auth 마이그레이션 `V14` 가 만든다. 콘솔에서 손으로 만들 필요가 없다                           | -                                                                                 |
 | 무인 배포                                  | **해결(A 단계).** `docker compose up -d` 한 번으로 마이그레이션·역할 시드·superadmin 부트스트랩·설정 주입이 끝난다 | 절차는 [DEPLOY.md](DEPLOY.md)                                                     |
 
-**대신 지금 넣은 완화책**: `tools.sessions.visibility` 를 이 모드의 배포 설정에서 `"self"` 로 좁혀 둔다. 부서 강제가 없는 동안 모델의 sessions 도구가 남의 세션을 훑지 못하게 하는 최소 방어다.
+**A 단계의 완화책**: `tools.sessions.visibility` 를 `"self"` 로 좁혀 두었다. B 단계에서 같은 키를 `"department"` 로 올려 그 자리가 실제 경계가 됐다.
 
-### 6.1 부서 강제 진입 조건
+### 6.1 부서 강제 (B 단계에서 완료)
 
-1. 부서 코드 체계 확정(`dept-<slug>` 규칙, 부서 목록의 정본이 IX-Auth 그룹인지 포크 DB 인지).
-2. `departments` / `department_agents` 스키마 승인 - AGENTS.md 가 SQLite 스키마 변경에 명시 승인을 요구한다.
-3. AUTH-PLAN 3.2 "인가·부서 경계" 훅 10곳의 회귀 테스트 계획.
+세 진입 조건이 모두 충족돼 구현했다. 정본은 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).
+
+1. 부서 코드 체계 확정 - `dept-<slug>`, 정본은 IX-Auth 그룹이고 포크 DB 는 투영이다.
+2. 스키마 승인 - 감독자 승인 근거를 AUTH-DEPARTMENTS.md 6.1 에 남겼다.
+3. 훅 회귀 - `department-access.test.ts` 21건 + 기존 sharing·visibility 회귀 통과.
 
 ### 6.2 초대장 가입 진입 조건
 
@@ -351,7 +353,7 @@ docker compose --env-file chris-local/ixauth.env \
 | 토큰 위조·알고리즘 강등 | `ix-auth-jwks.ts` (alg 화이트리스트, kid 필수)                  | `ix-auth-jwks.test.ts`           |
 | 발급자·대상 위조        | `ix-auth-claims.ts` iss/aud 대조                                | `ix-auth-claims.test.ts`         |
 | 로그 비밀 배제          | 감사 이벤트에 토큰·비밀번호를 싣지 않는다                       | 코드 리뷰                        |
-| 부서 누출               | **미구현** (6.1)                                                | -                                |
+| 부서 누출               | `department-access.ts` (에이전트 경계, superadmin 만 통과)      | `department-access.test.ts` (21) |
 
 ## 11. 라이브 검증 기록 (2026-09-07, WSL 로컬)
 
