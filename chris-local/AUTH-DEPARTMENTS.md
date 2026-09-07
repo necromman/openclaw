@@ -401,20 +401,39 @@ superadmin), 에이전트 3개(`rnd-bot`->rnd, `qa-bot`->qa, `main` 미바인딩
 여기에 마운트가 `:ro` 라서 컨테이너 파일시스템이 네 번째 방어선이 된다.\
 쓰기가 성공하면 그 자체가 배선 오류의 신호다.
 
-### 13.4 셸 exec 을 끄는 이유
+**세 잠금 중 앞의 둘은 네이티브 런타임의 도구 목록과 세션 권한에 걸리고, 세 번째는 파일 도구의 경로\
+검사에 걸린다.** 셋 다 모델이 파일을 `read` 도구로 읽는다는 전제 위에 있다. codex 하네스는 파일을\
+자기 셸로 읽으므로 그 전제가 깨진다. 13.9 를 보라.
 
-```json
-"exec": { "mode": "deny" }
-```
-
-`tools.exec.mode` 의 유효값은 `deny`·`allowlist`·`ask`·`auto`·`full` 이다\
-(`src/config/zod-schema.agent-runtime.ts:528`, 타입은 `src/infra/exec-approvals-core.ts:12`).\
-같은 블록에 `security`·`ask` 를 함께 쓰면 스키마가 거부한다(같은 파일 `addExecPolicyModeConflictIssue`).
+### 13.4 셸이 열려 있으면 3중 잠금이 무너진다
 
 셸이 열려 있으면 위의 3중 잠금이 의미를 잃는다. 파일 도구의 경로 검사는 파일 도구에만 걸리고,\
 셸은 `cat`·`find` 로 임의 경로를 읽는 별도의 통로이기 때문이다. 한 곳만 새도 화이트리스트가 무너지는\
-구조라, 파일 서버 용도 에이전트에서는 셸을 아예 닫는다. 셸이 필요한 작업은 부서 에이전트가 아니라\
+구조라, 파일 서버 용도 에이전트에서는 셸을 닫는다. 셸이 필요한 작업은 부서 에이전트가 아니라\
 다른 에이전트에서 한다.
+
+네이티브 런타임에서 셸을 닫는 것은 `tools.profile: "readonly"` 다. readonly 프로필은 허용 목록이라\
+`exec`·`process` 가 애초에 들어오지 않는다(`src/agents/tool-catalog.ts:475`).
+
+G 단계 템플릿에는 부서 에이전트마다 `tools.exec.mode: "deny"` 와 `tools.fs.workspaceOnly: true` 를\
+한 번 더 적어 두었다. 둘 다 이미 성립하는 값을 되풀이한 것이라(readonly 프로필이 exec 을 빼고,\
+전역 `tools.fs.workspaceOnly` 가 이미 참이다) 판정을 바꾸지 않으면서 기동마다 경고만 남겼다.
+
+```text
+tools policy: profile "readonly" (agent "rnd-bot") has configured tool sections
+(tools.exec / tools.fs) that no longer implicitly widen the profile.
+```
+
+경고의 뜻은 "프로필과 함께 적은 `tools.exec`·`tools.fs` 절이 예전처럼 프로필을 넓혀 주지 않는다" 이고,\
+판정은 `detectImplicitProfileGrants`(`src/agents/agent-tools.policy.ts:322-341`)와 그 호출부\
+(같은 파일 `423-465`)에 있다. 넓힐 의도가 없었으므로 두 절을 템플릿에서 지웠다.\
+부서 에이전트에 남은 것은 `profile` 과 `permissionMode` 두 줄이다.\
+에이전트 `tools.fs` 를 지워도 경계는 그대로다. 값이 없으면 전역 `tools.fs` 로 떨어지기 때문이다\
+(`resolveToolFsConfig`, `src/agents/tool-fs-policy.ts:15-25`).\
+`tools.exec.mode` 의 유효값 자체는 그대로 `deny`·`allowlist`·`ask`·`auto`·`full` 이다\
+(`src/config/zod-schema.agent-runtime.ts:528`, 타입은 `src/infra/exec-approvals-core.ts:12`).
+
+**이 절이 성립하는 것은 네이티브 런타임에서다.** codex 하네스에서는 성립하지 않는다. 13.9 를 보라.
 
 ### 13.5 NAS 공유가 에이전트에 닿는 3단계
 
@@ -491,6 +510,88 @@ NAS 워크스페이스를 켜면 `main` 을 포함한 이 배포의 모든 에�
 두 통제면을 각각 관리한다는 말의 뜻은 이렇다. NAS 에서 어떤 사람의 폴더 권한을 회수해도\
 그 사람이 쓰던 에이전트는 그대로 그 폴더를 본다. 반대로 에이전트 바인딩을 바꿔도 NAS 의\
 파일 탐색기 접근은 그대로다. 사람이 부서를 옮기거나 퇴사하면 **양쪽을 다 처리해야 한다.**
+
+### 13.9 codex 하네스에서는 폴더 경계가 서지 않는다 (2026-09-08 실측)
+
+**결론부터.** `openai/gpt-5.6-sol` 을 ChatGPT 구독 OAuth 로 붙이면 부서 에이전트는 codex 하네스에서\
+돈다. 그 경로에서는 13.3 의 3중 잠금이 폴더 경계를 만들지 못한다. **읽기를 열면 다른 부서 폴더도\
+같이 열린다.** 그래서 열지 않았고, 부서 에이전트는 그 경로에서 파일을 읽지 못한 채로 둔다.\
+경계가 새는 것이 기능이 없는 것보다 나쁘다.
+
+**증상.** 관리자가 `rnd-bot` 새 세션(권한 표시 "읽기 전용")에 "작업 폴더 문서들을 한 줄씩 요약하고\
+summary.md 로 저장해줘" 를 보내면, 명령 2개를 실행한 뒤 "작업 폴더 접근 권한이 승인되지 않아\
+문서를 읽거나 summary.md 를 생성할 수 없었습니다" 로 끝난다. 쓰기 거부는 의도지만 읽기까지 실패한다.
+
+**전사에서 확인한 두 명령.** 세션 기록은 컨테이너의\
+`/home/node/.openclaw/agents/rnd-bot/agent/codex-home/sessions/<날짜>/rollout-*.jsonl` 이다.
+
+```text
+1) rg --files -g '*.md' ... (cwd /mnt/nas/rnd)
+   -> bwrap: No permissions to create a new namespace, likely because the kernel
+      does not allow non-privileged user namespaces.
+2) 같은 명령을 sandbox_permissions="require_escalated" 로 재시도
+   -> exec_command failed: CreateProcess { message: "Rejected(\"rejected by user\")" }
+```
+
+같은 파일의 `turn_context` 는 `approval_policy=on-request`, `sandbox_policy={"type":"read-only"}`,\
+`permission_profile={managed, file_system:{restricted, entries:[{path::root, access:read}]}}` 였다.\
+번역 자체는 의도대로다. `permissionMode: "read-only"` 는 codex 의 `read-only` 샌드박스와 사용자 승인으로\
+내려간다(`extensions/codex/src/app-server/session-permission-policy.ts:44-71`). 두 번째 명령이 거부된 것도\
+읽기 전용 세션에서 권한 상승을 자동 거부한 정상 동작이다.
+
+**원인 1: 컨테이너 안에서 codex 샌드박스가 아예 못 뜬다.** codex 는 리눅스에서 bubblewrap 으로\
+샌드박스를 만들고, bubblewrap 은 사용자 네임스페이스를 필요로 한다. 도커 기본 seccomp 프로파일은\
+`CAP_SYS_ADMIN` 이 없는 컨테이너에서 `unshare(CLONE_NEWUSER)` 를 막는다. 그래서 **읽기 명령까지 포함해\
+모든 명령이 실패한다.** 게이트웨이 컨테이너에서 그대로 재현된다.
+
+```bash
+docker exec openclaw-ixauth-gateway-1 sh -lc 'unshare -Ur /bin/echo ok'
+# unshare: unshare failed: Operation not permitted
+```
+
+**원인 2: 그 봉인을 풀어도 폴더 경계는 서지 않는다.** codex 의 `read-only` 샌드박스는 "쓰기 금지"이지\
+"워크스페이스만 읽기"가 아니다. 위 `permission_profile` 의 `:root` 는 워크스페이스 루트가 아니라\
+파일시스템 루트 `/` 로 풀린다(`resolveFsSpecialPath`,\
+`extensions/codex/src/app-server/sandbox-exec-server/fs-policy.ts:132-135`).\
+같은 이미지에서 그 프로파일을 그대로 넣고 확인한 결과다.
+
+```bash
+# seccomp 를 푼 일회용 컨테이너에서, 실제 턴이 쓰던 permission_profile 을 그대로 준다
+codex sandbox --sandbox-state-json '{"sandboxCwd":"file:///mnt/nas/rnd","permissionProfile":
+  {"type":"managed","file_system":{"type":"restricted","entries":[
+  {"path":{"type":"special","value":{"kind":"root"}},"access":"read"}]},"network":"restricted"}}' \
+  -- /bin/cat /mnt/nas/qa/README.md
+# -> 다른 부서 문서가 그대로 출력된다
+```
+
+읽기 범위를 워크스페이스로 좁히려면 `entries` 를 `{"kind":"project_roots"}` 로 바꿔야 하고,\
+그렇게 주면 실제로 `/mnt/nas/qa` 는 사라진다(같은 방식으로 확인). 그러나 턴마다 보내는\
+app-server 프로토콜의 `sandboxPolicy` 에는 쓰기 루트(`writableRoots`)만 있고 읽기 루트를 좁힐 자리가 없다\
+(`extensions/codex/src/app-server/protocol.ts:417`, 생성부는 `codexSandboxPolicyForTurn`,\
+`extensions/codex/src/app-server/config-runtime.ts:532-542`).\
+`--sandbox-state-json` 은 CLI 전용 표면이라 하네스가 쓰지 않는다.
+
+**검토하고 기각한 것.**
+
+| 안                                                           | 기각 이유                                                                                                                                                       |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 컨테이너에 `cap_add: SYS_ADMIN` 을 주어 bubblewrap 을 살린다 | 원인 2 때문에 그 순간 `/mnt/nas/qa` 가 읽힌다. 셸을 살리는 것이 곧 경계를 여는 것이다                                                                           |
+| 에이전트별 도커 샌드박스(`agents.entries.<id>.sandbox`)      | codex 하네스가 그 경로를 타기는 한다(`ensureCodexSandboxExecServerEnvironment`). 다만 게이트웨이 컨테이너에 도커 소켓을 넣어야 하고, 그것은 호스트 root 와 같다 |
+| 부서 에이전트만 네이티브 런타임으로                          | **유일하게 성립하는 길이다.** 다만 구독 OAuth 프로필은 codex 경로에만 붙는다. API 키가 필요하다                                                                 |
+
+**그래서 지금 지원되는 구성.** 부서 에이전트를 실제로 쓰려면 그 에이전트의 모델을 네이티브 런타임이\
+받는 자격증명(API 키)으로 준다([DEPLOY.md](DEPLOY.md) 3.4 (가)). 네이티브 런타임에서는 파일 접근이\
+`read` 도구를 지나고, 그 도구가 `tools.fs.workspaceOnly` 로 워크스페이스 밖을 막는다.\
+구독 OAuth 만 있는 배포에서는 부서 에이전트를 파일 서버로 쓰지 않는다.
+
+**조용히 지나가지 않게 하는 장치.** 위 조합이 설정에 남아 있으면 `openclaw doctor` 가 경고한다.\
+검사 id 는 `codex/agent-workspace-boundary` 이고, 읽기 전용 + 워크스페이스 한정으로 선언된 에이전트가\
+codex 런타임으로 라우팅될 때만 뜬다(`extensions/codex/src/doctor-workspace-boundary.ts`).
+
+```bash
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml \
+  exec -u node gateway node openclaw.mjs doctor --lint --only codex/agent-workspace-boundary
+```
 
 ## 14. 텔레그램 운영 규칙
 
