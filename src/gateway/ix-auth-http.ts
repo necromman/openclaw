@@ -359,6 +359,10 @@ async function handleIxAuthLogoutRoute(params: {
       revokedAt: Date.now(),
       reason: "user-logout",
     });
+    // The session row is dead, but an already admitted WebSocket keeps the scopes it was
+    // given at connect time. Close those before answering, so the tab that just signed
+    // out cannot keep driving the Gateway until it happens to reload.
+    params.deps.disconnectClientsForUserProfile?.(resolution.row.profile_id);
     // Best effort: the Gateway session is already dead, so a failure here only delays
     // the identity server's own cleanup.
     await relayIxAuthLogout({

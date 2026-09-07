@@ -33,6 +33,7 @@ async function runIxAuthHttpStage(params: {
   trustedProxies: string[];
   clientIp?: string;
   rateLimiter?: AuthRateLimiter;
+  disconnectClientsForUserProfile?: (profileId: string) => void;
   respondNotFound: (res: ServerResponse) => void;
 }): Promise<boolean> {
   // Imported here rather than at module scope so a deployment that never enables this
@@ -70,6 +71,9 @@ async function runIxAuthHttpStage(params: {
         fromTrustedProxy: isTrustedProxyAddress(socket?.remoteAddress, params.trustedProxies),
       }),
       rateLimiter: params.rateLimiter,
+      ...(params.disconnectClientsForUserProfile
+        ? { disconnectClientsForUserProfile: params.disconnectClientsForUserProfile }
+        : {}),
     },
   });
 }
@@ -155,6 +159,8 @@ export function planIxAuthHttpStages(params: {
   trustedProxies: string[];
   clientIp?: string;
   rateLimiter?: AuthRateLimiter;
+  /** Reaches the live connection set so signing out can close that person's sockets. */
+  disconnectClientsForUserProfile?: (profileId: string) => void;
   respondNotFound: (res: ServerResponse) => void;
 }): Array<() => Promise<boolean>> {
   const { authMode: _authMode, ...stageParams } = params;

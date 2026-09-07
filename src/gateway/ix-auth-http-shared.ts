@@ -41,6 +41,14 @@ export type IxAuthHttpDependencies = {
   /** True when the browser reached the Gateway over TLS or a loopback secure context. */
   isSecureContext: boolean;
   rateLimiter?: AuthRateLimiter;
+  /**
+   * Close the WebSocket connections that authenticated as this user profile.
+   *
+   * Signing out has to reach the sockets too: the cookie is gone, but an already
+   * admitted connection keeps its scopes until something closes it, so without this a
+   * signed-out browser tab would still be able to drive the Gateway.
+   */
+  disconnectClientsForUserProfile?: (profileId: string) => void;
   onSecurityEvent?: (event: IxAuthSecurityEvent) => void;
 };
 

@@ -470,6 +470,11 @@ export function createGatewayHttpServer(opts: {
         trustedProxies,
         clientIp: ingressAttribution.rateLimit.subject.key,
         rateLimiter: joinRateLimiter,
+        // Read through the resolver rather than captured once: the request context is
+        // rebuilt across Gateway epochs, and a stale closure would close nothing.
+        disconnectClientsForUserProfile: (profileId: string) => {
+          opts.getGatewayRequestContext?.()?.disconnectClientsForUserProfile?.(profileId);
+        },
         respondNotFound,
       })) {
         addRequestStage(true, stage);
