@@ -166,7 +166,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 ### 3.4 모델 프로바이더
 
-기동 직후에는 **"사용 가능한 모델 없음"** 이다. 이 스택은 모델을 하나도 켜 놓지 않는다. 아래 둘 중 하나를 고른다.
+기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 기본 모델(`agents.defaults.model.primary` = `openai/gpt-5.6-sol`)과 그 모델이 요구하는 codex 런타임(`plugins.entries.codex.enabled`)만 켜 두고, 키도 계정도 담지 않는다. 아래 셋 중 하나를 고른다.
 
 정본 설정 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 매 기동마다 상태 볼륨에 덮어쓴다(5절). 모델 설정도 이 파일에 넣는다.
 
@@ -250,6 +250,54 @@ ollama-models:
 - 모델은 미리 받아 둔다: `docker compose ... exec ollama ollama pull qwen4:32b`, 임베딩은 `ollama pull bge-m3`.
 - 임베딩 모델을 바꾸면 색인 정체성이 달라진다. 반드시 3.5 의 재색인을 돌린다.
 - GPU 가 있으면 compose 서비스에 `deploy.resources.reservations.devices` 로 넘긴다. 없으면 CPU 로도 뜨지만 응답이 느리다.
+
+#### (다) ChatGPT 구독(Codex OAuth) 방식
+
+API 키를 따로 사지 않고, 이미 있는 ChatGPT 유료 구독 계정으로 붙인다. 자격증명은 API 키가 아니라 OAuth 프로필이라 `.env` 에도 설정 파일에도 쓰지 않는다. 상태 볼륨의 인증 저장소(`/home/node/.openclaw/state/openclaw.sqlite`)에 들어가고, 컨테이너를 다시 만들어도 볼륨이 살아 있는 한 유지된다.
+
+정본 템플릿에는 이 방식에 필요한 두 키가 이미 들어 있다. 그래서 로그인만 하면 되고, 설정을 고칠 일이 없다.
+
+```json
+{
+  "plugins": { "entries": { "codex": { "enabled": true } } },
+  "agents": { "defaults": { "model": { "primary": "openai/gpt-5.6-sol" } } }
+}
+```
+
+`openai/gpt-5.6-sol` 은 codex 하니스가 실행하는 모델이고, 그 하니스를 소유한 플러그인이 **설정에서 명시적으로 켜져 있어야** 런타임으로 인정된다. 이 키가 없으면 로그인을 해 두어도 `models status` 가 `runtime=unavailable | No enabled plugin owns agent harness "codex"` 로 답한다.
+
+**로그인 절차.** 브라우저 리디렉션이 없는 device-code 흐름을 쓴다. 로그인 명령은 대화형이라 TTY 가 필요하므로 `script` 로 감싸 배경에서 띄우고, 승인 주소와 코드는 로그에서 읽는다.
+
+```bash
+# 1) 로그인 명령을 배경에서 띄운다 (출력은 /tmp/openai-login.log 로 흘린다)
+docker exec -d openclaw-ixauth-gateway-1 sh -c \
+  "script -q -f -c 'openclaw models auth login --provider openai --device-code --agent main' /tmp/openai-login.log"
+
+# 2) 승인 주소와 코드를 읽는다 (몇 초 뒤에 찍힌다)
+docker exec openclaw-ixauth-gateway-1 cat /tmp/openai-login.log
+```
+
+로그에 나오는 주소(`https://auth.openai.com/codex/device`)를 브라우저에서 열고, 같은 로그에 찍힌 코드를 넣은 뒤 구독 계정으로 승인한다. 승인이 끝나면 로그가 프로필 생성(`openai:<계정메일>`)으로 끝난다.
+
+**첫 로그인은 codex 런타임 패키지도 같이 내려받는다.** 납품 이미지는 이 플러그인을 담고 있지 않고, 로그인 명령이 상태 볼륨(`/home/node/.openclaw/npm/projects/`)에 설치한다. 그러니 첫 로그인 뒤에는 게이트웨이를 한 번 다시 띄워야 실행 중인 프로세스가 새 플러그인을 잡는다. 두 번째부터는 볼륨에 이미 있으므로 재기동만으로 끝난다.
+
+```bash
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml \
+  restart gateway
+```
+
+> **함정.** `openclaw doctor --fix` 로 고치려 들지 마라. 게이트웨이가 도는 컨테이너에서 돌릴 수 있는 수리가 아니다. doctor 는 대화형 확인을 거는 흐름이라 TTY 없는 `docker exec` 에서 그대로 서고, 끝까지 돌더라도 doctor 가 고친 `openclaw.json` 은 다음 기동 때 `start-gateway.sh` 의 템플릿 렌더에 덮여 사라진다. 덮인 사본이 상태 볼륨에 `openclaw.json.clobbered.<시각>` 으로 남는 것이 그 증거다. 이 스택에서 설정을 바꾸는 길은 템플릿 파일 하나뿐이다(5절).
+
+**확인.**
+
+```bash
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml \
+  exec -u node gateway node openclaw.mjs models status --agent main
+```
+
+`Runtime auth` 줄이 `openai via codex ... status=usable` 이면 끝난 것이다. `runtime=unavailable` 이면 템플릿의 `plugins.entries.codex.enabled` 가 렌더된 설정에 들어갔는지부터 본다.
+
+> 구독 계정 하나를 여러 사용자가 공유하는 셈이므로 사용량 한도가 계정 단위로 걸린다. `models status` 의 `OAuth/token status` 줄이 남은 5시간·주간 한도를 알려 준다.
 
 #### 확인
 
