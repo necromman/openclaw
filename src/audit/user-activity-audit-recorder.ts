@@ -7,13 +7,14 @@
 // Failures never propagate. A ledger that can break a login is worse than a ledger with
 // a hole in it, so a write error becomes a diagnostic line and nothing else.
 import { getRuntimeConfig } from "../config/io.js";
+import { getRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
 import { logVerbose } from "../globals.js";
 import type { UserActivityAuditKind } from "../state/user-activity-audit-schema.js";
 import {
   appendUserActivityAuditEvent,
   type UserActivityAuditActor,
 } from "../state/user-activity-audit-store.js";
-import { resolveUserActivityAuditPolicy } from "./audit-config.js";
+import { resolveUserActivityAuditPolicy, type UserActivityAuditPolicy } from "./audit-config.js";
 
 export type { UserActivityAuditActor };
 
@@ -29,13 +30,22 @@ export type UserActivityRecordParams = {
   at?: number;
 };
 
+/**
+ * Resolve the ledger policy without loading configuration when it is already resolved.
+ *
+ * The Gateway installs a runtime snapshot, so the common path is a field read; a direct
+ * local command with no snapshot falls back to the cached loader.
+ */
+function readPolicy(): UserActivityAuditPolicy {
+  return resolveUserActivityAuditPolicy(getRuntimeConfigSnapshot() ?? getRuntimeConfig());
+}
+
 /** Record one activity row. Returns whether a row was written. */
 export function recordUserActivity(params: UserActivityRecordParams): boolean {
-  const policy = resolveUserActivityAuditPolicy(getRuntimeConfig());
-  if (!policy.enabled) {
-    return false;
-  }
   try {
+    if (!readPolicy().enabled) {
+      return false;
+    }
     appendUserActivityAuditEvent({
       at: params.at ?? Date.now(),
       kind: params.kind,
@@ -54,7 +64,16 @@ export function recordUserActivity(params: UserActivityRecordParams): boolean {
   }
 }
 
-/** Whether this deployment stores question text. Read once per recording point. */
+/**
+ * Whether this deployment stores question text.
+ *
+ * Answers "no" if the policy cannot be read at all: a ledger that guessed wrong here
+ * would write user-authored content into a deployment that never asked for it.
+ */
 export function isPromptTextRecorded(): boolean {
-  return resolveUserActivityAuditPolicy(getRuntimeConfig()).promptText;
+  try {
+    return readPolicy().promptText;
+  } catch {
+    return false;
+  }
 }
