@@ -13,6 +13,14 @@ const DEFAULT_SETTINGS = {
 
 describe("resolveIxAuthGatewayRole", () => {
   it("maps each default identity role onto its gateway role", () => {
+    // The five tiers the fork ships, listed so a dropped or renamed one fails here.
+    expect({ ...IX_AUTH_DEFAULT_ROLE_MAP }).toEqual({
+      SUPERADMIN: "superadmin",
+      ADMIN: "admin",
+      EXECUTIVE: "executive",
+      MODERATOR: "moderator",
+      MEMBER: "member",
+    });
     for (const [code, expected] of Object.entries(IX_AUTH_DEFAULT_ROLE_MAP)) {
       expect(resolveIxAuthGatewayRole({ roles: [code], settings: DEFAULT_SETTINGS }).gatewayRole).toBe(
         expected,
@@ -31,6 +39,35 @@ describe("resolveIxAuthGatewayRole", () => {
         settings: DEFAULT_SETTINGS,
       }).gatewayRole,
     ).toBe("superadmin");
+  });
+
+  it("orders the five tiers superadmin, admin, executive, moderator, member", () => {
+    // Every adjacent pair, so inserting a tier in the wrong slot fails here rather than
+    // silently demoting somebody in production.
+    const ordered = ["SUPERADMIN", "ADMIN", "EXECUTIVE", "MODERATOR", "MEMBER"] as const;
+    for (let index = 0; index + 1 < ordered.length; index += 1) {
+      const higher = ordered[index] ?? "";
+      const lower = ordered[index + 1] ?? "";
+      expect(
+        resolveIxAuthGatewayRole({ roles: [lower, higher], settings: DEFAULT_SETTINGS })
+          .gatewayRole,
+      ).toBe(IX_AUTH_DEFAULT_ROLE_MAP[higher]);
+    }
+  });
+
+  it("keeps an executive below an administrator and above a moderator", () => {
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["EXECUTIVE", "ADMIN"], settings: DEFAULT_SETTINGS })
+        .gatewayRole,
+    ).toBe("admin");
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["MODERATOR", "EXECUTIVE"], settings: DEFAULT_SETTINGS })
+        .gatewayRole,
+    ).toBe("executive");
+    // Being an executive is a reach, never a super-admin promotion.
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["EXECUTIVE"], settings: DEFAULT_SETTINGS }).isSuperAdmin,
+    ).toBe(false);
   });
 
   it("returns no role when nothing maps, so the caller falls back to the default role", () => {
@@ -83,6 +120,15 @@ describe("resolveIxAuthGatewayRole", () => {
     expect(resolveIxAuthGatewayRole({ roles: ["CUSTOM", "MEMBER"], settings }).gatewayRole).toBe(
       "member",
     );
+    // Including below the tier added for this fork.
+    const withExecutive = {
+      roleMap: { CUSTOM: "auditor", EXECUTIVE: "executive" },
+      superAdminRoles: ["superadmin"],
+    };
+    expect(
+      resolveIxAuthGatewayRole({ roles: ["CUSTOM", "EXECUTIVE"], settings: withExecutive })
+        .gatewayRole,
+    ).toBe("executive");
   });
 });
 
@@ -93,6 +139,8 @@ describe("canOpenIxAuthAdminConsole", () => {
   });
 
   it("withholds it from everyone else, including unmapped users", () => {
+    // An executive reads across departments but never manages accounts.
+    expect(canOpenIxAuthAdminConsole("executive")).toBe(false);
     expect(canOpenIxAuthAdminConsole("moderator")).toBe(false);
     expect(canOpenIxAuthAdminConsole("member")).toBe(false);
     expect(canOpenIxAuthAdminConsole(undefined)).toBe(false);

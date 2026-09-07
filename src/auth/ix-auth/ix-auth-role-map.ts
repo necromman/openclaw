@@ -13,6 +13,7 @@ import type { IxAuthRuntimeSettings } from "./ix-auth-types.js";
 export const IX_AUTH_DEFAULT_ROLE_MAP: Readonly<Record<string, string>> = Object.freeze({
   SUPERADMIN: "superadmin",
   ADMIN: "admin",
+  EXECUTIVE: "executive",
   MODERATOR: "moderator",
   MEMBER: "member",
 });
@@ -41,10 +42,15 @@ export function canOpenIxAuthAdminConsole(gatewayRole: string | undefined): bool
  * A user carrying several IX-Auth roles resolves to the most privileged mapped name.
  * Names outside this list sort last in configuration order, so a custom role never
  * silently outranks a known one.
+ *
+ * `executive` sits below `admin` because it is a reach role, not a rank: it reads across
+ * every department but never writes another person's session. Ranking it above `admin`
+ * would demote an administrator who also holds it.
  */
 const IX_AUTH_ROLE_PRECEDENCE: readonly string[] = Object.freeze([
   "superadmin",
   "admin",
+  "executive",
   "moderator",
   "member",
 ]);
