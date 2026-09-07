@@ -132,6 +132,7 @@ describe("google provider plugin hooks", () => {
       } as never),
     ).toEqual({
       sanitizeMode: "full",
+      appendOnlyRuntimeContext: false,
       sanitizeToolCallIds: true,
       toolCallIdMode: "strict",
       sanitizeThoughtSignatures: {
