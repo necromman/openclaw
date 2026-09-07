@@ -314,6 +314,28 @@ queued wait time), while `resultCount` counts identified physical platform
 sends. `deliveryKind`, when present, describes the effective post-hook,
 post-render payload; suppressed and crash-ambiguous rows omit it.
 
+## `openclaw audit users`
+
+A separate, person-attributed ledger answers a different question: which account
+signed in, what it asked, and which files that revealed. It is recorded only
+where a verified account is in scope, and it is queried with a subcommand of the
+same name:
+
+```bash
+openclaw audit users --email person@example.com --kind tool_read --since 2026-09-01
+openclaw audit users --json --limit 200
+```
+
+Filters are `--email`, `--profile`, `--kind`, `--agent`, `--session`, `--since`,
+`--until`, `--cursor`, and `--limit` (1-500). Kinds are `login`, `logout`,
+`login_failed`, `prompt`, `tool_read`, `session_view`, `file_download`,
+`admin_action`, and `access_denied`.
+
+Question text is not stored unless `logging.audit.userActivity.promptText` is
+enabled; otherwise a row carries only the question's length and a digest. Tool
+arguments are never stored, only the file paths an allowlisted read names.
+Retention is `logging.audit.userActivity.retentionDays` (default 90).
+
 ## Gateway RPC
 
 `audit.activity.list` requires `operator.read` and accepts the same filters. It
@@ -326,6 +348,11 @@ openclaw gateway call audit.activity.list --params '{"channel":"telegram","limit
 
 The result is `{ "events": AuditActivityEventV1[], "nextCursor"?: string }`.
 Results are newest first and limited to 500 records per request.
+
+`audit.userActivity.list` backs `openclaw audit users`. It also requires
+`operator.read`, and additionally answers `FORBIDDEN` for a delegated-identity
+connection whose account may not read the ledger, narrowing an administrator's
+page to the departments that account belongs to.
 
 `audit.run.inspect` also requires `operator.read`:
 

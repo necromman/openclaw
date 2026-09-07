@@ -1695,6 +1695,17 @@ and coverage limits.
   identifiers with installation-local keyed pseudonyms where correlation is
   available. These are correlation aids rather than anonymization; the state
   database stores the derivation key, but RPC and CLI exports do not.
+- `userActivity`: person-attributed activity ledger, recorded in a separate
+  table from the metadata ledger above and queried through
+  `audit.userActivity.list`, `openclaw audit users`, and the Control UI. It
+  follows `enabled`, so there is no second on/off switch.
+  - `promptText`: store the text of each question beside the person who asked
+    it (default: `false`, which records only its length and a digest). Turning
+    it on puts user-authored content in the ledger.
+  - `retentionDays`: days a row stays queryable before the hourly sweep deletes
+    it (default: `90`).
+  - `maxRows`: hard row cap; the oldest rows are deleted first once it is
+    exceeded (default: `1000000`).
 
 A root-level `audit` block is retired; the canonical path is `logging.audit`.
 The root config object is strict, so an old top-level `audit` block is rejected.

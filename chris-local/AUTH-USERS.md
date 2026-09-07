@@ -108,7 +108,7 @@ park@example.com,박민수,ADMIN,
 
 ## 7. 감사
 
-모든 관리자 행위는 `recordIxAuthAdminAction()` 한 곳을 지난다(`src/gateway/ix-auth-admin-ledger.ts`). 지금 그 함수가 하는 일은 기존 보안 이벤트 콜백(`ix-auth.admin.action`)과 verbose 로그 한 줄뿐이다. **사람 귀속 원장은 H 단계**에서 붙으며, 그때 고칠 곳은 이 함수 하나다. 행위 이름은 닫힌 목록이다(`invite`·`user-roles`· `user-departments`·`user-disabled`·`users-imported` 등) - 한 호출부에만 있는 자유 문자열은 나중에 검색할 수 없다.
+모든 관리자 행위는 `recordIxAuthAdminAction()` 한 곳을 지난다(`src/gateway/ix-auth-admin-ledger.ts`). 그 함수는 기존 보안 이벤트 콜백(`ix-auth.admin.action`)과 verbose 로그에 더해, **사람 귀속 원장에 `admin_action` 한 줄을 적는다**(H 단계, 정본 [AUTH-AUDIT.md](AUTH-AUDIT.md)). 한 곳으로 모아 둔 덕에 그때 고친 곳은 이 함수 하나였다. 행위 이름은 닫힌 목록이다(`invite`·`user-roles`· `user-departments`·`user-disabled`·`users-imported` 등) - 한 호출부에만 있는 자유 문자열은 나중에 검색할 수 없다.
 
 IX-Auth 자체 원장에는 이미 실제 관리자가 남는다. 중계가 서비스 키가 아니라 그 사람의 토큰을 쓰기 때문이다.
 

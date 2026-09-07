@@ -338,6 +338,40 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 디스크가 빠듯해 변환기를 빼야 하면 빌드 인자에서 `libreoffice-*` 세 개만 지운다. 폰트는 PDF 생성에도 쓰이므로 남긴다.
 
+### 3.7 감사 원장
+
+사람 단위 활동 기록은 **기본으로 켜져 있다**. 정본은 [AUTH-AUDIT.md](AUTH-AUDIT.md). 배포가 정해야 하는 값은 셋뿐이다.
+
+```jsonc
+{
+  "logging": {
+    "audit": {
+      "enabled": true,
+      "userActivity": {
+        "promptText": false,
+        "retentionDays": 90,
+        "maxRows": 1000000,
+      },
+    },
+  },
+}
+```
+
+| 키              | 기본값    | 정할 때 생각할 것                                                                                            |
+| --------------- | --------- | ------------------------------------------------------------------------------------------------------------ |
+| `promptText`    | `false`   | `true` 로 켜면 **사용자가 쓴 질문 본문**이 원장에 들어간다. 끄면 길이와 해시만. 고객 내부 규정에 따라 정한다 |
+| `retentionDays` | `90`      | 계약 문구와 같은 값이어야 한다(AUTH-AUDIT 8절)                                                               |
+| `maxRows`       | `1000000` | 상한을 넘으면 오래된 행부터 지운다. 100만 행은 대략 수백 MiB. NAS 디스크가 작으면 줄인다                     |
+| `enabled`       | `true`    | 이것을 끄면 사람 원장도 함께 꺼진다. 정리(보존기간 적용)는 꺼져 있어도 계속 돈다                             |
+
+확인:
+
+```bash
+docker exec -it openclaw-gateway openclaw audit users --limit 5
+```
+
+관리자 화면은 **설정 > 개인정보 보호 & 보안 > 감사 기록**, CSV 는 그 화면의 내려받기 버튼이다. 원장은 보존기간 내 조회용이고 변조 방지가 없다 - 장기 보존이 요건이면 고객사 SIEM 내보내기를 정본으로 계약에 적는다.
+
 ## 4. 백업 · 복구
 
 볼륨 2개가 상태의 전부다.
