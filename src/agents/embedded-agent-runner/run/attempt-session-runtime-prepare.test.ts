@@ -48,7 +48,12 @@ type PrepareInput = Parameters<typeof prepareEmbeddedAttemptSessionRuntime>[0];
 
 function createFixture() {
   const order: string[] = [];
-  const sessionManager = { kind: "manager", getBranch: () => [] };
+  const activeMarker = { type: "custom", customType: "openclaw.cache-ttl", data: "active" };
+  const sessionManager = {
+    kind: "manager",
+    getBranch: () => [activeMarker],
+    getEntries: () => [activeMarker, { ...activeMarker, data: "sibling" }],
+  };
   const activeSession = {
     messages: [{ role: "user" }, { role: "assistant" }],
     sessionId: "active-session",
@@ -229,6 +234,10 @@ describe("prepareEmbeddedAttemptSessionRuntime", () => {
 
     const result = await prepareEmbeddedAttemptSessionRuntime(fixture.input);
 
+    expect(mocks.restoreProjections).toHaveBeenCalledWith(
+      fixture.promptState.toolResults,
+      fixture.sessionManager.getBranch(),
+    );
     expect(fixture.order).toEqual([
       "manager",
       "own-manager",

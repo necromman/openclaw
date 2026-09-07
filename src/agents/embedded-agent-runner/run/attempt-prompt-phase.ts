@@ -7,6 +7,7 @@ import {
 import { releasePendingAgentSteeringItems } from "../../subagents/registry/subagent-registry.js";
 import { prepareGooglePromptCacheStreamFn } from "../google-prompt-cache.js";
 import { log } from "../logger.js";
+import { persistToolResultProjections } from "../session-prompt-state.js";
 import { resolveEmbeddedAgentApiKey } from "../stream-resolution.js";
 import { runEmbeddedAttemptBeforeAgentRun } from "./attempt-before-agent-run.js";
 import {
@@ -351,6 +352,15 @@ export async function runEmbeddedAttemptPromptPhase(input: {
         onFinalPromptText: input.lifecycle.setFinalPromptText,
         onSteeringAcknowledged: () => {
           leasedSteering = undefined;
+        },
+        persistToolResultProjections: async () => {
+          if (!isRawModelRun && toolResultPromptProjectionState.frozen.size > 0) {
+            await withOwnedTranscriptWrite(() => {
+              persistToolResultProjections(toolResultPromptProjectionState, (customType, data) =>
+                sessionManager.appendCustomEntry(customType, data),
+              );
+            });
+          }
         },
         ...(promptBuildPrependContext ? { prependContext: promptBuildPrependContext } : {}),
         ...(promptContext.runtimeContextMessageForCurrentTurn

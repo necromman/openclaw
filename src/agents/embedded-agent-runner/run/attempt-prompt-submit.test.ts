@@ -91,6 +91,7 @@ function createBaseInput() {
     modelPrompt: "model prompt",
     onFinalPromptText: vi.fn(),
     onSteeringAcknowledged: vi.fn(),
+    persistToolResultProjections: vi.fn(async () => {}),
     prependContext: "prepend context",
     runtimeOnly: false,
     sessionPromptState,
