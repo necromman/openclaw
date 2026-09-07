@@ -40,6 +40,9 @@ const ALL_ROUTES: RouteId[] = Array.from(
     "skill-workshop",
     // Hub tabs and settings subpages route without their own nav entry.
     "worktrees",
+    // Only visible with an identity-server administrator session, which this suite has
+    // none of, so it is listed by hand to keep its presentation entry covered.
+    "users",
     "memory-import",
     "ai-agents",
     "model-setup",
