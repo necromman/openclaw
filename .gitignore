@@ -247,3 +247,4 @@ extensions/discord/assets/embedded-app-sdk.mjs
 
 # Local deployment secrets for the IX-Auth compose stack (chris-local/DEPLOY.md).
 chris-local/ixauth.env
+!.claude/PROMPT.md
