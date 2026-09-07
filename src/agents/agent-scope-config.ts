@@ -85,6 +85,7 @@ export type ResolvedAgentConfig = {
   subagents?: AgentEntry["subagents"];
   embeddedAgent?: AgentEntry["embeddedAgent"];
   sandbox?: AgentEntry["sandbox"];
+  skipBootstrap?: boolean;
   tools?: AgentEntry["tools"];
 };
 
@@ -462,6 +463,7 @@ export function resolveAgentConfig(
         ? entry.embeddedAgent
         : undefined,
     sandbox: entry.sandbox,
+    skipBootstrap: entry.skipBootstrap,
     tools: entry.tools,
   };
 }
@@ -610,6 +612,20 @@ export function resolveAgentDir(
   const agentDir = path.join(root, "agents", id, "agent");
   registerResolvedAgentDir({ agentId: id, agentDir, env });
   return agentDir;
+}
+
+/**
+ * Whether workspace bootstrap-file publication is skipped for one agent. The agent entry
+ * wins; agents.defaults.skipBootstrap stays the deployment-wide fallback. An agent whose
+ * workspace is a read-only mount needs this: publishing AGENTS.md writes a staging file
+ * inside the workspace, which fails on such a mount and takes the turn with it.
+ */
+export function resolveAgentSkipBootstrap(
+  cfg: OpenClawConfig | undefined,
+  agentId: string | undefined,
+): boolean {
+  const entry = cfg && agentId ? resolveAgentConfig(cfg, agentId)?.skipBootstrap : undefined;
+  return (entry ?? cfg?.agents?.defaults?.skipBootstrap) === true;
 }
 
 export function resolveDefaultAgentDir(

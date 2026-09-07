@@ -108,6 +108,21 @@ Disables automatic creation of workspace bootstrap files (`AGENTS.md`, `SOUL.md`
 }
 ```
 
+`agents.entries.<id>.skipBootstrap` overrides the default for one agent, in either
+direction. Set it for an agent whose workspace is a read-only mount: bootstrap
+publication writes a staging file inside the workspace, so it fails there and takes the
+first turn with it.
+
+```json5
+{
+  agents: {
+    entries: {
+      "docs-bot": { workspace: "/mnt/share/docs", skipBootstrap: true },
+    },
+  },
+}
+```
+
 ### `agents.defaults.skipOptionalBootstrapFiles`
 
 Skips creation of selected optional workspace files while still writing required bootstrap files (`AGENTS.md`, `BOOTSTRAP.md`). Valid values: `SOUL.md`, `USER.md`, and `IDENTITY.md` (`HEARTBEAT.md` is accepted but a no-op since heartbeat context moved to cron monitor scratch).

@@ -166,6 +166,13 @@ export type AgentConfig = {
   sandbox?: AgentSandboxConfig;
   /** Optional per-agent stream params (e.g. cacheRetention, temperature). */
   params?: Record<string, unknown>;
+  /**
+   * Skip workspace bootstrap-file publication for this agent, overriding
+   * agents.defaults.skipBootstrap. Required for an agent whose workspace is a
+   * read-only mount: publishing AGENTS.md writes a staging file inside the
+   * workspace and fails there.
+   */
+  skipBootstrap?: boolean;
   tools?: AgentToolsConfig;
   /** Optional runtime descriptor for this agent. */
   runtime?: AgentRuntimeConfig;

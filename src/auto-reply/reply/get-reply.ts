@@ -1,7 +1,10 @@
 // Main auto-reply pipeline: prepares context, runs commands, and dispatches agents.
 import fs from "node:fs/promises";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
-import { isImplicitAcpWorkspaceCandidate } from "../../agents/agent-scope-config.js";
+import {
+  isImplicitAcpWorkspaceCandidate,
+  resolveAgentSkipBootstrap,
+} from "../../agents/agent-scope-config.js";
 import {
   hasLegacyAutoFallbackWithoutOrigin,
   resolveAutoFallbackPrimaryProbe,
@@ -549,7 +552,7 @@ export async function getReplyFromConfig(
       ? (await fs.mkdir(workspaceDirRaw, { recursive: true }), { dir: workspaceDirRaw })
       : await ensureAgentWorkspace({
           dir: workspaceDirRaw,
-          ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,
+          ensureBootstrapFiles: !resolveAgentSkipBootstrap(cfg, agentId) && !isFastTestEnv,
           skipOptionalBootstrapFiles: agentCfg?.skipOptionalBootstrapFiles,
           provisioning: await (
             await import("../../agents/acp-workspace-provisioning.js")

@@ -17,6 +17,7 @@ import {
 import { defaultRuntime } from "../../runtime.js";
 import { createLazyRuntimeNamedExport } from "../../shared/lazy-runtime.js";
 import type { SkillEligibilityContext, SkillSnapshot, SkillUsagePath } from "../../skills/types.js";
+import { resolveAgentSkipBootstrap } from "../agent-scope-config.js";
 import type { ExecPolicyOverrides } from "../exec-defaults.js";
 import { getSandboxBackendWorkdirResolver, requireSandboxBackendFactory } from "./backend.js";
 import { ensureSandboxBrowser } from "./browser.js";
@@ -119,7 +120,7 @@ async function ensureSandboxWorkspaceLayout(params: {
     await ensureSandboxWorkspace(
       sandboxWorkspaceDir,
       agentWorkspaceDir,
-      params.config?.agents?.defaults?.skipBootstrap,
+      resolveAgentSkipBootstrap(params.config, params.agentId),
       params.config?.agents?.defaults?.skipOptionalBootstrapFiles,
     );
     syncedSkills = await syncSandboxSkillsToWorkspace({

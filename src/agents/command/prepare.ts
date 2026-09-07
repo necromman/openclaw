@@ -27,7 +27,7 @@ import {
 import { resolveUserPath } from "../../utils.js";
 import { isDeliverableMessageChannel, resolveMessageChannel } from "../../utils/message-channel.js";
 import { resolveAgentRuntimeConfig } from "../agent-runtime-config.js";
-import { resolveAgentRunCwd } from "../agent-scope-config.js";
+import { resolveAgentRunCwd, resolveAgentSkipBootstrap } from "../agent-scope-config.js";
 import {
   listAgentIds,
   resolveAgentDir,
@@ -367,7 +367,7 @@ export async function prepareAgentCommandExecution(
     });
     await ensureAgentWorkspace({
       dir: workspaceDirRaw,
-      ensureBootstrapFiles: !agentCfg?.skipBootstrap,
+      ensureBootstrapFiles: !resolveAgentSkipBootstrap(cfg, sessionAgentId),
       skipOptionalBootstrapFiles: agentCfg?.skipOptionalBootstrapFiles,
       provisioning: workspaceProvisioning,
     });

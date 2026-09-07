@@ -958,6 +958,7 @@ export const AgentEntrySchema = z
       .optional(),
     bootstrapMaxChars: z.number().int().positive().optional(),
     bootstrapTotalMaxChars: z.number().int().positive().optional(),
+    skipBootstrap: z.boolean().optional(),
     experimental: z
       .object({
         localModelLean: z.boolean().optional(),

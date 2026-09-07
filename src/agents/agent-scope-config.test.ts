@@ -9,6 +9,7 @@ import {
   resolveConfiguredAgentId,
   resolveAgentConfig,
   resolveAgentOperationAgentId,
+  resolveAgentSkipBootstrap,
   resolveAgentWorkspaceDir,
   resolveAmbientOwnerAgentId,
   resolveDefaultAgentDir,
@@ -344,5 +345,31 @@ describe("resolveAgentConfig model policy", () => {
     expect(resolveAgentConfig(cfg, "main")?.modelPolicy).toEqual({
       allow: ["openai/gpt-5.6-sol"],
     });
+  });
+});
+
+describe("resolveAgentSkipBootstrap", () => {
+  const cfg = {
+    agents: {
+      defaults: { skipBootstrap: true },
+      entries: { main: {}, "rnd-bot": { skipBootstrap: false }, "qa-bot": { skipBootstrap: true } },
+    },
+  } as OpenClawConfig;
+
+  it("prefers the agent entry over the deployment default in both directions", () => {
+    expect(resolveAgentSkipBootstrap(cfg, "rnd-bot")).toBe(false);
+    expect(resolveAgentSkipBootstrap(cfg, "qa-bot")).toBe(true);
+  });
+
+  it("falls back to agents.defaults.skipBootstrap", () => {
+    expect(resolveAgentSkipBootstrap(cfg, "main")).toBe(true);
+    expect(
+      resolveAgentSkipBootstrap({ agents: { entries: { main: {} } } } as OpenClawConfig, "main"),
+    ).toBe(false);
+  });
+
+  it("reports false without config or an agent id", () => {
+    expect(resolveAgentSkipBootstrap(undefined, "main")).toBe(false);
+    expect(resolveAgentSkipBootstrap(cfg, undefined)).toBe(true);
   });
 });
