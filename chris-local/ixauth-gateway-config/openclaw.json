@@ -89,9 +89,19 @@
       "workspaceOnly": true
     }
   },
+  "plugins": {
+    "entries": {
+      "codex": {
+        "enabled": true
+      }
+    }
+  },
   "agents": {
     "ownership": "explicit",
     "defaults": {
+      "model": {
+        "primary": "openai/gpt-5.6-sol"
+      },
       "systemAgent": {
         "agentId": "main"
       }
