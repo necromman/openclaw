@@ -100,16 +100,20 @@ async function handleUpdateUser(params: ActionParams): Promise<void> {
     sendJson(params.res, 400, { error: "invalid_body" });
     return;
   }
+  // Renaming yourself is harmless; switching your own account off is how an operator locks
+  // the whole deployment out of its own administration. Decided before the account is read,
+  // so a refusal costs no relay call.
+  if (
+    status !== undefined &&
+    rejectSelfTarget({ res: params.res, admin: params.admin, userId: params.userId })
+  ) {
+    return;
+  }
   const target = await loadTarget(params);
   if (!target) {
     return;
   }
   if (status !== undefined) {
-    // Renaming yourself is harmless; switching your own account off is how an operator
-    // locks the whole deployment out of its own administration.
-    if (rejectSelfTarget({ res: params.res, admin: params.admin, userId: params.userId })) {
-      return;
-    }
     if (rejectSuperAdminTarget({ ...params, target })) {
       return;
     }
@@ -207,15 +211,16 @@ async function handleReplaceRoles(params: ActionParams): Promise<void> {
   if (rejectSelfTarget({ res: params.res, admin: params.admin, userId: params.userId })) {
     return;
   }
-  const target = await loadTarget(params);
-  if (!target) {
-    return;
-  }
   const wantsSuperAdmin = grantsSuperAdmin({ roles, settings: params.deps.settings });
   // Granting a rank is the same privilege as holding it: an administrator who could hand
-  // out super-admin could hand it to a second account of their own.
+  // out super-admin could hand it to a second account of their own. Decided from the
+  // request alone, so a refusal costs no relay call.
   if (wantsSuperAdmin && !params.admin.principal.isSuperAdmin) {
     sendJson(params.res, 403, { error: "forbidden" });
+    return;
+  }
+  const target = await loadTarget(params);
+  if (!target) {
     return;
   }
   if (rejectSuperAdminTarget({ ...params, target })) {

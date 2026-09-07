@@ -166,10 +166,12 @@ function stubIdentityServer(routes: UpstreamRoutes): UpstreamCall[] {
       method: init?.method ?? "GET",
       body: typeof init?.body === "string" ? init.body : "",
     };
-    calls.push(call);
     if (call.path === "/.well-known/jwks.json") {
+      // Key fetching is session verification, not an administration call, so it stays out
+      // of the recorded list the assertions read.
       return Promise.resolve(jwksDocument());
     }
+    calls.push(call);
     const route = routes[`${call.method} ${call.path}`] ?? routes[call.path];
     if (!route) {
       throw new Error(`unexpected identity-server call to ${call.method} ${call.path}`);
