@@ -14,7 +14,11 @@ import { html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { subtitleForRoute, titleForRoute } from "../../app-navigation.ts";
 import { applicationContext, type ApplicationContext } from "../../app/context.ts";
-import { renderSettingsRow, renderSettingsSection } from "../../components/settings-ui.ts";
+import {
+  renderSettingsPage,
+  renderSettingsRow,
+  renderSettingsSection,
+} from "../../components/settings-ui.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import {
   fetchIxAuthDepartments,
@@ -468,62 +472,66 @@ export class UsersPage extends OpenClawLightDomElement {
     if (!this.canManage()) {
       return html`
         ${header}
-        ${renderSettingsWorkspace([
-          renderSettingsSection({ title: t("ixAuth.users.title") }, [
-            renderSettingsRow({ title: t("ixAuth.users.forbidden") }),
+        ${renderSettingsWorkspace(
+          renderSettingsPage([
+            renderSettingsSection({ title: t("ixAuth.users.title") }, [
+              renderSettingsRow({ title: t("ixAuth.users.forbidden") }),
+            ]),
           ]),
-        ])}
+        )}
       `;
     }
     return html`
       ${header}
-      ${renderSettingsWorkspace([
-        renderSettingsSection(
-          { title: t("ixAuth.users.title"), description: t("ixAuth.users.description") },
-          [
-            renderSettingsRow({ title: "", stacked: true, control: this.renderToolbar() }),
-            this.errorKey
-              ? renderSettingsRow({
-                  title: "",
-                  control: html`<div class="callout danger" role="alert">
-                    ${t(`ixAuth.error.${this.errorKey}`)}
-                  </div>`,
-                })
-              : nothing,
-            renderSettingsRow({
-              title: "",
-              stacked: true,
-              control: renderUsersTable({
-                users: this.users,
-                loading: this.loading,
-                selectedId: this.selected?.user.id,
-                onSelect: (userId) => void this.selectUser(userId),
+      ${renderSettingsWorkspace(
+        renderSettingsPage([
+          renderSettingsSection(
+            { title: t("ixAuth.users.title"), description: t("ixAuth.users.description") },
+            [
+              renderSettingsRow({ title: "", stacked: true, control: this.renderToolbar() }),
+              this.errorKey
+                ? renderSettingsRow({
+                    title: "",
+                    control: html`<div class="callout danger" role="alert">
+                      ${t(`ixAuth.error.${this.errorKey}`)}
+                    </div>`,
+                  })
+                : nothing,
+              renderSettingsRow({
+                title: "",
+                stacked: true,
+                control: renderUsersTable({
+                  users: this.users,
+                  loading: this.loading,
+                  selectedId: this.selected?.user.id,
+                  onSelect: (userId) => void this.selectUser(userId),
+                }),
               }),
-            }),
-            renderSettingsRow({ title: "", stacked: true, control: this.renderPager() }),
-          ],
-        ),
-        this.renderDetail(),
-        this.showInvite
-          ? html`<openclaw-ix-auth-invites
-              section="invite"
-              .basePath=${this.basePath}
-              .canManage=${true}
-              .canGrantSuperAdmin=${this.session?.user?.isSuperAdmin === true}
-            ></openclaw-ix-auth-invites>`
-          : nothing,
-        this.showImport
-          ? html`<openclaw-ix-auth-users-import
-              .basePath=${this.basePath}
-              .onImported=${() => void this.reload()}
-            ></openclaw-ix-auth-users-import>`
-          : nothing,
-        html`<openclaw-ix-auth-invites
-          section="approvals"
-          .basePath=${this.basePath}
-          .canManage=${true}
-        ></openclaw-ix-auth-invites>`,
-      ])}
+              renderSettingsRow({ title: "", stacked: true, control: this.renderPager() }),
+            ],
+          ),
+          this.renderDetail(),
+          this.showInvite
+            ? html`<openclaw-ix-auth-invites
+                section="invite"
+                .basePath=${this.basePath}
+                .canManage=${true}
+                .canGrantSuperAdmin=${this.session?.user?.isSuperAdmin === true}
+              ></openclaw-ix-auth-invites>`
+            : nothing,
+          this.showImport
+            ? html`<openclaw-ix-auth-users-import
+                .basePath=${this.basePath}
+                .onImported=${() => void this.reload()}
+              ></openclaw-ix-auth-users-import>`
+            : nothing,
+          html`<openclaw-ix-auth-invites
+            section="approvals"
+            .basePath=${this.basePath}
+            .canManage=${true}
+          ></openclaw-ix-auth-invites>`,
+        ]),
+      )}
     `;
   }
 }
