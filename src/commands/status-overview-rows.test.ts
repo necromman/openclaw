@@ -245,6 +245,12 @@ describe("status-overview-rows", () => {
       },
       summary: {
         ...summary,
+        secretEgressProxy: {
+          state: "degraded",
+          caExpiresAt: "2036-09-01T00:00:00.000Z",
+          failedCertificates: 1,
+          message: "Check OpenSSL, then retry the request.",
+        },
         degradedSecretOwners: [
           {
             ownerKind: "capability",
@@ -285,6 +291,9 @@ describe("status-overview-rows", () => {
     expect(findRowValue(rows, "Update")).toBe("✅ OpenClaw updated to 2026.9.2 (from 2026.9.1).");
     expect(findRowValue(rows, "Update restart")).toBe("restart pending health verification");
     expect(findRowValue(rows, "Security")).toBe("Run: openclaw security audit --deep");
+    expect(findRowValue(rows, "Secret egress proxy")).toBe(
+      "Check OpenSSL, then retry the request.",
+    );
     expect(findRowValue(rows, "Degraded secrets")).toBe("1 degraded · capability:tts");
     expect(findRowValue(rows, "Degraded plugins")).toBe("1 configured-unavailable · discord");
     expect(findRowValue(rows, "Secrets")).toBe("2 diagnostics");
