@@ -32,6 +32,37 @@ New sessions, including managed worktree sessions, inherit the configured global
 
 The Control UI permission picker labels Default with the agent's resolved exec posture when it matches a session mode, for example **Default (Guarded)** for `tools.exec.mode: "ask"` without a stricter host approval policy. Resolution includes global settings, agent overrides, and host approval floors. Without those settings or sandboxing, the default is full access. Allowlist-only policy and non-equivalent `security`/`ask` pairs, including `ask: "always"`, keep the plain **Default** label. Agents whose sandbox configuration could apply to their sessions also keep plain **Default**, because effective policy cannot be stated at agent scope. This is display metadata, not an authorization decision or a filesystem-access guarantee; tool policy still applies. Selecting Default clears the session override; it does not save the displayed mode into the session.
 
+## Agent default permission mode
+
+`agents.entries.<id>.tools.permissionMode` states the mode a session inherits when the
+caller names none, and `agents.defaults.tools.permissionMode` does the same for every
+agent whose entry names none. Values are `read-only`, `guarded`, `workspace`, and
+`full`.
+
+```json
+{
+  "agents": {
+    "entries": {
+      "docs-bot": {
+        "workspace": "/mnt/share/docs",
+        "tools": { "profile": "readonly", "permissionMode": "read-only" }
+      }
+    }
+  }
+}
+```
+
+The configured mode is also a ceiling. A session may narrow it freely, and
+`sessions.create`, `sessions.patch`, and `sessions.patchMany` reject a mode that widens
+past it unless the caller holds `operator.admin`. `full` keeps needing `operator.admin`
+whether or not a ceiling is configured. Sessions that already carry an explicit mode are
+unaffected; the ceiling is checked when a mode is named, and applied when none is.
+
+A ceiling shapes sessions, not the agent's whole tool surface. Pair it with
+`tools.profile: "readonly"`, `tools.fs.workspaceOnly: true`, and an exec policy that
+denies the shell when an agent must stay read-only regardless of how its sessions were
+created.
+
 ## Delegated setup and repair
 
 When a regular agent delegates a persistent change through its `openclaw` tool,

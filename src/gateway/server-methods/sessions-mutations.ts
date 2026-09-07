@@ -9,8 +9,11 @@ import {
   validateSessionsPatchParams,
   validateSessionsPluginPatchParams,
   validateSessionsResetParams,
+  type SessionPermissionMode,
 } from "../../../packages/gateway-protocol/src/index.js";
+import { resolveRequestedSessionPermissionMode } from "../../agents/agent-permission-mode.js";
 import { assignSessionOwner } from "../../config/sessions/session-accessor.js";
+import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { patchPluginSessionExtension } from "../../plugins/host-hook-state.js";
 import { isPluginJsonValue } from "../../plugins/host-hooks.js";
 import { ADMIN_SCOPE } from "../operator-scopes.js";
@@ -35,6 +38,29 @@ import { loadSessionsRuntimeModule, requireSessionKey } from "./sessions-shared.
 import type { GatewayRequestHandlers } from "./types.js";
 import { assertValidParams } from "./validation.js";
 
+/**
+ * True when a patched permission mode widens past any target agent's configured ceiling.
+ * A null patch clears the session mode so the configured ceiling applies again, which
+ * never widens anything and needs no scope.
+ */
+function patchModeNeedsAdminScope(
+  cfg: OpenClawConfig,
+  keys: readonly string[],
+  requested: SessionPermissionMode | null | undefined,
+): boolean {
+  if (requested === null || requested === undefined) {
+    return false;
+  }
+  return keys.some((key) => {
+    const requestedAgent = resolveRequestedSessionAgentId(cfg, key);
+    return resolveRequestedSessionPermissionMode(
+      cfg,
+      requestedAgent.ok ? requestedAgent.agentId : undefined,
+      requested,
+    ).needsAdminScope;
+  });
+}
+
 export const sessionMutationHandlers: GatewayRequestHandlers = {
   "sessions.patchMany": async ({
     params,
@@ -49,8 +75,14 @@ export const sessionMutationHandlers: GatewayRequestHandlers = {
       return;
     }
     const scopes = Array.isArray(client?.connect.scopes) ? client.connect.scopes : [];
+    // One patch mode is applied to every target, so the strictest ceiling among them
+    // decides. Narrowing stays free; widening past a ceiling needs the admin scope.
     if (
-      params.patch.permissionMode === "full" &&
+      patchModeNeedsAdminScope(
+        context.getRuntimeConfig(),
+        params.targets.map((target) => target.key),
+        params.patch.permissionMode,
+      ) &&
       client !== null &&
       !scopes.includes(ADMIN_SCOPE)
     ) {
@@ -79,16 +111,20 @@ export const sessionMutationHandlers: GatewayRequestHandlers = {
       return;
     }
     const scopes = Array.isArray(client?.connect.scopes) ? client.connect.scopes : [];
-    if (params.permissionMode === "full" && client !== null && !scopes.includes(ADMIN_SCOPE)) {
+    const key = requireSessionKey(params.key, respond);
+    if (!key) {
+      return;
+    }
+    if (
+      patchModeNeedsAdminScope(context.getRuntimeConfig(), [key], params.permissionMode) &&
+      client !== null &&
+      !scopes.includes(ADMIN_SCOPE)
+    ) {
       respond(
         false,
         undefined,
         missingScopeErrorShape({ missingScope: ADMIN_SCOPE, requiredScopes: [ADMIN_SCOPE] }),
       );
-      return;
-    }
-    const key = requireSessionKey(params.key, respond);
-    if (!key) {
       return;
     }
     const executed = await executeSessionPatch({

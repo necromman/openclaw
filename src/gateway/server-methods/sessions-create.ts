@@ -9,6 +9,7 @@ import {
   missingScopeErrorShape,
   validateSessionsCreateParams,
 } from "../../../packages/gateway-protocol/src/index.js";
+import { resolveRequestedSessionPermissionMode } from "../../agents/agent-permission-mode.js";
 import { resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import { insideGitCheckout } from "../../agents/worktrees/git.js";
 import { resolveAgentMainSessionKey } from "../../config/sessions/main-session.js";
@@ -267,7 +268,14 @@ export const sessionCreateHandlers: GatewayRequestHandlers = {
       return;
     }
     const clientScopes = Array.isArray(client?.connect?.scopes) ? client.connect.scopes : [];
-    if (p.permissionMode === "full" && client !== null && !clientScopes.includes(ADMIN_SCOPE)) {
+    // A config-declared ceiling applies when the caller names no mode, and bounds the
+    // mode a caller may name. Narrowing stays free; widening needs the admin scope.
+    const permission = resolveRequestedSessionPermissionMode(
+      cfg,
+      explicitlyRequestedAgent.agentId,
+      p.permissionMode,
+    );
+    if (permission.needsAdminScope && client !== null && !clientScopes.includes(ADMIN_SCOPE)) {
       respond(
         false,
         undefined,
@@ -557,7 +565,7 @@ export const sessionCreateHandlers: GatewayRequestHandlers = {
           : undefined,
       spawnedCwd: p.worktree === true ? undefined : sessionCwd,
       sessionRoot: p.worktree === true ? undefined : sessionRoot,
-      permissionMode: p.permissionMode,
+      permissionMode: permission.mode,
       ...(p.toolOverrides !== undefined ? { toolOverrides: p.toolOverrides } : {}),
       prepareLifecycle,
       onLifecycleCleanupError: (error) => {

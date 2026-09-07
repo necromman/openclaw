@@ -448,6 +448,14 @@ const ToolsWebSchema = z
   .strict()
   .optional();
 
+/** Session permission ceiling a session inherits when the caller names none. */
+export const SessionPermissionModeSchema = z.union([
+  z.literal("read-only"),
+  z.literal("guarded"),
+  z.literal("workspace"),
+  z.literal("full"),
+]);
+
 const ToolProfileSchema = z
   .union([
     z.literal("readonly"),
@@ -741,6 +749,7 @@ const GitHubToolIdentitySchema = z
 const AgentToolsSchema = z
   .object({
     ...CommonToolPolicyFields,
+    permissionMode: SessionPermissionModeSchema.optional(),
     codeMode: CodeModeSchema,
     swarm: SwarmSchema,
     elevated: z

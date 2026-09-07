@@ -1,5 +1,6 @@
 // Defines tool availability and allowlist configuration types.
 import { normalizeLowercaseStringOrEmpty } from "@openclaw/normalization-core/string-coerce";
+import type { SessionPermissionMode } from "../../packages/gateway-protocol/src/schema/sessions-row.js";
 import type { ChatType } from "../channels/chat-type.js";
 import type { SafeBinProfileFixture } from "../infra/exec-safe-bin-policy.js";
 import type { AgentModelConfig } from "./types.agents-shared.js";
@@ -390,6 +391,13 @@ export type GitHubToolIdentityConfig = {
 export type AgentToolsConfig = {
   /** Base tool profile applied before allow/deny lists. */
   profile?: ToolProfileId;
+  /**
+   * Default session permission mode for sessions created against this agent when the
+   * caller names none ("read-only" | "guarded" | "workspace" | "full"). A session may
+   * narrow it freely; widening past it needs the operator admin scope, the same rule
+   * that already guards "full".
+   */
+  permissionMode?: SessionPermissionMode;
   allow?: string[];
   /** Additional allowlist entries merged into allow and/or profile allowlist. */
   alsoAllow?: string[];

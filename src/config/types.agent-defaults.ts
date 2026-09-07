@@ -1,5 +1,6 @@
 // Defines agent default configuration types shared by runtime schemas.
 import type { FastMode } from "@openclaw/normalization-core/string-coerce";
+import type { SessionPermissionMode } from "../../packages/gateway-protocol/src/schema/sessions-row.js";
 import type { SilentReplyPolicyShape } from "../shared/silent-reply-policy.js";
 import type {
   AgentModelConfig,
@@ -125,6 +126,17 @@ export type AgentDefaultsConfig = {
   timeFormat?: "auto" | "12" | "24";
   /** @deprecated Doctor-only legacy input. */
   promptOverlays?: { gpt5?: { personality?: "friendly" | "on" | "off" } };
+  /**
+   * Agent-wide tool defaults. Only the session permission mode is read here; the rest of
+   * the tool policy lives in tools.* and agents.entries.<id>.tools.
+   */
+  tools?: {
+    /**
+     * Fallback session permission mode for agents whose entry names none
+     * ("read-only" | "guarded" | "workspace" | "full").
+     */
+    permissionMode?: SessionPermissionMode;
+  };
   /** Global default provider params applied to all models before per-model and per-agent overrides. */
   params?: Record<string, unknown>;
   /** Primary model and fallbacks (provider/model). Accepts string or {primary,fallbacks}. */

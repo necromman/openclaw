@@ -9,6 +9,7 @@ import {
   AgentModelPolicySchema,
   AgentModelSchema,
   AgentToolModelSchema,
+  SessionPermissionModeSchema,
 } from "./zod-schema.agent-runtime.js";
 import {
   BlockStreamingChunkSchema,
@@ -113,6 +114,12 @@ export const AgentDefaultsSchema = z
           .optional(),
         maxFileChars: z.number().int().min(1).max(10_000).optional(),
         maxTotalChars: z.number().int().min(1).max(50_000).optional(),
+      })
+      .strict()
+      .optional(),
+    tools: z
+      .object({
+        permissionMode: SessionPermissionModeSchema.optional(),
       })
       .strict()
       .optional(),
