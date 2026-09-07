@@ -171,22 +171,23 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 `.env` 에 키를 넣고, compose 가 그 이름 그대로 게이트웨이 컨테이너에 넘긴다.
 
-```jsonc
-// ixauth-gateway-config/openclaw.json 에 추가
+`ixauth-gateway-config/openclaw.json` 에 넣는다 (`agents` 는 이미 있으니 `defaults` 만 더한다).
+
+```json
 {
   "models": {
     "providers": {
       "anthropic": {
         "baseUrl": "https://api.anthropic.com",
-        "apiKey": "${ANTHROPIC_API_KEY}",
-      },
-    },
+        "apiKey": "${ANTHROPIC_API_KEY}"
+      }
+    }
   },
   "agents": {
     "defaults": {
-      "model": "anthropic/claude-sonnet-5",
-    },
-  },
+      "model": "anthropic/claude-sonnet-5"
+    }
+  }
 }
 ```
 
@@ -214,32 +215,32 @@ ollama-models:
 
 게이트웨이 설정:
 
-```jsonc
+```json
 {
   "models": {
     "providers": {
       "ollama": {
-        // /v1 을 붙이지 마라. OpenAI 호환 경로는 도구 호출을 깨뜨린다.
         "baseUrl": "http://ollama:11434",
-        "api": "ollama",
-      },
-    },
+        "api": "ollama"
+      }
+    }
   },
   "agents": {
     "defaults": {
-      "model": "ollama/qwen4:32b",
-    },
+      "model": "ollama/qwen4:32b"
+    }
   },
   "memory": {
     "search": {
       "provider": "ollama",
       "model": "bge-m3",
-      "remote": { "baseUrl": "http://ollama:11434" },
-    },
-  },
+      "remote": { "baseUrl": "http://ollama:11434" }
+    }
+  }
 }
 ```
 
+- `baseUrl` 에 **`/v1` 을 붙이지 마라.** OpenAI 호환 경로는 도구 호출을 깨뜨려서 모델이 도구 호출 JSON 을 본문에 그대로 뱉는다.
 - 루프백·사설망·컨테이너 이름 주소는 토큰이 필요 없다. 게이트웨이가 `ollama-local` 표식을 쓴다.
 - 모델은 미리 받아 둔다: `docker compose ... exec ollama ollama pull qwen4:32b`, 임베딩은 `ollama pull bge-m3`.
 - 임베딩 모델을 바꾸면 색인 정체성이 달라진다. 반드시 3.5 의 재색인을 돌린다.
