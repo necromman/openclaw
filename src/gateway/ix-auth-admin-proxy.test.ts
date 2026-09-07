@@ -26,6 +26,7 @@ const SETTINGS = {
   superAdminRoles: ["superadmin"],
   departmentClaim: "ixauth_groups",
   departmentGroupPrefix: "dept-",
+  selfSignupEnabled: false,
   idleTimeoutMs: 60_000,
   absoluteTimeoutMs: 600_000,
 } satisfies IxAuthRuntimeSettings;
