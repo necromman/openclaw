@@ -26,7 +26,6 @@ import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import type { ResolvedGatewayAuth } from "./auth.js";
 import { parseControlUiUserAvatarPath, parseControlUiResourcePath } from "./control-ui-contract.js";
 import { respondNotFound, respondPlainText } from "./control-ui-http-utils.js";
-import { isSecureGatewayBrowserContext } from "./cookie-header.js";
 import { controlUiPluginAssetRoot } from "./control-ui-plugin-assets-contract.js";
 import { resolveAssistantMediaRoutePath } from "./control-ui-resource-routes.js";
 import {
@@ -57,8 +56,7 @@ import {
   type GatewayIngressTransport,
   type GatewayUnattributableProxyReporter,
 } from "./ingress-attribution.js";
-import { classifyIxAuthHttpPath } from "./ix-auth-http-paths.js";
-import { isLocalDirectRequest, isLoopbackAddress, isTrustedProxyAddress } from "./net.js";
+import { claimsIxAuthHttpRequest, runIxAuthHttpStage } from "./ix-auth-http-stage.js";
 import { normalizePluginNodeCapabilityScopedUrl } from "./plugin-node-capability.js";
 import {
   getCachedPluginGatewayAuthBypassPaths,
@@ -465,41 +463,28 @@ export function createGatewayHttpServer(opts: {
       // plain request stage rather than an admitted one, and ahead of handleHooksRequest
       // so a configured hook base path cannot swallow the auth namespace.
       addRequestStage(
-        resolvedAuthValue.mode === "ix-auth" &&
-          classifyIxAuthHttpPath(scopedRequestPath) !== "outside",
+        claimsIxAuthHttpRequest({
+          authMode: resolvedAuthValue.mode,
+          pathname: scopedRequestPath,
+        }),
         async () => {
           const [httpModule, principalModule] = await Promise.all([
             getIxAuthHttpModule(),
             getIxAuthPrincipalModule(),
           ]);
-          const settings = await principalModule.loadIxAuthGatewaySettings();
-          if (!settings) {
-            respondNotFound(res);
-            return true;
-          }
-          return await httpModule.handleIxAuthHttpRequest({
+          return await runIxAuthHttpStage({
             req,
             res,
             pathname: scopedRequestPath,
-            deps: {
-              settings,
-              allowedOrigins: configSnapshot.gateway?.controlUi?.allowedOrigins,
-              allowHostHeaderOriginFallback:
-                configSnapshot.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback ===
-                true,
-              clientIp: ingressAttribution.rateLimit.subject.key,
-              isLocalClient: isLocalDirectRequest(req, trustedProxies),
-              isSecureContext: isSecureGatewayBrowserContext({
-                // A TLS server hands this handler a TLSSocket, a plain server a net.Socket.
-                // The encrypted flag is what distinguishes them at this point.
-                // SAFETY: the property is read as optional, which holds for both socket types.
-                encrypted: Boolean((req.socket as { encrypted?: boolean }).encrypted),
-                remoteAddressIsLoopback: isLoopbackAddress(req.socket?.remoteAddress),
-                forwardedProto: req.headers["x-forwarded-proto"],
-                fromTrustedProxy: isTrustedProxyAddress(req.socket?.remoteAddress, trustedProxies),
-              }),
-              rateLimiter: joinRateLimiter,
+            config: configSnapshot,
+            trustedProxies,
+            clientIp: ingressAttribution.rateLimit.subject.key,
+            rateLimiter: joinRateLimiter,
+            modules: {
+              handleIxAuthHttpRequest: httpModule.handleIxAuthHttpRequest,
+              loadIxAuthGatewaySettings: principalModule.loadIxAuthGatewaySettings,
             },
+            respondNotFound,
           });
         },
       );

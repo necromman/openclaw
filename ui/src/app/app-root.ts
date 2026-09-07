@@ -12,9 +12,9 @@ import { renderLazyElementState, renderLazyViewError } from "../components/lazy-
 import { installTitleTooltips } from "../components/tooltip-title.ts";
 import { t } from "../i18n/index.ts";
 import {
+  buildIxAuthLoginProps,
   clearIxAuthFormSecrets,
   createEmptyIxAuthFormState,
-  formatIxAuthLockoutTime,
   type IxAuthFormState,
 } from "../features/ix-auth/ix-auth-form-state.ts";
 import {
@@ -692,38 +692,18 @@ export class OpenClawApp extends OpenClawLightDomElement {
       return html`
         <openclaw-tooltip-provider>
           <openclaw-ix-auth-login
-            .props=${{
+            .props=${buildIxAuthLoginProps({
               resourceBasePath: context.resourceBasePath,
-              email: this.ixAuthForm.email,
-              password: this.ixAuthForm.password,
-              showPassword: this.ixAuthForm.showPassword,
-              mfaChallenge: this.ixAuthForm.mfaChallenge,
-              mfaCode: this.ixAuthForm.mfaCode,
-              submitting: this.ixAuthForm.submitting,
-              errorKey: this.ixAuthForm.errorKey,
-              lockedUntilLabel: formatIxAuthLockoutTime(this.ixAuthForm.lockedUntilMs),
-              onEmailChange: (value: string) => {
-                this.ixAuthForm = { ...this.ixAuthForm, email: value, errorKey: undefined };
+              state: this.ixAuthForm,
+              handlers: {
+                onChange: (next) => {
+                  this.ixAuthForm = next;
+                },
+                onSubmit: () => {
+                  void this.submitIxAuthForm(basePath);
+                },
               },
-              onPasswordChange: (value: string) => {
-                this.ixAuthForm = { ...this.ixAuthForm, password: value, errorKey: undefined };
-              },
-              onTogglePassword: () => {
-                this.ixAuthForm = {
-                  ...this.ixAuthForm,
-                  showPassword: !this.ixAuthForm.showPassword,
-                };
-              },
-              onMfaCodeChange: (value: string) => {
-                this.ixAuthForm = { ...this.ixAuthForm, mfaCode: value, errorKey: undefined };
-              },
-              onSubmit: () => {
-                void this.submitIxAuthForm(basePath);
-              },
-              onCancelMfa: () => {
-                this.ixAuthForm = createEmptyIxAuthFormState();
-              },
-            }}
+            })}
           ></openclaw-ix-auth-login>
         </openclaw-tooltip-provider>
       `;
