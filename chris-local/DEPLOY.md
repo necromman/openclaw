@@ -64,6 +64,8 @@
 | `OPENCLAW_GATEWAY_PORT`                 |        | `18800`                               | 호스트에 여는 포트                                                                                                              |
 | `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다                |
 | `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                 |
+| `OPENCLAW_NAS_ROOT`                     |        | (없음)                                | 부서 공유의 부모 경로. 비우면 샘플 트리를 마운트하고 부서 에이전트는 자기 워크스페이스를 쓴다 (11.4)                            |
+| `OPENCLAW_KNOWLEDGE_ROOT`               |        | (없음)                                | 마크다운 사이드카 색인의 부모 경로. 비우면 부서 에이전트의 `extraPaths` 가 빈 목록이 된다 (12절, KNOWLEDGE.md)                  |
 | `ANTHROPIC_API_KEY`                     |        | (없음)                                | 외부 모델 API 키. 사내 ollama 만 쓰면 비워 둔다. 설정 파일에는 `"${ANTHROPIC_API_KEY}"` 이름만 적는다 (3.4)                     |
 | `OPENAI_API_KEY`                        |        | (없음)                                | 위와 같다. 두 키 모두 비면 모델 목록이 비고 화면에 "사용 가능한 모델 없음" 이 뜬다                                              |
 
@@ -785,3 +787,70 @@ CPU 가 포화되고, 그동안 NAS 본래의 파일 서비스가 같이 느려�
 
 NAS 는 **파일 공유 자리로 두고**, 게이트웨이 호스트가 그 공유를 읽기 전용으로 마운트하는 배치가\
 11.4 의 그림이다. 그러면 NAS 부하는 파일 읽기뿐이고, 모델·변환·브라우저는 전부 별도 호스트에 남는다.
+
+
+## 12. NAS 문서를 검색 가능하게 만들기 (마크다운 사이드카 색인)
+
+> 정본은 [KNOWLEDGE.md](KNOWLEDGE.md). 여기에는 설치·운영에 필요한 최소 절차만 둔다.
+
+메모리 색인기는 `.md` 만 모은다. 그래서 11.4 로 공유를 마운트해도 그 안의 pdf·docx·xlsx·pptx 는
+검색에 잡히지 않는다. `openclaw knowledge sync` 가 문서마다 마크다운 사이드카를 만들어
+**호스트 로컬 색인 폴더**에 쌓고, 부서 에이전트가 그 폴더를 `memory.search.extraPaths` 로 본다.
+
+### 12.1 변수와 마운트
+
+```bash
+# chris-local/ixauth.env
+OPENCLAW_NAS_ROOT=/srv/nas              # 공유의 부모 (읽기 전용)
+OPENCLAW_KNOWLEDGE_ROOT=/srv/knowledge  # 색인의 부모 (쓰기 가능, NAS 가 아니어야 한다)
+```
+
+```bash
+sudo mkdir -p /srv/knowledge/rnd /srv/knowledge/qa
+sudo chown -R 1000:1000 /srv/knowledge     # 컨테이너의 node 사용자
+```
+
+compose 가 `/mnt/knowledge/rnd`·`/mnt/knowledge/qa` 로 쓰기 가능하게 마운트하고,
+`start-gateway.sh` 는 `OPENCLAW_KNOWLEDGE_ROOT` 가 비어 있지 않을 때만 두 부서 에이전트의
+`extraPaths` 를 그 경로로 렌더링한다. 비우면 빈 목록이라 이 기능이 없던 때와 동작이 같다.
+
+**색인 폴더를 NAS 에 두지 않는다.** 공유는 읽기 전용이 원칙이고, 색인이 호스트에 있는 이유가 그것이다.
+
+### 12.2 첫 색인과 확인
+
+```bash
+CO="docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml"
+$CO up -d
+
+$CO exec gateway openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd
+$CO exec gateway openclaw knowledge sync --source /mnt/nas/qa  --out /mnt/knowledge/qa
+
+# 사이드카가 생겼는지
+$CO exec gateway sh -c "ls /mnt/knowledge/rnd"
+
+# 렌더링된 설정에 extraPaths 가 들어갔는지
+$CO exec gateway sh -c "grep -A3 extraPaths /home/node/.openclaw/openclaw.json"
+
+# 색인기에 알린다. 이 단계를 빼면 사이드카가 있어도 검색에 안 잡힌다
+$CO exec gateway openclaw memory index --force --agent rnd-bot
+$CO exec gateway openclaw memory search "에탄올 재고" --agent rnd-bot
+```
+
+### 12.3 주기 실행
+
+```bash
+$CO exec gateway openclaw cron add   --name knowledge-sync-rnd --every 30m   --command "openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd && openclaw memory index --force --agent rnd-bot"
+```
+
+컨테이너 밖에서 돌리려면 호스트 systemd 타이머를 쓴다. 유닛 파일 예시는 KNOWLEDGE.md 7.3 에 있다.
+
+### 12.4 자주 나오는 증상
+
+| 증상                                    | 원인·조치                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| 사이드카는 있는데 검색이 빈손이다       | `openclaw memory index --force --agent <id>` 를 안 돌렸다                             |
+| pptx 만 `failed/converter-unavailable`  | 이미지에 LibreOffice 가 없다. D 단계의 빌드 인자를 확인하고 이미지를 다시 만든다      |
+| 스캔 pdf 가 `ignored/empty` 로 남는다   | 텍스트 층이 없는 이미지 pdf 다. OCR 은 범위 밖이다                                    |
+| hwp 가 통째로 빠진다                    | 지원 대상이 아니다(사용자 확정). `ignored/extension` 으로 집계된다                    |
+| 쓰기 권한 오류                          | 색인 폴더 소유자가 컨테이너의 `node`(uid 1000)가 아니다                               |
+| 원본을 지웠는데 답변에 계속 나온다      | 동기를 한 번 더 돌려 사이드카를 지우고 재색인한다                                     |
