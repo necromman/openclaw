@@ -19,8 +19,10 @@ function createRuntime(): { runtime: RuntimeEnv; lines: string[] } {
     runtime: {
       error: vi.fn(),
       exit: vi.fn(),
-      log: (message?: unknown) => {
-        lines.push(String(message ?? ""));
+      log: (...args: unknown[]) => {
+        lines.push(
+          args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" "),
+        );
       },
     } satisfies RuntimeEnv,
   };

@@ -191,7 +191,7 @@ describe("syncKnowledgeIndex", () => {
       source: path.resolve(source),
       startedAt: "2026-09-08T07:00:00.000Z",
     });
-    expect(Object.keys(summary.counts).sort()).toEqual([
+    expect(Object.keys(summary.counts).toSorted()).toEqual([
       "created",
       "deleted",
       "failed",

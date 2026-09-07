@@ -262,7 +262,7 @@ export async function syncKnowledgeIndex(
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
     entries,
     finishedAt: finishedAt.toISOString(),
-    include: [...include].sort(),
+    include: [...include].toSorted(),
     maxBytes,
     out,
     source,

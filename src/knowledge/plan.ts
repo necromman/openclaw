@@ -191,5 +191,5 @@ export async function findOrphanSidecars(params: {
       orphans.push(relativePath);
     }
   }
-  return orphans.sort((left, right) => left.localeCompare(right));
+  return orphans.toSorted((left, right) => left.localeCompare(right));
 }
