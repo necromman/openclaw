@@ -134,8 +134,8 @@ IX-Auth UNLICENSED 법무, 고객 SMTP·도메인·TLS·약관, 부서 기밀 �
 
 | 단계 | 상태    | 브랜치             | 머지 커밋 | 비고                  |
 | ---- | ------- | ------------------ | --------- | --------------------- |
-| D    | 진행 중 | `chris/delivery-d` | -         | 2026-09-07 21:10 착수 |
-| E    | 대기    |                    |           |                       |
+| D    | 완료    | `chris/delivery-d` | `45ef6d3eec7` (ff) | 2026-09-07 22:15. 실측: 로그아웃 메뉴·WS 4001 종료, pptx·docx·xlsx 변환 미리보기(한글 정상), `cron.list`·`talk.catalog` 오류 0건. 증적 chris-server `analysis/2026-09-07-openclaw-auth/delivery-d-*.png`. 알아 둘 것: WS 종료는 프로필 단위(다른 기기 연결도 순간 끊김 후 재연결), 종료 사유 문자열은 업스트림 `operator role changed` 그대로, 시작 번들 예산 선재 초과 +164B |
+| E    | 진행 중 | `chris/delivery-e` | -         | 2026-09-07 22:20 착수 |
 | F    | 대기    |                    |           |                       |
 | G    | 대기    |                    |           |                       |
 | H    | 대기    |                    |           |                       |
