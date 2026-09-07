@@ -28,6 +28,7 @@ import {
   pruneExpiredOutboundMessageProgress,
   recordOutboundMessageProgress,
 } from "./message-delivery-progress-store.js";
+import { pruneExpiredUserActivityAudit } from "./user-activity-audit-retention.js";
 
 const MAX_PENDING_AUDIT_EVENTS = 4_096;
 const AUDIT_MAINTENANCE_INTERVAL_MS = 60 * 60_000;
@@ -142,6 +143,7 @@ export function createAuditEventWriter(
       () => pruneExpiredExecutionIdentityContexts({ database }),
       () => pruneExpiredExecutionDecisionFacts({ database }),
       () => pruneExpiredOutboundMessageProgress({ database }),
+      () => pruneExpiredUserActivityAudit(database),
     ]) {
       try {
         more = runWithoutBusyWait(maintenance) > 0 || more;

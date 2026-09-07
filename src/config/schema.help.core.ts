@@ -60,6 +60,14 @@ export const CORE_FIELD_HELP: Record<string, string> = {
     "Retains bounded execution-identity attribution for exact-run inspection. Default: false. Requires logging.audit.enabled; restart the Gateway after changing it.",
   "logging.audit.messages":
     'Controls content-free message lifecycle records: "off" (default), "direct" for known direct conversations only, or "all" for direct, group, channel, and unknown conversation kinds. Both logging.audit.enabled and logging.audit.messages are startup-scoped; restart the Gateway after changing either setting.',
+  "logging.audit.userActivity":
+    "Person-attributed activity ledger: sign-in, sign-out, questions asked, file paths a tool read, transcripts opened, administrator actions, and denied access. Requires logging.audit.enabled. It is a query ledger for the retention window, not a tamper-evident archive; an external SIEM stays the long-term record.",
+  "logging.audit.userActivity.promptText":
+    "Stores the text of each question beside the person who asked it. Default: false, which records only its length and a digest. Turning it on puts user-authored content in the ledger.",
+  "logging.audit.userActivity.retentionDays":
+    "Days an activity row stays queryable before the hourly sweep deletes it. Default: 90.",
+  "logging.audit.userActivity.maxRows":
+    "Hard row cap for the activity ledger; the oldest rows are deleted first once it is exceeded. Default: 1000000.",
   diagnostics:
     "Diagnostics controls for targeted tracing, telemetry export, and cache inspection during debugging. Keep baseline diagnostics minimal in production and enable deeper signals only when investigating issues.",
   "diagnostics.otel":

@@ -340,6 +340,21 @@ export type AuditConfig = {
    * unknown conversation kinds. Default: `off`.
    */
   messages?: "off" | "direct" | "all";
+  /** Person-attributed activity ledger: who signed in, asked, and read which files. */
+  userActivity?: AuditUserActivityConfig;
+};
+
+export type AuditUserActivityConfig = {
+  /**
+   * Store the text of each question next to the person who asked it. Default: false,
+   * which records only its length and a digest. Turning it on puts user-authored
+   * content in the ledger, so it is an explicit deployment decision.
+   */
+  promptText?: boolean;
+  /** Days a ledger row stays queryable before the hourly sweep deletes it. Default: 90. */
+  retentionDays?: number;
+  /** Hard row cap; the oldest rows go first once it is exceeded. Default: 1000000. */
+  maxRows?: number;
 };
 
 export type DiagnosticsConfig = {

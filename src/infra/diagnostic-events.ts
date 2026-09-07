@@ -540,6 +540,12 @@ type DiagnosticToolExecutionBaseEvent = DiagnosticBaseEvent & {
   paramsSummary?: DiagnosticToolParamsSummary;
   /** Deterministic mutation classification computed before tool execution. */
   mutatingAction?: boolean;
+  /**
+   * File paths a read-only tool call is about to reveal, for the person-attributed
+   * activity ledger. Derived the same way `mutatingAction` is - from an allowlist of
+   * tools and parameter names - so no other part of the argument object travels here.
+   */
+  readPaths?: string[];
 };
 
 export type DiagnosticToolExecutionStartedEvent = DiagnosticToolExecutionBaseEvent & {

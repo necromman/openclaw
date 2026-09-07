@@ -3,6 +3,7 @@
  * Owns tool preparation/finalization, adjusted-param replay state, terminal
  * results, diagnostics around execution, and wrapper metadata.
  */
+import { projectToolReadPathsFact } from "../audit/tool-read-paths.js";
 import {
   emitTrustedDiagnosticEvent,
   emitTrustedDiagnosticEventWithPrivateData,
@@ -339,6 +340,7 @@ export function wrapToolWithBeforeToolCallHook(
         ...(toolCallId && { toolCallId }),
         paramsSummary: summarizeToolParams(toolParams),
         mutatingAction: buildToolMutationState(normalizedToolName, toolParams).mutatingAction,
+        ...projectToolReadPathsFact(normalizedToolName, toolParams),
       });
       const recordPreExecutionError = (
         error: unknown,

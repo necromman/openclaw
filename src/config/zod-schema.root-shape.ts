@@ -122,6 +122,13 @@ export const OpenClawSchemaShape = {
           enabled: z.boolean().optional(),
           executionIdentity: z.boolean().optional(),
           messages: z.union([z.literal("off"), z.literal("direct"), z.literal("all")]).optional(),
+          userActivity: z
+            .strictObject({
+              promptText: z.boolean().optional(),
+              retentionDays: z.number().int().positive().optional(),
+              maxRows: z.number().int().positive().optional(),
+            })
+            .optional(),
         })
         .optional(),
     })
