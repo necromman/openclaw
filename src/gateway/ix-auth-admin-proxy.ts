@@ -171,7 +171,10 @@ function buildUpstreamHeaders(params: {
     headers.set("x-real-ip", clientIp);
   }
   const userAgent = readFirstHeaderValue(params.req.headers["user-agent"]);
-  const sanitizedUserAgent = userAgent?.replaceAll(/[\r\n]/gu, " ").slice(0, 512).trim();
+  const sanitizedUserAgent = userAgent
+    ?.replaceAll(/[\r\n]/gu, " ")
+    .slice(0, 512)
+    .trim();
   if (sanitizedUserAgent) {
     headers.set("user-agent", sanitizedUserAgent);
   }
@@ -337,7 +340,8 @@ export async function handleIxAuthAdminProxyRequest(params: {
   }
 
   const location = upstream.headers.get("location");
-  const rewrittenLocation = location === null ? undefined : rewriteIxAuthAdminProxyLocation(location);
+  const rewrittenLocation =
+    location === null ? undefined : rewriteIxAuthAdminProxyLocation(location);
   if (location !== null && rewrittenLocation === undefined) {
     sendJson(params.res, 502, { error: "identity_response_invalid" });
     return;

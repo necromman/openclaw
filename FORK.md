@@ -756,13 +756,13 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 
 포크에 사내 인증 서버 **IX-Auth** 를 신원 공급자로 붙였다. `gateway.auth.mode: "ix-auth"` 로만 켜지고, 기존 token/password/trusted-proxy 모드는 무영향이다.
 
-| 문서                                                                   | 내용                                                                             |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| [chris-local/AUTH-IXAUTH.md](chris-local/AUTH-IXAUTH.md)               | **연동 정본.** 구조·시퀀스·설정 키·역할 매핑·운영 절차·되돌리기·라이브 검증 기록 |
+| 문서                                                                   | 내용                                                                                               |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [chris-local/AUTH-IXAUTH.md](chris-local/AUTH-IXAUTH.md)               | **연동 정본.** 구조·시퀀스·설정 키·역할 매핑·운영 절차·되돌리기·라이브 검증 기록                   |
 | [chris-local/DEPLOY.md](chris-local/DEPLOY.md)                         | **납품 설치 절차서.** 요구사항·`.env` 항목표·기동·백업·업그레이드·되돌리기·포트·라이선스 확인 항목 |
-| [chris-local/AUTH-IXAUTH-OPTION.md](chris-local/AUTH-IXAUTH-OPTION.md) | 자체 구현안 대비 채택 근거 비교                                                  |
-| [chris-local/AUTH-PLAN.md](chris-local/AUTH-PLAN.md)                   | v2 결정 요약 + 폐기된 자체 구현 계획(부록)                                       |
-| [ix-auth/VENDOR.md](ix-auth/VENDOR.md)                                 | `ix-auth/` 벤더 복사본의 출처·제외 목록·재동기화·되돌리기                        |
-| [ix-auth/MODULE.md](ix-auth/MODULE.md)                                 | 포크가 수정해도 되는 구역, 지켜야 할 계약, 설계 불변식 준수 상태                 |
+| [chris-local/AUTH-IXAUTH-OPTION.md](chris-local/AUTH-IXAUTH-OPTION.md) | 자체 구현안 대비 채택 근거 비교                                                                    |
+| [chris-local/AUTH-PLAN.md](chris-local/AUTH-PLAN.md)                   | v2 결정 요약 + 폐기된 자체 구현 계획(부록)                                                         |
+| [ix-auth/VENDOR.md](ix-auth/VENDOR.md)                                 | `ix-auth/` 벤더 복사본의 출처·제외 목록·재동기화·되돌리기                                          |
+| [ix-auth/MODULE.md](ix-auth/MODULE.md)                                 | 포크가 수정해도 되는 구역, 지켜야 할 계약, 설계 불변식 준수 상태                                   |
 
 `ix-auth/` 는 별도 제품 IX-Auth 의 벤더 복사본이다(원본 `D:\PROJECT\ix-auth` 커밋 `da66bda`). 포크의 oxfmt·oxlint·dup:check 는 이 트리를 건너뛰도록 설정돼 있다.

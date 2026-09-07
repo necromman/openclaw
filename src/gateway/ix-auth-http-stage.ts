@@ -75,10 +75,7 @@ async function runIxAuthHttpStage(params: {
 }
 
 /** True when this request belongs to the identity server's admin console namespace. */
-function claimsIxAuthAdminProxyRequest(params: {
-  authMode: string;
-  pathname: string;
-}): boolean {
+function claimsIxAuthAdminProxyRequest(params: { authMode: string; pathname: string }): boolean {
   return params.authMode === "ix-auth" && isIxAuthAdminProxyPath(params.pathname);
 }
 

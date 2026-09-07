@@ -92,7 +92,9 @@ function buildRequest(params: {
   }) as unknown as IncomingMessage;
 }
 
-function buildDeps(overrides?: Partial<IxAuthAdminProxyDependencies>): IxAuthAdminProxyDependencies {
+function buildDeps(
+  overrides?: Partial<IxAuthAdminProxyDependencies>,
+): IxAuthAdminProxyDependencies {
   return {
     settings: SETTINGS,
     principal: buildPrincipal("admin"),
@@ -147,7 +149,9 @@ describe("handleIxAuthAdminProxyRequest", () => {
     const { calls } = stubUpstream(new Response("should not be requested"));
     const captured = buildResponse();
     await handleIxAuthAdminProxyRequest({
-      req: buildRequest({ headers: { origin: "https://evil.example", "sec-fetch-site": "cross-site" } }),
+      req: buildRequest({
+        headers: { origin: "https://evil.example", "sec-fetch-site": "cross-site" },
+      }),
       res: captured.res,
       pathname: "/admin/identity/",
       deps: buildDeps(),
