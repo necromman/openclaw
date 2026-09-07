@@ -113,11 +113,35 @@
       },
       "rnd-bot": {
         "name": "R&D Bot",
-        "description": "Department agent for R&D"
+        "description": "Department agent for R&D",
+        "workspace": "__OPENCLAW_RND_WORKSPACE__",
+        "skipBootstrap": "__OPENCLAW_NAS_SKIP_BOOTSTRAP__",
+        "tools": {
+          "profile": "readonly",
+          "permissionMode": "read-only",
+          "fs": {
+            "workspaceOnly": true
+          },
+          "exec": {
+            "mode": "deny"
+          }
+        }
       },
       "qa-bot": {
         "name": "QA Bot",
-        "description": "Department agent for QA"
+        "description": "Department agent for QA",
+        "workspace": "__OPENCLAW_QA_WORKSPACE__",
+        "skipBootstrap": "__OPENCLAW_NAS_SKIP_BOOTSTRAP__",
+        "tools": {
+          "profile": "readonly",
+          "permissionMode": "read-only",
+          "fs": {
+            "workspaceOnly": true
+          },
+          "exec": {
+            "mode": "deny"
+          }
+        }
       }
     }
   },

@@ -141,12 +141,34 @@ services:
       # gateway.auth.ixAuth.selfSignup from it, so the signup screen and the identity
       # server's signup mode can never disagree.
       IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
+      # Parent directory of the department shares on the host, empty by default. When
+      # it is set, start-gateway.sh points the department agents' workspaces at the
+      # read-only mounts below; when it is empty they keep their own writable state
+      # directories and the mounts are only there to be looked at. One variable decides
+      # both, so a bind mount can never disagree with the workspace it is meant to be.
+      OPENCLAW_NAS_ROOT: ${OPENCLAW_NAS_ROOT:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       # Declarative config: the tracked template is copied over the state copy on every
       # start, so this file is the single source of truth for the deployment.
       - ./ixauth-gateway-config:/config:ro
       - gateway-state:/home/node/.openclaw
+      # Department shares from the NAS, mounted read only. The agent workspace is the
+      # whitelist: a folder reaches an agent by being mounted here and named in that
+      # agent's "workspace", and by nothing else. Relative paths resolve against the
+      # project directory, which is this file's directory, so the default is
+      # chris-local/nas-sample: a tracked sample tree that lets the wiring be exercised
+      # without a NAS. In a real delivery OPENCLAW_NAS_ROOT is an absolute host path
+      # where the SMB or NFS shares are already mounted.
+      #
+      # Personnel and payroll (hr/) is deliberately absent from every mount, and that
+      # absence is the control. A folder nobody mounts is a folder no agent can reach,
+      # so adding a line for hr/ here is the single edit that would break the boundary.
+      # There is no deny list to keep in step, which is the point: a blacklist would
+      # have to enumerate every folder an agent must not see, and one forgotten entry
+      # is an open door.
+      - ${OPENCLAW_NAS_ROOT:-./nas-sample}/rnd:/mnt/nas/rnd:ro
+      - ${OPENCLAW_NAS_ROOT:-./nas-sample}/qa:/mnt/nas/qa:ro
     ports:
       # The Gateway is the only service the browser ever reaches.
       - "${OPENCLAW_GATEWAY_PORT:-18800}:18789"
