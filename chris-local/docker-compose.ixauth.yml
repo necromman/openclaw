@@ -98,6 +98,10 @@ services:
       # Read by the committed config through its "${IXAUTH_SERVICE_KEY}" env SecretRef,
       # so the shared secret never has to be written into a tracked file.
       IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
+      # The exact origin the browser uses. It becomes gateway.controlUi.allowedOrigins.
+      # Behind bridge networking the request no longer looks local to the Gateway, so
+      # the loopback development shortcut does not apply and this must be right.
+      OPENCLAW_PUBLIC_ORIGIN: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       # Declarative config: the tracked template is copied over the state copy on every
@@ -107,15 +111,11 @@ services:
     ports:
       # The Gateway is the only service the browser ever reaches.
       - "${OPENCLAW_GATEWAY_PORT:-18800}:18789"
-    # The image binds loopback by default, which bridge networking cannot reach through
-    # -p. Binding "lan" is safe only because gateway.auth.mode is "ix-auth": there is no
-    # unauthenticated surface behind it.
-    command:
-      [
-        "sh",
-        "-c",
-        "cp /config/openclaw.json /home/node/.openclaw/openclaw.json && exec node dist/index.js gateway --bind lan --port 18789",
-      ]
+    # The script renders the tracked config into the state volume and then starts the
+    # Gateway. The image binds loopback by default, which bridge networking cannot reach
+    # through -p, so it binds "lan" instead. That is safe only because
+    # gateway.auth.mode is "ix-auth": there is no unauthenticated surface behind it.
+    command: ["sh", "/config/start-gateway.sh"]
     cap_drop:
       - NET_RAW
       - NET_ADMIN
