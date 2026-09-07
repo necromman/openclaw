@@ -73,10 +73,18 @@
   "tools": {
     "sessions": {
       "visibility": "department"
+    },
+    "fs": {
+      "workspaceOnly": true
     }
   },
   "agents": {
     "ownership": "explicit",
+    "defaults": {
+      "systemAgent": {
+        "agentId": "main"
+      }
+    },
     "entries": {
       "main": {
         "name": "Shared Assistant",
@@ -91,5 +99,18 @@
         "description": "Department agent for QA"
       }
     }
+  },
+  "memory": {
+    "citations": "on",
+    "search": {
+      "store": {
+        "fts": {
+          "tokenizer": "trigram"
+        }
+      }
+    }
+  },
+  "talk": {
+    "agentId": "main"
   }
 }

@@ -201,6 +201,8 @@ docker build \
 
 폰트만 필요하고 변환기는 필요 없다면 `fonts-noto-cjk` 만 넣는다 (증가폭이 크게 줄어든다). 그 경우 문서 미리보기는 HTML 폴백 경로로만 동작한다.
 
+**compose 반영 2026-09-07.** 납품 스택 `chris-local/docker-compose.ixauth.yml` 의 gateway 빌드 인자 `OPENCLAW_IMAGE_APT_PACKAGES` 가 위 예시와 같은 패키지 집합(`fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji fonts-nanum libreoffice-writer libreoffice-calc libreoffice-impress`)을 쓴다. 그 전까지는 폰트 3종만 들어 있어 컨테이너에 `soffice` 가 없었고, docx·xlsx 는 이미지 없는 HTML 폴백, pptx·doc·xls·ppt 는 실패였다. `chris-local/ixauth-verify.sh` 는 IX-Auth 이미지만 빌드하고 게이트웨이 이미지는 만들지 않으므로 동기화할 것이 없다.
+
 ### 에이전트가 PDF 를 만들 때의 규칙
 
 규칙 원문은 `chris-local/workspace-pdf-rules.md` 이고, `chris-local/install-pdf-rules.sh` 가 로컬 인스턴스 워크스페이스 `AGENTS.md` 에 멱등으로 덧붙인다 (설치 완료).

@@ -104,10 +104,13 @@ services:
       context: ..
       dockerfile: Dockerfile
       args:
-        # Chromium for the browser tool, and CJK fonts so Korean text renders in
-        # screenshots and PDF output instead of tofu boxes.
+        # Chromium for the browser tool, CJK fonts so Korean text renders in screenshots
+        # and PDF output instead of tofu boxes, and LibreOffice so Word, Excel, and
+        # PowerPoint files get a real document preview rather than an image-less HTML
+        # fallback. The converter adds roughly 580 MiB to the image; the measurement and
+        # the font rules are in chris-local/FILE-PREVIEW.md.
         OPENCLAW_INSTALL_BROWSER: "1"
-        OPENCLAW_IMAGE_APT_PACKAGES: "fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji"
+        OPENCLAW_IMAGE_APT_PACKAGES: "fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji fonts-nanum libreoffice-writer libreoffice-calc libreoffice-impress"
     image: openclaw-gateway:local
     restart: unless-stopped
     depends_on:
