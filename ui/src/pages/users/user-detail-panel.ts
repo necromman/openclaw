@@ -164,10 +164,8 @@ function renderDepartmentRow(props: UserDetailPanelProps): TemplateResult {
                       .checked=${props.selectedDepartments.includes(item.code)}
                       @change=${(event: Event) => {
                         // SAFETY: bound to the checkbox on this template line.
-                        props.onDepartmentToggle(
-                          item.code,
-                          (event.target as HTMLInputElement).checked,
-                        );
+                        const checkbox = event.target as HTMLInputElement;
+                        props.onDepartmentToggle(item.code, checkbox.checked);
                       }}
                     />
                     <span>${item.name}</span>

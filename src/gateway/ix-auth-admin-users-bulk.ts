@@ -175,11 +175,12 @@ export async function handleIxAuthUsersImport(params: {
   admin: IxAuthAdminContext;
 }): Promise<void> {
   const body = await readJsonBody(params.req, IX_AUTH_BULK_BODY_MAX_BYTES);
-  const envelope =
-    body.ok && body.value !== null && typeof body.value === "object" && !Array.isArray(body.value)
-      ? // SAFETY: the guard on this line rejected null, arrays, and non-objects.
-        (body.value as Record<string, unknown>)
-      : undefined;
+  const value = body.ok ? body.value : undefined;
+  let envelope: Record<string, unknown> | undefined;
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    // SAFETY: the guard on the line above rejected null, arrays, and non-objects.
+    envelope = value as Record<string, unknown>;
+  }
   const csv = typeof envelope?.csv === "string" ? envelope.csv : undefined;
   if (!csv) {
     sendJson(params.res, 400, { error: "invalid_body" });
