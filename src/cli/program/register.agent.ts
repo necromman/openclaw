@@ -1,4 +1,5 @@
 // Agent and agents command registration with lazy command-module loading for startup speed.
+import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import type { Command } from "commander";
 import { formatDocsLink } from "../../../packages/terminal-core/src/links.js";
 import { theme } from "../../../packages/terminal-core/src/theme.js";
@@ -10,6 +11,7 @@ import { collectOption } from "./helpers.js";
 type AgentsAddModule = typeof import("../../commands/agents.commands.add.js");
 type AgentsBindModule = typeof import("../../commands/agents.commands.bind.js");
 type AgentsDeleteModule = typeof import("../../commands/agents.commands.delete.js");
+type AgentsDepartmentModule = typeof import("../../commands/agents.commands.department.js");
 type AgentsIdentityModule = typeof import("../../commands/agents.commands.identity.js");
 type AgentsListModule = typeof import("../../commands/agents.commands.list.js");
 type CliUtilsModule = typeof import("../cli-utils.js");
@@ -37,6 +39,12 @@ async function loadAgentsUnbindCommand(): Promise<AgentsBindModule["agentsUnbind
 
 async function loadAgentsDeleteCommand(): Promise<AgentsDeleteModule["agentsDeleteCommand"]> {
   return (await import("../../commands/agents.commands.delete.js")).agentsDeleteCommand;
+}
+
+async function loadAgentsDepartmentCommand(): Promise<
+  AgentsDepartmentModule["agentsDepartmentCommand"]
+> {
+  return (await import("../../commands/agents.commands.department.js")).agentsDepartmentCommand;
 }
 
 async function loadAgentsSetIdentityCommand(): Promise<
@@ -94,6 +102,28 @@ export function registerAgentsCommands(program: Command): void {
             json: Boolean(opts.json),
             bindings: Boolean(opts.bindings),
             tree: Boolean(opts.tree),
+          },
+          runtime,
+        );
+      });
+    });
+
+  agents
+    .command("department")
+    .description("Show or change which department an agent belongs to")
+    .option("--agent <id>", "Agent id to change")
+    .option("--set <slug>", "Bind the agent to this department slug")
+    .option("--clear", "Unbind the agent, returning it to the shared pool", false)
+    .option("--json", "Output JSON instead of text", false)
+    .action(async (opts): Promise<void> => {
+      await runAgentsCommandAction(async (runtime) => {
+        const agentsDepartmentCommand = await loadAgentsDepartmentCommand();
+        await agentsDepartmentCommand(
+          {
+            agent: normalizeOptionalString(opts.agent),
+            set: normalizeOptionalString(opts.set),
+            clear: Boolean(opts.clear),
+            json: Boolean(opts.json),
           },
           runtime,
         );

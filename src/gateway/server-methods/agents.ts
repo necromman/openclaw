@@ -101,6 +101,7 @@ import {
 } from "../../state/agent-deletion-journal.js";
 import { unregisterOpenClawAgentDatabase } from "../../state/openclaw-agent-db-registry.js";
 import { resolveUserPath } from "../../utils.js";
+import { prepareDepartmentGate } from "../department-access.js";
 import { listAgentsForGateway } from "../session-utils.js";
 import {
   AgentConfigPreconditionError,
@@ -808,17 +809,26 @@ export const agentsHandlers: GatewayRequestHandlers = {
     }
 
     const cfg = context.getRuntimeConfig();
+    // Narrowed before catalog preparation so an agent outside the caller's department
+    // costs no discovery work and never reaches the projection below.
+    const departmentGate = prepareDepartmentGate({ cfg, client: client ?? null });
+    const allowedAgentIds = departmentGate
+      ? new Set(listAgentIds(cfg).filter((agentId) => departmentGate.allowsAgent(agentId)))
+      : undefined;
     const modelCatalogByAgentId = new Map(
       await Promise.all(
-        listAgentIds(cfg).map(
-          async (agentId) =>
-            [agentId, await readPreparedServerMethodModelCatalog(context, { agentId })] as const,
-        ),
+        listAgentIds(cfg)
+          .filter((agentId) => !allowedAgentIds || allowedAgentIds.has(agentId))
+          .map(
+            async (agentId) =>
+              [agentId, await readPreparedServerMethodModelCatalog(context, { agentId })] as const,
+          ),
       ),
     );
     respond(
       true,
       listAgentsForGateway(cfg, undefined, {
+        ...(allowedAgentIds ? { allowedAgentIds } : {}),
         modelCatalogByAgentId,
         includeSystem: hasGatewayClientCap(client?.connect.caps, GATEWAY_CLIENT_CAPS.AGENT_KIND),
         httpAvatarBasePath:

@@ -343,6 +343,8 @@ export function listAgentsForGateway(
     modelCatalogByAgentId?: SessionListModelCatalog;
     includeSystem?: boolean;
     httpAvatarBasePath?: string;
+    /** Caller-scoped roster ceiling; omitted means the caller may see every agent. */
+    allowedAgentIds?: ReadonlySet<string>;
   },
 ): {
   defaultId: string;
@@ -381,9 +383,13 @@ export function listAgentsForGateway(
       : undefined;
     identityById.set(agentId, identity);
   }
+  const allowedAgentIds = options?.allowedAgentIds;
+  const visible = allowedAgentIds
+    ? basic.agents.filter((entry) => allowedAgentIds.has(entry.id))
+    : basic.agents;
   const roster = options?.includeSystem
-    ? basic.agents
-    : basic.agents.filter((entry) => entry.kind !== "system");
+    ? visible
+    : visible.filter((entry) => entry.kind !== "system");
   const provenanceById = new Map(
     listAgentProvenance().map((record) => [record.agentId, record] as const),
   );
@@ -460,7 +466,12 @@ export function listAgentsForGateway(
       : agent;
   });
   return {
-    defaultId: basic.defaultId,
+    // The picker treats defaultId as authoritative, so a filtered-out default must not
+    // survive as a selectable target the caller is then refused at creation time.
+    defaultId:
+      allowedAgentIds && !allowedAgentIds.has(basic.defaultId)
+        ? (agents[0]?.id ?? basic.defaultId)
+        : basic.defaultId,
     ownership: basic.ownership,
     selectionRequired: basic.selectionRequired,
     mainKey: basic.mainKey,
