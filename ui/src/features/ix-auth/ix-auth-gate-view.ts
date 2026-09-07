@@ -10,8 +10,22 @@ import {
 } from "../../app/lazy-custom-element.ts";
 import { renderLazyViewError } from "../../components/lazy-view-error.ts";
 import { buildIxAuthLoginProps, type IxAuthFormState } from "./ix-auth-form-state.ts";
+import type { IxAuthSessionState } from "./ix-auth-session-api.ts";
+
+/**
+ * True when the identity-server screen owns this pre-connection render.
+ *
+ * `undefined` means the session probe has not answered yet, which also belongs here:
+ * showing the shared-token form first would flash a screen the answer is about to
+ * replace, and in this mode that form is a way around the login.
+ */
+export function shouldRenderIxAuthGate(session: IxAuthSessionState | undefined): boolean {
+  return session === undefined || session.authMode === "ix-auth";
+}
 
 export type IxAuthGateViewParams = {
+  /** Undefined while the session probe is still in flight. */
+  session: IxAuthSessionState | undefined;
   loader: LazyCustomElementRequestController;
   resourceBasePath: string;
   state: IxAuthFormState;
@@ -27,6 +41,9 @@ export type IxAuthGateViewParams = {
  * would be a way around the login.
  */
 export function renderIxAuthGate(params: IxAuthGateViewParams): TemplateResult {
+  if (params.session === undefined) {
+    return html`<openclaw-tooltip-provider>${params.renderPending()}</openclaw-tooltip-provider>`;
+  }
   if (!isOptionalElementDefined(IX_AUTH_LOGIN_ELEMENT)) {
     const loadState = params.loader.visibleState;
     if (!loadState) {

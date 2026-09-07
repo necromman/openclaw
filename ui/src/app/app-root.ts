@@ -15,7 +15,10 @@ import {
   createEmptyIxAuthFormState,
   type IxAuthFormState,
 } from "../features/ix-auth/ix-auth-form-state.ts";
-import { renderIxAuthGate } from "../features/ix-auth/ix-auth-gate-view.ts";
+import {
+  renderIxAuthGate,
+  shouldRenderIxAuthGate,
+} from "../features/ix-auth/ix-auth-gate-view.ts";
 import {
   probeIxAuthSession,
   type IxAuthSessionState,
@@ -639,18 +642,10 @@ export class OpenClawApp extends OpenClawLightDomElement {
     // Identity-server mode owns the pre-connection screen. A person signs in with an
     // account; the Gateway URL and shared token are not theirs to enter, and falling
     // back to that form after a failed sign-in would offer a way around the login.
-    if (showLoginGate && this.ixAuthSession === undefined) {
-      // The probe is still in flight. Showing the splash rather than either login form
-      // avoids flashing a screen the answer is about to replace.
-      return html`
-        <openclaw-tooltip-provider>
-          ${renderConnectingSplash(gatewayStartupStatus)}
-        </openclaw-tooltip-provider>
-      `;
-    }
-    if (showLoginGate && this.ixAuthSession?.authMode === "ix-auth") {
+    if (showLoginGate && shouldRenderIxAuthGate(this.ixAuthSession)) {
       const basePath = context.basePath;
       return renderIxAuthGate({
+        session: this.ixAuthSession,
         loader: this.ixAuthLoginLoader,
         resourceBasePath: context.resourceBasePath,
         state: this.ixAuthForm,
@@ -660,7 +655,7 @@ export class OpenClawApp extends OpenClawLightDomElement {
         onSubmit: () => {
           void this.submitIxAuthForm(basePath);
         },
-        renderPending: () => renderConnectingSplash(),
+        renderPending: () => renderConnectingSplash(gatewayStartupStatus),
       });
     }
     if (showLoginGate && !isOptionalElementDefined(LOGIN_GATE_ELEMENT)) {

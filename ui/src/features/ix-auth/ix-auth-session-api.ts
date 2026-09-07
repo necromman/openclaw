@@ -7,6 +7,13 @@
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
 const IX_AUTH_CSRF_HEADER = "x-openclaw-csrf";
 
+/**
+ * The session probe gates the whole pre-connection screen, including for Gateways that
+ * do not use this mode at all. A stalled request must not strand those on a splash, so
+ * it fails fast and the caller falls through to the shared-token form.
+ */
+const IX_AUTH_PROBE_TIMEOUT_MS = 8_000;
+
 /** Signed-in user as reported by the Gateway. */
 export type IxAuthSessionUser = {
   profileId: string;
@@ -135,6 +142,7 @@ export async function probeIxAuthSession(basePath: string): Promise<IxAuthSessio
       method: "GET",
       credentials: "same-origin",
       headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(IX_AUTH_PROBE_TIMEOUT_MS),
     });
   } catch {
     return { authenticated: false };
