@@ -79,6 +79,8 @@ function isGatewayHandshakeRefusal(error: unknown): boolean {
   if (!(error instanceof Error) || error.name !== "GatewayClientRequestError") {
     return false;
   }
+  // SAFETY: the name check above proves this is a GatewayClientRequestError, which
+  // carries the error shape's optional `details` alongside the Error fields.
   const details = (error as { details?: unknown }).details;
   const code = readConnectErrorDetailCode(details);
   return code !== null && Object.hasOwn(ConnectErrorDetailCodes, code);
