@@ -1,0 +1,166 @@
+# 납품 호스트용 compose (진바이오 NAS). 빌드하지 않고 ghcr 이미지를 받아 쓴다.
+#
+# 사용법 (NAS 에서 root):
+#   cd /volume1/docker/openclaw
+#   docker-compose -p openclaw-ixauth --env-file ixauth.env -f docker-compose.nas.yml \
+#     --profile tunnel up -d
+#
+# 설치 절차 전체와 되돌리기는 chris-local/DEPLOY.md 13절.
+#
+# chris-local/docker-compose.ixauth.yml 과 형제 파일이다. 다른 점은 셋뿐이다.
+#   1) build: 가 없다. 이미지는 GitHub Actions 가 굽고 ghcr 에서 받는다.
+#      NAS 는 2코어라 게이트웨이 이미지를 여기서 빌드할 수 없다.
+#   2) mem_limit 로 컨테이너별 상한을 건다. NAS 는 본래 파일 서비스와 기존 컨테이너
+#      7개를 함께 돌리는 기계라, 한 컨테이너가 RAM 을 다 먹으면 그쪽이 먼저 죽는다.
+#   3) mailpit(개발용 수신함) 서비스가 없다. 납품 호스트에서 쓸 일이 없다.
+# 그 밖의 값은 전부 같다. 원본을 고치면 이 파일도 같이 고친다.
+#
+# 파일 형식에 version: 을 쓰지 않는다. NAS 의 docker-compose 는 1.28.5 이고, 그
+# 버전이 처음으로 Compose Specification(version 키 없는 형식)을 읽는다. version: "3.x"
+# 로 적으면 mem_limit 가 조용히 무시된다.
+
+services:
+  ix-auth-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${IXAUTH_DB_NAME:-ixauth}
+      POSTGRES_USER: ${IXAUTH_DB_USERNAME:-ixauth}
+      POSTGRES_PASSWORD: ${IXAUTH_DB_PASSWORD:?set IXAUTH_DB_PASSWORD}
+    volumes:
+      - ix-auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${IXAUTH_DB_USERNAME:-ixauth} -d ${IXAUTH_DB_NAME:-ixauth}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    mem_limit: 512m
+    networks: [ix-auth-internal]
+
+  ix-auth:
+    image: ghcr.io/necromman/openclaw-ix-auth:chris-main
+    restart: unless-stopped
+    depends_on:
+      ix-auth-db:
+        condition: service_healthy
+    environment:
+      IXAUTH_DB_URL: jdbc:postgresql://ix-auth-db:5432/${IXAUTH_DB_NAME:-ixauth}
+      IXAUTH_DB_USERNAME: ${IXAUTH_DB_USERNAME:-ixauth}
+      IXAUTH_DB_PASSWORD: ${IXAUTH_DB_PASSWORD:?set IXAUTH_DB_PASSWORD}
+      IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
+      # 고정 리터럴. 게이트웨이 설정 파일이 같은 두 값을 들고 있고, 어긋나면 로그인은
+      # 되는데 곧바로 로그아웃된다.
+      IXAUTH_JWT_ISSUER: openclaw-ix-auth
+      IXAUTH_JWT_AUDIENCE: openclaw-gateway
+      IXAUTH_ADMIN_EMAIL: ${IXAUTH_ADMIN_EMAIL:?set IXAUTH_ADMIN_EMAIL}
+      IXAUTH_ADMIN_PASSWORD: ${IXAUTH_ADMIN_PASSWORD:?set IXAUTH_ADMIN_PASSWORD}
+      IXAUTH_ADMIN_NAME: ${IXAUTH_ADMIN_NAME:-관리자}
+      IXAUTH_ADMIN_UI_ENABLED: "true"
+      IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
+      IXAUTH_ACCOUNT_SIGNUP_VERIFICATION: ${IXAUTH_ACCOUNT_SIGNUP_VERIFICATION:-EMAIL}
+      IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS: ${IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS:-}
+      IXAUTH_ACCOUNT_INVITE_TOKEN_TTL: ${IXAUTH_ACCOUNT_INVITE_TOKEN_TTL:-72h}
+      IXAUTH_MAIL_APP_BASE_URL: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
+      IXAUTH_MAIL_FROM: ${IXAUTH_MAIL_FROM:-no-reply@localhost}
+      IXAUTH_MAIL_PRODUCT_NAME: ${IXAUTH_MAIL_PRODUCT_NAME:-Chris Agent}
+      IXAUTH_MAIL_TRANSPORT: ${IXAUTH_MAIL_TRANSPORT:-WEBHOOK}
+      IXAUTH_MAIL_WEBHOOK_URL: ${IXAUTH_MAIL_WEBHOOK_URL:-http://gateway:18789/auth/mail-hook}
+      IXAUTH_MAIL_SMTP_HOST: ${IXAUTH_MAIL_SMTP_HOST:-}
+      IXAUTH_MAIL_SMTP_PORT: ${IXAUTH_MAIL_SMTP_PORT:-587}
+      IXAUTH_MAIL_SMTP_USERNAME: ${IXAUTH_MAIL_SMTP_USERNAME:-}
+      IXAUTH_MAIL_SMTP_PASSWORD: ${IXAUTH_MAIL_SMTP_PASSWORD:-}
+      IXAUTH_MAIL_SMTP_STARTTLS: ${IXAUTH_MAIL_SMTP_STARTTLS:-true}
+      IXAUTH_PASSWORD_MIN_LENGTH: ${IXAUTH_PASSWORD_MIN_LENGTH:-10}
+      IXAUTH_LOG_LEVEL: ${IXAUTH_LOG_LEVEL:-INFO}
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
+    # 힙은 이미지의 -XX:MaxRAMPercentage=75 가 컨테이너 상한에서 계산한다.
+    # 768m 상한이면 힙 약 576m 이고, 이 배치의 계정 수에는 충분하다.
+    mem_limit: 768m
+    networks: [ix-auth-internal]
+
+  gateway:
+    image: ghcr.io/necromman/openclaw-gateway:chris-main
+    restart: unless-stopped
+    depends_on:
+      ix-auth:
+        condition: service_healthy
+    environment:
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_GATEWAY_PORT: "18789"
+      IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
+      OPENCLAW_PUBLIC_ORIGIN: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
+      IXAUTH_ACCOUNT_SIGNUP_MODE: ${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}
+      OPENCLAW_NAS_ROOT: ${OPENCLAW_NAS_ROOT:-}
+      OPENCLAW_KNOWLEDGE_ROOT: ${OPENCLAW_KNOWLEDGE_ROOT:-}
+      OPENCLAW_TRUSTED_PROXIES: ${OPENCLAW_TRUSTED_PROXIES:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
+    volumes:
+      - ./ixauth-gateway-config:/config:ro
+      - gateway-state:/home/node/.openclaw
+      # 부서 공유는 읽기 전용. 마운트된 폴더만 에이전트에 닿는다. 인사·급여(hr/)가
+      # 어디에도 없는 것이 통제 그 자체다.
+      - ${OPENCLAW_NAS_ROOT:-./nas-sample}/rnd:/mnt/nas/rnd:ro
+      - ${OPENCLAW_NAS_ROOT:-./nas-sample}/qa:/mnt/nas/qa:ro
+      # 마크다운 사이드카 색인은 쓰기 가능. 공유는 읽기 전용으로 두고 색인만 여기 쌓는다.
+      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/rnd:/mnt/knowledge/rnd
+      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/qa:/mnt/knowledge/qa
+    ports:
+      # 터널을 쓰므로 밖으로 열지 않는다. 이 포트는 NAS 안에서 하는 점검용이다.
+      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18800}:18789"
+    command: ["sh", "/config/start-gateway.sh"]
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "dist/docker-healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    # Node 와 Chromium 과 LibreOffice 가 한 컨테이너에 있다. 문서 변환 한 번이 가장
+    #크게 쓰는 지점이라 여유를 둔다. NAS 전체 RAM 이 9.8GB 이고 기존 컨테이너 7개와
+    # 파일 서비스가 함께 돌아간다는 것을 잊지 않는다.
+    mem_limit: 3g
+    networks: [ix-auth-internal]
+
+  # 나가는 연결만 쓰는 인그레스. --profile tunnel 일 때만 만들어진다.
+  # 공개 호스트명의 오리진은 대시보드에서 http://gateway:18789 로 잡혀 있다.
+  # 호스트 포트가 아니라 이 compose 네트워크의 서비스 이름이다.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.3
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    networks: [ix-auth-internal]
+
+volumes:
+  ix-auth-db-data:
+  gateway-state:
+
+networks:
+  ix-auth-internal:
+    driver: bridge

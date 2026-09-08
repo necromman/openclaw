@@ -10,6 +10,8 @@
 | `jinbio-nas.md`                      | `chris-server/knowledge/infrastructure/jinbio-nas.md`                   | 진바이오테크 NAS(Synology DS218+) 실측, SSH 접속 절차(apps01 OpenVPN 경유), 공유 폴더·사용자 목록           |
 | `server-inventory.md`                | `chris-server/knowledge/infrastructure/server-inventory.md`             | 사내 서버 인벤토리와 자격증명(NAS 관리자 비밀번호 포함)                                                     |
 | `openclaw-jinbio-nas-feasibility.md` | `chris-server/knowledge/development/openclaw-jinbio-nas-feasibility.md` | NAS 설치·권한 동기화 타당성. 접근 정책은 경로 A(부서·사람 = 에이전트, 워크스페이스 = 허용 폴더 마운트) 채택 |
+| `cloudflare-botops.md`               | `chris-server/homelab/homelab-access.md` 5절                            | Cloudflare 계정·API 토큰, 진바이오 터널 ID·커넥터 토큰·DNS·ingress (`jinbio.botops.cloud`)                  |
+| `jinbio-deploy.md`                   | NAS 의 `/volume1/docker/openclaw/ixauth.env`                            | M 단계에서 NAS 에 세운 납품 스택의 서비스 키·DB 비밀번호·관리자 계정과 배포 좌표                            |
 
 ## 다시 만들기
 

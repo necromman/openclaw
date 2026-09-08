@@ -1162,6 +1162,207 @@ ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth
 | 쓰기 권한 오류                         | 색인 폴더 소유자가 컨테이너의 `node`(uid 1000)가 아니다                                                         |
 | 원본을 지웠는데 답변에 계속 나온다     | 동기를 한 번 더 돌려 사이드카를 지우고 재색인한다                                                               |
 
+## 13. 진바이오 NAS 배치 (CI/CD)
+
+> 사용자 결정(2026-09-08): 진바이오테크 NAS 에 납품 스택을 직접 설치하고, 코드를 고치면 이미지가 자동으로 갱신되게 한다. 11.6 이 적어 둔 "NAS 직접 설치는 PoC 로만" 이라는 권고는 그대로 유효하고, 이 배치가 그 PoC 다.
+>
+> 저장소 쪽 정본 파일은 [chris-local/nas/](nas/) 폴더와 `.github/workflows/chris-deliver-images.yml` 이다.
+
+### 13.1 흐름
+
+```
+D:\PROJECT\openclaw  --(git push origin chris/main)-->  GitHub 포크
+                                                            |
+                              GitHub Actions "Chris Deliver Images"
+                              게이트웨이 이미지 + ix-auth 이미지 빌드
+                                                            |
+                        ghcr.io/necromman/openclaw-gateway:chris-main
+                        ghcr.io/necromman/openclaw-ix-auth:chris-main
+                                                            |
+                           (5분 주기 cron) NAS 의 deploy.sh 가 다이제스트 비교
+                                                            |
+                         다르면 pull -> up -d -> 헬스 대기 -> 옛 이미지 정리
+                                                            |
+                     진바이오 NAS /volume1/docker/openclaw (컨테이너 4개)
+                                                            |
+                              cloudflared -> https://jinbio.botops.cloud
+```
+
+NAS 는 2코어 Celeron 이라 게이트웨이 이미지를 스스로 빌드할 수 없고, git 도 없다. 그래서 이 배치에서 NAS 가 하는 일은 "레지스트리에 새 이미지가 있으면 받아서 다시 띄운다" 하나뿐이다.
+
+### 13.2 CI: GitHub Actions 가 이미지를 굽는다
+
+워크플로 `.github/workflows/chris-deliver-images.yml`. 업스트림 워크플로는 건드리지 않았고, 이 포크가 더한 CI 는 이 파일 하나다.
+
+| 항목      | 값                                                                                               |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| 트리거    | `chris/main` 푸시, 그리고 수동 실행                                                              |
+| 동시 실행 | `concurrency` 로 최신 것만 남긴다. 늦게 끝난 옛 빌드가 `chris-main` 을 뒤로 돌리는 일을 막는다   |
+| 잡        | `gateway image`(저장소 루트 `Dockerfile`), `ix-auth image`(`ix-auth/docker/Dockerfile`)          |
+| 빌드 인자 | compose 의 `gateway.build.args` 와 같은 값. 브라우저·한글 폰트·LibreOffice 가 여기서 들어간다    |
+| 대상      | `ghcr.io/necromman/openclaw-gateway`, `ghcr.io/necromman/openclaw-ix-auth` (둘 다 public)        |
+| 태그      | `chris-main`(움직인다, NAS 가 보는 것) + `sha-<짧은 커밋>`(움직이지 않는다, 되돌릴 때 쓴다)      |
+| 캐시      | 레지스트리 캐시 `:buildcache` (`mode=max`)                                                       |
+| 인증      | `GITHUB_TOKEN` + `permissions: packages: write`                                                  |
+
+러너에서 먼저 하는 일이 디스크 확보다. 게이트웨이 이미지는 Chromium 과 LibreOffice 를 포함해 압축 전 7 GB 대이고, 기본 러너에는 buildx 캐시와 내보내기를 함께 둘 자리가 없다. 쓰지 않는 SDK(dotnet·android·ghc 등)를 지워 약 25 GB 를 돌려받는다.
+
+이미지에 시크릿은 굽히지 않는다. 설정은 `ixauth-gateway-config/` 를 읽기 전용으로 마운트해 넣고, 자격증명은 전부 런타임 환경변수다. `IXAUTH_SERVICE_KEY` 같은 값은 게이트웨이 설정 파일에 `"${IXAUTH_SERVICE_KEY}"` 라는 이름으로만 적혀 있다.
+
+패키지는 **public** 으로 둔다. 저장소가 공개이고 이미지에 시크릿이 없으므로 숨길 것이 없으며, 공개라야 NAS 의 `deploy.sh` 가 자격증명 없이 다이제스트를 읽고 `docker pull` 을 할 수 있다. 비공개로 두려면 NAS 에 읽기 전용 토큰을 넣고 `docker login ghcr.io` 를 먼저 시켜야 한다.
+
+### 13.3 NAS 에 두는 파일
+
+```
+/volume1/docker/openclaw/
+  docker-compose.nas.yml      chris-local/nas/ 에서 복사
+  deploy.sh                   chris-local/nas/ 에서 복사 (실행권한 필요)
+  ixauth-gateway-config/      chris-local/ixauth-gateway-config/ 에서 복사
+  nas-sample/                 chris-local/nas-sample/ 에서 복사
+  knowledge-index/rnd, /qa    빈 폴더
+  ixauth.env                  호스트에서 만든다 (0600, root 소유). 복사하지 않는다
+  deploy.log                  deploy.sh 가 만든다
+```
+
+`docker-compose.nas.yml` 은 `docker-compose.ixauth.yml` 의 형제다. 다른 점은 셋뿐이고 파일 머리말에 적혀 있다. `build:` 대신 `image:`, 컨테이너별 `mem_limit`, 개발용 수신함(mailpit) 제거.
+
+NAS 의 docker-compose 는 **1.28.5** 다. 그 버전이 처음으로 `profiles` 와 version 키 없는 Compose Specification 을 읽는다. `version: "3.x"` 를 적으면 `mem_limit` 가 무시되므로 적지 않는다. `init`·`cap_drop`·`security_opt`·healthcheck·`depends_on.condition` 은 이 버전에서 그대로 동작한다(2026-09-08 NAS 에서 `docker-compose config` 로 확인).
+
+메모리 상한은 NAS 가 파일 서비스와 기존 컨테이너 7개를 함께 돌리는 기계라서 건다.
+
+| 컨테이너      | `mem_limit` | 근거                                                               |
+| ------------- | ----------- | ------------------------------------------------------------------ |
+| `gateway`     | 3g          | Node + Chromium + LibreOffice. 문서 변환이 가장 크게 쓰는 지점이다 |
+| `ix-auth`     | 768m        | JVM 힙은 이미지의 `MaxRAMPercentage=75` 가 여기서 계산한다         |
+| `ix-auth-db`  | 512m        | PostgreSQL 16                                                      |
+| `cloudflared` | 128m        | 나가는 연결 하나                                                   |
+
+### 13.4 첫 설치
+
+NAS 에는 git 이 없다. 파일은 apps01 을 거쳐 두 번 복사한다(Windows 의 ssh 에는 `sshpass` 가 없고, DSM 6 의 sshd 에는 sftp 서브시스템이 없어 `scp -O` 가 필요하다). 접속 절차는 `infra/local/jinbio-nas.md` 5절.
+
+```bash
+# 1) 보낼 것을 묶는다 (저장소 루트에서)
+mkdir -p /tmp/ocnas/openclaw
+cp chris-local/nas/docker-compose.nas.yml chris-local/nas/deploy.sh /tmp/ocnas/openclaw/
+cp -r chris-local/ixauth-gateway-config chris-local/nas-sample /tmp/ocnas/openclaw/
+mkdir -p /tmp/ocnas/openclaw/knowledge-index/rnd /tmp/ocnas/openclaw/knowledge-index/qa
+(cd /tmp/ocnas && tar czf /tmp/ocnas.tgz openclaw)
+
+# 2) apps01 로, 다시 NAS 로
+scp /tmp/ocnas.tgz chris@192.168.100.12:/tmp/ocnas.tgz
+ssh chris@192.168.100.12 "sshpass -p '<NAS 비번>' scp -O -o PreferredAuthentications=password \
+  -o PubkeyAuthentication=no /tmp/ocnas.tgz jinbiotec@192.168.2.1:/tmp/ocnas.tgz"
+
+# 3) NAS 에서 root 로 펼친다
+sudo mkdir -p /volume1/docker/openclaw
+sudo tar xzf /tmp/ocnas.tgz -C /volume1/docker
+sudo chmod +x /volume1/docker/openclaw/deploy.sh \
+  /volume1/docker/openclaw/ixauth-gateway-config/start-gateway.sh
+sudo chown -R root:root /volume1/docker/openclaw
+```
+
+`ixauth.env` 는 `chris-local/ixauth.env.example` 을 보고 NAS 에서 만든다. 값은 새로 만들고(`openssl rand`), **저장소에는 넣지 않는다.** 이 배치에서 채운 값은 다음과 같다.
+
+| 변수                                   | 값                                         | 비고                                                         |
+| -------------------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `IXAUTH_SERVICE_KEY`                   | `openssl rand -base64 36`                  | 32자 이상이라야 신원 서버가 뜬다                             |
+| `IXAUTH_DB_PASSWORD`                   | `openssl rand -base64 24`                  |                                                              |
+| `IXAUTH_ADMIN_EMAIL`                   | 로컬 검증 스택과 같은 주소                 | 첫 부팅에만 시드되고 `SUPERADMIN` 을 받는다                  |
+| `IXAUTH_ADMIN_PASSWORD`                | `openssl rand` + 대문자·숫자·기호          | 로그인 뒤 화면에서 바꾼다                                    |
+| `OPENCLAW_PUBLIC_ORIGIN`               | `https://jinbio.botops.cloud`              | 터널 주소                                                    |
+| `OPENCLAW_TRUSTED_PROXIES`             | `172.16.0.0/12`                            | cloudflared 가 오는 대역. `__Host-`·`Secure` 쿠키가 돌아온다 |
+| `CLOUDFLARE_TUNNEL_TOKEN`              | 이미 만들어 둔 `jinbio` 터널의 커넥터 토큰 | 대시보드에서 다시 만들지 않는다                              |
+| `IXAUTH_MAIL_TRANSPORT`                | `WEBHOOK`                                  | SMTP 는 배포 후 (3.8)                                        |
+| `OPENCLAW_NAS_ROOT`                    | `/volume1/docker/openclaw/nas-sample`      | 실제 공유 매핑은 다음 단계 (11.4)                            |
+| `OPENCLAW_KNOWLEDGE_ROOT`              | `/volume1/docker/openclaw/knowledge-index` |                                                              |
+| `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | 빈 값                                      | 배포 후 세팅 (3.4 (라))                                      |
+
+만든 값은 `chris-local/infra/local/jinbio-deploy.md`(git 제외)에 적어 둔다.
+
+**시드 계정은 생기지 않는다.** Flyway 마이그레이션이 넣는 것은 역할·권한 정의뿐이고, 계정으로 시드되는 것은 `IXAUTH_ADMIN_EMAIL` 하나다. 로컬 검증 스택의 시험 계정 8개는 손으로 만든 것이라 새 볼륨에는 따라오지 않는다. `reset-seed.sh` 를 돌릴 일도 없다.
+
+기동은 터널 프로파일과 함께 한다.
+
+```bash
+cd /volume1/docker/openclaw
+sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
+  --env-file ixauth.env -f docker-compose.nas.yml --profile tunnel pull
+sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
+  --env-file ixauth.env -f docker-compose.nas.yml --profile tunnel up -d
+```
+
+프로젝트 이름 `-p openclaw-ixauth` 를 반드시 준다. 볼륨 이름(`openclaw-ixauth_gateway-state` 등)과 컨테이너 이름이 여기서 나오고, `deploy.sh` 와 4절 백업 절차가 그 이름을 쓴다.
+
+### 13.5 CD: cron 이 5분마다 본다
+
+`deploy.sh` 가 하는 일은 하나다. ghcr 의 `chris-main` 태그가 지금 가리키는 다이제스트를 익명 토큰으로 읽고, 이 호스트에 있는 같은 태그의 다이제스트와 견준다. 같으면 로그에 "변경 없음" 한 줄만 남기고 끝난다. 다르면 `pull` 하고 `up -d --remove-orphans` 하고 헬스를 기다린 뒤, 갈려 나간 옛 이미지를 지운다.
+
+```
+# /etc/crontab 에 한 줄 (칸 구분은 탭이다)
+*/5	*	*	*	*	root	/volume1/docker/openclaw/deploy.sh
+```
+
+DSM 6 은 `/etc/crontab` 을 고친 뒤 `sudo synoservice --restart crond` 로 다시 읽힌다. 칸을 공백으로 구분하면 DSM 이 그 줄을 통째로 버린다.
+
+```bash
+sudo /volume1/docker/openclaw/deploy.sh --force     # 태그가 그대로여도 다시 받는다
+sudo /volume1/docker/openclaw/deploy.sh --status    # 컨테이너 헬스와 지금 이미지 다이제스트
+tail -20 /volume1/docker/openclaw/deploy.log
+```
+
+지키는 규칙은 자동 배포 스크립트(FORK.md 7-5)와 같은 성격이다.
+
+| 규칙                                 | 왜                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `mkdir` 잠금으로 단일 실행           | pull 과 재기동이 5분을 넘길 수 있다. 겹치면 같은 컨테이너를 두 번 내린다 |
+| 두 시간 넘은 잠금은 걷어낸다         | 죽은 실행이 남긴 잠금 때문에 배포가 영영 멈추는 것을 막는다              |
+| 다이제스트가 같으면 아무것도 안 한다 | 평상시 cron 은 HTTP 요청 두 번으로 끝난다                                |
+| ghcr 를 못 읽으면 배포하지 않는다    | 네트워크 문제로 돌던 컨테이너를 내리지 않는다                            |
+| `pull` 실패 시 그대로 둔다           | 반쯤 받은 이미지로 재기동하지 않는다                                     |
+| 헬스 300초 대기 후 판정              | 안 되면 `WARN` 으로 남기고 사람이 본다                                   |
+| `image prune -f` 만 한다             | dangling 만 지운다. NAS 의 다른 앱 이미지는 건드리지 않는다              |
+
+### 13.6 되돌리기
+
+```bash
+# (가) 이전 커밋 이미지로 (태그가 움직이지 않는 sha- 태그를 쓴다)
+cd /volume1/docker/openclaw
+sudo /var/packages/Docker/target/usr/bin/docker tag \
+  ghcr.io/necromman/openclaw-gateway:sha-<이전 커밋> \
+  ghcr.io/necromman/openclaw-gateway:chris-main
+sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
+  --env-file ixauth.env -f docker-compose.nas.yml --profile tunnel up -d
+
+# (나) 자동 배포만 끄기
+sudo sed -i '/openclaw\/deploy.sh/d' /etc/crontab && sudo synoservice --restart crond
+
+# (다) 스택 전체 내리기 (볼륨은 남는다)
+sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
+  --env-file ixauth.env -f docker-compose.nas.yml --profile tunnel down
+```
+
+(가) 를 하면 다음 cron 이 다시 원격 `chris-main` 으로 되돌린다. 되돌린 상태를 유지하려면 (나) 를 함께 한다.
+
+### 13.7 확인 항목
+
+| 확인                 | 방법                                                                              |
+| -------------------- | --------------------------------------------------------------------------------- |
+| 컨테이너 4개 healthy | `sudo /volume1/docker/openclaw/deploy.sh --status`                                 |
+| 밖에서 열리나        | `curl -sI https://jinbio.botops.cloud/`                                            |
+| 쿠키 모양            | 로그인 뒤 개발자 도구에서 `__Host-openclaw-session` 과 `Secure` 확인 (11.7 (다))   |
+| 터널 연결            | `docker-compose ... logs cloudflared` 에 `Registered tunnel connection` 이 네 줄쯤 |
+| 자동 배포            | `tail /volume1/docker/openclaw/deploy.log` 에 "변경 없음" 줄이 5분마다             |
+| 메모리               | `sudo ... docker stats --no-stream` 과 `free -m`                                   |
+
+### 13.8 이 배치의 한계
+
+- **NAS 직접 설치는 PoC 다**(11.6). 문서 변환 한 번에 2코어가 포화되고 그동안 NAS 본래의 파일 서비스가 함께 느려진다. 상시 운영은 별도 x86 호스트를 권한다.
+- 도메인과 터널은 감독 개인 Cloudflare 계정의 것이다. 정식 납품 때 고객 도메인·계정으로 옮긴다. 바뀌는 것은 `OPENCLAW_PUBLIC_ORIGIN` 과 터널 토큰뿐이다.
+- `OPENCLAW_NAS_ROOT` 가 아직 샘플 트리를 가리킨다. 실제 공유 폴더 매핑은 11.4 절차로 따로 한다.
+- 모델 API 키가 비어 있어 부서 에이전트(rnd-bot·qa-bot)는 답하지 못한다. 절차는 3.4 (라).
+- 이미지 태그 `chris-main` 은 브랜치를 따라 움직인다. 검증하지 않은 커밋을 `chris/main` 에 올리면 5분 안에 납품 호스트에 반영된다. 게이트(`pnpm check` + 라이브 실측)를 통과한 것만 머지한다.
+
 ## 용어 설명
 
 1. <a id="g1"></a>**게이트웨이** - 모든 요청이 먼저 닿는 앞단 서버. 이 제품에서는 화면·인증·에이전트 실행을 한꺼번에 맡는 본체다.
