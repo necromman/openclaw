@@ -61,10 +61,7 @@ function slugForGroupCode(code: string, prefix: string): string | undefined {
  * user screens read this list to choose from, and offering a code no group answers to
  * would produce an "unknown department" the moment someone picked it.
  */
-function projectDepartments(params: {
-  groups: readonly IxAuthDepartmentGroup[];
-  prefix: string;
-}): {
+function projectDepartments(params: { groups: readonly IxAuthDepartmentGroup[]; prefix: string }): {
   departments: Record<string, unknown>[];
   orphans: Record<string, unknown>[];
 } {
@@ -120,9 +117,9 @@ async function handleList(params: DepartmentsRouteParams): Promise<void> {
 }
 
 /** Read and check the `{ slug, name }` body both writers take. */
-function readDepartmentBody(body: Record<string, unknown>):
-  | { ok: true; slug: string; name: string }
-  | { ok: false } {
+function readDepartmentBody(
+  body: Record<string, unknown>,
+): { ok: true; slug: string; name: string } | { ok: false } {
   const slug = normalizeDepartmentSlug(normalizeOptionalString(body.slug) ?? "");
   const name = normalizeOptionalString(body.name) ?? "";
   if (!DEPARTMENT_SLUG_PATTERN.test(slug)) {

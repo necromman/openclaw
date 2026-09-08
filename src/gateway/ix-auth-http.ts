@@ -13,8 +13,8 @@ import {
   type IxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-client.js";
 import { syncIxAuthDepartments } from "../auth/ix-auth/ix-auth-departments.js";
-import { projectIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-projection.js";
 import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
+import { projectIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-projection.js";
 import {
   matchesIxAuthCsrfDigest,
   persistIxAuthLoginSession,

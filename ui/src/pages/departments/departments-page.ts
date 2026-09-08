@@ -604,9 +604,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
             ? renderSettingsSection({}, [
                 renderSettingsRow({
                   title: "",
-                  control: html`<div class="departments-notice" role="status">
-                    ${this.notice}
-                  </div>`,
+                  control: html`<div class="departments-notice" role="status">${this.notice}</div>`,
                 }),
               ])
             : nothing,

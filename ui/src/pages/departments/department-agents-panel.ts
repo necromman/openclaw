@@ -50,9 +50,7 @@ function renderRow(params: {
             // SAFETY: the listener is bound to this select element.
             params.onBind(agent.agentId, (event.target as HTMLSelectElement).value)}
         >
-          <option value="" ?selected=${!agent.department}>
-            ${t("ixAuth.departments.shared")}
-          </option>
+          <option value="" ?selected=${!agent.department}>${t("ixAuth.departments.shared")}</option>
           ${params.departments.map((department) => {
             const slug = department.slug ?? "";
             return html`<option value=${slug} ?selected=${slug === agent.department}>

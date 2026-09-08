@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../../test/helpers/temp-dir.js";
-import { closeOpenClawStateDatabaseForTest } from "../../state/openclaw-state-db.js";
 import { readDepartmentAgentBindings } from "../../state/departments-store.js";
-import { departmentsHandlers, mayAdministerDepartments } from "./departments.js";
+import { closeOpenClawStateDatabaseForTest } from "../../state/openclaw-state-db.js";
 import type { GatewayClient } from "./client-types.js";
+import { departmentsHandlers, mayAdministerDepartments } from "./departments.js";
 import type { GatewayRequestHandlerOptions } from "./shared-types.js";
 
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);

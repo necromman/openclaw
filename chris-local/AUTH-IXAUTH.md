@@ -215,17 +215,17 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 
 ## 6. 이번 단계에서 하지 않은 것
 
-| 항목                                       | 상태                                                                                                               | 다음 단계 조건                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| 부서 접근 강제(`department-access`)        | **해결(B 단계).** `tools.sessions.visibility: "department"` 로 켠다                                                | 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md)                                   |
-| `departments` / `department_agents` 테이블 | **해결(B 단계).** feature-local DDL 3표, 스키마 버전 유지                                                          | AUTH-DEPARTMENTS.md 6절                                                           |
-| 세션 목록·이벤트·`agents.list` 부서 필터   | **해결(B 단계).** 목록·직접 열람·전사·이벤트·에이전트 선택·생성 게이트                                             | AUTH-DEPARTMENTS.md 7절                                                           |
-| 초대장 가입 플로우 화면                    | **해결(C 단계).** 초대 수락·가입 신청·이메일 인증·비밀번호 찾기·재설정 + 관리자 초대·승인 화면                     | 정본 [AUTH-SIGNUP.md](AUTH-SIGNUP.md)                                             |
-| 포크 감사 원장 해시 체인                   | 미구현. 인증 사건은 IX-Auth 원장에 남는다                                                                          | 6.3                                                                               |
-| TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다                                                                        | IX-Auth 콘솔에서 등록. **콘솔 접근 경로가 A 단계에서 열렸다**(`/admin/identity/`) |
+| 항목                                       | 상태                                                                                                                              | 다음 단계 조건                                                                    |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 부서 접근 강제(`department-access`)        | **해결(B 단계).** `tools.sessions.visibility: "department"` 로 켠다                                                               | 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md)                                   |
+| `departments` / `department_agents` 테이블 | **해결(B 단계).** feature-local DDL 3표, 스키마 버전 유지                                                                         | AUTH-DEPARTMENTS.md 6절                                                           |
+| 세션 목록·이벤트·`agents.list` 부서 필터   | **해결(B 단계).** 목록·직접 열람·전사·이벤트·에이전트 선택·생성 게이트                                                            | AUTH-DEPARTMENTS.md 7절                                                           |
+| 초대장 가입 플로우 화면                    | **해결(C 단계).** 초대 수락·가입 신청·이메일 인증·비밀번호 찾기·재설정 + 관리자 초대·승인 화면                                    | 정본 [AUTH-SIGNUP.md](AUTH-SIGNUP.md)                                             |
+| 포크 감사 원장 해시 체인                   | 미구현. 인증 사건은 IX-Auth 원장에 남는다                                                                                         | 6.3                                                                               |
+| TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다                                                                                       | IX-Auth 콘솔에서 등록. **콘솔 접근 경로가 A 단계에서 열렸다**(`/admin/identity/`) |
 | 관리 콘솔 접근 경로                        | **해결(A 단계).** 게이트웨이 BFF `/admin/identity/` 가 중계한다. **J 단계에서 superadmin 전용 + 무로그인 진입으로 바뀌었다**(7.2) | -                                                                                 |
-| 역할 4단계 시드                            | **해결(A 단계).** IX-Auth 마이그레이션 `V14` 가 만든다. 콘솔에서 손으로 만들 필요가 없다                           | -                                                                                 |
-| 무인 배포                                  | **해결(A 단계).** `docker compose up -d` 한 번으로 마이그레이션·역할 시드·superadmin 부트스트랩·설정 주입이 끝난다 | 절차는 [DEPLOY.md](DEPLOY.md)                                                     |
+| 역할 4단계 시드                            | **해결(A 단계).** IX-Auth 마이그레이션 `V14` 가 만든다. 콘솔에서 손으로 만들 필요가 없다                                          | -                                                                                 |
+| 무인 배포                                  | **해결(A 단계).** `docker compose up -d` 한 번으로 마이그레이션·역할 시드·superadmin 부트스트랩·설정 주입이 끝난다                | 절차는 [DEPLOY.md](DEPLOY.md)                                                     |
 
 **A 단계의 완화책**: `tools.sessions.visibility` 를 `"self"` 로 좁혀 두었다. B 단계에서 같은 키를 `"department"` 로 올려 그 자리가 실제 경계가 됐다.
 
@@ -323,7 +323,7 @@ docker compose --env-file chris-local/ixauth.env \
 | `src/auth/ix-auth/ix-auth-client.ts`                 | IX-Auth `/auth/*` 중계. 서비스 키·실방문자 IP 전달   |
 | `src/auth/ix-auth/ix-auth-role-map.ts`               | 역할 코드 -> 게이트웨이 역할, 콘솔·관리 API 판정 2종 |
 | `src/auth/ix-auth/ix-auth-sessions.ts`               | 세션 발급·검증·갱신·폐기                             |
-| `src/auth/ix-auth/ix-auth-role-projection.ts`        | 매핑된 역할을 `user_profiles.role` 에 투영            |
+| `src/auth/ix-auth/ix-auth-role-projection.ts`        | 매핑된 역할을 `user_profiles.role` 에 투영           |
 | `src/gateway/ix-auth-connection-scopes.ts`           | 역할 정의 -> 연결 스코프 (요청은 상한이 아니다)      |
 | `src/auth/ix-auth/ix-auth-settings.ts`               | 설정 해석·기본값·서비스 키 캐시                      |
 | `src/state/ix-auth-sessions-schema.ts`               | feature-local DDL (`user_profiles` 와 같은 방식)     |

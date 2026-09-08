@@ -241,7 +241,8 @@ const enIxAuth = {
       createTitle: "Add a department",
       createSlug: "Short code",
       createSlugPlaceholder: "rnd",
-      createSlugHint: "Lowercase letters, digits and hyphens. The group code becomes {prefix}{slug}.",
+      createSlugHint:
+        "Lowercase letters, digits and hyphens. The group code becomes {prefix}{slug}.",
       createName: "Name",
       createNamePlaceholder: "Research and development",
       createSubmit: "Create",
