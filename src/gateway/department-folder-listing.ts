@@ -43,16 +43,14 @@ export function isDepartmentFolderRejection(
 /**
  * The roots this deployment might hold the shares under, most specific first.
  *
- * `OPENCLAW_NAS_ROOT` names the parent of the shares *on the host*, which is what the
- * compose file needs it for. Inside the container that path usually does not exist, and
- * the same tree is at the fixed mount point instead, so both are tried and the first one
- * that is really there wins. No new variable is introduced for the container-side path:
- * the mount point is fixed by the compose file, not by an operator.
+ * The compose file fixes the container-side mount point, so the default needs no setting
+ * of its own. `OPENCLAW_NAS_ROOT` is deliberately not read here: it names the parent of
+ * the shares *on the host*, which is what compose needs it for and which usually does not
+ * exist inside the container. A deployment that mounts somewhere else passes its own root
+ * instead of relying on a second name for the same thing.
  */
-export function departmentFolderRootCandidates(
-  env: Record<string, string | undefined> = process.env,
-): string[] {
-  const configured = env.OPENCLAW_NAS_ROOT?.trim();
+export function departmentFolderRootCandidates(overrideRoot?: string): string[] {
+  const configured = overrideRoot?.trim();
   return configured && configured.length > 0
     ? [configured, DEFAULT_DEPARTMENT_FOLDER_ROOT]
     : [DEFAULT_DEPARTMENT_FOLDER_ROOT];
@@ -60,9 +58,9 @@ export function departmentFolderRootCandidates(
 
 /** The first candidate root that exists here, or the default when none does. */
 export async function resolveDepartmentFolderRoot(
-  env: Record<string, string | undefined> = process.env,
+  overrideRoot?: string,
 ): Promise<{ root: string; available: boolean }> {
-  for (const candidate of departmentFolderRootCandidates(env)) {
+  for (const candidate of departmentFolderRootCandidates(overrideRoot)) {
     try {
       return { root: await realpath(candidate), available: true };
     } catch {

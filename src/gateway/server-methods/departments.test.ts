@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../../test/helpers/temp-dir.js";
 import { closeOpenClawStateDatabaseForTest } from "../../state/openclaw-state-db.js";
@@ -201,9 +199,7 @@ describe("departments.folders.list", () => {
   });
 
   it("refuses a path outside the shared folder root", async () => {
-    const root = path.join(tempDirs.make("openclaw-departments-share-"), "nas");
-    await mkdir(path.join(root, "rnd"), { recursive: true });
-    vi.stubEnv("OPENCLAW_NAS_ROOT", root);
+    // Refused before any filesystem call, so this holds whether or not a share is mounted.
     const answer = await callMethod({
       method: "departments.folders.list",
       params: { path: "../" },
@@ -213,11 +209,9 @@ describe("departments.folders.list", () => {
     expect(answer.error?.code).toBe("INVALID_REQUEST");
   });
 
-  it("lists the folders under the shared root", async () => {
-    const root = path.join(tempDirs.make("openclaw-departments-share-"), "nas");
-    await mkdir(path.join(root, "rnd"), { recursive: true });
-    await mkdir(path.join(root, "qa"), { recursive: true });
-    vi.stubEnv("OPENCLAW_NAS_ROOT", root);
+  it("says the shared root is not mounted rather than inventing one", async () => {
+    // The mount point is fixed by the compose file and absent on a developer machine.
+    // Listing a real tree is covered where the lister itself is tested, with a real root.
     const answer = await callMethod({
       method: "departments.folders.list",
       client: client({ identity: { isSuperAdmin: true } }),
@@ -225,7 +219,7 @@ describe("departments.folders.list", () => {
     expect(answer.ok).toBe(true);
     // SAFETY: the assertion above proves the handler answered with its result shape.
     const result = answer.result as { available: boolean; entries: { name: string }[] };
-    expect(result.available).toBe(true);
-    expect(result.entries.map((entry) => entry.name)).toEqual(["qa", "rnd"]);
+    expect(result.available).toBe(false);
+    expect(result.entries).toEqual([]);
   });
 });

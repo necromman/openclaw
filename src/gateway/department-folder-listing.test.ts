@@ -55,25 +55,22 @@ describe("department folder path parsing", () => {
 });
 
 describe("department folder root", () => {
-  it("prefers the configured host root, then the fixed mount point", () => {
-    expect(departmentFolderRootCandidates({ OPENCLAW_NAS_ROOT: "/srv/nas" })).toEqual([
-      "/srv/nas",
-      "/mnt/nas",
-    ]);
-    expect(departmentFolderRootCandidates({})).toEqual(["/mnt/nas"]);
-    expect(departmentFolderRootCandidates({ OPENCLAW_NAS_ROOT: "  " })).toEqual(["/mnt/nas"]);
+  it("prefers a caller-supplied root, then the fixed mount point", () => {
+    expect(departmentFolderRootCandidates("/srv/nas")).toEqual(["/srv/nas", "/mnt/nas"]);
+    expect(departmentFolderRootCandidates()).toEqual(["/mnt/nas"]);
+    expect(departmentFolderRootCandidates("  ")).toEqual(["/mnt/nas"]);
   });
 
   it("reports the default as unavailable when nothing is mounted", async () => {
-    const resolved = await resolveDepartmentFolderRoot({
-      OPENCLAW_NAS_ROOT: path.join(tempDirs.make("openclaw-department-missing-"), "absent"),
-    });
+    const resolved = await resolveDepartmentFolderRoot(
+      path.join(tempDirs.make("openclaw-department-missing-"), "absent"),
+    );
     expect(resolved.available).toBe(false);
   });
 
-  it("resolves a configured root that really exists", async () => {
+  it("resolves a root that really exists", async () => {
     const { root } = await buildShareRoot();
-    const resolved = await resolveDepartmentFolderRoot({ OPENCLAW_NAS_ROOT: root });
+    const resolved = await resolveDepartmentFolderRoot(root);
     expect(resolved.available).toBe(true);
     expect(resolved.root).toContain("nas");
   });
