@@ -86,7 +86,7 @@ export function upsertDepartment(
   options: OpenClawStateDatabaseOptions = {},
 ): void {
   const slug = normalizeDepartmentSlug(params.slug);
-  const displayName = params.displayName?.trim() || slug;
+  const authoredName = params.displayName?.trim();
   ensureDepartmentsSchema(options);
   runOpenClawStateWriteTransaction(
     ({ db }) => {
@@ -96,17 +96,19 @@ export function upsertDepartment(
           .insertInto("departments")
           .values({
             slug,
-            display_name: displayName,
+            display_name: authoredName ?? slug,
             created_at: params.nowMs,
             updated_at: params.nowMs,
           })
           .onConflict((conflict) =>
-            // A projected login must not overwrite an operator-authored display name with
-            // the bare slug it can derive; only a real name advances the row.
-            conflict.column("slug").doUpdateSet({
-              display_name: displayName,
-              updated_at: params.nowMs,
-            }),
+            // A caller that only knows the slug (a projected login, an agent binding) must
+            // not overwrite the name an operator typed. Only a real name advances the row.
+            authoredName === undefined
+              ? conflict.column("slug").doNothing()
+              : conflict.column("slug").doUpdateSet({
+                  display_name: authoredName,
+                  updated_at: params.nowMs,
+                }),
           ),
       );
     },
