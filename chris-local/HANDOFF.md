@@ -98,9 +98,9 @@
 ## 6. 새 세션 시작 절차
 
 1. 이 문서 → `knowledge/development/openclaw-fork.md` → 포크 `chris-local/AUTH-PLAN.md` 진행 기록 순으로 읽는다.
-2. 상태 실측 3줄: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18789/`(200), `docker ps | grep ixauth`(4개 healthy), `wsl -d Ubuntu -- bash -lc 'cd ~/openclaw && git log --oneline -1 && systemctl --user is-active openclaw-local.service openclaw-auto-deploy.timer'`.
-3. 포크 작업은 브랜치 하나에 에이전트 하나. 같은 체크아웃을 두 에이전트가 동시에 쓰면 커밋이 섞인다(이번에 두 번 발생). 워크트리 명령은 이 PC 정책상 금지.
-4. 게이트: `pnpm check` 0 실패 → 라이브 실측 스크린샷 → `origin/chris/main` 리베이스 → ff 머지 → 자동 배포 확인 → 브랜치 삭제.
+2. 상태 실측 3줄: `curl -s -o /dev/null -w '%{http_code}' https://jinbio.botops.cloud/`(200), `gh run list --repo necromman/openclaw --limit 3`(최근 이미지 빌드 성공), NAS 에서 `sudo /volume1/docker/openclaw/deploy.sh --status`(컨테이너 4개 healthy).
+3. **`chris/main` 에서 직접 작업한다**(2026-09-08 사용자 확정). 브랜치와 별도 작업 트리를 만들지 않고, 의미 단위로 커밋해 바로 푸시한다. `.claude/settings.json` 의 PreToolUse 훅이 그 명령들을 차단한다. 같은 체크아웃을 두 에이전트가 동시에 쓰지 않는 규칙은 그대로다.
+4. **게이트: 푸시 → GitHub Actions 이미지 빌드 성공 → NAS cron 반영(`deploy.log` 의 OK 줄) → `https://jinbio.botops.cloud` 브라우저 실측.** WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측은 하지 않는다. 저장소 규칙(700줄 상한·env 이름 래칫·번들 상한)은 CI 가 걸러 준다. 푸시가 곧 배포이고, 중간 상태가 운영에 반영돼도 된다는 것이 사용자 결정이다.
 5. chris-server 쪽은 스크린샷·문서만 두고 autosync 가 커밋한다. 포크 커밋은 자유.
 
 ## 7. 이번 작업에서 배운 함정 (재발 방지)
