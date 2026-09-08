@@ -12,7 +12,7 @@ name: Chris Deliver Images
 
 on:
   push:
-    branches: [chris/main]
+    branches: [chris/main, chris/delivery-m]
   workflow_dispatch:
 
 # Only the newest push matters: the older build would publish a "chris-main" that is
