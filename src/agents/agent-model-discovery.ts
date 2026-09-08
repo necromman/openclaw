@@ -132,6 +132,7 @@ function createOpenClawModelRegistry(
     useRuntimeConfig: options?.config === undefined,
   });
   const registryOptions = {
+    config: options?.config,
     ...(pluginMetadataSnapshot ? { pluginMetadataSnapshot } : {}),
     ...(options?.includePluginCatalogs !== undefined
       ? { includePluginCatalogs: options.includePluginCatalogs }
