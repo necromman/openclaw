@@ -10,6 +10,18 @@
 
 > **인프라 정보 규칙**: 홈랩·회사 서버·접속 정보·시크릿 위치가 필요하면 `D:\PROJECT\chris-server\CLAUDE.md`(인덱스) → 그 정본 문서를 참조한다. 이 포크 저장소에는 인프라 정보와 시크릿을 두지 않는다.
 
+## 0-1. 2026-09-08 갱신 (D~J 단계 완료)
+
+- 제안서·사용자 지시 기반 납품 기능 D~J 7단계가 **전부 `chris/main` 에 머지·푸시**됐다(마지막 커밋 `983afae343e`). 단계별 내용·실측·잔여는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 진행 기록이 정본이고, 이 절은 다음 세션이 바로 움직일 수 있는 최소 요약이다.
+- 들어간 것: 로그아웃(WS 즉시 종료) · 납품 이미지 LibreOffice(Office 미리보기) · 임원 역할·다중 부서 초대 · 앱 내 사용자 관리 `/settings/users` · 읽기 전용 프로필·권한 모드·NAS 마운트(경로 A) · 사람 귀속 감사 원장 `/settings/audit` · `openclaw knowledge sync` 문서 색인 · 관리자 권한 결함 수정(로그인 시 역할 투영) · IX-Auth 콘솔 SSO(superadmin 전용) · 부서·에이전트·폴더 관리 `/settings/departments` · 시드 정리 `reset-seed.sh` · 자립형 `CLAUDE.md`.
+- **라이브 상태(이 PC)**: compose 스택 4컨테이너 기동 중, 게이트웨이 이미지는 J 코드 기준. 모델은 ChatGPT 구독 codex OAuth 프로필(상태 볼륨에 저장, 템플릿에 codex 런타임·기본 모델 `openai/gpt-5.6-sol` 고정). `chris-local/ixauth.env` 에 `OPENCLAW_NAS_ROOT=./nas-sample`, `OPENCLAW_KNOWLEDGE_ROOT=./knowledge-index` 가 켜져 있고 rnd 색인 폴더에 사이드카 8개가 생성돼 있다. 관리자 권한 수정은 **재로그인 후** 반영된다(`user_profiles.role` 은 로그인 때 투영).
+- **다음 세션 첫 할 일**:
+  1. 사용자 결정 받기: 부서 에이전트용 API 키(OpenAI/Anthropic; codex 경로로는 폴더 경계를 지키며 읽을 수 없음, AUTH-DEPARTMENTS.md 13.9), 감사 보존기간·`promptText`, 시드 계정 8개 삭제 여부, 제품명, IX-Auth 라이선스, SMTP·도메인·TLS.
+  2. API 키가 오면 `rnd-bot`·`qa-bot` 모델을 그 키 모델로 바꾸고 "폴더 문서 요약 → 출처 경로" 와 쓰기 거부·타 부서 거부를 브라우저로 실측(DELIVERY-PLAN 3-1절·KNOWLEDGE.md).
+  3. J 잔여: 부서 삭제, IX-Auth 그룹 이름 변경(벤더 API 부재라 표시 이름만), 콘솔 로그아웃 버튼(404), 사용자 표 다듬기, xlsx 날짜 서식, 시작 번들 예산 기준선(`config/control-ui-startup-budget-baseline.json`, 선재 초과 +약 2KB 누적) 조정 결정.
+  4. 브라우저 실측 후 스크린샷을 chris-server `analysis/2026-09-07-openclaw-auth/` 에 `delivery-*-*.png` 로 보관(D·E·F 는 있음, G~J 는 curl·DB 실측만 있고 스크린샷 없음).
+- **이번에 배운 함정(재발 방지)**: Windows 에서 vitest·pnpm check 를 돌리면 `ui/vitest.config.ts` 가 Chrome 을 실행해 화면에 창이 뜬다 → WSL 전용. chrome-devtools MCP 의 `isolatedContext` 는 호출마다 새 창을 만든다 → 확인 즉시 닫기. `CLAUDE.md` 가 심볼릭 링크(120000)로 커밋되면 리눅스 체크아웃이 깨진다 → 일반 파일 유지. 컨테이너 안 `openclaw` CLI 는 ix-auth 모드에서 게이트웨이 RPC 가 unauthorized 라 `audit users`·`knowledge sync` 처럼 로컬 경로가 있는 명령만 된다. codex 하네스는 컨테이너에서 bwrap 사용자 네임스페이스가 막혀 셸을 못 쓰고, 열면 읽기 루트가 `/` 다. `start-gateway.sh` 가 매 기동마다 템플릿으로 `openclaw.json` 을 덮어쓰므로 `doctor --fix` 결과는 템플릿에 넣어야 남는다. 같은 체크아웃을 두 에이전트가 쓰면 안 되고, 단계마다 브랜치 하나·opus 에이전트 하나.
+
 ## 1. 좌표
 
 | 대상                  | 위치                                                                                                      | 비고                                                                                                                                                          |
