@@ -20,6 +20,7 @@
         "__OPENCLAW_PUBLIC_ORIGIN__"
       ]
     },
+    "trustedProxies": "__OPENCLAW_TRUSTED_PROXIES__",
     "roles": {
       "default": "member",
       "definitions": {

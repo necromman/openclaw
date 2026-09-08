@@ -94,12 +94,6 @@ services:
       # Password policy for seeded and console-created accounts.
       IXAUTH_PASSWORD_MIN_LENGTH: ${IXAUTH_PASSWORD_MIN_LENGTH:-10}
       IXAUTH_LOG_LEVEL: ${IXAUTH_LOG_LEVEL:-INFO}
-      # Model provider credentials, empty by default: a deployment that answers from an
-      # internal ollama service needs neither. The Gateway reads these names directly,
-      # and the tracked config can also name them through a "${ANTHROPIC_API_KEY}"
-      # SecretRef, so the value stays in the env file. Setup: DEPLOY.md 3.4.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     # No ports section on purpose (design invariant 4). The console is reached through
     # the Gateway route /admin/identity/.
@@ -152,6 +146,26 @@ services:
       # memory.search.extraPaths at its index below. The indexes are host local on
       # purpose: the share is mounted read only and stays that way.
       OPENCLAW_KNOWLEDGE_ROOT: ${OPENCLAW_KNOWLEDGE_ROOT:-}
+      # Upstream proxies whose forwarded headers may be believed, empty by default. The
+      # Gateway reads "x-forwarded-proto: https" only from an address in this list, and
+      # that header is what brings back the "__Host-" prefix and the Secure attribute on
+      # the session cookie. A direct plain-HTTP deployment must leave this empty: trusting
+      # an address that ordinary clients also arrive from would let any of them claim
+      # HTTPS and induce a cookie the browser then drops, which reads as a login that
+      # silently fails. Set it only when something in front really terminates TLS: the
+      # tunnel profile below, or the reverse proxy in DEPLOY.md 11.3. Comma separated
+      # CIDRs or addresses.
+      OPENCLAW_TRUSTED_PROXIES: ${OPENCLAW_TRUSTED_PROXIES:-}
+      # Model provider credentials, empty by default: a deployment that answers from an
+      # internal ollama service needs neither, and one that answers from a ChatGPT
+      # subscription keeps its OAuth profile in the state volume instead. The Gateway
+      # reads these names directly, and the tracked config can also name them through a
+      # "${ANTHROPIC_API_KEY}" SecretRef, so the value stays in the env file. The
+      # department agents are the reason one of them is eventually needed: their
+      # read-only folder boundary does not hold on the subscription runtime
+      # (AUTH-DEPARTMENTS.md 13.9). Setup: DEPLOY.md 3.4.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       # Declarative config: the tracked template is copied over the state copy on every
@@ -201,6 +215,54 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks: [ix-auth-internal]
+
+  # Outbound-only ingress. Started only with --profile tunnel, so a stack that does not
+  # ask for it is byte for byte the stack that existed before this service did.
+  #
+  # cloudflared holds an outbound connection to Cloudflare and answers the hostname the
+  # tunnel is configured for. Nothing has to be forwarded on the router, no public IP is
+  # needed, TLS is terminated at Cloudflare's edge, and WebSocket upgrades pass through,
+  # which the Control UI needs to finish connecting.
+  #
+  # The public hostname's origin in the Cloudflare dashboard is http://gateway:18789:
+  # the service name on this compose network, not the published host port. The published
+  # port is a second, separate door; routing the tunnel through it would work but would
+  # also make the tunnel depend on the host's port binding for no gain.
+  #
+  # Two settings ride with this profile and are not optional:
+  #   OPENCLAW_PUBLIC_ORIGIN=https://<hostname>   the browser origin is now the tunnel's
+  #   OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12      so the forwarded https is believed
+  # Procedure, boundaries and rollback: DEPLOY.md 11.7.
+  #
+  # The image tag is pinned to a real release rather than "latest" so a rebuild cannot
+  # move the ingress under a running deployment. Newer releases exist; raise it
+  # deliberately.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.3
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    # The token identifies one tunnel in one Cloudflare account and is a credential:
+    # it lives in chris-local/ixauth.env, which is git-ignored, and never in this file.
+    #
+    # It rides as TUNNEL_TOKEN rather than as "--token <value>" for two reasons. A value
+    # on the command line shows up in "docker inspect" and in the host's process list.
+    # And a "${VAR:?}" guard inside a profiled service would still be evaluated on every
+    # plain "docker compose config" or "up -d", because interpolation happens before
+    # profiles are filtered; the whole stack would then refuse to start for a service
+    # nobody asked for. cloudflared reads this variable on its own.
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+      TZ: ${OPENCLAW_TZ:-Asia/Seoul}
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
     networks: [ix-auth-internal]
 
   # Development inbox. Started only with --profile mail, and used to prove the SMTP
