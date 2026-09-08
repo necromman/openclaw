@@ -182,6 +182,7 @@ describe("detail panel", () => {
       busy: false,
       canGrantSuperAdmin: true,
       canDelete: true,
+      protectedTarget: false,
       deleteArmed: false,
       onDisplayNameInput: () => {},
       onSaveDisplayName: () => {},
@@ -230,6 +231,21 @@ describe("detail panel", () => {
     expect(host.querySelector("select")?.disabled).toBe(true);
     for (const checkbox of host.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
       expect(checkbox.disabled).toBe(true);
+    }
+  });
+
+  it("locks every change on a system administrator the reader does not outrank", () => {
+    const host = draw(renderUserDetailPanel(panelProps({ protectedTarget: true })));
+    expect(host.textContent).toContain("This is a system administrator account.");
+    expect(host.querySelector("select")?.disabled).toBe(true);
+    for (const checkbox of host.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
+      expect(checkbox.disabled).toBe(true);
+    }
+    for (const label of ["Deactivate", "Reset two-step verification", "Sign this person out"]) {
+      const button = [...host.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent?.trim() === label,
+      );
+      expect(button?.disabled).toBe(true);
     }
   });
 

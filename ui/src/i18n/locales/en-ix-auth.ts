@@ -98,6 +98,11 @@ const enIxAuth = {
       departmentFailed: "The account was created, but the department was not applied.",
       empty: "No invitation links are waiting.",
     },
+    // Shown in place of a settings page the signed-in rank may not open. The menu hides
+    // the entry; this is what a typed address gets.
+    settings: {
+      forbidden: "Only an administrator can open this settings screen.",
+    },
     audit: {
       title: "Audit log",
       description:
@@ -185,6 +190,8 @@ const enIxAuth = {
       deactivate: "Deactivate",
       rolesHelp: "Changing a role ends that person's sessions right away.",
       departmentsHelp: "Departments decide whose sessions this person can read.",
+      superAdminProtected:
+        "This is a system administrator account. Only another system administrator can change its role, departments, or status.",
       mfaOn: "Two-step verification is on",
       mfaOff: "Two-step verification is off",
       lockedUntil: "Locked until {time}",

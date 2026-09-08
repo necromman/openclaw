@@ -68,12 +68,24 @@ export function canManageIxAuthUsers(): boolean {
 /**
  * True when the signed-in account may open the department screen.
  *
- * False before the first probe answers, and false for an ordinary administrator: the
- * department writes are superadmin only (`rejectNonSuperAdmin` in
- * `src/gateway/ix-auth-admin-departments-http.ts`). The top rank alone decides it, because
- * every superadmin is also an admin; asking both would only restate that.
+ * Administrators too, since P: running the company's departments is the same job as
+ * running its accounts, and splitting the two left the people who do that job asking a
+ * system administrator to press the button. The department routes agree
+ * (`src/gateway/ix-auth-admin-departments-http.ts`). What stays out of reach is widening
+ * one's own departments, which the Gateway refuses to everyone alike.
  */
 export function canManageIxAuthDepartments(): boolean {
+  return ixAuthAdminAccess;
+}
+
+/**
+ * True when the signed-in account may open the system-administrator screens.
+ *
+ * Kept apart from the flag above because the two answer different questions: an
+ * administrator runs the company on this deployment, a system administrator runs the
+ * deployment itself.
+ */
+export function canManageIxAuthSystem(): boolean {
   return ixAuthSuperAdminAccess;
 }
 
@@ -83,9 +95,22 @@ export function canManageIxAuthDepartments(): boolean {
  * A staff member, a moderator and an executive all configure nothing on this deployment:
  * every remaining settings screen writes Gateway configuration that everyone shares, and
  * a screen whose every control answers 403 is worse than no screen. Administrators keep
- * the full menu, and a shared-token Gateway keeps it too because it has no accounts to
- * rank. False before the first probe answers, so nothing disappears mid-flight.
+ * more (see below), and a shared-token Gateway keeps everything because it has no
+ * accounts to rank. False before the first probe answers, so nothing disappears
+ * mid-flight.
  */
 export function isIxAuthRestrictedAccount(): boolean {
   return ixAuthManagedSession && !ixAuthAdminAccess;
+}
+
+/**
+ * True for an administrator who is not a system administrator.
+ *
+ * The middle tier: every screen that runs the company (people, departments, the ledger,
+ * approvals) plus everything a staff account keeps, and none of the screens that
+ * reconfigure the Gateway. Those need `operator.admin`, which this rank does not hold, so
+ * showing them would only be a menu of refusals.
+ */
+export function isIxAuthAdminOnlyAccount(): boolean {
+  return ixAuthManagedSession && ixAuthAdminAccess && !ixAuthSuperAdminAccess;
 }

@@ -283,6 +283,12 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
   if (!target) {
     return;
   }
+  // The same protection the role and status routes carry. Departments are the reach of an
+  // account, so moving a system administrator into a single department would be a quiet
+  // way of narrowing what the person who can undo this change is able to see.
+  if (rejectSuperAdminTarget({ ...params, target })) {
+    return;
+  }
   const prefix = params.deps.settings.departmentGroupPrefix;
   const current = target.groups.filter((code) => prefix.length > 0 && code.startsWith(prefix));
   let failed = false;
@@ -403,6 +409,15 @@ async function handleUnlock(params: ActionParams): Promise<void> {
 }
 
 async function handleMfaReset(params: ActionParams): Promise<void> {
+  const target = await loadTarget(params);
+  if (!target) {
+    return;
+  }
+  // Clearing someone's second factor weakens exactly the account it is aimed at, so an
+  // ordinary administrator does not aim it at the rank that can undo their own changes.
+  if (rejectSuperAdminTarget({ ...params, target })) {
+    return;
+  }
   const reset = await resetIxAuthUserMfa({ ...params.admin.call, userId: params.userId });
   if (!reset.ok) {
     sendRelayFailure(params.res, reset);
@@ -422,6 +437,11 @@ async function handleMfaReset(params: ActionParams): Promise<void> {
 async function handleRevokeSessions(params: ActionParams): Promise<void> {
   const target = await loadTarget(params);
   if (!target) {
+    return;
+  }
+  // Signing a system administrator out repeatedly is how an ordinary administrator would
+  // keep the person who can reverse their changes from being at the keyboard.
+  if (rejectSuperAdminTarget({ ...params, target })) {
     return;
   }
   const takedown = await endIxAuthUserSessions({

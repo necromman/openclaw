@@ -52,6 +52,7 @@ import {
   isDesktopPanelAvailable,
   isHomePanelAvailable,
 } from "./panel-availability.ts";
+import { renderShellRouterOutlet } from "./settings-route-access.ts";
 import {
   NAV_WIDTH_MAX,
   NAV_WIDTH_MIN,
@@ -211,6 +212,7 @@ export function renderApplicationShell(host: ShellViewHost) {
     !sessionRoute &&
     activeRoute !== "new-session" &&
     activeRoute !== "appearance";
+  const outletBlocked = pageActionsBlocked || reloadRequired;
   // Plugin tabs share one route; the search picks the active item.
   const activePluginRef =
     activeRoute === "plugin"
@@ -608,14 +610,7 @@ export function renderApplicationShell(host: ShellViewHost) {
           onNavigate: (routeId) => host.navigate(routeId),
           onOpenApprovals: () => host.openApprovals(),
         })}
-        <openclaw-router-outlet
-          ?inert=${pageActionsBlocked || reloadRequired}
-          aria-disabled=${pageActionsBlocked || reloadRequired ? "true" : nothing}
-          .router=${runtime.router}
-          .retryContext=${context}
-          .onNotFound=${() => host.replaceChatWithCurrentSession()}
-          .notFoundRecoveryReady=${gatewayConnected}
-        ></openclaw-router-outlet>
+        ${renderShellRouterOutlet(host, outletBlocked, gatewayConnected, settingsTakeover)}
       </main>
       <openclaw-terminal-panel
         ?inert=${navDrawerOpen}

@@ -8,6 +8,7 @@ import type { IconName } from "./components/icons.ts";
 import {
   canManageIxAuthDepartments,
   canManageIxAuthUsers,
+  isIxAuthAdminOnlyAccount,
   isIxAuthRestrictedAccount,
 } from "./features/ix-auth/ix-auth-admin-access.ts";
 import { i18n, t } from "./i18n/index.ts";
@@ -256,13 +257,24 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
 // from chat, and the version panel. Everything else in the settings menu writes Gateway
 // configuration that the whole company shares, or reads an administration API, so it is
 // hidden rather than shown as a screen whose every control would be refused.
-const IX_AUTH_MEMBER_SETTINGS_ROUTES: readonly NavigationRouteId[] = [
+const IX_AUTH_MEMBER_SETTINGS_ROUTES: ReadonlySet<NavigationRouteId> = new Set([
   "profile",
   "appearance",
   "notifications",
   "talk",
   "about",
-];
+]);
+
+// What an administrator adds to that list: the screens that run the company rather than
+// the deployment. Everything absent from here reconfigures the Gateway and needs
+// `operator.admin`, which only a system administrator holds.
+const IX_AUTH_ADMIN_SETTINGS_ROUTES: ReadonlySet<NavigationRouteId> = new Set([
+  ...IX_AUTH_MEMBER_SETTINGS_ROUTES,
+  "users",
+  "departments",
+  "audit",
+  "approvals",
+]);
 
 export function isSettingsNavigationRouteVisible(
   routeId: NavigationRouteId,
@@ -277,16 +289,18 @@ export function isSettingsNavigationRouteVisible(
   if (routeId === "users" || routeId === "audit") {
     return canManageIxAuthUsers();
   }
-  // Departments decide which agents an account can reach at all, so the screen that moves
-  // them belongs to the one rank the department fence is not built for.
+  // Departments are part of that same job, so the same rank decides them.
   if (routeId === "departments") {
     return canManageIxAuthDepartments();
   }
-  // Ranked accounts below administrator keep only what is theirs. Placed after the three
-  // rules above so an administrator without operator.admin still reaches them, and before
-  // the operator-scope fallback so the shared-token modes are left exactly as they were.
+  // The two narrower tiers. Placed after the rules above so an administrator holding no
+  // operator scope still reaches them, and before the operator-scope fallback so the
+  // shared-token modes are left exactly as they were.
   if (isIxAuthRestrictedAccount()) {
-    return IX_AUTH_MEMBER_SETTINGS_ROUTES.includes(routeId);
+    return IX_AUTH_MEMBER_SETTINGS_ROUTES.has(routeId);
+  }
+  if (isIxAuthAdminOnlyAccount()) {
+    return IX_AUTH_ADMIN_SETTINGS_ROUTES.has(routeId);
   }
   if (routeId === "updates") {
     return canAdmin || nativeDeviceSettings !== null;

@@ -287,17 +287,19 @@ describe("POST /auth/admin/departments", () => {
     expect(calls.filter((entry) => entry.method === "POST")).toHaveLength(0);
   });
 
-  it("refuses an ordinary administrator", async () => {
+  it("admits an ordinary administrator", async () => {
     const cookie = seedSession(["ADMIN"]);
-    const calls = stubIdentityServer({});
+    stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      "POST /admin/groups": () => jsonResponse({ data: { id: 11, code: "dept-qa" } }),
+    });
     const answer = await call({
       method: "POST",
       cookie,
       body: { slug: "qa", name: "Quality" },
     });
-    expect(answer.status()).toBe(403);
-    expect(JSON.parse(answer.body())).toEqual({ error: "forbidden" });
-    expect(calls.filter((entry) => entry.path === "/admin/groups")).toHaveLength(0);
+    expect(answer.status()).toBe(200);
+    expect(listDepartments().map((row) => row.slug)).toEqual(["qa"]);
   });
 
   it("refuses a department that already exists", async () => {
@@ -331,16 +333,18 @@ describe("PATCH /auth/admin/departments", () => {
     ]);
   });
 
-  it("refuses an ordinary administrator", async () => {
+  it("admits an ordinary administrator", async () => {
     const cookie = seedSession(["ADMIN"]);
-    stubIdentityServer({});
+    stubIdentityServer({ "GET /admin/groups": groupListing });
     const answer = await call({
       method: "PATCH",
       cookie,
       body: { slug: "rnd", name: "Renamed" },
     });
-    expect(answer.status()).toBe(403);
-    expect(listDepartments()).toEqual([]);
+    expect(answer.status()).toBe(200);
+    expect(listDepartments().map((row) => [row.slug, row.display_name])).toEqual([
+      ["rnd", "Renamed"],
+    ]);
   });
 
   it("refuses a department the identity server does not list", async () => {
@@ -402,12 +406,16 @@ describe("DELETE /auth/admin/departments", () => {
     expect(calls.some((entry) => entry.method === "DELETE")).toBe(false);
   });
 
-  it("refuses an ordinary administrator", async () => {
+  it("admits an ordinary administrator", async () => {
     const cookie = seedSession(["ADMIN"]);
     upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
-    stubIdentityServer({});
+    stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      "GET /admin/groups/7/members": () => jsonResponse({ data: [] }),
+      "DELETE /admin/groups/7": () => jsonResponse({ data: {} }),
+    });
     const answer = await call({ method: "DELETE", cookie, body: { slug: "rnd" } });
-    expect(answer.status()).toBe(403);
-    expect(listDepartments().map((row) => row.slug)).toEqual(["rnd"]);
+    expect(answer.status()).toBe(200);
+    expect(listDepartments()).toEqual([]);
   });
 });

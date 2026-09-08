@@ -16,7 +16,11 @@ import {
 import type { NativeDeviceSettingsCapability } from "./app/native-device-settings.ts";
 import { readGatewayOperatorAccess } from "./app/operator-access.ts";
 import { getStaticCommandPaletteCatalogItems } from "./components/command-palette-catalog-search.ts";
-import { setIxAuthAdminAccess } from "./features/ix-auth/ix-auth-admin-access.ts";
+import {
+  setIxAuthAdminAccess,
+  setIxAuthManagedSession,
+  setIxAuthSuperAdminAccess,
+} from "./features/ix-auth/ix-auth-admin-access.ts";
 import { findSettingsSearchBlocks } from "./pages/config/settings-search.ts";
 import { createNativeDeviceSettingsSnapshot } from "./test-helpers/native-device-settings.ts";
 
@@ -266,5 +270,81 @@ describe("identity-server administration entries", () => {
   it("keeps the audit log a lazily routed settings destination, not a sidebar pin", () => {
     expect(isSettingsNavigationRoute("audit")).toBe(true);
     expect(SIDEBAR_NAV_ROUTES).not.toContain("audit");
+  });
+});
+
+describe("settings menu for a ranked account", () => {
+  afterEach(() => {
+    setIxAuthAdminAccess(false);
+    setIxAuthManagedSession(false);
+    setIxAuthSuperAdminAccess(false);
+  });
+
+  // Every entry below either writes Gateway configuration the whole company shares or
+  // reads an administration API, so a staff account keeps none of them.
+  const ADMINISTRATION_ROUTES = [
+    "connection",
+    "users",
+    "departments",
+    "channels",
+    "devices",
+    "agents",
+    "model-providers",
+    "memory",
+    "audit",
+    "approvals",
+    "advanced",
+    "debug",
+    "logs",
+  ] as const;
+
+  it.each([true, false])(
+    "leaves a non-administrator only the settings that are its own, admin=%s",
+    (canAdmin) => {
+      setIxAuthManagedSession(true);
+      setIxAuthAdminAccess(false);
+      const routes = visibleSettingsNavigationGroups(canAdmin).flatMap((group) => group.routes);
+      expect(routes).toEqual(["profile", "appearance", "notifications", "talk", "about"]);
+      for (const routeId of ADMINISTRATION_ROUTES) {
+        expect(isSettingsNavigationRouteVisible(routeId, canAdmin)).toBe(false);
+      }
+    },
+  );
+
+  it("gives an administrator the company screens and none of the system ones", () => {
+    setIxAuthManagedSession(true);
+    setIxAuthAdminAccess(true);
+    setIxAuthSuperAdminAccess(false);
+    const routes = visibleSettingsNavigationGroups(false).flatMap((group) => group.routes);
+    expect(routes).toEqual([
+      "profile",
+      "appearance",
+      "notifications",
+      "users",
+      "departments",
+      "talk",
+      "audit",
+      "approvals",
+      "about",
+    ]);
+  });
+
+  it("keeps everything for a system administrator", () => {
+    setIxAuthManagedSession(true);
+    setIxAuthAdminAccess(true);
+    setIxAuthSuperAdminAccess(true);
+    const routes = visibleSettingsNavigationGroups(true).flatMap((group) => group.routes);
+    for (const routeId of ["users", "departments", "audit", "advanced", "debug", "logs"] as const) {
+      expect(routes).toContain(routeId);
+    }
+  });
+
+  it("leaves the shared-token modes exactly as they were", () => {
+    setIxAuthManagedSession(false);
+    setIxAuthAdminAccess(false);
+    const routes = visibleSettingsNavigationGroups(false).flatMap((group) => group.routes);
+    for (const routeId of ["connection", "channels", "agents", "advanced", "logs"] as const) {
+      expect(routes).toContain(routeId);
+    }
   });
 });

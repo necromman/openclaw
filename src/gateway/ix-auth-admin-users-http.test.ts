@@ -594,6 +594,48 @@ describe("departments", () => {
     ).toBe(true);
   });
 
+  it("refuses an ordinary administrator moving a system administrator", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/groups": () => jsonResponse({ data: [{ id: 11, code: "dept-rnd", name: "R&D" }] }),
+      [`GET /admin/users/${TARGET_USER_ID}`]: () =>
+        jsonResponse({ data: userView({ roles: ["SUPERADMIN"], groups: ["dept-rnd"] }) }),
+    });
+    const answer = await callAdmin({
+      method: "PUT",
+      pathname: `/auth/admin/users/${TARGET_USER_ID}/departments`,
+      headers: adminHeaders(session),
+      body: { departments: [] },
+    });
+    expect(answer.status()).toBe(403);
+    expect(JSON.parse(answer.body())).toEqual({ error: "forbidden" });
+    expect(calls.some((call) => call.method === "DELETE" && call.path.includes("/members/"))).toBe(
+      false,
+    );
+  });
+
+  it("lets a system administrator move another system administrator", async () => {
+    const session = seedSession({ roles: ["SUPERADMIN"], sessionToken: "super-session" });
+    const calls = stubIdentityServer({
+      "/admin/groups": () => jsonResponse({ data: [{ id: 11, code: "dept-rnd", name: "R&D" }] }),
+      [`GET /admin/users/${TARGET_USER_ID}`]: () =>
+        jsonResponse({ data: userView({ roles: ["SUPERADMIN"], groups: [] }) }),
+      "POST /admin/groups/11/members": () => new Response(null, { status: 204 }),
+      [`DELETE /admin/users/${TARGET_USER_ID}/sessions`]: () =>
+        jsonResponse({ data: { revoked: 0 } }),
+    });
+    const answer = await callAdmin({
+      method: "PUT",
+      pathname: `/auth/admin/users/${TARGET_USER_ID}/departments`,
+      headers: adminHeaders(session),
+      body: { departments: ["dept-rnd"] },
+    });
+    expect(answer.status()).toBe(200);
+    expect(
+      calls.some((call) => call.method === "POST" && call.path === "/admin/groups/11/members"),
+    ).toBe(true);
+  });
+
   it("refuses a department the identity server does not have", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
     stubIdentityServer({

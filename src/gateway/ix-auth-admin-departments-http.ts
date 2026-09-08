@@ -15,6 +15,16 @@
 // goes here. It is refused while anyone is still in the group, because a department is
 // the shape of a boundary and emptying one silently is how people lose access without
 // anybody deciding they should.
+//
+// Every route here is open to an administrator, not only to a system administrator (P).
+// The earlier rule read "an ordinary administrator lives inside the boundary, so it must
+// not move it", which sounded right and was wrong in practice: running the company's
+// departments is the same job as running its accounts, and splitting the two meant the
+// person who does that job had to ask someone else to press the button. What actually
+// guards the boundary is elsewhere and stays: nobody, of any rank, may edit their own
+// departments (`rejectSelfTarget` in `ix-auth-admin-users-actions.ts`), an administrator
+// may not touch a system administrator's row, and a department with members in it cannot
+// be deleted. Creating an empty department grants its creator nothing.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import {
@@ -141,35 +151,7 @@ function readDepartmentBody(
   return { ok: true, slug, name };
 }
 
-/**
- * Only the top rank may change the department set.
- *
- * Reading is open to every administrator because the invitation and user screens need the
- * list to choose from. Writing is not: a department is where the boundary is drawn, and
- * an ordinary administrator lives inside it (AUTH-DEPARTMENTS 4). The check is the same
- * one the boundary itself uses, the token's own rank rather than a scope.
- */
-function rejectNonSuperAdmin(params: DepartmentsRouteParams): boolean {
-  if (params.admin.principal.isSuperAdmin) {
-    return false;
-  }
-  params.deps.onSecurityEvent?.({
-    action: "ix-auth.admin.denied",
-    outcome: "denied",
-    clientIp: params.deps.clientIp,
-    profileId: params.admin.principal.profileId,
-    identitySubject: params.admin.principal.claims.subject,
-    loginSessionId: params.admin.principal.loginSessionId,
-    reason: "role",
-  });
-  sendJson(params.res, 403, { error: "forbidden" });
-  return true;
-}
-
 async function handleCreate(params: DepartmentsRouteParams): Promise<void> {
-  if (rejectNonSuperAdmin(params)) {
-    return;
-  }
   const body = await readIxAuthJsonBody(params.req, params.res);
   if (!body) {
     return;
@@ -215,9 +197,6 @@ async function handleCreate(params: DepartmentsRouteParams): Promise<void> {
 }
 
 async function handleRename(params: DepartmentsRouteParams): Promise<void> {
-  if (rejectNonSuperAdmin(params)) {
-    return;
-  }
   const body = await readIxAuthJsonBody(params.req, params.res);
   if (!body) {
     return;
@@ -265,9 +244,6 @@ async function handleRename(params: DepartmentsRouteParams): Promise<void> {
  * the config write can clear those.
  */
 async function handleDelete(params: DepartmentsRouteParams): Promise<void> {
-  if (rejectNonSuperAdmin(params)) {
-    return;
-  }
   const body = await readIxAuthJsonBody(params.req, params.res);
   if (!body) {
     return;

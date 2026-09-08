@@ -58,6 +58,13 @@ export type UserDetailPanelProps = {
   busy: boolean;
   canGrantSuperAdmin: boolean;
   canDelete: boolean;
+  /**
+   * True when this row is a system administrator and the reader is not one.
+   *
+   * The Gateway refuses these changes either way (`rejectSuperAdminTarget`); the flag is
+   * what keeps the screen from offering a control whose only outcome is a refusal.
+   */
+  protectedTarget: boolean;
   deleteArmed: boolean;
   notice?: TemplateResult | string;
   onDisplayNameInput: (value: string) => void;
@@ -139,7 +146,7 @@ function renderRoleRow(props: UserDetailPanelProps): TemplateResult {
     control: html`
       <select
         class="settings-select"
-        ?disabled=${props.busy || props.user.self}
+        ?disabled=${props.busy || props.user.self || props.protectedTarget}
         @change=${(event: Event) => {
           // SAFETY: this listener is bound to the select element on this line.
           props.onRoleChange((event.target as HTMLSelectElement).value);
@@ -170,7 +177,7 @@ function renderDepartmentRow(props: UserDetailPanelProps): TemplateResult {
                   <label>
                     <input
                       type="checkbox"
-                      ?disabled=${props.busy || props.user.self}
+                      ?disabled=${props.busy || props.user.self || props.protectedTarget}
                       .checked=${props.selectedDepartments.includes(item.code)}
                       @change=${(event: Event) => {
                         // SAFETY: bound to the checkbox on this template line.
@@ -185,7 +192,7 @@ function renderDepartmentRow(props: UserDetailPanelProps): TemplateResult {
             </div>
             <button
               class="btn"
-              ?disabled=${props.busy || props.user.self}
+              ?disabled=${props.busy || props.user.self || props.protectedTarget}
               @click=${() => props.onSaveDepartments()}
             >
               ${t("ixAuth.users.save")}
@@ -220,15 +227,23 @@ function renderActionRows(props: UserDetailPanelProps): unknown[] {
           >
             ${t("ixAuth.users.unlock")}
           </button>
-          <button class="btn" ?disabled=${props.busy} @click=${() => props.onAction("mfa-reset")}>
+          <button
+            class="btn"
+            ?disabled=${props.busy || props.protectedTarget}
+            @click=${() => props.onAction("mfa-reset")}
+          >
             ${t("ixAuth.users.mfaReset")}
           </button>
-          <button class="btn" ?disabled=${props.busy} @click=${() => props.onAction("sessions")}>
+          <button
+            class="btn"
+            ?disabled=${props.busy || props.protectedTarget}
+            @click=${() => props.onAction("sessions")}
+          >
             ${t("ixAuth.users.revokeSessions")}
           </button>
           <button
             class="btn"
-            ?disabled=${props.busy || user.self}
+            ?disabled=${props.busy || user.self || props.protectedTarget}
             @click=${() => props.onToggleStatus()}
           >
             ${user.status === "DISABLED" ? t("ixAuth.users.activate") : t("ixAuth.users.deactivate")}
@@ -279,6 +294,15 @@ function renderActionRows(props: UserDetailPanelProps): unknown[] {
 export function renderUserDetailPanel(props: UserDetailPanelProps): TemplateResult {
   return renderSettingsSection({ title: t("ixAuth.users.detailTitle") }, [
     ...renderIdentityRows(props),
+    // Said once, at the top, rather than repeated on every control it greys out.
+    props.protectedTarget
+      ? renderSettingsRow({
+          title: "",
+          control: html`<div class="callout" role="note">
+            ${t("ixAuth.users.superAdminProtected")}
+          </div>`,
+        })
+      : nothing,
     renderRoleRow(props),
     renderDepartmentRow(props),
     ...renderActionRows(props),
