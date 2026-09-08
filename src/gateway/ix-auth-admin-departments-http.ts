@@ -283,9 +283,7 @@ async function handleDelete(params: DepartmentsRouteParams): Promise<void> {
     return;
   }
   const prefix = params.deps.settings.departmentGroupPrefix;
-  const group = listing.departments.find(
-    (entry) => slugForGroupCode(entry.code, prefix) === slug,
-  );
+  const group = listing.departments.find((entry) => slugForGroupCode(entry.code, prefix) === slug);
   // A department the identity server no longer lists is an orphan row: there is no group
   // to delete, and clearing the projection is the whole job.
   if (group) {

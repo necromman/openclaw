@@ -370,9 +370,9 @@ describe("DELETE /auth/admin/departments", () => {
     expect(JSON.parse(answer.body())).toEqual({ slug: "rnd", unboundAgents: ["rnd-bot"] });
     expect(listDepartments()).toEqual([]);
     expect(readDepartmentAgentBindings().has("rnd-bot")).toBe(false);
-    expect(calls.some((entry) => entry.method === "DELETE" && entry.path === "/admin/groups/7")).toBe(
-      true,
-    );
+    expect(
+      calls.some((entry) => entry.method === "DELETE" && entry.path === "/admin/groups/7"),
+    ).toBe(true);
   });
 
   it("refuses while the identity server still holds members, and deletes nothing", async () => {

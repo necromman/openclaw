@@ -170,8 +170,7 @@ export function formatXlsxSerialDate(serial: number, kind: XlsxDateKind): string
   if (!Number.isFinite(serial) || serial < 0 || serial > XLSX_MAX_SERIAL) {
     return undefined;
   }
-  const offset =
-    serial < 61 ? XLSX_EPOCH_OFFSET_DAYS_BEFORE_LEAP_BUG : XLSX_EPOCH_OFFSET_DAYS;
+  const offset = serial < 61 ? XLSX_EPOCH_OFFSET_DAYS_BEFORE_LEAP_BUG : XLSX_EPOCH_OFFSET_DAYS;
   const rounded = Math.round((serial - offset) * MILLISECONDS_PER_DAY);
   const moment = new Date(Math.round(rounded / 60_000) * 60_000);
   if (Number.isNaN(moment.getTime())) {

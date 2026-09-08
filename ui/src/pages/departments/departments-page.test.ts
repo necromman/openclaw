@@ -15,10 +15,7 @@ import { renderDepartmentAccessPanel } from "./department-access-panel.ts";
 import { renderDepartmentAgentsTable } from "./department-agents-panel.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
 import { buildDepartmentAgentPatch } from "./departments-gateway.ts";
-import {
-  renderDepartmentDeleteForm,
-  renderDepartmentsTable,
-} from "./departments-table.ts";
+import { renderDepartmentDeleteForm, renderDepartmentsTable } from "./departments-table.ts";
 
 registerIxAuthEnglish();
 

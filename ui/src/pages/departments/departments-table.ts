@@ -177,7 +177,11 @@ export function renderDepartmentDeleteForm(params: {
               <p class="departments-form__hint">
                 ${t("ixAuth.departments.deleteConfirm", { name: params.department.name })}
               </p>
-              <button class="btn danger" ?disabled=${params.busy} @click=${() => params.onConfirm()}>
+              <button
+                class="btn danger"
+                ?disabled=${params.busy}
+                @click=${() => params.onConfirm()}
+              >
                 ${t("ixAuth.departments.deleteConfirmSubmit")}
               </button>
               <button class="btn" ?disabled=${params.busy} @click=${() => params.onCancel()}>

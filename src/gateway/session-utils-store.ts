@@ -7,6 +7,10 @@ import {
   readAcpSessionMetaForEntry,
   repairAcpSessionMetaKeyForMigration,
 } from "../acp/runtime/session-meta.js";
+import {
+  isPermissionModeWider,
+  resolveAgentDefaultPermissionMode,
+} from "../agents/agent-permission-mode.js";
 import { resolveModelAgentRuntimeMetadata } from "../agents/agent-runtime-metadata.js";
 import {
   listAgentEntries,
@@ -15,10 +19,6 @@ import {
   resolveAgentWorkspaceDir,
 } from "../agents/agent-scope.js";
 import { resolveExecDefaults } from "../agents/exec-defaults.js";
-import {
-  isPermissionModeWider,
-  resolveAgentDefaultPermissionMode,
-} from "../agents/agent-permission-mode.js";
 import { resolveAgentAvatarUrlFromSource } from "../agents/identity-avatar-file.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
 import { splitTrailingAuthProfile } from "../agents/model-ref-profile.js";
