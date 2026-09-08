@@ -518,6 +518,20 @@ docker exec -it openclaw-gateway openclaw audit users --limit 5
 
 관리자 화면은 **설정 > 개인정보 보호 & 보안 > 감사 기록**, CSV 는 그 화면의 내려받기 버튼이다. 원장은 보존기간 내 조회용이고 변조 방지가 없다 - 장기 보존이 요건이면 고객사 SIEM 내보내기를 정본으로 계약에 적는다.
 
+### 3.7-1 비서의 이름·말투·언어 바꾸기
+
+비서의 정체성은 두 군데에 나뉘어 있고 둘 다 템플릿이 정본이다. 화면과 채널에 보이는 **표시 이름**은 `ixauth-gateway-config/openclaw.json` 의 `agents.entries.main.name`(과 `identity.name`)이고, 모델이 자기 자신을 무엇으로 아는지는 `ixauth-gateway-config/workspace-seed/` 의 `IDENTITY.md`·`SOUL.md` 다. 지금 값은 이름 "공용", 언어 한국어, 역할 "회사 공용 AI 비서" 다.
+
+`start-gateway.sh` 는 기동마다 그 두 파일을 워크스페이스(`workspace` 와 `workspace-main`)에 덮어쓰고 `BOOTSTRAP.md` 를 지운다. `BOOTSTRAP.md` 는 새 워크스페이스에 시드되는 온보딩 문서이고 그 첫 절차가 "사용자에게 무엇이라고 부를지 물어라" 라, 남아 있으면 직원의 첫 질문이 이름 정하기 의식으로 돌아온다. 정체성 파일이 원본 템플릿과 다르면 게이트웨이가 그 워크스페이스를 "설정 끝남" 으로 기록하므로(`workspaceProfileLooksConfigured`) 지운 뒤 다시 생기지도 않는다.
+
+바꾸는 절차는 세 줄이다.
+
+1. 저장소에서 `openclaw.json` 의 이름과 `workspace-seed/*.md` 를 고친다.
+2. NAS 사본 `/volume1/docker/openclaw/ixauth-gateway-config/` 에 같은 파일을 복사한다(13.4-1).
+3. `sudo /volume1/docker/openclaw/deploy.sh --force`, 또는 게이트웨이 컨테이너만 `restart`.
+
+채팅에서 비서에게 이름을 바꿔 달라고 하면 `openclaw agents set-identity` 가 상태 볼륨의 설정과 `IDENTITY.md` 를 고치지만, 다음 기동의 렌더가 그것을 되돌린다. 이 배포에서 정체성은 템플릿만이 정한다.
+
 ### 3.8 배포 후 메일(SMTP) 세팅
 
 사용자 결정(2026-09-08): **메일 서버도 배포 시점에 붙인다.** 그때까지는 `IXAUTH_MAIL_TRANSPORT=WEBHOOK` 으로 두고, 초대 링크는 화면에 뜨는 것을 관리자가 직접 전달한다(2.1). 이 상태에서 못 하는 것은 비밀번호 재설정 메일과 자체 가입 두 가지뿐이다.
@@ -1416,6 +1430,10 @@ sudo /volume1/docker/openclaw/deploy.sh --force
 ```
 
 옮기기 전에 백업을 남기고, 옮긴 뒤 `diff` 로 정본과 대조한다.
+
+**`ixauth-gateway-config/` 는 폴더째 옮긴다.** Q 단계에서 `workspace-seed/IDENTITY.md`·`SOUL.md` 가 늘었고, `start-gateway.sh` 가 그 두 파일을 읽지 못하면 `set -eu` 때문에 게이트웨이가 아예 뜨지 않는다. `openclaw.json`·`start-gateway.sh` 만 옮기고 `workspace-seed/` 를 빠뜨리는 것이 이 폴더에서 가장 쉬운 실수다.
+
+**설정을 고쳤는데 반영되지 않으면 기동 로그를 먼저 본다.** `Config auto-restored from backup ... (missing-meta-vs-last-good)` 이 있으면 렌더한 설정이 통째로 버려지고 옛 백업이 살아난 것이다. 게이트웨이는 마지막으로 받아들인 설정에 최상위 `meta` 가 있었는데 새 설정에 없으면 손상으로 판정한다(`src/config/io.observe-suspicious.ts`). 템플릿이 `meta.migrations.modelPolicyAllowlist` 를 들고 있는 이유가 이것이고, 그 블록을 지우면 이 배포는 그날부터 설정 변경을 못 받는다.
 
 **네트워크 설정(`networks:` 아래의 `ipam`)을 바꿨다면 `up -d` 로는 반영되지 않는다.** 돌고 있는 네트워크의 주소 대역은 고칠 수 없어서 compose 가 "네트워크를 다시 만들어야 한다" 며 거부한다. 그때는 한 번만 손으로 내렸다 올린다. 이름 붙은 볼륨(`gateway-state`·`ix-auth-db-data`)은 `down` 에서 지워지지 않으므로 설정·인증·계정은 그대로 남는다.
 
