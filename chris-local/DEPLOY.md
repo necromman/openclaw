@@ -1228,6 +1228,8 @@ NAS 는 2코어 Celeron 이라 게이트웨이 이미지를 스스로 빌드할 
 
 NAS 의 docker-compose 는 **1.28.5** 다. 그 버전이 처음으로 `profiles` 와 version 키 없는 Compose Specification 을 읽는다. `version: "3.x"` 를 적으면 `mem_limit` 가 무시되므로 적지 않는다. `init`·`cap_drop`·`security_opt`·healthcheck·`depends_on.condition` 은 이 버전에서 그대로 동작한다(2026-09-08 NAS 에서 `docker-compose config` 로 확인).
 
+`depends_on.condition` 에는 실측한 한계가 하나 있다. 1.28.5 는 의존 서비스가 healthy 가 될 때까지 잠깐만 기다리고, 그 안에 안 되면 `ERROR: for cloudflared Container "..." is unhealthy.` 로 `up` 전체를 실패시킨다. 게이트웨이는 첫 기동에 1분 30초쯤 걸려서 이 조건을 걸면 첫 배포가 반드시 실패한다(2026-09-08 실측). 그래서 cloudflared 만 짧은 형식 `depends_on: [gateway]` 을 쓴다. cloudflared 는 원본이 아직 없는 동안 502 를 내고 계속 재시도하므로 순서만 정하면 된다. db 와 ix-auth 는 각각 10초·1분 안에 healthy 가 되어 조건이 그대로 통한다.
+
 메모리 상한은 NAS 가 파일 서비스와 기존 컨테이너 7개를 함께 돌리는 기계라서 건다.
 
 | 컨테이너      | `mem_limit` | 근거                                                               |
@@ -1279,6 +1281,8 @@ sudo chown -R root:root /volume1/docker/openclaw
 | `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | 빈 값                                      | 배포 후 세팅 (3.4 (라))                                      |
 
 만든 값은 `chris-local/infra/local/jinbio-deploy.md`(git 제외)에 적어 둔다.
+
+> **CR 함정.** 값을 만들 때 `| tr -d '\r\n'` 로 CR 도 함께 지운다. Windows Git Bash 의 `openssl` 은 CRLF 로 출력하고, `tr -d '\n'` 만 하면 값 한가운데에 CR 이 남는다. docker-compose 는 그 CR 자리에서 값을 자르므로 관리자 비밀번호가 짧아진 채로 시드되고, 로그인은 "이메일 또는 비밀번호가 올바르지 않습니다" 로 실패한다. env 파일은 항상 LF 로 저장한다. 확인은 `awk '/\r/{print NR}' ixauth.env` 가 아무것도 내지 않는 것이다.
 
 **시드 계정은 생기지 않는다.** Flyway 마이그레이션이 넣는 것은 역할·권한 정의뿐이고, 계정으로 시드되는 것은 `IXAUTH_ADMIN_EMAIL` 하나다. 로컬 검증 스택의 시험 계정 8개는 손으로 만든 것이라 새 볼륨에는 따라오지 않는다. `reset-seed.sh` 를 돌릴 일도 없다.
 
@@ -1355,7 +1359,27 @@ sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
 | 자동 배포            | `tail /volume1/docker/openclaw/deploy.log` 에 "변경 없음" 줄이 5분마다             |
 | 메모리               | `sudo ... docker stats --no-stream` 과 `free -m`                                   |
 
-### 13.8 이 배치의 한계
+### 13.8 실측 (2026-09-08)
+
+첫 설치를 그대로 밟은 결과다.
+
+| 항목                    | 값                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| Actions 소요            | ix-auth 이미지 1분 6초(캐시), 게이트웨이 이미지 15분 4초, 실행 전체 16분 9초                        |
+| 이미지 크기             | 게이트웨이 4.71 GB(압축 1.70 GB, 레이어 30개), ix-auth 274 MB                                       |
+| NAS 이미지 받기         | 게이트웨이 1개에 약 11분(내려받기 + 압축 해제). 2코어라 압축 해제가 대부분이다                      |
+| 컨테이너                | `ix-auth-db` healthy, `ix-auth` healthy, `gateway` healthy, `cloudflared` running(헬스체크 없음)    |
+| 메모리 (`docker stats`) | gateway 504 MiB/3 GiB, ix-auth 378 MiB/768 MiB, db 132 MiB/512 MiB, cloudflared 18 MiB/128 MiB      |
+| 호스트 메모리           | 전체 9,806 MB 중 사용 1,815 MB, 여유 7,541 MB                                                       |
+| 디스크                  | `/volume1` 2.9 TB 여유 그대로                                                                       |
+| compose 네트워크        | `172.19.0.0/16`. `OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12` 이 덮는다                                 |
+| 외부 접속               | `curl -sI https://jinbio.botops.cloud/` -> `HTTP/1.1 200 OK`, `Server: cloudflare`                  |
+| 쿠키                    | 로그인 뒤 `__Host-openclaw-session-csrf` 확인. `__Host-` 접두는 `Secure` 없이는 브라우저가 거부한다 |
+| 계정                    | 사용자 관리 화면에 `admin@deploy.local`(시스템 관리자) 1명. 시드 계정 없음                          |
+| 터널                    | cloudflared 로그에 `Registered tunnel connection` 4줄, ingress 가 `http://gateway:18789`            |
+| cron                    | `deploy.log` 에 5분 간격 "변경 없음" 줄. `--force` 는 "OK: 배포 완료 (헬스까지 0초)"                |
+
+### 13.9 이 배치의 한계
 
 - **NAS 직접 설치는 PoC 다**(11.6). 문서 변환 한 번에 2코어가 포화되고 그동안 NAS 본래의 파일 서비스가 함께 느려진다. 상시 운영은 별도 x86 호스트를 권한다.
 - 도메인과 터널은 감독 개인 Cloudflare 계정의 것이다. 정식 납품 때 고객 도메인·계정으로 옮긴다. 바뀌는 것은 `OPENCLAW_PUBLIC_ORIGIN` 과 터널 토큰뿐이다.
