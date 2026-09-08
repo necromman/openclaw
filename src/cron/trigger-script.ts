@@ -4,6 +4,7 @@ import {
   createOperationalRunInstanceRef,
   prepareAgentRunAdmission,
   resolveAdmittedRunActiveAssertion,
+  type AdmittedRunContext,
   type PreparedAgentRunAdmission,
 } from "../agents/admitted-run-context.js";
 import {
@@ -107,7 +108,7 @@ const assertTriggerCodesCoverHeadless: AssertTriggerCodesCoverHeadless = true;
 void assertTriggerCodesCoverHeadless;
 
 type PreparedTriggerRuntime = {
-  tools: AnyAgentTool[];
+  createTools: (admitted: AdmittedRunContext, signal: AbortSignal) => AnyAgentTool[];
   context: HookContext & { config: OpenClawConfig; agentId: string; sessionKey: string };
   pluginRegistry?: PluginRegistry;
 };
@@ -200,34 +201,39 @@ async function prepareTriggerRuntime(
     });
     // Bundle MCP tools are source:"mcp", which the headless bridge excludes.
     // LSP runtimes are session-scoped and intentionally outside trigger v1.
-    const allTools = toolPlan.constructTools
-      ? createOpenClawCodingTools({
-          agentId,
-          exec: { config },
-          sandbox,
-          sessionKey,
-          trigger: "cron",
-          jobId: params.jobId,
-          agentDir,
-          cwd: effectiveWorkspace,
-          workspaceDir: effectiveWorkspace,
-          spawnWorkspaceDir: workspaceDir,
-          config,
-          allowGatewaySubagentBinding: true,
-          includeCoreTools: toolPlan.includeCoreTools,
-          runtimeToolAllowlist: toolPlan.runtimeToolAllowlist,
-          inheritRuntimeToolAllowlist: Boolean(toolPlan.runtimeToolAllowlist),
-          scheduledToolPolicy: resolveScheduledToolPolicyContext({
-            toolsAllow: params.toolsAllow,
-            scheduledToolPolicy: params.scheduledToolPolicy,
-            execTarget: params.execTarget,
-          }),
-          toolConstructionPlan: toolPlan.codingToolConstructionPlan,
-        })
-      : [];
-    const tools = applyEmbeddedAttemptToolsAllow(allTools, params.toolsAllow, {
-      toolMeta: (tool) => getPluginToolMeta(tool),
-    });
+    const createTools: PreparedTriggerRuntime["createTools"] = (admitted, signal) => {
+      const allTools = toolPlan.constructTools
+        ? createOpenClawCodingTools({
+            agentId,
+            runId: admitted.operationalRunInstance.runId,
+            operationalRunInstance: admitted.operationalRunInstance,
+            abortSignal: signal,
+            exec: { config },
+            sandbox,
+            sessionKey,
+            trigger: "cron",
+            jobId: params.jobId,
+            agentDir,
+            cwd: effectiveWorkspace,
+            workspaceDir: effectiveWorkspace,
+            spawnWorkspaceDir: workspaceDir,
+            config,
+            allowGatewaySubagentBinding: true,
+            includeCoreTools: toolPlan.includeCoreTools,
+            runtimeToolAllowlist: toolPlan.runtimeToolAllowlist,
+            inheritRuntimeToolAllowlist: Boolean(toolPlan.runtimeToolAllowlist),
+            scheduledToolPolicy: resolveScheduledToolPolicyContext({
+              toolsAllow: params.toolsAllow,
+              scheduledToolPolicy: params.scheduledToolPolicy,
+              execTarget: params.execTarget,
+            }),
+            toolConstructionPlan: toolPlan.codingToolConstructionPlan,
+          })
+        : [];
+      return applyEmbeddedAttemptToolsAllow(allTools, params.toolsAllow, {
+        toolMeta: (tool) => getPluginToolMeta(tool),
+      });
+    };
     const context = {
       agentId,
       config,
@@ -237,7 +243,7 @@ async function prepareTriggerRuntime(
       loopDetection: resolveToolLoopDetectionConfig({ cfg: config, agentId }),
     };
     return {
-      tools,
+      createTools,
       context,
       ...(pluginRegistry ? { pluginRegistry } : {}),
     };
@@ -312,7 +318,8 @@ function createCronCodeModeRunner(deps: CronTriggerEvaluatorDeps) {
   const prepareRuntime =
     deps.prepareRuntime ?? ((params) => prepareTriggerRuntime(params, deps.loadPluginRegistry));
   // Config identity is the reload epoch; caching the preparation promise makes
-  // concurrent cold evaluations for one job single-flight.
+  // concurrent cold evaluations for one job single-flight. Cache only preparation:
+  // tool instances capture run authority, abort signals, and secret egress state.
   const runtimeCache = new Map<string, TriggerRuntimeCacheEntry>();
 
   const resolveCachedRuntime = async (
@@ -475,7 +482,7 @@ function createCronCodeModeRunner(deps: CronTriggerEvaluatorDeps) {
         assertActive();
         registerHeadlessToolSearchCatalog({
           catalogRef,
-          tools: runtime.tools,
+          tools: runtime.createTools(admitted, evaluationScope.signal),
           hookContext: { ...runtime.context, runId },
         });
         const remainingWallClockMs = Math.ceil(evaluationScope.deadline - performance.now());
