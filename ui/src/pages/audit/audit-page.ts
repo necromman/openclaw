@@ -30,6 +30,11 @@ import {
 } from "../../components/settings-ui.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import { canManageIxAuthUsers } from "../../features/ix-auth/ix-auth-admin-access.ts";
+import {
+  fetchIxAuthDepartments,
+  type IxAuthDepartmentOption,
+} from "../../features/ix-auth/ix-auth-admin-api.ts";
+import { ixAuthDepartmentLabels } from "../../features/ix-auth/ix-auth-department-labels.ts";
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
@@ -62,6 +67,12 @@ export class AuditPage extends OpenClawLightDomElement {
   @state() private failed = false;
   @state() private expanded: number | null = null;
   @state() private cursors: string[] = [];
+  /**
+   * The department directory, so a ledger row names departments the way every other
+   * screen does. The ledger stores codes because a code is what the boundary reads and
+   * what survives a rename; the reader should still see the word an operator chose.
+   */
+  @state() private departments: IxAuthDepartmentOption[] = [];
 
   private client: GatewayBrowserClient | null = null;
   private stopGateway: (() => void) | undefined;
@@ -97,6 +108,18 @@ export class AuditPage extends OpenClawLightDomElement {
     this.connected = snapshot.phase === "connected";
     if (this.connected && (clientChanged || this.events.length === 0)) {
       void this.load();
+      void this.loadDepartments();
+    }
+  }
+
+  /** Department names, fetched once. A failure leaves rows naming codes, as before. */
+  private async loadDepartments(): Promise<void> {
+    if (this.departments.length > 0) {
+      return;
+    }
+    const departments = await fetchIxAuthDepartments(this.basePath);
+    if (Array.isArray(departments)) {
+      this.departments = departments;
     }
   }
 
@@ -212,7 +235,7 @@ export class AuditPage extends OpenClawLightDomElement {
         <td>${new Date(event.at).toLocaleString()}</td>
         <td>${auditRowPerson(event)}</td>
         <td>${auditRowRole(event)}</td>
-        <td>${event.departments.join(", ") || "-"}</td>
+        <td>${this.renderDepartments(event.departments)}</td>
         <td>${auditKindLabel(event.kind)}</td>
         <td class="audit-table__summary">
           <button
@@ -230,9 +253,22 @@ export class AuditPage extends OpenClawLightDomElement {
               : nothing
           }
         </td>
-        <td>${event.sessionKey ?? "-"}</td>
+        <td class="audit-table__session" title=${event.sessionKey ?? ""}>
+          ${event.sessionKey ?? "-"}
+        </td>
       </tr>
     `;
+  }
+
+  /** Department names, with the code one hover away, exactly as the directory draws it. */
+  private renderDepartments(codes: readonly string[]): TemplateResult {
+    if (codes.length === 0) {
+      return html`-`;
+    }
+    return html`${ixAuthDepartmentLabels(codes, this.departments).map(
+      (label, index) =>
+        html`${index > 0 ? ", " : nothing}<span title=${label.code}>${label.name}</span>`,
+    )}`;
   }
 
   private renderTable(): TemplateResult {

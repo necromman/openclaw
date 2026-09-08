@@ -83,6 +83,16 @@
   word-break: break-word;
 }
 
+/* The session key is the last column and the only one whose value is a machine
+ * identifier: long, unbreakable, and read only when something has to be traced. It
+ * is capped and clipped rather than allowed to push the table past the right edge,
+ * and the whole key stays available in the cell's title. */
+.audit-table__session {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .audit-table__expand {
   background: none;
   border: 0;
