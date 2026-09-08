@@ -5,6 +5,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
+import { respondNotFound } from "./control-ui-http-utils.js";
 import { isSecureGatewayBrowserContext } from "./cookie-header.js";
 import { classifyIxAuthHttpPath, isIxAuthAdminProxyPath } from "./ix-auth-http-paths.js";
 import { isLocalDirectRequest, isLoopbackAddress, isTrustedProxyAddress } from "./net.js";
@@ -51,12 +52,12 @@ async function runIxAuthHttpStage(params: {
   res: ServerResponse;
   pathname: string;
   config: OpenClawConfig;
-  trustedProxies: string[];
   clientIp?: string;
   rateLimiter?: AuthRateLimiter;
   disconnectClientsForUserProfile?: (profileId: string) => void;
-  respondNotFound: (res: ServerResponse) => void;
 }): Promise<boolean> {
+  // Read off the same snapshot the caller pinned, rather than asking for it a second time.
+  const trustedProxies = params.config.gateway?.trustedProxies ?? [];
   // Imported here rather than at module scope so a deployment that never enables this
   // mode never loads the identity client, its session store, or the JWKS verifier.
   const [httpModule, principalModule] = await Promise.all([
@@ -67,7 +68,7 @@ async function runIxAuthHttpStage(params: {
   if (!settings) {
     // Configured for this mode but unusable. Denying is the only safe answer; startup
     // validation reports the underlying misconfiguration separately.
-    params.respondNotFound(params.res);
+    respondNotFound(params.res);
     return true;
   }
   const socket = params.req.socket;
@@ -81,7 +82,7 @@ async function runIxAuthHttpStage(params: {
       allowHostHeaderOriginFallback:
         params.config.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback === true,
       clientIp: params.clientIp,
-      isLocalClient: isLocalDirectRequest(params.req, params.trustedProxies),
+      isLocalClient: isLocalDirectRequest(params.req, trustedProxies),
       isSecureContext: isSecureGatewayBrowserContext({
         // A TLS server hands this handler a TLSSocket, a plain server a net.Socket. The
         // encrypted flag is what distinguishes them at this point.
@@ -89,7 +90,7 @@ async function runIxAuthHttpStage(params: {
         encrypted: Boolean((socket as { encrypted?: boolean }).encrypted),
         remoteAddressIsLoopback: isLoopbackAddress(socket?.remoteAddress),
         forwardedProto: params.req.headers["x-forwarded-proto"],
-        fromTrustedProxy: isTrustedProxyAddress(socket?.remoteAddress, params.trustedProxies),
+        fromTrustedProxy: isTrustedProxyAddress(socket?.remoteAddress, trustedProxies),
       }),
       rateLimiter: params.rateLimiter,
       ...(params.disconnectClientsForUserProfile
@@ -117,9 +118,7 @@ async function runIxAuthAdminProxyStage(params: {
   res: ServerResponse;
   pathname: string;
   config: OpenClawConfig;
-  trustedProxies: string[];
   clientIp?: string;
-  respondNotFound: (res: ServerResponse) => void;
 }): Promise<void> {
   const [proxyModule, principalModule, sessionsModule] = await Promise.all([
     import("./ix-auth-admin-proxy.js"),
@@ -128,7 +127,7 @@ async function runIxAuthAdminProxyStage(params: {
   ]);
   const settings = await principalModule.loadIxAuthGatewaySettings();
   if (!settings) {
-    params.respondNotFound(params.res);
+    respondNotFound(params.res);
     return;
   }
   const sessionToken = principalModule.readIxAuthSessionCookie({ req: params.req, settings });
@@ -166,9 +165,57 @@ async function runIxAuthAdminProxyStage(params: {
       allowHostHeaderOriginFallback:
         params.config.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback === true,
       clientIp: params.clientIp,
-      isLocalClient: isLocalDirectRequest(params.req, params.trustedProxies),
+      isLocalClient: isLocalDirectRequest(
+        params.req,
+        params.config.gateway?.trustedProxies ?? [],
+      ),
     },
   });
+}
+
+/** Everything both entry points below need, assembled once by `server-http.ts`. */
+export type IxAuthStageParams = {
+  authMode: string;
+  req: IncomingMessage;
+  res: ServerResponse;
+  pathname: string;
+  config: OpenClawConfig;
+  clientIp?: string;
+  rateLimiter?: AuthRateLimiter;
+  /**
+   * Resolves the live request context, so signing out can close that person's sockets.
+   * Read through the resolver rather than captured once: the context is rebuilt across
+   * Gateway epochs, and a stale closure would close nothing.
+   */
+  getGatewayRequestContext?: () =>
+    | { disconnectClientsForUserProfile?: (profileId: string) => void }
+    | undefined;
+};
+
+function toStageParams(params: IxAuthStageParams) {
+  const { authMode: _authMode, getGatewayRequestContext, ...rest } = params;
+  return {
+    ...rest,
+    disconnectClientsForUserProfile: (profileId: string) => {
+      getGatewayRequestContext?.()?.disconnectClientsForUserProfile?.(profileId);
+    },
+  };
+}
+
+/**
+ * Answer one server-to-server route that authenticates itself with the service key.
+ *
+ * Returns false for everything else, including the rest of this namespace, so the caller
+ * can go on refusing what it was refusing.
+ */
+export async function runIxAuthServiceKeyRoute(
+  params: IxAuthStageParams,
+  clientIp: string | undefined,
+): Promise<boolean> {
+  if (!claimsIxAuthServiceKeyRequest({ authMode: params.authMode, pathname: params.pathname })) {
+    return false;
+  }
+  return await runIxAuthHttpStage({ ...toStageParams(params), clientIp });
 }
 
 /**
@@ -178,30 +225,8 @@ async function runIxAuthAdminProxyStage(params: {
  * the namespace rules: it registers whatever comes back and never learns which paths this
  * mode owns. An empty array is the normal case for every other request.
  */
-export function planIxAuthHttpStages(params: {
-  authMode: string;
-  req: IncomingMessage;
-  res: ServerResponse;
-  pathname: string;
-  config: OpenClawConfig;
-  trustedProxies: string[];
-  clientIp?: string;
-  rateLimiter?: AuthRateLimiter;
-  /** Reaches the live connection set so signing out can close that person's sockets. */
-  disconnectClientsForUserProfile?: (profileId: string) => void;
-  respondNotFound: (res: ServerResponse) => void;
-  /**
-   * Plan only the service-key routes, for the ingress path that could not attribute the
-   * request to a browser client. Everything else in the namespace stays refused there.
-   */
-  serviceKeyRoutesOnly?: boolean;
-}): Array<() => Promise<boolean>> {
-  const { authMode: _authMode, serviceKeyRoutesOnly: _serviceOnly, ...stageParams } = params;
-  if (params.serviceKeyRoutesOnly === true) {
-    return claimsIxAuthServiceKeyRequest({ authMode: params.authMode, pathname: params.pathname })
-      ? [() => runIxAuthHttpStage(stageParams)]
-      : [];
-  }
+export function planIxAuthHttpStages(params: IxAuthStageParams): Array<() => Promise<boolean>> {
+  const stageParams = toStageParams(params);
   if (claimsIxAuthHttpRequest({ authMode: params.authMode, pathname: params.pathname })) {
     return [() => runIxAuthHttpStage(stageParams)];
   }

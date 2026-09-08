@@ -56,7 +56,7 @@ import {
   type GatewayIngressTransport,
   type GatewayUnattributableProxyReporter,
 } from "./ingress-attribution.js";
-import { planIxAuthHttpStages } from "./ix-auth-http-stage.js";
+import { planIxAuthHttpStages, runIxAuthServiceKeyRoute } from "./ix-auth-http-stage.js";
 import { normalizePluginNodeCapabilityScopedUrl } from "./plugin-node-capability.js";
 import {
   getCachedPluginGatewayAuthBypassPaths,
@@ -331,29 +331,22 @@ export function createGatewayHttpServer(opts: {
       const scopedRequestPath = scopedNodeCapability.pathname;
       const pluginPathContext = resolvePluginRoutePathContext(scopedRequestPath);
       const nodeCapability = resolvePluginNodeCapabilityRoute?.(pluginPathContext);
+      // Shared by the two entry points into the authentication namespace below.
+      const ixAuthStage = {
+        authMode: getResolvedAuth().mode,
+        req,
+        res,
+        pathname: scopedRequestPath,
+        config: configSnapshot,
+        rateLimiter: joinRateLimiter,
+        getGatewayRequestContext: opts.getGatewayRequestContext,
+      };
       if (ingressAttribution.kind === "unattributable-proxy") {
         opts.reportUnattributableProxy?.(ingressAttribution);
-        // Server-to-server routes that carry their own service key run before this refusal.
-        // Client attribution is a browser question, and there is no browser here: the
-        // identity server calls in over the container network with the shared key and no
-        // forwarded headers, which is exactly the shape this branch otherwise rejects.
-        // The planner claims nothing else in the namespace, so a session route arriving
-        // the same way is still refused below.
-        for (const stage of planIxAuthHttpStages({
-          authMode: getResolvedAuth().mode,
-          req,
-          res,
-          pathname: scopedRequestPath,
-          config: configSnapshot,
-          trustedProxies,
-          clientIp: ingressAttribution.remoteAddress,
-          rateLimiter: joinRateLimiter,
-          respondNotFound,
-          serviceKeyRoutesOnly: true,
-        })) {
-          if (await stage()) {
-            return;
-          }
+        // Service-key server-to-server routes answer before this refusal. Nothing else in
+        // the namespace does; ix-auth-http-stage.ts holds the reasoning.
+        if (await runIxAuthServiceKeyRoute(ixAuthStage, ingressAttribution.remoteAddress)) {
+          return;
         }
         if (
           !nodeCapability &&
@@ -484,20 +477,8 @@ export function createGatewayHttpServer(opts: {
       // ahead of handleHooksRequest so a configured hook base path cannot swallow either
       // namespace. The planner returns only the stages whose namespace claims this path.
       for (const stage of planIxAuthHttpStages({
-        authMode: resolvedAuthValue.mode,
-        req,
-        res,
-        pathname: scopedRequestPath,
-        config: configSnapshot,
-        trustedProxies,
+        ...ixAuthStage,
         clientIp: ingressAttribution.rateLimit.subject.key,
-        rateLimiter: joinRateLimiter,
-        // Read through the resolver rather than captured once: the request context is
-        // rebuilt across Gateway epochs, and a stale closure would close nothing.
-        disconnectClientsForUserProfile: (profileId: string) => {
-          opts.getGatewayRequestContext?.()?.disconnectClientsForUserProfile?.(profileId);
-        },
-        respondNotFound,
       })) {
         addRequestStage(true, stage);
       }
