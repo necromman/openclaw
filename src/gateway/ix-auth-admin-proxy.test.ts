@@ -5,12 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { IxAuthPrincipal, IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
 import {
   handleIxAuthAdminProxyRequest,
+  injectIxAuthAdminConsoleBootstrap,
   rewriteIxAuthAdminProxyLocation,
   type IxAuthAdminProxyDependencies,
 } from "./ix-auth-admin-proxy.js";
 
 const SERVICE_KEY = "service-key-that-is-long-enough-000000"; // pragma: allowlist secret
 const CSRF_TOKEN = "csrf-token-value";
+const SESSION_ACCESS_TOKEN = "session-access-token-value"; // pragma: allowlist secret
 
 /** Mirrors the private digest the session store keeps, so the check runs for real. */
 function digestSecretToken(token: string): Uint8Array {
@@ -40,7 +42,7 @@ function buildPrincipal(gatewayRole: string | undefined): IxAuthPrincipal {
       subject: "42",
       email: "person@example.test",
       displayName: "Person",
-      roles: [],
+      roles: gatewayRole === undefined ? [] : [gatewayRole.toUpperCase()],
       groups: [],
       identitySessionId: "identity-session-1",
       expiresAtMs: Date.now() + 900_000,
@@ -98,8 +100,9 @@ function buildDeps(
 ): IxAuthAdminProxyDependencies {
   return {
     settings: SETTINGS,
-    principal: buildPrincipal("admin"),
+    principal: buildPrincipal("superadmin"),
     csrfDigest: digestSecretToken(CSRF_TOKEN),
+    accessToken: SESSION_ACCESS_TOKEN,
     isLocalClient: true,
     clientIp: "203.0.113.7",
     ...overrides,
@@ -227,7 +230,159 @@ describe("handleIxAuthAdminProxyRequest", () => {
       deps: buildDeps(),
     });
     expect(calls[0]?.url).toBe("http://ix-auth:9100/admin/audit-logs/export?from=2026-01-01");
-    expect(new Headers(calls[0]?.init.headers).get("authorization")).toBe("Bearer console-token");
+    // The browser named its own bearer token; the session's token went upstream instead.
+    expect(new Headers(calls[0]?.init.headers).get("authorization")).toBe(
+      `Bearer ${SESSION_ACCESS_TOKEN}`,
+    );
+  });
+
+  it("refuses an administrator, who keeps the fork's own screens instead", async () => {
+    const { calls } = stubUpstream(new Response("should not be requested"));
+    const captured = buildResponse();
+    await handleIxAuthAdminProxyRequest({
+      req: buildRequest({}),
+      res: captured.res,
+      pathname: "/admin/identity/",
+      deps: buildDeps({ principal: buildPrincipal("admin") }),
+    });
+    expect(captured.status()).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it.each(["executive", "moderator", "member", undefined])(
+    "refuses the %s role outright",
+    async (role) => {
+      const { calls } = stubUpstream(new Response("should not be requested"));
+      const captured = buildResponse();
+      await handleIxAuthAdminProxyRequest({
+        req: buildRequest({}),
+        res: captured.res,
+        pathname: "/admin/identity/",
+        deps: buildDeps({ principal: buildPrincipal(role) }),
+      });
+      expect(captured.status()).toBe(403);
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it("sends the session's own access token and never the browser's", async () => {
+    const { calls } = stubUpstream(new Response("{}", { status: 200 }));
+    const captured = buildResponse();
+    await handleIxAuthAdminProxyRequest({
+      req: buildRequest({
+        url: "/admin/identity/admin/users",
+        headers: { authorization: "Bearer forged-token-from-the-browser" },
+      }),
+      res: captured.res,
+      pathname: "/admin/identity/admin/users",
+      deps: buildDeps(),
+    });
+    const sent = new Headers(calls[0]?.init.headers);
+    expect(sent.get("authorization")).toBe(`Bearer ${SESSION_ACCESS_TOKEN}`);
+    expect(sent.get("authorization")).not.toContain("forged-token-from-the-browser");
+  });
+
+  it.each(["/admin/identity/api/login", "/admin/identity/api/mfa/verify"])(
+    "answers 404 for the console sign-in route %s",
+    async (pathname) => {
+      const { calls } = stubUpstream(new Response("{}", { status: 200 }));
+      const captured = buildResponse();
+      await handleIxAuthAdminProxyRequest({
+        req: buildRequest({
+          method: "POST",
+          url: pathname,
+          headers: {
+            origin: "http://127.0.0.1:18800",
+            "content-type": "application/json",
+            "x-openclaw-csrf": CSRF_TOKEN,
+          },
+          body: '{"email":"person@example.test","password":"hunter2"}',
+        }),
+        res: captured.res,
+        pathname,
+        deps: buildDeps(),
+      });
+      expect(captured.status()).toBe(404);
+      expect(captured.body()).toContain("not_found");
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it("plants the console's sign-in state in the document it serves", async () => {
+    const { calls } = stubUpstream(
+      new Response("<!doctype html><body><script>let token = '';</script>", {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+    const captured = buildResponse();
+    await handleIxAuthAdminProxyRequest({
+      req: buildRequest({ headers: { accept: "text/html" } }),
+      res: captured.res,
+      pathname: "/admin/identity/",
+      deps: buildDeps(),
+    });
+    expect(calls).toHaveLength(1);
+    const body = captured.body();
+    expect(body).toContain("sessionStorage.setItem('ixauth_token'");
+    expect(body).toContain("sessionStorage.setItem('ixauth_who'");
+    expect(body).toContain("person@example.test");
+    // The real token stays on this side of the boundary.
+    expect(body).not.toContain(SESSION_ACCESS_TOKEN);
+    // The bootstrap runs before the page reads sessionStorage.
+    expect(body.indexOf("ixauth_token")).toBeLessThan(body.indexOf("let token"));
+  });
+
+  it("leaves a JSON answer alone", async () => {
+    stubUpstream(
+      new Response('{"data":{"items":[]}}', {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const captured = buildResponse();
+    await handleIxAuthAdminProxyRequest({
+      req: buildRequest({ url: "/admin/identity/admin/users" }),
+      res: captured.res,
+      pathname: "/admin/identity/admin/users",
+      deps: buildDeps(),
+    });
+    expect(captured.body()).toBe('{"data":{"items":[]}}');
+  });
+
+  it("leaves a stylesheet alone even at the console document path", async () => {
+    stubUpstream(
+      new Response("body{color:red}<script>", {
+        status: 200,
+        headers: { "content-type": "text/css" },
+      }),
+    );
+    const captured = buildResponse();
+    await handleIxAuthAdminProxyRequest({
+      req: buildRequest({}),
+      res: captured.res,
+      pathname: "/admin/identity/",
+      deps: buildDeps(),
+    });
+    expect(captured.body()).toBe("body{color:red}<script>");
+  });
+
+  it("serves the original document when the marker is missing", async () => {
+    stubUpstream(
+      new Response("<!doctype html><body>no script here", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+    const captured = buildResponse();
+    await handleIxAuthAdminProxyRequest({
+      req: buildRequest({ headers: { accept: "text/html" } }),
+      res: captured.res,
+      pathname: "/admin/identity/",
+      deps: buildDeps(),
+    });
+    expect(captured.status()).toBe(200);
+    expect(captured.body()).toBe("<!doctype html><body>no script here");
   });
 
   it("requires the session CSRF token on a write", async () => {
@@ -303,4 +458,48 @@ describe("rewriteIxAuthAdminProxyLocation", () => {
       expect(rewriteIxAuthAdminProxyLocation(location)).toBeUndefined();
     },
   );
+});
+
+describe("injectIxAuthAdminConsoleBootstrap", () => {
+  it("escapes an identity that would otherwise close the script element", () => {
+    const principal = buildPrincipal("superadmin");
+    const hostile = {
+      ...principal,
+      claims: {
+        ...principal.claims,
+        email: "</script><img src=x onerror=alert(1)>@example.test",
+        roles: ["SUPERADMIN"],
+      },
+    } satisfies IxAuthPrincipal;
+    const injected = injectIxAuthAdminConsoleBootstrap({
+      html: "<!doctype html><body><script>let token = '';</script>",
+      principal: hostile,
+    });
+    expect(injected).toBeDefined();
+    const bootstrap = (injected ?? "").slice(0, (injected ?? "").indexOf("let token"));
+    // Nothing the identity carries can start a tag or end this element: the angle
+    // brackets survive only as escapes inside a JavaScript string literal.
+    expect(bootstrap).not.toContain("<img");
+    expect(bootstrap).not.toContain("</script><img");
+    expect(bootstrap).toContain("\\u003cimg");
+    expect(bootstrap).toContain("\\u003c/script\\u003e");
+  });
+
+  it("injects exactly once", () => {
+    const injected =
+      injectIxAuthAdminConsoleBootstrap({
+        html: "<head><script>a</script><script>b</script>",
+        principal: buildPrincipal("superadmin"),
+      }) ?? "";
+    expect(injected.split("ixauth_token")).toHaveLength(2);
+  });
+
+  it("reports a document it does not recognize instead of guessing", () => {
+    expect(
+      injectIxAuthAdminConsoleBootstrap({
+        html: "<!doctype html><body>nothing to bootstrap",
+        principal: buildPrincipal("superadmin"),
+      }),
+    ).toBeUndefined();
+  });
 });

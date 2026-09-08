@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canOpenIxAuthAdminConsole,
+  canUseIxAuthAdminApi,
   IX_AUTH_DEFAULT_ROLE_MAP,
   IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES,
   resolveIxAuthGatewayRole,
@@ -133,9 +134,15 @@ describe("resolveIxAuthGatewayRole", () => {
 });
 
 describe("canOpenIxAuthAdminConsole", () => {
-  it("offers the console to super admins and department administrators", () => {
+  it("offers the identity server's console to super admins only", () => {
     expect(canOpenIxAuthAdminConsole("superadmin")).toBe(true);
-    expect(canOpenIxAuthAdminConsole("admin")).toBe(true);
+  });
+
+  it("withholds it from an administrator", () => {
+    // The console is unscoped and the baseline seed gives the ADMIN role every console
+    // permission, so opening it would hand an administrator account creation and role
+    // assignment. Their own administration screens stay open; see the predicate below.
+    expect(canOpenIxAuthAdminConsole("admin")).toBe(false);
   });
 
   it("withholds it from everyone else, including unmapped users", () => {
@@ -144,5 +151,24 @@ describe("canOpenIxAuthAdminConsole", () => {
     expect(canOpenIxAuthAdminConsole("moderator")).toBe(false);
     expect(canOpenIxAuthAdminConsole("member")).toBe(false);
     expect(canOpenIxAuthAdminConsole(undefined)).toBe(false);
+  });
+});
+
+describe("canUseIxAuthAdminApi", () => {
+  it("admits super admins and administrators to the fork's own admin routes", () => {
+    expect(canUseIxAuthAdminApi("superadmin")).toBe(true);
+    expect(canUseIxAuthAdminApi("admin")).toBe(true);
+  });
+
+  it("refuses everyone else", () => {
+    expect(canUseIxAuthAdminApi("executive")).toBe(false);
+    expect(canUseIxAuthAdminApi("moderator")).toBe(false);
+    expect(canUseIxAuthAdminApi("member")).toBe(false);
+    expect(canUseIxAuthAdminApi(undefined)).toBe(false);
+  });
+
+  it("is wider than the console predicate, which is the point of having two", () => {
+    expect(canOpenIxAuthAdminConsole("admin")).toBe(false);
+    expect(canUseIxAuthAdminApi("admin")).toBe(true);
   });
 });

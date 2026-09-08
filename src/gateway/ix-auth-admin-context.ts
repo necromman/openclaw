@@ -16,7 +16,7 @@ import {
   type IxAuthAdminCall,
 } from "../auth/ix-auth/ix-auth-admin-client.js";
 import type { IxAuthRelayFailure } from "../auth/ix-auth/ix-auth-client.js";
-import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
+import { canUseIxAuthAdminApi } from "../auth/ix-auth/ix-auth-role-map.js";
 import {
   matchesIxAuthCsrfDigest,
   resolveIxAuthSessionToken,
@@ -85,7 +85,7 @@ export async function resolveIxAuthAdminContext(params: {
     sendJson(params.res, 401, { error: "unauthenticated" });
     return undefined;
   }
-  if (!canOpenIxAuthAdminConsole(resolution.principal.gatewayRole)) {
+  if (!canUseIxAuthAdminApi(resolution.principal.gatewayRole)) {
     params.deps.onSecurityEvent?.({
       action: "ix-auth.admin.denied",
       outcome: "denied",

@@ -183,7 +183,7 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 | IX-Auth 역할 코드 | 게이트웨이 역할 | 한국어 표기   | 세션 타인 열람               | 스코프                            | 관리 콘솔 링크 |
 | ----------------- | --------------- | ------------- | ---------------------------- | --------------------------------- | -------------- |
 | `SUPERADMIN`      | `superadmin`    | 시스템 관리자 | write                        | `operator.admin`                  | 보인다         |
-| `ADMIN`           | `admin`         | 관리자        | write                        | read, write, approvals, questions | 보인다         |
+| `ADMIN`           | `admin`         | 관리자        | write                        | read, write, approvals, questions | 안 보인다      |
 | `EXECUTIVE`       | `executive`     | 임원          | view                         | read, write, questions            | 안 보인다      |
 | `MODERATOR`       | `moderator`     | 중재자        | suggest                      | read, write, approvals, questions | 안 보인다      |
 | `MEMBER`          | `member`        | 직원          | view                         | read, write, questions            | 안 보인다      |
@@ -195,7 +195,7 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 - **`executive` 는 계급이 아니라 도달 범위다.** 스코프와 세션 상한은 `member` 와 같고, 다른 점은 전 부서를 읽는다는 것뿐이다. 그 열람은 이 역할이 주는 것이 아니라 IX-Auth 에서 모든 `dept-` 그룹에 넣어서 얻는다 - 부서 경계 코드에는 임원을 위한 예외가 없다([AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 3절). 그래서 `admin` 보다 아래에 정렬한다. 위에 두면 임원을 겸한 관리자가 강등된다.
 - **한국어 표기는 UI 카탈로그 한 곳**(`ui/src/features/ix-auth/ix-auth-role-labels.ts` + `ixAuth.roles.*`)에서 나온다. 역할 코드와 게이트웨이 역할 이름 둘 다 같은 라벨로 옮겨지므로 화면이 날것의 코드를 보이지 않는다. 매핑에 없는 이름은 설정한 그대로 보인다.
 - **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
-- 관리 콘솔 링크는 `superadmin`·`admin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다.
+- 관리 콘솔 링크는 `superadmin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다. `admin` 은 콘솔을 못 열지만 앱 안의 초대·가입 승인·사용자 관리·감사 조회는 그대로 쓴다 - 두 판정은 이름이 다른 별개의 술어다(`canOpenIxAuthAdminConsole` 과 `canUseIxAuthAdminApi`).
 - 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. A 단계는 매핑 데이터만 준비했고, **B 단계가 강제를 붙였다** - 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).
 
 ## 6. 이번 단계에서 하지 않은 것
@@ -208,7 +208,7 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 | 초대장 가입 플로우 화면                    | **해결(C 단계).** 초대 수락·가입 신청·이메일 인증·비밀번호 찾기·재설정 + 관리자 초대·승인 화면                     | 정본 [AUTH-SIGNUP.md](AUTH-SIGNUP.md)                                             |
 | 포크 감사 원장 해시 체인                   | 미구현. 인증 사건은 IX-Auth 원장에 남는다                                                                          | 6.3                                                                               |
 | TOTP 등록 화면                             | 미구현. 로그인 시 코드 입력 단계는 구현했다                                                                        | IX-Auth 콘솔에서 등록. **콘솔 접근 경로가 A 단계에서 열렸다**(`/admin/identity/`) |
-| 관리 콘솔 접근 경로                        | **해결(A 단계).** 게이트웨이 BFF `/admin/identity/` 가 superadmin·admin 에게만 중계한다                            | -                                                                                 |
+| 관리 콘솔 접근 경로                        | **해결(A 단계).** 게이트웨이 BFF `/admin/identity/` 가 중계한다. **J 단계에서 superadmin 전용 + 무로그인 진입으로 바뀌었다**(7.2) | -                                                                                 |
 | 역할 4단계 시드                            | **해결(A 단계).** IX-Auth 마이그레이션 `V14` 가 만든다. 콘솔에서 손으로 만들 필요가 없다                           | -                                                                                 |
 | 무인 배포                                  | **해결(A 단계).** `docker compose up -d` 한 번으로 마이그레이션·역할 시드·superadmin 부트스트랩·설정 주입이 끝난다 | 절차는 [DEPLOY.md](DEPLOY.md)                                                     |
 
@@ -252,7 +252,11 @@ docker compose --env-file chris-local/ixauth.env \
 
 **앱 안의 설정 > 사용자**(`/settings/users`)에서 한다. F 단계에서 들어왔고 정본은 [AUTH-USERS.md](AUTH-USERS.md).
 
-콘솔은 게이트웨이가 **`/admin/identity/` 에서 중계**한다. 신원 서버는 포트를 열지 않는다(설계 불변식 4). 사용자 관리 화면의 "고급: IX-Auth 콘솔" 링크가 그 경로이고 superadmin 에게만 보이지만, 중계 자체는 superadmin·admin 을 통과시킨다. 콘솔은 자체 로그인을 유지한다 - 게이트웨이 세션만 훔쳐서는 사용자 관리를 할 수 없게 하는 이중 방어다.
+콘솔은 게이트웨이가 **`/admin/identity/` 에서 중계**한다. 신원 서버는 포트를 열지 않는다(설계 불변식 4). 사용자 관리 화면의 "고급: IX-Auth 콘솔" 링크가 그 경로이고, 링크 노출과 중계 통과 조건이 **둘 다 superadmin** 이다.
+
+**콘솔은 로그인 화면을 띄우지 않는다(J 단계).** 게이트웨이가 그 사람의 세션이 이미 쥔 신원 서버 access token 을 업스트림 요청의 `Authorization` 에 붙이고, 콘솔의 로그인 경로(`/api/login`·`/api/mfa/verify`)는 404 로 막는다. 토큰은 브라우저로 내려가지 않는다 - 콘솔 화면이 열리도록 `sessionStorage` 에 심는 값은 상류에서 항상 덮어써지는 불투명 sentinel 이다.
+
+그 대가로 "콘솔 자체 로그인" 이라는 이중 방어가 사라졌다. 이제 게이트웨이 세션 하나가 곧 콘솔 접근이므로 **통과 조건을 superadmin 으로 좁혔다.** 관리자에게 이중 방어였던 적도 없다 - baseline 시드가 `ADMIN` 역할에도 `ixauth:*:*` 전권을 주므로, 콘솔을 열 수 있는 관리자는 이미 사용자 생성·삭제·역할 변경을 다 할 수 있었다. 근거 정본은 [ix-auth/MODULE.md](../ix-auth/MODULE.md) 7.3.1.
 
 역할 `SUPERADMIN`·`ADMIN`·`MODERATOR`·`MEMBER` 4종은 IX-Auth 마이그레이션 `V14` 가 기동 시 시드한다. 원본 기본 역할이 `ADMIN`/`USER` 뿐이라 `roleMap` 이 비어 떨어지던 문제는 없어졌다. 고객이 자기 역할 코드를 쓰면 `roleMap` 을 그쪽에 맞춘다.
 
@@ -302,7 +306,7 @@ docker compose --env-file chris-local/ixauth.env \
 | `src/auth/ix-auth/ix-auth-claims.ts`                 | 클레임 파싱·검증, 부서 코드 추출                     |
 | `src/auth/ix-auth/ix-auth-jwks.ts`                   | JWKS 캐시 + RS256/ES256 로컬 검증 (`node:crypto` 만) |
 | `src/auth/ix-auth/ix-auth-client.ts`                 | IX-Auth `/auth/*` 중계. 서비스 키·실방문자 IP 전달   |
-| `src/auth/ix-auth/ix-auth-role-map.ts`               | 역할 코드 -> 게이트웨이 역할, 관리 콘솔 노출 판정    |
+| `src/auth/ix-auth/ix-auth-role-map.ts`               | 역할 코드 -> 게이트웨이 역할, 콘솔·관리 API 판정 2종 |
 | `src/auth/ix-auth/ix-auth-sessions.ts`               | 세션 발급·검증·갱신·폐기                             |
 | `src/auth/ix-auth/ix-auth-settings.ts`               | 설정 해석·기본값·서비스 키 캐시                      |
 | `src/state/ix-auth-sessions-schema.ts`               | feature-local DDL (`user_profiles` 와 같은 방식)     |

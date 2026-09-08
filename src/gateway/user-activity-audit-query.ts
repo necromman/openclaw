@@ -3,7 +3,7 @@
 // The RPC the CLI and Control UI call, and the CSV export the browser downloads, must
 // not answer differently about who may see whose rows. So both call in here, and the
 // only thing they own is how the answer is serialized.
-import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
+import { canUseIxAuthAdminApi } from "../auth/ix-auth/ix-auth-role-map.js";
 import {
   listUserActivityAuditEvents,
   type UserActivityAuditEntry,
@@ -45,7 +45,7 @@ export function scopeUserActivityFilters(
   if (reader.kind === "host" || reader.actor.isSuperAdmin) {
     return requested;
   }
-  if (!canOpenIxAuthAdminConsole(reader.actor.gatewayRole)) {
+  if (!canUseIxAuthAdminApi(reader.actor.gatewayRole)) {
     return undefined;
   }
   if (reader.actor.departments.length === 0) {

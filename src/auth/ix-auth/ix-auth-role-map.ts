@@ -22,18 +22,39 @@ export const IX_AUTH_DEFAULT_ROLE_MAP: Readonly<Record<string, string>> = Object
 export const IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES: readonly string[] = Object.freeze(["superadmin"]);
 
 /**
- * Role names allowed to see the identity server's admin console link.
+ * Role names allowed to reach the identity server's own admin console.
  *
- * Wider than the super-admin list on purpose. The console runs its own permission model
- * (`ixauth:users:read` and friends) and re-checks every action, so surfacing the link to
- * a department administrator cannot grant them anything the console would not already
- * allow. Hiding it from them would only mean they ask someone for the URL.
+ * Super admin only, and deliberately narrower than the list below.
+ *
+ * The console used to be reasoned about as "safe to show widely, because it keeps its own
+ * sign-in and re-checks every action against the identity server's permission model". Two
+ * facts retired that argument. The baseline seed grants the `ADMIN` role `ixauth:*:*`, so
+ * the console's own re-check stops nothing an administrator asks it for: account
+ * creation, deletion, and role assignment included. And the Gateway now signs the console
+ * in from the visitor's existing session (`src/gateway/ix-auth-admin-proxy.ts`), so the
+ * console's second sign-in is no longer a second factor at all. What is left is one
+ * screen that can mint a super admin, which is a super admin's decision to make.
  */
-const IX_AUTH_ADMIN_CONSOLE_ROLES: readonly string[] = Object.freeze(["superadmin", "admin"]);
+const IX_AUTH_ADMIN_CONSOLE_ROLES: readonly string[] = Object.freeze(["superadmin"]);
 
-/** True when this Gateway role should be offered the identity server's admin console. */
+/**
+ * Role names allowed to use the Gateway's own account-administration surfaces.
+ *
+ * Wider than the console list, and a different question: these are the fork's screens
+ * (invitations, signup approvals, the user list, the activity ledger), each of which the
+ * Gateway authorizes itself and scopes to the reader's departments. An administrator
+ * belongs here; the identity server's unscoped console is what they do not get.
+ */
+const IX_AUTH_ADMIN_API_ROLES: readonly string[] = Object.freeze(["superadmin", "admin"]);
+
+/** True when this Gateway role may open the identity server's admin console. */
 export function canOpenIxAuthAdminConsole(gatewayRole: string | undefined): boolean {
   return gatewayRole !== undefined && IX_AUTH_ADMIN_CONSOLE_ROLES.includes(gatewayRole);
+}
+
+/** True when this Gateway role may use the fork's own account-administration routes. */
+export function canUseIxAuthAdminApi(gatewayRole: string | undefined): boolean {
+  return gatewayRole !== undefined && IX_AUTH_ADMIN_API_ROLES.includes(gatewayRole);
 }
 
 /**

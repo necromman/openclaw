@@ -87,8 +87,9 @@ function claimsIxAuthAdminProxyRequest(params: { authMode: string; pathname: str
  * Answer one `/admin/identity/*` request.
  *
  * The session is resolved here rather than inside the proxy so the proxy receives a
- * principal it cannot construct itself, and so the CSRF digest travels with it: both
- * come from the same login-session row, and reading them apart would let one drift.
+ * principal it cannot construct itself, and so the CSRF digest and the identity-server
+ * access token travel with it: all three come from the same login-session row, and
+ * reading them apart would let one drift.
  */
 async function runIxAuthAdminProxyStage(params: {
   req: IncomingMessage;
@@ -132,7 +133,13 @@ async function runIxAuthAdminProxyStage(params: {
     deps: {
       settings,
       ...(resolution?.ok
-        ? { principal: resolution.principal, csrfDigest: resolution.row.csrf_digest }
+        ? {
+            principal: resolution.principal,
+            csrfDigest: resolution.row.csrf_digest,
+            // The console signs in as this person upstream. The resolver above rotates a
+            // token that is about to expire, so the row read here is the current one.
+            accessToken: resolution.row.access_token,
+          }
         : {}),
       allowedOrigins: params.config.gateway?.controlUi?.allowedOrigins,
       allowHostHeaderOriginFallback:

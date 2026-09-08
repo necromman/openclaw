@@ -6,14 +6,22 @@
 // that already proved who the visitor is.
 //
 // Three rules make that safe:
-//   1. Only a superadmin or admin session gets past. Everyone else is refused, and the
-//      link is withheld from their session payload in the first place.
+//   1. Only a superadmin session gets past. Everyone else is refused, and the link is
+//      withheld from their session payload in the first place.
 //   2. Nothing the browser sends is trusted onto the upstream request. Headers are
 //      rebuilt from an allowlist, so the Gateway session cookie, hop-by-hop headers, and
 //      any forged attribution header are dropped rather than filtered.
-//   3. The console keeps its own sign-in. This proxy does not mint an identity-server
-//      token from the Gateway session, so a stolen Gateway session alone cannot manage
-//      users; ix-auth/MODULE.md section 7.2 names that second factor as the point.
+//   3. The console does not sign anyone in. This proxy attaches the visitor's own
+//      identity-server access token, the one their Gateway session already holds, and
+//      refuses the console's sign-in routes outright. The console's second password
+//      prompt used to be counted as a second factor, but the identity server grants an
+//      administrator every console permission anyway, so it stopped nothing an
+//      administrator asked for and only cost a super admin a second password. Rule 1
+//      narrowing to super admin is what replaced it (ix-auth/MODULE.md section 7.3).
+//
+// The access token never reaches the browser. The console page will not open until it
+// finds a token in sessionStorage, so the proxy plants an opaque sentinel there instead;
+// it is worthless upstream because rule 2 overwrites whatever the page sends.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
 import { matchesIxAuthCsrfDigest } from "../auth/ix-auth/ix-auth-sessions.js";
@@ -53,11 +61,14 @@ const IX_AUTH_ADMIN_PROXY_MUTATING_METHODS: ReadonlySet<string> = new Set([
  * reach the identity server just because nobody thought to strip it. Cookies are absent
  * on purpose, so the Gateway session never crosses the boundary, and hop-by-hop headers
  * cannot appear because they were never eligible.
+ *
+ * `Authorization` is absent for the same reason and is set from the session instead. A
+ * browser that names its own bearer token must not be able to reach the identity server
+ * as somebody else, and a page under this proxy has no legitimate token of its own.
  */
 const IX_AUTH_ADMIN_PROXY_FORWARDED_REQUEST_HEADERS: readonly string[] = Object.freeze([
   "accept",
   "accept-language",
-  "authorization",
   "content-type",
 ]);
 
@@ -72,9 +83,10 @@ const IX_AUTH_ADMIN_PROXY_FORWARDED_RESPONSE_HEADERS: readonly string[] = Object
 /**
  * Content-Security-Policy for the console document.
  *
- * The page is one self-contained HTML file with an inline script and inline styles and
- * no external reference of any kind, so inline execution is allowed while every remote
- * origin, frame, and form target is denied.
+ * The page is one self-contained HTML file with inline script and inline styles and no
+ * external reference of any kind, and this proxy prepends one more inline script, so
+ * inline execution is allowed while every remote origin, frame, and form target is
+ * denied.
  */
 const IX_AUTH_ADMIN_PROXY_CSP =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
@@ -87,6 +99,14 @@ export type IxAuthAdminProxyDependencies = {
   principal?: IxAuthPrincipal;
   /** CSRF digest of that session row, used for the double-submit check. */
   csrfDigest?: Uint8Array;
+  /**
+   * Identity-server access token belonging to that same session row.
+   *
+   * The session layer rotates it before it expires, so reading it per request is what
+   * keeps a long console visit working. It is attached to the upstream call and is never
+   * written into a response.
+   */
+  accessToken?: string;
   allowedOrigins?: string[];
   allowHostHeaderOriginFallback?: boolean;
   clientIp?: string;
@@ -178,9 +198,118 @@ function buildUpstreamHeaders(params: {
   if (sanitizedUserAgent) {
     headers.set("user-agent", sanitizedUserAgent);
   }
-  // Injected last so no forwarded header can shadow it.
+  // Injected last so no forwarded header can shadow it. The bearer token is the visitor's
+  // own: the console authorizes on `users.id`, so an ordinary sign-in token carries
+  // exactly the permissions that person already has, and no new grant is minted here.
+  const accessToken = params.deps.accessToken;
+  if (accessToken) {
+    headers.set("authorization", `Bearer ${accessToken}`);
+  }
   headers.set("x-ixauth-key", params.deps.settings.serviceKey);
   return headers;
+}
+
+/**
+ * Upstream paths the console uses to sign itself in.
+ *
+ * Refused outright. The visitor is already signed in to the Gateway and the proxy speaks
+ * for them upstream, so a second credential prompt behind this route could only be a way
+ * to reach the identity server as a different account than the session proved.
+ */
+const IX_AUTH_ADMIN_PROXY_BLOCKED_UPSTREAM_PATHS: ReadonlySet<string> = new Set([
+  "/admin-ui/api/login",
+  "/admin-ui/api/mfa/verify",
+]);
+
+function isBlockedConsoleSignInPath(upstreamPath: string): boolean {
+  const normalized = upstreamPath.toLowerCase().replace(/\/+$/u, "");
+  return IX_AUTH_ADMIN_PROXY_BLOCKED_UPSTREAM_PATHS.has(normalized);
+}
+
+/**
+ * Value planted in the console's `sessionStorage` so the page opens instead of asking for
+ * a password.
+ *
+ * The page only tests that a token is present; every call it makes is re-authorized
+ * upstream with the session's real token, which this proxy sets. So the value here is a
+ * label, not a credential: it names why the page is unlocked and is worth nothing to
+ * anyone who reads it out of the browser.
+ */
+const IX_AUTH_ADMIN_CONSOLE_TOKEN_SENTINEL = "gateway-session";
+
+/** The console document carries exactly one script tag; the bootstrap goes before it. */
+const IX_AUTH_ADMIN_CONSOLE_SCRIPT_MARKER = "<script>";
+
+/**
+ * JSON-encode one value for a place inside an inline script.
+ *
+ * JSON alone is not enough there: a `</script>` inside a string would end the element,
+ * and the two line separators are ordinary characters in JSON but line breaks in
+ * JavaScript. Escaping every character that can start either problem keeps a display name
+ * from becoming markup.
+ */
+function encodeForInlineScript(value: string): string {
+  return JSON.stringify(value).replaceAll(/[<>&\u2028\u2029]/gu, (ch) => {
+    const code = ch.codePointAt(0) ?? 0;
+    return `\\u${code.toString(16).padStart(4, "0")}`;
+  });
+}
+
+/**
+ * Plant the console's sign-in state in the document it is about to run.
+ *
+ * Returns `undefined` when the page does not look like the console that was expected. The
+ * caller then serves the original bytes: a console that shows its own sign-in form is a
+ * worse screen, but it is the screen the identity server sent, and refusing to serve
+ * anything would turn a cosmetic mismatch into an outage.
+ */
+export function injectIxAuthAdminConsoleBootstrap(params: {
+  html: string;
+  principal: IxAuthPrincipal;
+}): string | undefined {
+  const markerIndex = params.html.indexOf(IX_AUTH_ADMIN_CONSOLE_SCRIPT_MARKER);
+  if (markerIndex === -1) {
+    return undefined;
+  }
+  const email = params.principal.claims.email;
+  const roles = params.principal.claims.roles.join(", ");
+  const who = roles.length > 0 ? `${email} · ${roles}` : email;
+  const bootstrap =
+    "<script>try{" +
+    `sessionStorage.setItem('ixauth_token',${encodeForInlineScript(IX_AUTH_ADMIN_CONSOLE_TOKEN_SENTINEL)});` +
+    `sessionStorage.setItem('ixauth_who',${encodeForInlineScript(who)});` +
+    "}catch{}</script>";
+  return params.html.slice(0, markerIndex) + bootstrap + params.html.slice(markerIndex);
+}
+
+/**
+ * Decide whether this response is the console document and rewrite it if so.
+ *
+ * Narrow on purpose: only the document itself, only a success, and only when the identity
+ * server called it HTML. A management API answer, a CSV export, or an error page passes
+ * through byte for byte.
+ */
+function applyIxAuthAdminConsoleBootstrap(params: {
+  payload: ArrayBuffer;
+  upstream: Response;
+  upstreamPath: string;
+  principal?: IxAuthPrincipal;
+}): Buffer {
+  const original = Buffer.from(params.payload);
+  const contentType = params.upstream.headers.get("content-type") ?? "";
+  if (
+    params.principal === undefined ||
+    params.upstreamPath !== "/admin-ui" ||
+    params.upstream.status !== 200 ||
+    !contentType.toLowerCase().includes("text/html")
+  ) {
+    return original;
+  }
+  const injected = injectIxAuthAdminConsoleBootstrap({
+    html: original.toString("utf8"),
+    principal: params.principal,
+  });
+  return injected === undefined ? original : Buffer.from(injected, "utf8");
 }
 
 /**
@@ -244,7 +373,7 @@ function rejectDisallowedRequest(params: {
       res: params.res,
       status: 403,
       error: "forbidden",
-      message: "이 화면은 관리자만 열 수 있다.",
+      message: "이 화면은 시스템 관리자만 열 수 있다.",
     });
     return true;
   }
@@ -298,7 +427,9 @@ export async function handleIxAuthAdminProxyRequest(params: {
 }): Promise<void> {
   params.res.setHeader("Cache-Control", "no-store");
   const upstreamPath = resolveIxAuthAdminProxyUpstreamPath(params.pathname);
-  if (upstreamPath === undefined) {
+  if (upstreamPath === undefined || isBlockedConsoleSignInPath(upstreamPath)) {
+    // The sign-in routes answer the same way a path that names nothing does, so the
+    // console's own login is not merely refused here: from this side it does not exist.
     sendJson(params.res, 404, { error: "not_found" });
     return;
   }
@@ -360,5 +491,12 @@ export async function handleIxAuthAdminProxyRequest(params: {
   params.res.setHeader("Cache-Control", "no-store");
   params.res.setHeader("Content-Security-Policy", IX_AUTH_ADMIN_PROXY_CSP);
   params.res.setHeader("X-Frame-Options", "DENY");
-  params.res.end(Buffer.from(payload));
+  params.res.end(
+    applyIxAuthAdminConsoleBootstrap({
+      payload,
+      upstream,
+      upstreamPath,
+      ...(params.deps.principal ? { principal: params.deps.principal } : {}),
+    }),
+  );
 }
