@@ -102,7 +102,7 @@
 1. 이 문서 → `knowledge/development/openclaw-fork.md` → 포크 `chris-local/AUTH-PLAN.md` 진행 기록 순으로 읽는다.
 2. 상태 실측 3줄: `curl -s -o /dev/null -w '%{http_code}' https://jinbio.botops.cloud/`(200), `gh run list --repo necromman/openclaw --limit 3`(최근 이미지 빌드 성공), NAS 에서 `sudo /volume1/docker/openclaw/deploy.sh --status`(컨테이너 4개 healthy).
 3. **`chris/main` 에서 직접 작업한다**(2026-09-08 사용자 확정). 브랜치와 별도 작업 트리를 만들지 않고, 의미 단위로 커밋해 바로 푸시한다. `.claude/settings.json` 의 PreToolUse 훅이 그 명령들을 차단한다. 같은 체크아웃을 두 에이전트가 동시에 쓰지 않는 규칙은 그대로다.
-4. **게이트: 푸시 → GitHub Actions 이미지 빌드 성공 → NAS cron 반영(`deploy.log` 의 OK 줄) → `https://jinbio.botops.cloud` 브라우저 실측.** WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측은 하지 않는다. 저장소 규칙(700줄 상한·env 이름 래칫·번들 상한)은 CI 가 걸러 준다. 푸시가 곧 배포이고, 중간 상태가 운영에 반영돼도 된다는 것이 사용자 결정이다.
+4. **게이트: 푸시 → GitHub Actions 이미지 빌드 성공 → NAS cron 반영(`deploy.log` 의 OK 줄) → `https://jinbio.botops.cloud` 브라우저 실측.** WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측은 하지 않는다. 저장소 규칙(700줄 상한·env 이름 래칫·번들 상한)은 CI 가 걸러 준다. `chris-check` 워크플로(`.github/workflows/chris-check.yml`)가 lint·테스트를 비차단으로 돌린다. 빨간 불이면 다음 커밋에서 고친다. 푸시가 곧 배포이고, 중간 상태가 운영에 반영돼도 된다는 것이 사용자 결정이다.
 5. chris-server 쪽은 스크린샷·문서만 두고 autosync 가 커밋한다. 포크 커밋은 자유.
 
 ## 7. 이번 작업에서 배운 함정 (재발 방지)

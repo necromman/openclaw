@@ -1,0 +1,228 @@
+# Fork-only non-blocking check lane (necromman/openclaw, chris/main).
+#
+# 이 포크는 chris/main 에 직접 커밋하고 푸시가 곧 배포다(CLAUDE.md 4절). 그래서 검증을
+# 배포 앞에 세우지 않는다. 이 워크플로는 chris-deliver-images.yml 과 완전히 분리된
+# 별도 워크플로이며, 어떤 job 도 배포에 needs 로 묶이지 않는다. 여기가 빨간 불이어도
+# 이미지 빌드와 NAS 반영은 그대로 진행되고, 결과는 GitHub 체크로만 보인다.
+# 빨간 불이면 다음 커밋에서 고친다.
+#
+# 레인은 셋이다.
+#  - pnpm check: 포맷·린트·타입·저장소 가드(700줄 상한·env 이름 래칫 등) 전량.
+#  - 포크 노드 테스트: origin/main(업스트림 기준 태그) 대비 이 포크가 더하거나 고친
+#    테스트 파일만 저장소 공식 러너 scripts/test-projects.mts 로 돌린다. 전체
+#    pnpm test 는 두 시간이 넘어(FORK.md 10-2b) 30분 예산에 들어오지 않는다.
+#  - 포크 Control UI 테스트: 같은 기준으로 고른 ui/ 테스트 파일만 돌린다.
+#    ui/vitest.config.ts 는 Playwright Chromium 을 띄우지만 headless: true 라
+#    리눅스 러너에서 화면 없이 돈다(Windows 에서만 창이 뜬다). Chromium 설치는
+#    upstream ci.yml 의 checks-ui 와 같은 scripts/ensure-playwright-chromium.mts 를 쓴다.
+name: chris-check (비차단)
+
+on:
+  push:
+    branches: [chris/main]
+  workflow_dispatch:
+
+# 최신 푸시만 의미가 있다. 앞선 실행은 이미 뒤처진 트리를 검사하는 중이다.
+concurrency:
+  group: chris-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # engines 는 >=24.15.0 <25 를 요구한다(내장 SQLite 가드). 24.x 최신을 받으면 충족된다.
+  NODE_VERSION: "24.x"
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  PLAYWRIGHT_CHROMIUM_VERSION: "1.62.1"
+
+jobs:
+  check:
+    name: pnpm check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable corepack pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+          echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: ${{ runner.os }}-chris-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-chris-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run pnpm check
+        id: run_check
+        run: |
+          set -o pipefail
+          pnpm check 2>&1 | tee "$RUNNER_TEMP/chris-check.log"
+
+      - name: 실패 요약
+        if: failure()
+        run: |
+          set -uo pipefail
+          {
+            echo "## chris-check 실패: pnpm check"
+            echo
+            echo "포맷·린트·타입·저장소 가드 중 하나가 실패했다. 배포는 막지 않는다."
+            echo "다음 커밋에서 고친다. 로그 끝 80줄:"
+            echo
+            echo '```'
+            tail -n 80 "$RUNNER_TEMP/chris-check.log" 2>/dev/null || echo "(로그 없음: 설치 단계에서 끊겼다)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: 포크 테스트 (${{ matrix.lane }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [node, ui]
+    steps:
+      # 포크 델타를 계산하려면 origin/main(업스트림 기준 태그)이 필요하다. 이 저장소의
+      # .git 은 4 GB 에 가까워 전체 히스토리를 받지 않는다. 얕은 두 팁 사이의
+      # 두 점 diff(origin/main HEAD)는 공통 조상 없이도 트리끼리 비교하므로 이것으로 충분하다.
+      # persist-credentials 를 기본값으로 두는 이유가 이 fetch 다.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable corepack pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+          echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: ${{ runner.os }}-chris-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-chris-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 포크 테스트 파일 목록
+        id: files
+        env:
+          LANE: ${{ matrix.lane }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "+main:refs/remotes/origin/main"
+          changed="$(git diff --name-only --diff-filter=d origin/main HEAD -- '*.test.ts' '*.test.tsx' || true)"
+          selected=""
+          while IFS= read -r file; do
+            [[ -n "$file" ]] || continue
+            case "$file" in
+              *.live.test.ts | *.e2e.test.ts | *.e2e.test.tsx) continue ;;
+            esac
+            if [[ "$LANE" == "ui" ]]; then
+              case "$file" in
+                ui/*) selected+="${file#ui/}"$'\n' ;;
+              esac
+            else
+              case "$file" in
+                ui/*) ;;
+                *) selected+="$file"$'\n' ;;
+              esac
+            fi
+          done <<< "$changed"
+          selected="$(printf '%s' "$selected" | sed '/^$/d')"
+          count="$(printf '%s' "$selected" | grep -c . || true)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo "list<<CHRIS_EOF"
+            printf '%s\n' "$selected"
+            echo "CHRIS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "레인 $LANE: 포크가 더하거나 고친 테스트 파일 $count 개"
+          printf '%s\n' "$selected"
+
+      - name: Restore Playwright Chromium
+        if: matrix.lane == 'ui' && steps.files.outputs.count != '0'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ env.PLAYWRIGHT_CHROMIUM_VERSION }}
+
+      - name: Install Playwright Chromium
+        if: matrix.lane == 'ui' && steps.files.outputs.count != '0'
+        run: node --import ./scripts/tsx.mjs scripts/ensure-playwright-chromium.mts
+
+      - name: 테스트 실행
+        if: steps.files.outputs.count != '0'
+        env:
+          LANE: ${{ matrix.lane }}
+          TEST_FILES: ${{ steps.files.outputs.list }}
+        run: |
+          set -o pipefail
+          mapfile -t files < <(printf '%s\n' "$TEST_FILES" | sed '/^$/d')
+          if [[ "$LANE" == "ui" ]]; then
+            # ui/vitest.config.ts 는 headless Chromium 을 쓴다. 워커 3 은 upstream
+            # checks-ui 와 같은 값이라 파일 묶음 방식이 그쪽과 어긋나지 않는다.
+            pnpm --dir ui test --maxWorkers=3 --reporter=default --reporter=github-actions "${files[@]}" 2>&1 |
+              tee "$RUNNER_TEMP/chris-test.log"
+          else
+            node --import ./scripts/tsx.mjs scripts/test-projects.mts "${files[@]}" 2>&1 |
+              tee "$RUNNER_TEMP/chris-test.log"
+          fi
+
+      - name: 선택된 파일 없음
+        if: steps.files.outputs.count == '0'
+        run: echo "origin/main 대비 이 레인에서 고른 테스트 파일이 없다. 건너뛴다."
+
+      - name: 실패 요약
+        if: failure()
+        env:
+          LANE: ${{ matrix.lane }}
+          FILE_COUNT: ${{ steps.files.outputs.count }}
+        run: |
+          set -uo pipefail
+          {
+            echo "## chris-check 실패: 포크 테스트 ($LANE)"
+            echo
+            echo "대상 파일 $FILE_COUNT 개. 배포는 막지 않는다. 다음 커밋에서 고친다."
+            echo
+            echo "### 실패한 테스트"
+            echo
+            echo '```'
+            grep -E "^ *(FAIL|×|✗|Error:)" "$RUNNER_TEMP/chris-test.log" 2>/dev/null |
+              head -n 40 || echo "(실패 줄을 못 찾았다)"
+            echo '```'
+            echo
+            echo "### 로그 끝 80줄"
+            echo
+            echo '```'
+            tail -n 80 "$RUNNER_TEMP/chris-test.log" 2>/dev/null || echo "(로그 없음: 설치 단계에서 끊겼다)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
