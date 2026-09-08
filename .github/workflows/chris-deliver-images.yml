@@ -1,0 +1,125 @@
+# Fork-only delivery images (necromman/openclaw, chris/main).
+#
+# Builds the two images the delivery stack runs and pushes them to GHCR, so the
+# customer host pulls a finished image instead of building 7 GB of Chromium and
+# LibreOffice on a two-core NAS. Upstream workflows are untouched; this file is the
+# only CI this fork adds.
+#
+# The two tags are on purpose. "chris-main" moves with the branch and is what the NAS
+# deploy script watches; "sha-<short>" never moves and is what a rollback names.
+# Procedure and rollback: chris-local/DEPLOY.md 13.
+name: Chris Deliver Images
+
+on:
+  push:
+    branches: [chris/main]
+  workflow_dispatch:
+
+# Only the newest push matters: the older build would publish a "chris-main" that is
+# already behind before it finishes.
+concurrency:
+  group: chris-deliver-images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  GATEWAY_IMAGE: ghcr.io/necromman/openclaw-gateway
+  IX_AUTH_IMAGE: ghcr.io/necromman/openclaw-ix-auth
+
+jobs:
+  gateway:
+    name: gateway image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      # The gateway image is roughly 7 GB and buildx needs room for both the layer
+      # cache and the export. A stock runner does not have it; the preinstalled SDKs
+      # nothing here uses are the cheapest 25 GB to give back.
+      - name: Free runner disk space
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve tags
+        id: tags
+        run: echo "short_sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The build args are the ones chris-local/docker-compose.ixauth.yml passes, and
+      # they have to stay identical: they are what puts Chromium, the CJK fonts and
+      # LibreOffice in the image, and a delivery image without them loses the browser
+      # tool and every Office preview.
+      - name: Build and push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            OPENCLAW_INSTALL_BROWSER=1
+            OPENCLAW_IMAGE_APT_PACKAGES=fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji fonts-nanum libreoffice-writer libreoffice-calc libreoffice-impress
+          tags: |
+            ${{ env.GATEWAY_IMAGE }}:chris-main
+            ${{ env.GATEWAY_IMAGE }}:sha-${{ steps.tags.outputs.short_sha }}
+          cache-from: type=registry,ref=${{ env.GATEWAY_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.GATEWAY_IMAGE }}:buildcache,mode=max
+
+  ix-auth:
+    name: ix-auth image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve tags
+        id: tags
+        run: echo "short_sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ix-auth
+          file: ix-auth/docker/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IX_AUTH_IMAGE }}:chris-main
+            ${{ env.IX_AUTH_IMAGE }}:sha-${{ steps.tags.outputs.short_sha }}
+          cache-from: type=registry,ref=${{ env.IX_AUTH_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IX_AUTH_IMAGE }}:buildcache,mode=max
