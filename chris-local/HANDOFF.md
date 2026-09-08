@@ -10,10 +10,10 @@
 
 > **인프라 정보 규칙**: 홈랩·회사 서버·접속 정보·시크릿 위치가 필요하면 `D:\PROJECT\chris-server\CLAUDE.md`(인덱스) → 그 정본 문서를 참조한다. 이 포크 저장소에는 인프라 정보와 시크릿을 두지 않는다.
 
-## 0-1. 2026-09-08 갱신 (D~K 단계 완료)
+## 0-1. 2026-09-08 갱신 (D~L 단계 완료)
 
-- 제안서·사용자 지시 기반 납품 기능 D~K 8단계가 **전부 `chris/main` 에 머지·푸시**됐다(마지막 머지 커밋 `fdc3b837012`, K 단계 ff 머지 2026-09-08 16:20). 단계별 내용·실측·잔여는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 진행 기록이 정본이고, 이 절은 다음 세션이 바로 움직일 수 있는 최소 요약이다.
-- 들어간 것: 로그아웃(WS 즉시 종료) · 납품 이미지 LibreOffice(Office 미리보기) · 임원 역할·다중 부서 초대 · 앱 내 사용자 관리 `/settings/users` · 읽기 전용 프로필·권한 모드·NAS 마운트(경로 A) · 사람 귀속 감사 원장 `/settings/audit` · `openclaw knowledge sync` 문서 색인 · 관리자 권한 결함 수정(로그인 시 역할 투영) · IX-Auth 콘솔 SSO(superadmin 전용) · 부서·에이전트·폴더 관리 `/settings/departments` · 시드 정리 `reset-seed.sh` · 자립형 `CLAUDE.md`.
+- 제안서·사용자 지시 기반 납품 기능 D~L 9단계가 **전부 `chris/main` 에 머지·푸시**됐다(마지막 머지 커밋 `299496394bc`, L 단계 ff 머지 2026-09-08 17:44). 단계별 내용·실측·잔여는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 진행 기록이 정본이고, 이 절은 다음 세션이 바로 움직일 수 있는 최소 요약이다.
+- 들어간 것: 로그아웃(WS 즉시 종료) · 납품 이미지 LibreOffice(Office 미리보기) · 임원 역할·다중 부서 초대 · 앱 내 사용자 관리 `/settings/users` · 읽기 전용 프로필·권한 모드·NAS 마운트(경로 A) · 사람 귀속 감사 원장 `/settings/audit` · `openclaw knowledge sync` 문서 색인 · 관리자 권한 결함 수정(로그인 시 역할 투영) · IX-Auth 콘솔 SSO(superadmin 전용) · 부서·에이전트·폴더 관리 `/settings/departments` · 시드 정리 `reset-seed.sh` · 자립형 `CLAUDE.md` · **L 단계**: Cloudflare Tunnel 프로파일(`--profile tunnel`, `jinbio.botops.cloud`) · `OPENCLAW_TRUSTED_PROXIES` 신설(Cloudflare 뒤에서 `__Host-`·`Secure` 쿠키 복귀) · 모델 API 키를 게이트웨이 컨테이너로 전달(신원 서버에 붙어 있었다) · 자동 배포가 pull 전에 빌드 산출물을 되돌린다 · 시작 번들 기준선 352955 B 로 갱신 · 사용자 결정 9건 문서 반영(DELIVERY-PLAN 4절 표).
 - **라이브 상태(이 PC)**: compose 스택 4컨테이너 기동 중, 게이트웨이 이미지는 K 코드 기준(`fdc3b837012`). WSL 로컬 게이트웨이도 같은 커밋으로 자동 배포됐다. 모델은 ChatGPT 구독 codex OAuth 프로필(상태 볼륨에 저장, 템플릿에 codex 런타임·기본 모델 `openai/gpt-5.6-sol` 고정). `chris-local/ixauth.env` 에 `OPENCLAW_NAS_ROOT=./nas-sample`, `OPENCLAW_KNOWLEDGE_ROOT=./knowledge-index` 가 켜져 있고 rnd 색인 폴더에 사이드카 8개가 생성돼 있다. 관리자 권한 수정은 **재로그인 후** 반영된다(`user_profiles.role` 은 로그인 때 투영).
 - **다음 세션 첫 할 일**:
   1. **사용자 결정은 2026-09-08 에 전부 끝났다.** 9건의 결정값과 반영 위치는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 4절 표가 정본이다: IX-Auth 라이선스(자사 제품이라 제약 없음), 도메인·TLS(`jinbio.botops.cloud` + Cloudflare Tunnel, PoC 단계, DEPLOY.md 11.7), SMTP(배포 후, DEPLOY.md 3.8), 약관(고객 제공), 부서 에이전트 API 키(배포 후, DEPLOY.md 3.4 (라)), 감사 보존 90일·질문 본문 미기록(기존 기본값과 동일), 시드 계정(로컬 유지·납품 시 정리, DEPLOY.md 4.1 (다)), 제품명(임시 "Chris Agent" 유지), 시작 번들 예산(기준선 갱신). 배포 시점에 값만 넣으면 되는 것은 DEPLOY.md 4.2 체크리스트에 모아 두었다.
