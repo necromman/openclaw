@@ -103,8 +103,15 @@
  * its content wants (978px measured at a 1280px viewport, in a 788px box), so the
  * last column sat outside the visible box and the only way to read it was a
  * horizontal scrollbar that nothing announces. Fixed layout is what makes the
- * declared widths binding instead of advisory, and the ratios below are the
- * measured natural widths compressed into the space that actually exists.
+ * declared widths binding instead of advisory.
+ *
+ * The ratios are set by the longest fixed phrase each column can hold, not by the
+ * measured natural widths: those columns whose vocabulary is closed must never
+ * ellipsize, because "시스템 관…" is not a rank anybody can read and hovering to
+ * find out which one it was is not a table. So the rank and kind columns are sized
+ * for "시스템 관리자" and "관리자 행위", the time column for a full localized
+ * timestamp, and the two that are genuinely open-ended (the summary, which wraps,
+ * and the session key, which nobody reads in full) give up the difference.
  *
  * Ellipsis needs a clipping box, so every cell gets one here; the cells that can
  * lose text carry the full value in a `title`. The summary keeps wrapping, which
@@ -128,17 +135,17 @@
 
   .audit-table th:nth-child(1),
   .audit-table td:nth-child(1) {
-    width: 19%;
+    width: 18%;
   }
 
   .audit-table th:nth-child(2),
   .audit-table td:nth-child(2) {
-    width: 15%;
+    width: 13%;
   }
 
   .audit-table th:nth-child(3),
   .audit-table td:nth-child(3) {
-    width: 11%;
+    width: 13%;
   }
 
   .audit-table th:nth-child(4),
@@ -148,7 +155,7 @@
 
   .audit-table th:nth-child(5),
   .audit-table td:nth-child(5) {
-    width: 10%;
+    width: 12%;
   }
 
   .audit-table th:nth-child(6),
@@ -158,7 +165,7 @@
 
   .audit-table th:nth-child(7),
   .audit-table td:nth-child(7) {
-    width: 19%;
+    width: 18%;
   }
 
   .audit-table__summary {
