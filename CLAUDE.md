@@ -35,9 +35,10 @@
 
 ## 4. 작업 규칙 (요약, 상세는 FORK.md)
 
-- 브랜치 하나에 에이전트 하나. 단계별 브랜치 `chris/delivery-<단계>` 에서 작업하고 `chris/main` 에 ff 머지. 워크트리 명령은 쓰지 않는다.
-- 게이트: `pnpm check` 0 실패 → 라이브 실측(스크린샷) → `origin/chris/main` 리베이스 → ff 머지 → 자동 배포 확인 → 브랜치 삭제.
-- 업스트림 파일 수정 최소화. 새 파일은 `chris-local/`·`src/brand.ts`·`ui/src/styles/fork-style.css`·ix-auth 계층에. 저장소 규칙(700줄 상한·env 이름 래칫·UI 청크 215KiB gz·시작 번들 예산)은 `pnpm check` 가 강제한다.
+- **`chris/main` 에서 직접 작업한다(2026-09-08 사용자 확정).** 브랜치·워크트리를 만들지 않는다(`git checkout -b`·`git switch -c`·`git worktree` 금지, `.claude/settings.json` 의 PreToolUse 훅이 차단). 커밋은 의미 단위로 main 에 쌓고 바로 푸시한다.
+- **푸시가 곧 배포다.** 푸시하면 GitHub Actions 가 이미지를 굽고 진바이오 NAS cron(5분)이 반영한다. 중간 상태가 운영에 배포돼도 된다는 것이 사용자 결정이다.
+- **WSL 검증을 하지 않는다.** `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 생략하고, 검증은 Actions 성공 + 운영 `https://jinbio.botops.cloud` 실측으로 한다. 저장소 규칙(700줄 상한·env 이름 래칫·번들 상한)은 CI 가 걸러 준다.
+- 업스트림 파일 수정 최소화. 새 파일은 `chris-local/`·`src/brand.ts`·`ui/src/styles/fork-style.css`·ix-auth 계층에. 저장소 규칙(700줄 상한·env 이름 래칫·UI 청크 215KiB gz·시작 번들 예산)은 CI 의 `pnpm check` 가 강제한다.
 - 브랜딩: 표시 문자열에 "OpenClaw" 금지, 제품명은 `src/brand.ts` 상수(임시 "Chris Agent"). 내부 식별자·LICENSE 는 유지.
 - 스타일: 상세페이지 full width(채팅 제외), border-radius 2/4/5px 상한.
 - 문서·문자열에 U+2014·U+00A7·U+3161 을 쓰지 않는다. 시크릿 값은 어디에도 커밋하지 않는다.

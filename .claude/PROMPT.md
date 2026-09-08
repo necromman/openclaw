@@ -21,8 +21,8 @@
 
 ## 작업 규칙 (요약, 상세는 FORK.md)
 
-- 브랜치 하나에 에이전트 하나. 브랜치 전환 전 `git status`. 워크트리 명령 금지(이 PC 정책).
-- 게이트: `pnpm check` 0 실패 → 라이브 실측(스크린샷) → `origin/chris/main` 리베이스 → ff 머지 → 자동 배포 확인 → 브랜치 삭제.
+- `chris/main` 에서 직접 작업(2026-09-08 확정). 브랜치·워크트리 생성 금지(훅이 차단). 커밋 후 바로 푸시 = 진바이오 NAS 배포.
+- WSL 검증(`pnpm check`·vitest)·로컬 compose 실측 생략. 검증은 GitHub Actions + 운영 `https://jinbio.botops.cloud` 실측.
 - 업스트림 파일 수정 최소화, 새 파일은 `chris-local/`·`src/brand.ts`·`ui/src/styles/fork-style.css` 계층에. 저장소 규칙(700줄 상한·env 이름 래칫·번들 상한 215KiB gz)은 `pnpm check` 가 강제한다.
 - 브랜딩: 표시 문자열에 "OpenClaw" 금지, 제품명은 `src/brand.ts` 의 상수(임시 "Chris Agent"). 내부 식별자·LICENSE 는 유지.
 - 스타일: 상세페이지 full width(채팅 제외), border-radius 2/4/5px 상한, "줄이기만·0 은 0".
@@ -32,4 +32,4 @@
 
 - D~K 단계 전부 머지(마지막 `fdc3b837012`): 로그아웃, Office 미리보기, 임원 역할, 앱 내 사용자 관리, 읽기 전용·NAS 마운트, 감사 원장, 문서 색인, 관리자 권한 결함 수정, 콘솔 SSO, 부서·폴더 관리 화면(부서 삭제), 콘솔 로그아웃 수정, xlsx 날짜, 권한 칩 라벨, 표 고정 열 폭. 코드 잔여 없음, 사용자 결정 항목만 남았다. 상세·잔여는 `chris-local/DELIVERY-PLAN.md` 5절, 요약은 `chris-local/HANDOFF.md` 0-1절.
 - 사용자 결정 대기: 부서 에이전트용 API 키(codex 구독 경로로는 폴더 경계 유지 불가), 감사 보존기간·질문 본문 기록, 시드 계정 삭제, 제품명, IX-Auth 라이선스, SMTP·도메인·TLS.
-- 규칙 추가: Windows 에서 vitest·pnpm check 금지(Chrome 창이 뜸), 검증은 WSL 전용. 브라우저 도구는 확인 즉시 페이지를 닫는다.
+- 규칙 추가: Windows 에서 vitest·pnpm check 금지(Chrome 창이 뜸). WSL 검증도 폐지(2026-09-08). 브라우저 도구는 확인 즉시 페이지를 닫는다.
