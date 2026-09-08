@@ -93,9 +93,47 @@
   gap: 2px;
 }
 
-.users-table__email {
+/* Two columns carry values a person scans past rather than reads: the address and
+ * the sign-in time. Muting them lets the name, role and status carry the row. */
+.users-table__email,
+.users-table__moment {
   color: var(--muted);
   font-size: var(--control-ui-text-xs);
+}
+
+/* An address and a department list are the two cells that can be long. Capping them
+ * keeps the columns after them on screen at ordinary window widths; the full value
+ * stays reachable through the cell's own title, and the box still scrolls. */
+.users-table__email,
+.users-table__departments {
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.users-empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm);
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Narrow windows: the table keeps its columns and scrolls, which is the honest
+ * shape for a directory, but the padding that reads well at desktop width wastes
+ * most of a phone screen. */
+@media (max-width: 720px) {
+  .users-table th,
+  .users-table td {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .users-table__email,
+  .users-table__departments {
+    max-width: 12rem;
+  }
 }
 
 .users-table__select {

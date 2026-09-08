@@ -55,6 +55,18 @@ describe("users table", () => {
     expect(host.textContent).toContain("Never");
   });
 
+  it("names an account with no role instead of leaving the cell blank", () => {
+    const host = draw(
+      renderUsersTable({
+        users: [managedUser({ roles: [], gatewayRole: undefined })],
+        loading: false,
+        onSelect: () => {},
+      }),
+    );
+    const cells = host.querySelectorAll("tbody tr td");
+    expect(cells[2]?.textContent?.trim()).toBe("Unassigned");
+  });
+
   it("shows a department by name and keeps its code in the title", () => {
     const host = draw(
       renderUsersTable({

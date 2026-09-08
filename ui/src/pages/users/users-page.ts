@@ -66,10 +66,14 @@ const IX_AUTH_STATUS_FILTERS: readonly string[] = Object.freeze([
   "DISABLED",
 ]);
 
+// Every rank the fork maps, so "filter by role" can name the same five the directory
+// column shows. Leaving one out makes its holders unreachable through the filter and
+// looks like the role does not exist.
 const IX_AUTH_ROLE_FILTERS: readonly string[] = Object.freeze([
   "SUPERADMIN",
   "ADMIN",
   "EXECUTIVE",
+  "MODERATOR",
   "MEMBER",
 ]);
 

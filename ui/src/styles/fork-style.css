@@ -99,6 +99,7 @@
  * page sheets sets a width on this control, and the :has() selector already
  * outranks the two-class stacked rule it refines. */
 .settings-row--stacked > .settings-row__control:has(> .users-table-scroll),
+.settings-row--stacked > .settings-row__control:has(> .users-empty),
 .settings-row--stacked > .settings-row__control:has(> .users-toolbar),
 .settings-row--stacked > .settings-row__control:has(> .users-pager),
 .settings-row--stacked > .settings-row__control:has(> .audit-table-scroll),

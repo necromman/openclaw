@@ -23,6 +23,24 @@ function formatMoment(value: string | undefined): string {
 }
 
 /**
+ * The role cell.
+ *
+ * Three answers are possible and only two of them used to be drawn. An account the
+ * identity server has granted no role at all left the cell empty, which reads as a broken
+ * column rather than as a fact about the account; it is a real state on this deployment,
+ * because an invitation accepted before any role is chosen lands exactly there.
+ */
+function renderRole(user: IxAuthManagedUser): TemplateResult {
+  if (user.gatewayRole) {
+    return html`${ixAuthRoleLabel(user.gatewayRole)}`;
+  }
+  const raw = user.roles.filter((role) => role.trim().length > 0);
+  return raw.length > 0
+    ? html`${raw.join(", ")}`
+    : html`<span class="muted">${t("ixAuth.users.noRole")}</span>`;
+}
+
+/**
  * The departments cell: names to read, codes one hover away.
  *
  * The code is what a CSV import and an audit row speak, so it stays reachable; it just
@@ -62,9 +80,11 @@ function renderRow(params: {
           </span>
         </button>
       </td>
-      <td class="users-table__email">${user.email}</td>
-      <td>${user.gatewayRole ? ixAuthRoleLabel(user.gatewayRole) : user.roles.join(", ")}</td>
-      <td>${renderDepartments(user.departments, params.departments)}</td>
+      <td class="users-table__email" title=${user.email}>${user.email}</td>
+      <td>${renderRole(user)}</td>
+      <td class="users-table__departments">
+        ${renderDepartments(user.departments, params.departments)}
+      </td>
       <td>
         <span
           class=${
@@ -75,7 +95,7 @@ function renderRow(params: {
           >${t(`ixAuth.users.status.${user.status}`)}</span
         >
       </td>
-      <td>${formatMoment(user.lastLoginAt)}</td>
+      <td class="users-table__moment">${formatMoment(user.lastLoginAt)}</td>
     </tr>
   `;
 }
@@ -90,9 +110,11 @@ export function renderUsersTable(params: {
   onSelect: (userId: string) => void;
 }): TemplateResult {
   if (params.users.length === 0) {
-    return html`<span class="muted"
-      >${params.loading ? t("ixAuth.users.loading") : t("ixAuth.users.empty")}</span
-    >`;
+    // A block rather than a bare span: the row this sits in is as wide as the table it
+    // replaces, and a floating fragment of text there reads as a half-drawn table.
+    return html`<p class="users-empty" role="status">
+      ${params.loading ? t("ixAuth.users.loading") : t("ixAuth.users.empty")}
+    </p>`;
   }
   return html`
     <div class="users-table-scroll">
