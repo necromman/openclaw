@@ -259,3 +259,73 @@ docker build \
 - docx 는 표·글머리표·제목 단계가 원본 그대로 나온다. 툴바에 "Converted for preview" 표시가 붙는다.
 - xlsx·pptx 도 같은 뷰어로 통일돼 보인다.
 - 변환 지연은 체감상 1초 미만이고, 같은 파일을 다시 열면 캐시가 걸려 즉시 뜬다.
+
+---
+
+## 8. 채팅 첨부 재참조 도구 (2026-09-08, N 단계)
+
+미리보기는 **파일 패널**에 있는 문서를 사람이 보는 기능이다. 이 절은 그 짝인 **채팅에 올린 첨부를 모델이 다시 꺼내 보는** 경로다.
+
+### 8-1. 왜 필요했나
+
+Control UI 에서 파일을 붙여 보내면 서버가 `<stateDir>/media/inbound/` 에 저장하고, 전사에는 `media://inbound/<id>` 라는 불투명한 표시만 남는다. 모델 프롬프트에도 `[media attached: media://inbound/...]` 한 줄만 간다. 그래서 세 가지가 안 됐다.
+
+- 그 턴이 문맥 창에서 밀려나면 모델은 파일이 아직 있다는 사실조차 모른다.
+- 비이미지 첨부는 `hydrationSuppressed` 라 다음 턴부터는 아예 안 보인다.
+- `tools.fs.workspaceOnly: true` 라 `read` 로 미디어 폴더를 열 수 없다.
+
+사용자 요구는 "사용자가 채팅에 올린 파일은 나중에도 참조 가능해야 한다" 였다.
+
+### 8-2. 도구 두 개
+
+| 도구         | 하는 일                                                                                                        | 정본                                       |
+| ------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `media_list` | 올린 첨부 목록. id, 원본명, 형식, 크기, 올린 시각, 세션 키, 에이전트. 최근순, 상한 50, `search` 로 이름 부분일치 | `src/agents/tools/media-list-tool.ts`      |
+| `media_read` | id 로 첨부 하나를 모델 입력으로 돌려준다                                                                       | `src/agents/tools/media-read-tool.ts`      |
+| 공통 결정    | 누구의 것을 어디까지 보여 줄지                                                                                 | `src/agents/tools/media-reference-context.ts` |
+
+`media_read` 의 형식별 동작은 미리보기와 같은 서버 변환기를 쓴다. 정확히는 문서 색인(`openclaw knowledge sync`)이 쓰는 `convertKnowledgeSource`(`src/knowledge/convert.ts`) 를 그대로 부른다.
+
+| 첨부                        | 결과                                                                    |
+| --------------------------- | ------------------------------------------------------------------------- |
+| 이미지                      | 이미지 블록으로 모델 문맥에 들어간다(사용자 답변에 첨부되지는 않는다)   |
+| PDF                         | 페이지별 텍스트. 텍스트 층이 없는 스캔본은 "본문 추출 불가" 로 돌아온다 |
+| docx · xlsx                 | 내장 OOXML 리더 -> 마크다운. 비면 LibreOffice -> PDF -> 텍스트로 넘어간다  |
+| pptx · ppt · doc · xls · 기타 | LibreOffice -> PDF -> 텍스트. 변환기가 없으면 "본문 추출 불가"            |
+| txt · md · csv              | UTF-8 로 읽고 실패하면 CP949 로 다시 읽는다                             |
+
+상한은 도구가 스스로 건다. 읽는 바이트 **20 MB**(`MEDIA_READ_MAX_BYTES`), 모델에 넘기는 글자 **60,000자**(`MEDIA_READ_MAX_CHARS`). 넘으면 잘라서 주고 잘렸다고 말한다.
+
+### 8-3. 누구의 파일까지 보이나
+
+**도구가 인자로 받는 사람 정보는 없다.** 세션에서 서버가 정한다.
+
+1. 지금 세션의 **생성자 프로필**이 소유자다(`sessionCreatorProfileId`). 모델이 남의 이름을 넣어 부를 방법이 없다.
+2. 첨부가 기록된 **에이전트의 부서 바인딩**이 지금 에이전트의 것과 같아야 한다. 둘 다 미바인딩(공용)인 경우도 같은 것으로 본다.
+3. 세션이 지워진 첨부(`deleted_at`)는 목록에서 빠지고 `media_read` 도 "not found" 로 답한다.
+
+거부는 종류를 가리지 않고 전부 같은 문구다. 남의 id 를 찍어 보는 것과 없는 id 를 찍는 것이 구분되면 안 된다.
+
+**ix-auth 모드가 아닐 때**(토큰 모드, WSL 로컬)는 귀속시킬 계정이 없다. 이때는 **지금 세션의 첨부만** 보여 준다. 기존 세션 가시성 기본값이 `self`(HANDOFF 4절 표) 이므로, 첨부만 그보다 넓어지면 안 된다는 판단이다.
+
+경계 자체의 정본은 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 7-1 이다. HTTP 로 첨부를 직접 받는 경로도 같은 절이 다룬다.
+
+### 8-4. 프로필과 시스템 프롬프트
+
+두 도구는 도구 카탈로그(`src/agents/tool-catalog.ts`)의 `media` 절에 있고 `readonly` · `coding` · `messaging` 프로필에 들어간다. 납품 부서 에이전트가 `readonly` 프로필이라 그쪽에서도 그대로 쓸 수 있다. `minimal` 에는 넣지 않았다(그 프로필은 `session_status` 하나만 두는 것이 취지다).
+
+시스템 프롬프트에는 두 도구가 **모두 있을 때만** 한 줄이 붙는다(`src/agents/system-prompt.ts`).
+
+```text
+Looking for a file the user uploaded earlier: `media_list` first, then `media_read` with that id.
+```
+
+### 8-5. 보존
+
+`attachments.ttlHours` 는 납품 템플릿(`chris-local/ixauth-gateway-config/openclaw.json`)에 **넣지 않는다.** 넣으면 그 시간이 지난 첨부가 삭제돼 재참조 요구와 정면으로 충돌한다. 값이 없으면 인바운드 첨부는 무기한 남는다(`src/gateway/server-maintenance.ts` 의 미디어 정리는 값이 없으면 아웃바운드만 정리한다).
+
+세션을 지워도 파일은 지우지 않고 소유권 행에 삭제 표시만 남긴다. 사용량이 걱정되면 게이트웨이 상태 볼륨에서 직접 본다.
+
+```bash
+docker compose -f chris-local/docker-compose.ixauth.yml --env-file chris-local/ixauth.env   exec gateway du -sh /home/node/.openclaw/media/inbound
+```

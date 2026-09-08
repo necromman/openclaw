@@ -15,7 +15,12 @@ import { Type } from "typebox";
 import { createLazyRuntimeModule } from "../../shared/lazy-runtime.js";
 import { MEDIA_REFERENCE_TOOL_HINT } from "../tool-description-presets.js";
 import type { AnyAgentTool } from "./common.js";
-import { imageResultFromFile, readToolStringParam, textResult } from "./common.js";
+import {
+  asToolParamsRecord,
+  imageResultFromFile,
+  readToolStringParam,
+  textResult,
+} from "./common.js";
 import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
 import {
   resolveMediaReferenceContext,
@@ -71,7 +76,7 @@ export function createMediaReadTool(opts?: {
     description: MEDIA_READ_TOOL_DESCRIPTION,
     parameters: MediaReadToolSchema,
     execute: async (_toolCallId, rawArgs) => {
-      const params = (rawArgs ?? {}) as Record<string, unknown>;
+      const params = asToolParamsRecord(rawArgs);
       const id = readToolStringParam(params, "id", { required: true });
       const caller = getGatewayToolCallerIdentity();
       const context = await resolveMediaReferenceContext({

@@ -10,7 +10,12 @@ import { Type } from "typebox";
 import { INBOUND_MEDIA_LIST_MAX } from "../../state/inbound-media-store.js";
 import { MEDIA_REFERENCE_TOOL_HINT } from "../tool-description-presets.js";
 import type { AnyAgentTool } from "./common.js";
-import { jsonResult, readPositiveIntegerParam, readToolStringParam } from "./common.js";
+import {
+  asToolParamsRecord,
+  jsonResult,
+  readPositiveIntegerParam,
+  readToolStringParam,
+} from "./common.js";
 import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
 import {
   listReferenceableInboundMedia,
@@ -73,7 +78,7 @@ export function createMediaListTool(opts?: {
     parameters: MediaListToolSchema,
     outputSchema: MediaListOutputSchema,
     execute: async (_toolCallId, rawArgs) => {
-      const params = (rawArgs ?? {}) as Record<string, unknown>;
+      const params = asToolParamsRecord(rawArgs);
       const caller = getGatewayToolCallerIdentity();
       const context = await resolveMediaReferenceContext({
         ...(opts?.agentSessionKey ?? caller?.sessionKey

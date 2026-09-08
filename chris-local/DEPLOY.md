@@ -470,7 +470,7 @@ docker exec -it openclaw-gateway openclaw audit users --limit 5
 | 볼륨                              | 담는 것                                                       | 잃으면                                                      |
 | --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
 | `openclaw-ixauth_ix-auth-db-data` | 계정·역할·세션·감사 원장·서명 키                              | 계정을 전부 다시 만든다                                     |
-| `openclaw-ixauth_gateway-state`   | 게이트웨이 SQLite(프로필·로그인 세션·부서·대화), 워크스페이스 | 대화 이력·로그인 세션과 **에이전트 부서 바인딩**이 사라진다 |
+| `openclaw-ixauth_gateway-state`   | 게이트웨이 SQLite(프로필·로그인 세션·부서·대화·첨부 소유권), 워크스페이스, `media/inbound` 채팅 첨부 원본 | 대화 이력·로그인 세션·**에이전트 부서 바인딩**과 **사용자가 올린 첨부 파일**이 사라진다 |
 
 ```bash
 # 백업 (정지 상태에서 뜨는 것이 안전하다)
@@ -494,6 +494,14 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 ```
 
 **두 볼륨은 한 벌로 백업하고 한 벌로 복구한다.** 게이트웨이 세션 행이 IX-Auth 의 refresh 토큰을 들고 있어서, 한쪽만 옛 시점으로 되돌리면 로그인한 사람이 전부 튕긴다(다시 로그인하면 회복된다).
+
+**채팅 첨부 보존**: 사용자가 채팅에 올린 파일은 `media/inbound/` 에 **무기한** 남는다. 재참조 도구(`media_list`·`media_read`, [FILE-PREVIEW.md](FILE-PREVIEW.md) 8절)가 나중에도 열 수 있어야 한다는 요구 때문이며, 그래서 납품 템플릿에 `attachments.ttlHours` 를 **넣지 않는다.** 세션을 지워도 파일은 지우지 않고 공용 DB `inbound_media` 행에 삭제 표시만 남는다(감사 원장 보존 90일과 짝을 맞춘다). 사용량은 이렇게 본다.
+
+```bash
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec gateway du -sh /home/node/.openclaw/media/inbound
+```
+
+정리가 필요해지면 `attachments.ttlHours` 를 템플릿에 넣고 재기동한다. 그 시점부터 지난 첨부는 사라지고 재참조도 불가능해지므로, 넣기 전에 고객과 합의한다.
 
 `IXAUTH_SERVICE_KEY` 를 바꾸면 등록된 TOTP 가 전부 무효가 된다(서버가 MFA 암호화 키를 이 값에서 파생한다). 키 회전은 2단계 인증 재등록 안내와 함께 한다.
 

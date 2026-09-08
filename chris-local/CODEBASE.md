@@ -397,6 +397,14 @@ pnpm ui:build
 
 공용 DB 에는 **FTS5 테이블이 없다.**
 
+**이 포크가 추가한 feature-local 표**(`.sql` 이 아니라 각 기능 모듈이 처음 쓸 때 만든다. `user_version` 은 15 그대로다):
+
+| 표                                                         | 정본 모듈                                 | 담는 것                                                                                             |
+| ---------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `departments` · `department_members` · `department_agents` | `src/state/departments-schema.ts`         | 부서 목록 · 소속 투영 · 에이전트 바인딩                                                             |
+| `audit_user_activity`                                      | `src/state/user-activity-audit-schema.ts` | 사람 귀속 감사 원장(보존 90일)                                                                      |
+| `inbound_media`                                            | `src/state/inbound-media-schema.ts`       | 채팅 첨부 소유자(세션 · 에이전트 · 프로필 · 원본명 · 크기 · 삭제 표시). 부서 열은 없고 `agent_id` 로 파생한다 |
+
 **에이전트별 `openclaw-agent.sqlite`** (줄 번호는 `src/state/openclaw-agent-schema.sql`):
 
 | 그룹                   | 테이블                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -422,6 +430,7 @@ pnpm ui:build
 | 워크스페이스 (Markdown, `AGENTS.md`) | `$OPENCLAW_WORKSPACE_DIR` 없으면 `<stateDir>/workspace`                                                            | `src/agents/workspace-default.ts:14-34`                                                                                                                                     |
 | 세션 파일                            | `<stateDir>/agents/<agentId>/sessions/`                                                                            | `src/config/sessions/paths.ts:12-35`                                                                                                                                        |
 | 미디어 blob                          | `<configDir>/media` (+ `outgoing/`, `outbound/`, `playback-transcode/`)                                            | `src/media/store.ts:29,37-46`                                                                                                                                               |
+| **채팅 첨부(인바운드)**              | `<configDir>/media/inbound/<정제원본명>---<uuid><확장자>` - 소유자는 공용 DB `inbound_media` 가 따로 들고 있다     | `src/media/store.ts:361-375,564-594`, `src/gateway/inbound-media-access.ts`                                                                                                  |
 | 미배달 첨부                          | `<stateDir>/delivery-queue-media`                                                                                  | `src/config/paths.ts:427-429`                                                                                                                                               |
 | 로그                                 | `<stateDir>/logs/` - `anthropic-payload.jsonl`, `cache-trace.jsonl`, `raw-stream.jsonl`, 설정 감사 로그, 지원 번들 | `src/agents/anthropic-payload-log.ts:51` 외                                                                                                                                 |
 | 게이트웨이 락                        | `<stateDir>/tmp/openclaw-<uid>`                                                                                    | `src/config/paths.ts:412-420`                                                                                                                                               |

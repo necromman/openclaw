@@ -60,6 +60,8 @@
     "apply_patch": {"emoji":"🩹","title":"Apply Patch","detailKeys":[]},
     "image": {"emoji":"🖼️","title":"Image","detailKeys":["path","paths","url","urls","prompt","model"]},
     "view_image": {"emoji":"🖼️","title":"View Image","detailKeys":["path","paths","url","urls","prompt","model"]},
+    "media_list": {"emoji":"📎","title":"Attachments","detailKeys":["scope","count"]},
+    "media_read": {"emoji":"📎","title":"Attachment","detailKeys":["id","name","mime","sizeBytes","status"]},
     "image_generate": {"emoji":"🎨","title":"Image Generation","actions":{"generate":{"label":"generate","detailKeys":["prompt","model","count","resolution","aspectRatio"]},"list":{"label":"list","detailKeys":["provider","model"]}}},
     "music_generate": {"emoji":"🎵","title":"Music Generation","actions":{"generate":{"label":"generate","detailKeys":["prompt","model","durationSeconds","format","instrumental"]},"list":{"label":"list","detailKeys":["provider","model"]}}},
     "video_generate": {"emoji":"🎬","title":"Video Generation","actions":{"generate":{"label":"generate","detailKeys":["prompt","model","durationSeconds","resolution","aspectRatio","audio","watermark"]},"list":{"label":"list","detailKeys":["provider","model"]}}},

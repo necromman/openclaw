@@ -211,6 +211,7 @@ CREATE INDEX IF NOT EXISTS idx_department_agents_department
 | `src/gateway/session-utils-store.ts`                       | 로스터 투영 상한 + 걸러진 `defaultId` 재지정                                |
 | `src/gateway/server-methods/session-catalog-visibility.ts` | 외부 CLI 카탈로그는 부서 강제 시 생성자 전용으로 내려간다                   |
 | `src/gateway/auth.ts` · `http-auth-utils.ts`               | 검증된 부서를 **생산 지점에서** HTTP 요청 인가에 싣는다                     |
+| `src/gateway/inbound-media-access.ts`                      | **채팅 첨부 열람.** 참조 자체로 판정한다(7-1)                              |
 | `src/gateway/openai-http.ts` · `openresponses-http.ts`     | Gateway 클라이언트가 없는 표면도 생성 게이트를 지나게 한다                  |
 
 계획 3.2 의 훅 10곳 표 대비:
@@ -240,6 +241,70 @@ SQLite 파일을 직접 열 수도 있으므로 애초에 경계 안쪽이 아�
 사람들** 사이의 경계이고, 호스트 접근은 별도(OS 권한)로 통제한다. 바인딩 명령을 게이트웨이
 메서드가 아니라 CLI 에 둔 것도 같은 이유다: 자기를 가두는 펜스를 옮길 수 있는 브라우저 세션은
 펜스가 아니다.
+
+## 7-1. 채팅 첨부 경계 (2026-09-08, N 단계)
+
+세션과 전사에는 부서 경계가 걸려 있었지만 **채팅에 올린 파일에는 걸려 있지 않았다.** 첨부는 미디어 id 하나로만 서빙되고, 그 id 를 아는 사람은 로그인만 돼 있으면 누구든 파일을 받을 수 있었다.
+
+무엇이 뚫려 있었나:
+
+| 지점 | 문제 |
+| --- | --- |
+| `src/gateway/control-ui.ts` 의 `/__openclaw__/assistant-media` | `sessionKey` 가 **선택** 파라미터라, 빼고 부르면 세션 검사가 아예 만들어지지 않았다 |
+| `src/media/local-media-access.ts` | 인바운드 참조는 자기 부모 디렉터리를 루트로 삼아 폴더 컨테인먼트를 항상 통과한다 |
+| 저장 시점 | 전사에 `media://inbound/<id>` 만 남고 누가 어느 세션에서 올렸는지가 어디에도 없었다 |
+
+### 7-1-1. 소유권을 먼저 기록한다
+
+정본은 공용 SQLite 의 feature-local 표 `inbound_media` 다(DDL `src/state/inbound-media-schema.ts`, 접근 `src/state/inbound-media-store.ts`).
+
+```sql
+CREATE TABLE IF NOT EXISTS inbound_media (
+  id TEXT NOT NULL PRIMARY KEY,   -- 미디어 저장소가 발급한 id
+  session_key TEXT,
+  agent_id TEXT,
+  profile_id TEXT,                -- 신원 서버 계정. 토큰 모드에서는 NULL
+  original_name TEXT,
+  mime TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  deleted_at INTEGER              -- 세션 삭제 표시. 지우지는 않는다
+) STRICT;
+```
+
+**부서 열은 일부러 두지 않았다.** 세션에 부서를 찍지 않은 것과 같은 이유다(6-3): 첨부는 세션 안에 있고 세션은 에이전트 안에 있으므로 에이전트가 이미 경계다. 부서는 매번 `department_agents` 에서 `agent_id` 로 파생한다. 두 번 적으면 정본이 둘이 되고, 에이전트가 부서를 옮길 때마다 backfill 이 필요해진다.
+
+행을 쓰는 자리는 첨부가 디스크에 남는 그 지점 하나다: `persistInboundImagesForTranscript` 를 감싸는 `src/gateway/server-methods/chat-send-user-turn.ts` 의 `persistChatSendImages`, 기록 본체는 `src/gateway/inbound-media-ownership.ts`. 이미지와 비이미지를 모두 남긴다. 기록이 실패해도 첨부 전송 자체는 진행한다. 행이 없으면 소유자가 없는 것이고, 그러면 시스템 관리자 외에는 아무도 못 여는 안전한 방향으로 실패한다.
+
+### 7-1-2. 판정
+
+정본은 `src/gateway/inbound-media-access.ts` 의 `authorizeInboundMediaRead` 하나다. 순서가 곧 규칙이다.
+
+1. `gateway.auth.mode` 가 `ix-auth` 가 아니면 통과. 공용 비밀 하나로 들어오는 배포에는 첨부를 귀속시킬 계정이 없다.
+2. 시스템 관리자는 전부 통과.
+3. `inbound_media` 행이 없으면 **404**. 이 표가 생기기 전에 올라온 파일(레거시)이 여기 걸린다.
+4. 요청자 프로필이 소유자면 통과.
+5. 그 첨부의 에이전트가 요청자의 부서에서 보이지 않으면 404. **관리자 통과는 이 검사 뒤에 있다.** 세션 공유 정책과 같은 순서라, 한 부서의 관리자가 다른 부서 첨부를 열 수 없다.
+6. 나머지는 그 세션이 요청자에게 보일 때만 통과한다(`createProfileSessionEntryFilter` + 역할별 `sessions.others` 상한).
+
+`sessionKey` 파라미터는 판정에 쓰지 않는다. 참조 문자열 자체에서 미디어 id 를 뽑고, `media://inbound/<id>` 형태와 저장소 안 절대경로 형태를 **둘 다** 같은 게이트에 태운다(`readInboundMediaIdFromSource`). 티켓 경로(`mediaTicket`)도 같은 판정을 받는다. 티켓의 reader 에 검증된 부서 사실을 같이 실어 두었다(`AssistantMediaReader.departments`, HMAC 서명 안).
+
+거부는 **404** 이고(존재 은닉, 4절과 같은 관례), 감사 원장에 `access_denied` 로 남는다. detail 은 `{ reason, surface: "assistant-media", mediaId }` 다(`recordInboundMediaDeniedActivity`).
+
+**같은 미디어를 내려주는 다른 경로**: `src/gateway/channel-avatar-http.ts` 도 인바운드 파일을 서빙하지만 호출자가 준 id 가 아니라 세션 저장소가 들고 있는 아바타 참조를 읽고, 그 전에 세션 소유자 권한을 요구한다. 임의 id 로 부를 수 없어 같은 결함이 아니다.
+
+### 7-1-3. 재참조 도구도 같은 경계를 쓴다
+
+`media_list` 와 `media_read` 는 도구 쪽 경계를 따로 만들지 않는다. 세션의 생성자 프로필이 소유자이고, 첨부가 기록된 에이전트의 부서 바인딩이 현재 에이전트의 것과 같아야 한다. 상세는 [FILE-PREVIEW.md](FILE-PREVIEW.md) 8절.
+
+### 7-1-4. 세션을 지우면
+
+`sessions.delete` 가 그 세션의 `inbound_media` 행에 `deleted_at` 만 찍는다(`softDeleteInboundMediaForSession`). 파일은 즉시 지우지 않는다. 이유 둘.
+
+- 사용자 요구가 "올린 파일은 나중에도 참조 가능해야 한다" 이고,
+- 감사 원장이 90일 동안 "누가 무엇을 열었나" 를 답해야 하는데 소유 사실이 사라지면 그 행을 설명할 수 없다.
+
+표시가 찍힌 행은 재참조 도구 두 개에서 사라진다. 소유자 판정 자체는 그대로 남으므로 남이 열 수 있게 되지는 않는다.
 
 ## 8. 동기화 시점과 반영 지연
 
