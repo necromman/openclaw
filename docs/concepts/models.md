@@ -86,6 +86,26 @@ Other selection rules:
 - The Control UI starts from the Gateway's prepared configured model view, so opening chat does not start provider discovery. Opening or refreshing a model picker may discover models required by a trailing `provider/*` policy entry. Default and configured picker views hide catalog rows marked `deprecated` or `disabled` unless that exact model is configured as a primary, fallback, utility/tool model, alias/settings key, or exact policy entry. Hidden rows remain selectable by exact `provider/model` ref. The full built-in catalog, including hidden rows, is reserved for explicit browse views (`models.list` with `view: "all"`, or `openclaw models list --all`).
 - Provider inventory UIs use `models.list` with `view: "provider-config"` to show source-authored `models.providers.*.models` rows without applying picker allowlists.
 
+Ordinary `models.list` and `/models` browsing use the Gateway's published
+configured or completed catalog. They do not start provider discovery, including
+after a restart. If the owner is not yet published, the request reports that the
+catalog is not ready. Retry after startup or an in-progress refresh finishes.
+Use an explicit Refresh action or `openclaw models list --refresh` to acquire
+provider inventory. Model selection, subagent capability checks, and hook-model
+validation also use the published inventory. Missing capability facts do not
+start another provider discovery. Native runtime observations keep their separate
+owner and authentication requirements.
+
+Programmatic catalog loads, including the public SDK loader, also default to
+passive reads. Without a published owner they use existing read-only facts. Callers
+that explicitly request a full refresh keep inventory acquisition; an explicit
+read-only request keeps its narrower refresh scope. Runtime callers can retain
+explicit writable ownership when needed.
+
+For models configured to use a CLI runtime, channel picker availability follows that
+runtime's prepared authentication; a provider API key does not substitute for its
+native login.
+
 Once the Gateway has discovered a provider inventory, model-selection hot reloads
 retain it without running discovery again. Aliases, policy, and runtime capabilities
 use the new configuration. Explicit catalog refresh replaces that inventory;
