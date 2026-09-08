@@ -121,6 +121,23 @@ describe("audit users fallback decision", () => {
     ).toBe(true);
   });
 
+  it("treats a refused handshake as unanswered", () => {
+    // The ix-auth container case: the connect frame is rejected, so no handler ran.
+    const refused = Object.assign(new Error("unauthorized"), {
+      name: "GatewayClientRequestError",
+      details: { code: "AUTH_REQUIRED", authReason: "gateway_auth_required" },
+    });
+    expect(isGatewayLedgerUnavailableError(refused)).toBe(true);
+  });
+
+  it("does not mistake a method rejection for a refused handshake", () => {
+    const denied = Object.assign(new Error("forbidden"), {
+      name: "GatewayClientRequestError",
+      details: { code: "FORBIDDEN" },
+    });
+    expect(isGatewayLedgerUnavailableError(denied)).toBe(false);
+  });
+
   it("keeps an answered rejection an answer", () => {
     // A handler that said no has decided. Reading around that decision locally would turn
     // an authorization answer into an authorization bypass.

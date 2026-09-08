@@ -14,6 +14,10 @@
 // the local database answers only when the RPC left the question unanswered on a target
 // whose ledger is genuinely this one.
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
+import {
+  ConnectErrorDetailCodes,
+  readConnectErrorDetailCode,
+} from "../../packages/gateway-protocol/src/connect-error-details.js";
 import type {
   AuditUserActivityListParams,
   AuditUserActivityListResult,
@@ -56,7 +60,28 @@ export function isGatewayLedgerUnavailableError(error: unknown): boolean {
   if (isGatewayCredentialsRequiredError(error) || isGatewayExplicitAuthRequiredError(error)) {
     return true;
   }
+  if (isGatewayHandshakeRefusal(error)) {
+    return true;
+  }
   return error instanceof Error && error.name === "GatewayStoredDeviceAuthUnavailableError";
+}
+
+/**
+ * Whether the Gateway refused the handshake rather than the query.
+ *
+ * This is the ix-auth container case: the connect frame is answered with `unauthorized`
+ * and the socket closes, so no handler ever saw the request. The discriminator is the
+ * structured detail code, which only the handshake emits, and never a method's own
+ * rejection. Matching on the message would be guesswork; matching on the code keeps a
+ * `FORBIDDEN` from `audit.userActivity.list` an answer that still stands.
+ */
+function isGatewayHandshakeRefusal(error: unknown): boolean {
+  if (!(error instanceof Error) || error.name !== "GatewayClientRequestError") {
+    return false;
+  }
+  const details = (error as { details?: unknown }).details;
+  const code = readConnectErrorDetailCode(details);
+  return code !== null && Object.hasOwn(ConnectErrorDetailCodes, code);
 }
 
 /** Why the RPC could not answer, in the words the operator sees on the notice line. */
@@ -72,6 +97,9 @@ function describeGatewayUnavailable(error: unknown): string {
     return reason
       ? `the gateway closed the connection: ${reason}`
       : "the gateway closed the connection";
+  }
+  if (isGatewayHandshakeRefusal(error)) {
+    return "the gateway refused this command's handshake";
   }
   return "this host holds no gateway credentials";
 }
