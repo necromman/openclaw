@@ -87,10 +87,14 @@
  * identifier: long, unbreakable, and read only when something has to be traced. It
  * is capped and clipped rather than allowed to push the table past the right edge,
  * and the whole key stays available in the cell's title. */
-.audit-table__session {
+/* The cap lives on an inner block, not on the cell: auto table layout treats a
+ * max-width on a `td` as a hint it may ignore, and it does. */
+.audit-table__session > span {
+  display: inline-block;
   max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .audit-table__expand {

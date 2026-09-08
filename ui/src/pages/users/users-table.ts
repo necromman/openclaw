@@ -80,10 +80,10 @@ function renderRow(params: {
           </span>
         </button>
       </td>
-      <td class="users-table__email" title=${user.email}>${user.email}</td>
+      <td class="users-table__email"><span title=${user.email}>${user.email}</span></td>
       <td>${renderRole(user)}</td>
       <td class="users-table__departments">
-        ${renderDepartments(user.departments, params.departments)}
+        <span>${renderDepartments(user.departments, params.departments)}</span>
       </td>
       <td>
         <span

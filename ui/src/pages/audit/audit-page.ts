@@ -253,8 +253,8 @@ export class AuditPage extends OpenClawLightDomElement {
               : nothing
           }
         </td>
-        <td class="audit-table__session" title=${event.sessionKey ?? ""}>
-          ${event.sessionKey ?? "-"}
+        <td class="audit-table__session">
+          <span title=${event.sessionKey ?? ""}>${event.sessionKey ?? "-"}</span>
         </td>
       </tr>
     `;

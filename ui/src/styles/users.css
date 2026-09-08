@@ -103,12 +103,16 @@
 
 /* An address and a department list are the two cells that can be long. Capping them
  * keeps the columns after them on screen at ordinary window widths; the full value
- * stays reachable through the cell's own title, and the box still scrolls. */
-.users-table__email,
-.users-table__departments {
+ * stays reachable through a title, and the box still scrolls. The cap sits on an
+ * inner block because auto table layout treats a max-width on a `td` as a hint it
+ * may ignore, and it does. */
+.users-table__email > span,
+.users-table__departments > span {
+  display: inline-block;
   max-width: 22rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .users-empty {
@@ -130,8 +134,8 @@
     padding: var(--space-1) var(--space-2);
   }
 
-  .users-table__email,
-  .users-table__departments {
+  .users-table__email > span,
+  .users-table__departments > span {
     max-width: 12rem;
   }
 }
