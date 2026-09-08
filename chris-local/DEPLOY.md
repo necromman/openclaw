@@ -11,15 +11,15 @@
 
 아래 7가지 가운데 7번은 사용자가 확정한 값이고, 나머지는 감독 판단으로 정한 기본값이다. 고객 요건이 다르면 바꾸고, 바꾼 값을 이 문서에 적는다.
 
-| #   | 가정                                                                                                              | 바꾸려면                                                                                                                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 관리 콘솔은 **외부에 포트를 열지 않는다.** 게이트웨이 경로 `/admin/identity/` 로만 superadmin·admin 에게 중계한다 | 별도 호스트명으로 띄우려면 `gateway.auth.ixAuth.adminConsoleUrl` 에 절대 URL 을 넣는다. 그때는 IP allowlist 나 VPN 이 반드시 앞에 있어야 한다 |
-| 2   | 역할 5단계 `SUPERADMIN`/`ADMIN`/`EXECUTIVE`/`MODERATOR`/`MEMBER` 를 **기동 시 마이그레이션으로 시드**한다         | 고객이 자기 역할 체계를 쓰면 `gateway.auth.ixAuth.roleMap` 을 그 코드에 맞춘다                                                                |
-| 3   | DB 는 **PostgreSQL 16**                                                                                           | MariaDB·MySQL 8 도 서버가 지원한다. `IXAUTH_DB_URL` 을 바꾸고 compose 의 `ix-auth-db` 를 교체한다                                             |
-| 4   | 한국어 로케일은 `pnpm ui:i18n:sync` 로 채운다                                                                     | 다른 언어를 쓰면 브라우저 언어 설정을 따른다. ko 외 로케일은 아직 영어 폴백이다 (7절)                                                         |
-| 5   | 호스트 포트는 **18800**                                                                                           | `.env` 의 `OPENCLAW_GATEWAY_PORT` 와 `OPENCLAW_PUBLIC_ORIGIN` 을 함께 바꾼다                                                                  |
-| 6   | 부서 강제를 **켠 채로** 납품한다 (`tools.sessions.visibility: "department"`, 부서 코드 `dept-<slug>`)             | 부서를 안 쓰는 고객이면 그 값을 `"self"` 로 되돌린다. 접두사는 `gateway.auth.ixAuth.departmentGroupPrefix` (AUTH-DEPARTMENTS.md 4·5절)        |
-| 7   | **사용자 확정(2026-09-07).** 주소는 `https://jinbio.botops.cloud`, TLS 는 Cloudflare Tunnel 로 붙인다. PoC·데모·초기 운영 한정이고 정식 납품 시 진바이오테크 자체 도메인으로 옮긴다 | 절차·되돌리기는 11.7. 도메인 없이 사내 IP 로만 쓰려면 11.1 로 간다 |
+| #   | 가정                                                                                                                                                                                | 바꾸려면                                                                                                                                      |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 관리 콘솔은 **외부에 포트를 열지 않는다.** 게이트웨이 경로 `/admin/identity/` 로만 superadmin·admin 에게 중계한다                                                                   | 별도 호스트명으로 띄우려면 `gateway.auth.ixAuth.adminConsoleUrl` 에 절대 URL 을 넣는다. 그때는 IP allowlist 나 VPN 이 반드시 앞에 있어야 한다 |
+| 2   | 역할 5단계 `SUPERADMIN`/`ADMIN`/`EXECUTIVE`/`MODERATOR`/`MEMBER` 를 **기동 시 마이그레이션으로 시드**한다                                                                           | 고객이 자기 역할 체계를 쓰면 `gateway.auth.ixAuth.roleMap` 을 그 코드에 맞춘다                                                                |
+| 3   | DB 는 **PostgreSQL 16**                                                                                                                                                             | MariaDB·MySQL 8 도 서버가 지원한다. `IXAUTH_DB_URL` 을 바꾸고 compose 의 `ix-auth-db` 를 교체한다                                             |
+| 4   | 한국어 로케일은 `pnpm ui:i18n:sync` 로 채운다                                                                                                                                       | 다른 언어를 쓰면 브라우저 언어 설정을 따른다. ko 외 로케일은 아직 영어 폴백이다 (7절)                                                         |
+| 5   | 호스트 포트는 **18800**                                                                                                                                                             | `.env` 의 `OPENCLAW_GATEWAY_PORT` 와 `OPENCLAW_PUBLIC_ORIGIN` 을 함께 바꾼다                                                                  |
+| 6   | 부서 강제를 **켠 채로** 납품한다 (`tools.sessions.visibility: "department"`, 부서 코드 `dept-<slug>`)                                                                               | 부서를 안 쓰는 고객이면 그 값을 `"self"` 로 되돌린다. 접두사는 `gateway.auth.ixAuth.departmentGroupPrefix` (AUTH-DEPARTMENTS.md 4·5절)        |
+| 7   | **사용자 확정(2026-09-07).** 주소는 `https://jinbio.botops.cloud`, TLS 는 Cloudflare Tunnel 로 붙인다. PoC·데모·초기 운영 한정이고 정식 납품 시 진바이오테크 자체 도메인으로 옮긴다 | 절차·되돌리기는 11.7. 도메인 없이 사내 IP 로만 쓰려면 11.1 로 간다                                                                            |
 
 ## 1. 요구사항
 
@@ -37,40 +37,40 @@
 
 `chris-local/ixauth.env.example` 을 `chris-local/ixauth.env` 로 복사해 채운다. 이 파일은 `.gitignore` 에 들어 있다 (`chris-local/ixauth.env`).
 
-| 변수                                    | 필수   | 기본값                                | 설명                                                                                                                            |
-| --------------------------------------- | ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `IXAUTH_DB_NAME`                        |        | `ixauth`                              | PostgreSQL 데이터베이스 이름                                                                                                    |
-| `IXAUTH_DB_USERNAME`                    |        | `ixauth`                              | DB 사용자                                                                                                                       |
-| `IXAUTH_DB_PASSWORD`                    | **예** |                                       | DB 비밀번호. `openssl rand -base64 24`                                                                                          |
-| `IXAUTH_SERVICE_KEY`                    | **예** |                                       | 게이트웨이와 신원 서버의 공유 비밀. **32자 이상**이어야 서버가 뜬다. `openssl rand -base64 36`. 브라우저에는 절대 나가지 않는다 |
-| `IXAUTH_ADMIN_EMAIL`                    | **예** |                                       | 최초 관리자 이메일. 첫 부팅에만 시드되고 `SUPERADMIN` 을 받는다                                                                 |
-| `IXAUTH_ADMIN_PASSWORD`                 | **예** |                                       | 최초 관리자 비밀번호. 아래 비밀번호 정책을 만족해야 한다                                                                        |
-| `IXAUTH_ADMIN_NAME`                     |        | `관리자`                              | 콘솔에 보이는 표시 이름                                                                                                         |
-| `IXAUTH_PASSWORD_MIN_LENGTH`            |        | `10`                                  | 최소 길이. 대문자·숫자·특수문자 각 1개 이상은 서버 기본값으로 항상 요구된다                                                     |
-| `IXAUTH_LOG_LEVEL`                      |        | `INFO`                                | 신원 서버 로그 수준                                                                                                             |
-| `IXAUTH_ACCOUNT_SIGNUP_MODE`            |        | `CLOSED`                              | 자체 가입 모드. 계정은 관리자가 만든다. `OPEN`·`APPROVAL` 은 메일이 먼저 있어야 한다                                            |
-| `IXAUTH_ACCOUNT_SIGNUP_VERIFICATION`    |        | `EMAIL`                               | 가입 본인확인. `EMAIL` 인증 메일 / `NONE` 생략 / `PASS` 별도 연동                                                               |
-| `IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS` |        | (없음)                                | 가입 허용 도메인. 쉼표로 구분. 비우면 제한 없음. 초대에는 적용되지 않는다                                                       |
-| `IXAUTH_ACCOUNT_INVITE_TOKEN_TTL`       |        | `72h`                                 | 초대 링크 수명. 원본 기본값 `7d` 에서 줄였다                                                                                    |
-| `IXAUTH_MAIL_TRANSPORT`                 |        | `WEBHOOK`                             | `WEBHOOK` 게이트웨이가 초대 링크를 보관 / `SMTP` 실제 발송 / `LOG` 개발용. 자세한 것은 AUTH-SIGNUP.md 6.1                       |
-| `IXAUTH_MAIL_WEBHOOK_URL`               |        | `http://gateway:18789/auth/mail-hook` | WEBHOOK 일 때만 읽는다. 컴포즈 네트워크 주소이지 브라우저 오리진이 아니다                                                       |
-| `IXAUTH_MAIL_FROM`                      |        | `no-reply@localhost`                  | 보내는 사람                                                                                                                     |
-| `IXAUTH_MAIL_PRODUCT_NAME`              |        | `Chris Agent`                         | 메일 제목·본문에 쓰는 제품명                                                                                                    |
-| `IXAUTH_MAIL_SMTP_HOST`                 |        |                                       | SMTP 서버. `IXAUTH_MAIL_TRANSPORT=SMTP` 일 때만 읽는다                                                                          |
-| `IXAUTH_MAIL_SMTP_PORT`                 |        | `587`                                 | SMTP 포트                                                                                                                       |
-| `IXAUTH_MAIL_SMTP_USERNAME`             |        |                                       | 비우면 인증 없이 보낸다                                                                                                         |
-| `IXAUTH_MAIL_SMTP_PASSWORD`             |        |                                       | 위와 같다                                                                                                                       |
-| `IXAUTH_MAIL_SMTP_STARTTLS`             |        | `true`                                | STARTTLS 사용 여부                                                                                                              |
-| `MAILPIT_UI_PORT`                       |        | `18025`                               | 개발용 수신함(`--profile mail`)의 호스트 포트                                                                                   |
-| `OPENCLAW_GATEWAY_PORT`                 |        | `18800`                               | 호스트에 여는 포트                                                                                                              |
-| `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다. 터널을 쓰면 `https://jinbio.botops.cloud` (11.7) |
+| 변수                                    | 필수   | 기본값                                | 설명                                                                                                                                                                                          |
+| --------------------------------------- | ------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IXAUTH_DB_NAME`                        |        | `ixauth`                              | PostgreSQL 데이터베이스 이름                                                                                                                                                                  |
+| `IXAUTH_DB_USERNAME`                    |        | `ixauth`                              | DB 사용자                                                                                                                                                                                     |
+| `IXAUTH_DB_PASSWORD`                    | **예** |                                       | DB 비밀번호. `openssl rand -base64 24`                                                                                                                                                        |
+| `IXAUTH_SERVICE_KEY`                    | **예** |                                       | 게이트웨이와 신원 서버의 공유 비밀. **32자 이상**이어야 서버가 뜬다. `openssl rand -base64 36`. 브라우저에는 절대 나가지 않는다                                                               |
+| `IXAUTH_ADMIN_EMAIL`                    | **예** |                                       | 최초 관리자 이메일. 첫 부팅에만 시드되고 `SUPERADMIN` 을 받는다                                                                                                                               |
+| `IXAUTH_ADMIN_PASSWORD`                 | **예** |                                       | 최초 관리자 비밀번호. 아래 비밀번호 정책을 만족해야 한다                                                                                                                                      |
+| `IXAUTH_ADMIN_NAME`                     |        | `관리자`                              | 콘솔에 보이는 표시 이름                                                                                                                                                                       |
+| `IXAUTH_PASSWORD_MIN_LENGTH`            |        | `10`                                  | 최소 길이. 대문자·숫자·특수문자 각 1개 이상은 서버 기본값으로 항상 요구된다                                                                                                                   |
+| `IXAUTH_LOG_LEVEL`                      |        | `INFO`                                | 신원 서버 로그 수준                                                                                                                                                                           |
+| `IXAUTH_ACCOUNT_SIGNUP_MODE`            |        | `CLOSED`                              | 자체 가입 모드. 계정은 관리자가 만든다. `OPEN`·`APPROVAL` 은 메일이 먼저 있어야 한다                                                                                                          |
+| `IXAUTH_ACCOUNT_SIGNUP_VERIFICATION`    |        | `EMAIL`                               | 가입 본인확인. `EMAIL` 인증 메일 / `NONE` 생략 / `PASS` 별도 연동                                                                                                                             |
+| `IXAUTH_ACCOUNT_SIGNUP_ALLOWED_DOMAINS` |        | (없음)                                | 가입 허용 도메인. 쉼표로 구분. 비우면 제한 없음. 초대에는 적용되지 않는다                                                                                                                     |
+| `IXAUTH_ACCOUNT_INVITE_TOKEN_TTL`       |        | `72h`                                 | 초대 링크 수명. 원본 기본값 `7d` 에서 줄였다                                                                                                                                                  |
+| `IXAUTH_MAIL_TRANSPORT`                 |        | `WEBHOOK`                             | `WEBHOOK` 게이트웨이가 초대 링크를 보관 / `SMTP` 실제 발송 / `LOG` 개발용. 자세한 것은 AUTH-SIGNUP.md 6.1                                                                                     |
+| `IXAUTH_MAIL_WEBHOOK_URL`               |        | `http://gateway:18789/auth/mail-hook` | WEBHOOK 일 때만 읽는다. 컴포즈 네트워크 주소이지 브라우저 오리진이 아니다                                                                                                                     |
+| `IXAUTH_MAIL_FROM`                      |        | `no-reply@localhost`                  | 보내는 사람                                                                                                                                                                                   |
+| `IXAUTH_MAIL_PRODUCT_NAME`              |        | `Chris Agent`                         | 메일 제목·본문에 쓰는 제품명                                                                                                                                                                  |
+| `IXAUTH_MAIL_SMTP_HOST`                 |        |                                       | SMTP 서버. `IXAUTH_MAIL_TRANSPORT=SMTP` 일 때만 읽는다                                                                                                                                        |
+| `IXAUTH_MAIL_SMTP_PORT`                 |        | `587`                                 | SMTP 포트                                                                                                                                                                                     |
+| `IXAUTH_MAIL_SMTP_USERNAME`             |        |                                       | 비우면 인증 없이 보낸다                                                                                                                                                                       |
+| `IXAUTH_MAIL_SMTP_PASSWORD`             |        |                                       | 위와 같다                                                                                                                                                                                     |
+| `IXAUTH_MAIL_SMTP_STARTTLS`             |        | `true`                                | STARTTLS 사용 여부                                                                                                                                                                            |
+| `MAILPIT_UI_PORT`                       |        | `18025`                               | 개발용 수신함(`--profile mail`)의 호스트 포트                                                                                                                                                 |
+| `OPENCLAW_GATEWAY_PORT`                 |        | `18800`                               | 호스트에 여는 포트                                                                                                                                                                            |
+| `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다. 터널을 쓰면 `https://jinbio.botops.cloud` (11.7)                            |
 | `OPENCLAW_TRUSTED_PROXIES`              |        | (없음)                                | `x-forwarded-proto` 를 믿어도 되는 앞단 주소 목록, 쉼표 구분. 비우면 게이트웨이가 모든 접속을 평문으로 보고 `__Host-` 없는 쿠키를 내린다. TLS 종단이 앞에 실제로 있을 때만 채운다 (11.3·11.7) |
-| `CLOUDFLARE_TUNNEL_TOKEN`               |        | (없음)                                | Cloudflare Tunnel 토큰. `--profile tunnel` 일 때만 읽는다. 시크릿이므로 `.env` 에만 두고 어디에도 커밋하지 않는다 (11.7) |
-| `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                 |
-| `OPENCLAW_NAS_ROOT`                     |        | (없음)                                | 부서 공유의 부모 경로. 비우면 샘플 트리를 마운트하고 부서 에이전트는 자기 워크스페이스를 쓴다 (11.4)                            |
-| `OPENCLAW_KNOWLEDGE_ROOT`               |        | (없음)                                | 마크다운 사이드카 색인의 부모 경로. 비우면 부서 에이전트의 `extraPaths` 가 빈 목록이 된다 (12절, KNOWLEDGE.md)                  |
-| `ANTHROPIC_API_KEY`                     |        | (없음)                                | 외부 모델 API 키. 사내 ollama 만 쓰면 비워 둔다. 설정 파일에는 `"${ANTHROPIC_API_KEY}"` 이름만 적는다 (3.4)                     |
-| `OPENAI_API_KEY`                        |        | (없음)                                | 위와 같다. 두 키 모두 비면 모델 목록이 비고 화면에 "사용 가능한 모델 없음" 이 뜬다                                              |
+| `CLOUDFLARE_TUNNEL_TOKEN`               |        | (없음)                                | Cloudflare Tunnel 토큰. `--profile tunnel` 일 때만 읽는다. 시크릿이므로 `.env` 에만 두고 어디에도 커밋하지 않는다 (11.7)                                                                      |
+| `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                                                                               |
+| `OPENCLAW_NAS_ROOT`                     |        | (없음)                                | 부서 공유의 부모 경로. 비우면 샘플 트리를 마운트하고 부서 에이전트는 자기 워크스페이스를 쓴다 (11.4)                                                                                          |
+| `OPENCLAW_KNOWLEDGE_ROOT`               |        | (없음)                                | 마크다운 사이드카 색인의 부모 경로. 비우면 부서 에이전트의 `extraPaths` 가 빈 목록이 된다 (12절, KNOWLEDGE.md)                                                                                |
+| `ANTHROPIC_API_KEY`                     |        | (없음)                                | 외부 모델 API 키. 사내 ollama 만 쓰면 비워 둔다. 설정 파일에는 `"${ANTHROPIC_API_KEY}"` 이름만 적는다 (3.4)                                                                                   |
+| `OPENAI_API_KEY`                        |        | (없음)                                | 위와 같다. 두 키 모두 비면 모델 목록이 비고 화면에 "사용 가능한 모델 없음" 이 뜬다                                                                                                            |
 
 `gateway.auth.ixAuth.selfSignup` 도 **환경변수가 아니다.** `start-gateway.sh` 가 `IXAUTH_ACCOUNT_SIGNUP_MODE` 에서 유도한다(`OPEN`·`APPROVAL` 이면 가입 화면이 열린다). 두 곳을 손으로 맞추면 "가입 화면은 있는데 누르면 거부" 가 생긴다.
 
@@ -347,14 +347,14 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 4. **확인한다.** 위에서 아래로 하나씩 본다. 앞 단계가 안 되면 뒤는 볼 필요가 없다.
 
-   | 순서 | 확인                                                | 어디서                                                                       |
-   | ---- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
-   | 1    | 모델 목록에 새 모델이 보인다                        | 위 "확인" 의 `models list`                                                   |
-   | 2    | 부서 색인이 최신이다                                | `knowledge sync`(12절) 후 `memory index --force --agent rnd-bot`(3.5)        |
-   | 3    | rnd-bot 이 폴더 문서를 요약하고 **원본 경로**를 낸다 | 로그인 후 rnd-bot 세션에서 질문. 인용 규칙은 [KNOWLEDGE.md](KNOWLEDGE.md)    |
-   | 4    | qa-bot 에게 R&D 자료를 물으면 못 찾는다             | 같은 질문을 qa-bot 에게. 부서 경계는 마운트와 워크스페이스가 만든다          |
-   | 5    | 쓰기 요청이 거부된다                                | rnd-bot 에게 파일 수정을 시킨다. 공유는 `:ro` 이고 도구 프로필은 `readonly`  |
-   | 6    | 경계 경고가 없다                                    | `openclaw doctor --lint --only codex/agent-workspace-boundary`               |
+   | 순서 | 확인                                                 | 어디서                                                                      |
+   | ---- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
+   | 1    | 모델 목록에 새 모델이 보인다                         | 위 "확인" 의 `models list`                                                  |
+   | 2    | 부서 색인이 최신이다                                 | `knowledge sync`(12절) 후 `memory index --force --agent rnd-bot`(3.5)       |
+   | 3    | rnd-bot 이 폴더 문서를 요약하고 **원본 경로**를 낸다 | 로그인 후 rnd-bot 세션에서 질문. 인용 규칙은 [KNOWLEDGE.md](KNOWLEDGE.md)   |
+   | 4    | qa-bot 에게 R&D 자료를 물으면 못 찾는다              | 같은 질문을 qa-bot 에게. 부서 경계는 마운트와 워크스페이스가 만든다         |
+   | 5    | 쓰기 요청이 거부된다                                 | rnd-bot 에게 파일 수정을 시킨다. 공유는 `:ro` 이고 도구 프로필은 `readonly` |
+   | 6    | 경계 경고가 없다                                     | `openclaw doctor --lint --only codex/agent-workspace-boundary`              |
 
    근거와 배경은 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 3-1절과 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.9.
 
@@ -567,11 +567,11 @@ chris-local/reset-seed.sh --accounts delete --invites --audit
 chris-local/reset-seed.sh --accounts delete --invites --audit --yes
 ```
 
-| 구분          | 계정                                                                              | 결과                          |
-| ------------- | --------------------------------------------------------------------------------- | ----------------------------- |
-| 지운다        | `solo` `nobody` `nobody-1` `nobody-2` `newjoiner` `invitee` `qamem` `mod` `member` `admin2` `exec1` | 목록에서 사라진다             |
-| 남긴다        | `.env` 의 `IXAUTH_ADMIN_EMAIL` (SUPERADMIN 시드 계정)                             | 이 계정으로 인수인계한다      |
-| 남긴다        | 고객이 직접 만든 계정                                                             | 이름이 목록에 없으므로 안전   |
+| 구분   | 계정                                                                                                | 결과                        |
+| ------ | --------------------------------------------------------------------------------------------------- | --------------------------- |
+| 지운다 | `solo` `nobody` `nobody-1` `nobody-2` `newjoiner` `invitee` `qamem` `mod` `member` `admin2` `exec1` | 목록에서 사라진다           |
+| 남긴다 | `.env` 의 `IXAUTH_ADMIN_EMAIL` (SUPERADMIN 시드 계정)                                               | 이 계정으로 인수인계한다    |
+| 남긴다 | 고객이 직접 만든 계정                                                                               | 이름이 목록에 없으므로 안전 |
 
 실행 뒤 `/settings/users` 를 열어 남은 계정이 관리자 하나뿐인지 눈으로 본다. 목록에 없던 시험
 계정을 더 만들었으면 `--account <이름>` 으로 한 건씩 지운다.
@@ -584,12 +584,12 @@ chris-local/reset-seed.sh --accounts delete --invites --audit --yes
 기능 결정은 2026-09-08 에 전부 끝났다. 배포 시점에 값만 넣으면 되는 것이 아래 네 가지이고,
 각 항목의 절차는 옆 칸의 절이 정본이다.
 
-| # | 넣을 것            | 절차       | 안 넣으면                                                             |
-| - | ------------------ | ---------- | --------------------------------------------------------------------- |
-| 1 | 모델 API 키 한 개  | 3.4 (라)   | `main` 은 구독으로 답하고 부서 에이전트는 답하지 못한다               |
-| 2 | 고객 SMTP 자격증명 | 3.8        | 초대 링크를 관리자가 손으로 전달한다. 비밀번호 재설정 메일이 안 나간다 |
-| 3 | 제품명             | FORK.md 5-1 (`src/brand.ts` 의 `BRAND_NAME`) | 임시값 "Chris Agent" 가 화면과 메일에 그대로 나온다 |
-| 4 | 약관 문안          | 고객 제공  | 가입·초대 화면에 약관 링크가 없다                                      |
+| #   | 넣을 것            | 절차                                         | 안 넣으면                                                              |
+| --- | ------------------ | -------------------------------------------- | ---------------------------------------------------------------------- |
+| 1   | 모델 API 키 한 개  | 3.4 (라)                                     | `main` 은 구독으로 답하고 부서 에이전트는 답하지 못한다                |
+| 2   | 고객 SMTP 자격증명 | 3.8                                          | 초대 링크를 관리자가 손으로 전달한다. 비밀번호 재설정 메일이 안 나간다 |
+| 3   | 제품명             | FORK.md 5-1 (`src/brand.ts` 의 `BRAND_NAME`) | 임시값 "Chris Agent" 가 화면과 메일에 그대로 나온다                    |
+| 4   | 약관 문안          | 고객 제공                                    | 가입·초대 화면에 약관 링크가 없다                                      |
 
 같이 하는 것: 시험 계정 정리(4.1 (다)), 도메인·터널 확인(11.7), 백업 1회(4절).
 
@@ -628,13 +628,13 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 ## 8. 라이선스 확인 항목 (납품 전 법무 확인 필요)
 
-| 대상                                    | 라이선스                       | 상태                    |
-| --------------------------------------- | ------------------------------ | ----------------------- |
+| 대상                                    | 라이선스                       | 상태                                                                               |
+| --------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------- |
 | **IX-Auth** (`ix-auth/`)                | `package.json` 이 `UNLICENSED` | **해결.** 자사 제품이라 동봉·재배포에 제약이 없음을 사용자가 확인했다 (2026-09-08) |
-| 게이트웨이                              | MIT                            | 문제 없음               |
-| `postgres:16-alpine`                    | PostgreSQL License (BSD 계열)  | 문제 없음               |
-| Chromium (`OPENCLAW_INSTALL_BROWSER=1`) | BSD 계열 + 다수                | 고지 의무 확인          |
-| Noto CJK 폰트                           | SIL OFL 1.1                    | 재배포 시 라이선스 동봉 |
+| 게이트웨이                              | MIT                            | 문제 없음                                                                          |
+| `postgres:16-alpine`                    | PostgreSQL License (BSD 계열)  | 문제 없음                                                                          |
+| Chromium (`OPENCLAW_INSTALL_BROWSER=1`) | BSD 계열 + 다수                | 고지 의무 확인                                                                     |
+| Noto CJK 폰트                           | SIL OFL 1.1                    | 재배포 시 라이선스 동봉                                                            |
 
 **IX-Auth 는 자사 제품이다.** `package.json` 의 `UNLICENSED` 표기는 공개 npm 배포를 막는 표시일 뿐이고, 자사 제품을 자사 납품물에 동봉하는 데는 제약이 없다는 것을 사용자가 2026-09-08 에 확인했다. 남은 것은 문서 정리뿐이다.
 
@@ -997,14 +997,14 @@ NAS 는 **파일 공유 자리로 두고**, 게이트웨이 호스트가 그 공
 
 사용자 결정(2026-09-07): 개인 도메인 `botops.cloud` 의 서브도메인 **`jinbio.botops.cloud`** 로 서비스하고,TLS 는 Cloudflare 가 맡는다. cloudflared 컨테이너를 이 스택에 함께 띄워 홈랩 Cloudflare 계정의터널로 게이트웨이를 노출한다.
 
-| 항목             | 값                                                            |
-| ---------------- | ------------------------------------------------------------- |
-| 주소             | `https://jinbio.botops.cloud`                                 |
-| TLS              | Cloudflare 자동 (인증서 발급·갱신 없음)                       |
-| 공유기 포트포워딩 | 필요 없다 (cloudflared 가 나가는 연결만 쓴다)                 |
-| 공인 IP · NS 이전 | 필요 없다                                                     |
-| WebSocket        | 그대로 통과한다 (Control UI 가 이것으로 붙는다)               |
-| 적용 범위        | **PoC·데모·초기 운영.** 정식 납품 시 진바이오테크 자체 도메인으로 옮긴다 |
+| 항목              | 값                                                                       |
+| ----------------- | ------------------------------------------------------------------------ |
+| 주소              | `https://jinbio.botops.cloud`                                            |
+| TLS               | Cloudflare 자동 (인증서 발급·갱신 없음)                                  |
+| 공유기 포트포워딩 | 필요 없다 (cloudflared 가 나가는 연결만 쓴다)                            |
+| 공인 IP · NS 이전 | 필요 없다                                                                |
+| WebSocket         | 그대로 통과한다 (Control UI 가 이것으로 붙는다)                          |
+| 적용 범위         | **PoC·데모·초기 운영.** 정식 납품 시 진바이오테크 자체 도메인으로 옮긴다 |
 
 경계를 분명히 해 둔다. 이 주소는 감독 개인 계정의 도메인이고 터널도 그 계정의 것이다.고객이 상시 운영에 들어가면 고객 도메인과 고객 계정으로 옮겨야 한다. 옮길 때 바뀌는 것은`OPENCLAW_PUBLIC_ORIGIN` 과 터널 토큰 두 개뿐이다.
 
@@ -1016,14 +1016,14 @@ Cloudflare 대시보드에서 한 번만 한다. 저장소에서 할 일은 없�
 2. 이름을 정하고 만들면 **토큰**이 나온다. 이 값이 자격증명이다.
 3. 만든 터널의 **Public Hostname** 에 한 줄 추가한다.
 
-   | 칸        | 값                       |
-   | --------- | ------------------------ |
-   | Subdomain | `jinbio`                 |
-   | Domain    | `botops.cloud`           |
-   | Type      | `HTTP`                   |
-   | URL       | `gateway:18789`          |
+   | 칸        | 값              |
+   | --------- | --------------- |
+   | Subdomain | `jinbio`        |
+   | Domain    | `botops.cloud`  |
+   | Type      | `HTTP`          |
+   | URL       | `gateway:18789` |
 
-   **호스트의 `127.0.0.1:18800` 이 아니다.** cloudflared 는 이 스택의 compose 네트워크 안에서 돌고,   거기서 게이트웨이는 서비스 이름 `gateway` 의 컨테이너 포트 `18789` 로 보인다. 호스트 포트는   같은 곳으로 가는 두 번째 문일 뿐이고, 그쪽으로 돌리면 터널이 호스트의 포트 게시에 의존하게 된다.
+   **호스트의 `127.0.0.1:18800` 이 아니다.** cloudflared 는 이 스택의 compose 네트워크 안에서 돌고, 거기서 게이트웨이는 서비스 이름 `gateway` 의 컨테이너 포트 `18789` 로 보인다. 호스트 포트는 같은 곳으로 가는 두 번째 문일 뿐이고, 그쪽으로 돌리면 터널이 호스트의 포트 게시에 의존하게 된다.
 
 #### (나) 값을 넣고 띄운다
 
@@ -1042,11 +1042,11 @@ docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose
 
 세 값이 한 벌이다.
 
-| 값                         | 없으면                                                                     |
-| -------------------------- | -------------------------------------------------------------------------- |
-| `OPENCLAW_PUBLIC_ORIGIN`   | 로그인 폼이 403 `origin_not_allowed`, 또는 화면이 계속 연결 중             |
-| `OPENCLAW_TRUSTED_PROXIES` | 로그인은 되지만 쿠키가 평문 배포 모양 그대로다 (아래 (다))                 |
-| `CLOUDFLARE_TUNNEL_TOKEN`  | `docker compose` 가 변수 없음으로 거부한다                                 |
+| 값                         | 없으면                                                         |
+| -------------------------- | -------------------------------------------------------------- |
+| `OPENCLAW_PUBLIC_ORIGIN`   | 로그인 폼이 403 `origin_not_allowed`, 또는 화면이 계속 연결 중 |
+| `OPENCLAW_TRUSTED_PROXIES` | 로그인은 되지만 쿠키가 평문 배포 모양 그대로다 (아래 (다))     |
+| `CLOUDFLARE_TUNNEL_TOKEN`  | `docker compose` 가 변수 없음으로 거부한다                     |
 
 #### (다) 평문 HTTP 의 손실이 사라진다
 
