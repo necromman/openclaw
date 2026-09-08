@@ -15,6 +15,10 @@ import {
   resolveAgentWorkspaceDir,
 } from "../agents/agent-scope.js";
 import { resolveExecDefaults } from "../agents/exec-defaults.js";
+import {
+  isPermissionModeWider,
+  resolveAgentDefaultPermissionMode,
+} from "../agents/agent-permission-mode.js";
 import { resolveAgentAvatarUrlFromSource } from "../agents/identity-avatar-file.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
 import { splitTrailingAuthProfile } from "../agents/model-ref-profile.js";
@@ -336,6 +340,30 @@ function resolvedPermissionLabel(
     : undefined;
 }
 
+/**
+ * The narrower of the two things that decide what a new session on this agent may do.
+ *
+ * `resolvedPermissionLabel` reads the exec policy, which is only half the answer here:
+ * this fork also lets `agents.entries.<id>.tools.permissionMode` set the mode a session
+ * inherits, and a file-server agent pinned to `read-only` still resolves the default exec
+ * policy. The chip in the composer reads this field, so showing only the exec side made a
+ * read-only agent announce full access, which is exactly the overstatement the rule above
+ * forbids. Taking the narrower of the two keeps that rule while letting the configured
+ * ceiling be seen.
+ */
+function narrowerAgentPermissionLabel(
+  fromExecPolicy: GatewayAgentRow["defaultPermissionMode"],
+  fromConfig: GatewayAgentRow["defaultPermissionMode"],
+): GatewayAgentRow["defaultPermissionMode"] {
+  if (fromConfig === undefined) {
+    return fromExecPolicy;
+  }
+  if (fromExecPolicy === undefined) {
+    return fromConfig;
+  }
+  return isPermissionModeWider(fromExecPolicy, fromConfig) ? fromConfig : fromExecPolicy;
+}
+
 export function listAgentsForGateway(
   cfg: OpenClawConfig,
   modelCatalog?: ModelCatalogEntry[],
@@ -398,10 +426,12 @@ export function listAgentsForGateway(
     const execDefaults = resolveExecDefaults({ cfg, agentId: id, execApprovals });
     // This label must never overstate permissiveness. When sandbox policy can vary
     // by session, the effective policy is unknowable at agent scope: omit the label.
-    const defaultPermissionMode =
+    const defaultPermissionMode = narrowerAgentPermissionLabel(
       resolveSandboxConfigForAgent(cfg, id).mode === "off"
         ? resolvedPermissionLabel(execDefaults)
-        : undefined;
+        : undefined,
+      resolveAgentDefaultPermissionMode(cfg, id),
+    );
     const resolvedModel = resolveDefaultModelForAgent({ cfg, agentId: id });
     const model = resolveGatewayAgentModel(cfg, id, resolvedModel);
     const sessionKey = resolveAgentMainSessionKey({ cfg, agentId: id });

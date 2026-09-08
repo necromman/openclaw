@@ -4166,6 +4166,50 @@ describe("gateway session utils", () => {
     });
   });
 
+  test.each<{ name: string; cfg: OpenClawConfig; expected: string | undefined }>([
+    {
+      // The delivery case: a file-server agent pinned to read-only whose exec policy
+      // still resolves to full. The chip must say read-only, not full access.
+      name: "a configured read-only ceiling under a permissive exec policy",
+      cfg: {
+        tools: { exec: { security: "full", ask: "off" } },
+        agents: { entries: { main: { tools: { permissionMode: "read-only" } } } },
+      },
+      expected: "read-only",
+    },
+    {
+      name: "the exec policy when it is the narrower of the two",
+      cfg: {
+        tools: { exec: { security: "deny", ask: "off" } },
+        agents: { entries: { main: { tools: { permissionMode: "full" } } } },
+      },
+      expected: "read-only",
+    },
+    {
+      name: "a ceiling inherited from the agent defaults",
+      cfg: {
+        tools: { exec: { security: "full", ask: "off" } },
+        agents: { defaults: { tools: { permissionMode: "guarded" } }, entries: { main: {} } },
+      },
+      expected: "guarded",
+    },
+    {
+      // With no exec label at all the configured ceiling is the only thing known, and
+      // showing it is better than showing nothing.
+      name: "a ceiling where the exec policy has no matching label",
+      cfg: {
+        tools: { exec: { security: "allowlist", ask: "off" } },
+        agents: { entries: { main: { tools: { permissionMode: "read-only" } } } },
+      },
+      expected: "read-only",
+    },
+  ])("listAgentsForGateway reports $name", async ({ cfg, expected }) => {
+    await withStateDirEnv("openclaw-agent-permission-ceiling-", async () => {
+      const agent = listAgentsForGateway(cfg).agents.find((entry) => entry.id === "main");
+      expect(agent).toHaveProperty("defaultPermissionMode", expected);
+    });
+  });
+
   test("listAgentsForGateway shares one approvals read across agent permission labels", async () => {
     await withStateDirEnv("openclaw-agent-permission-roster-", async () => {
       const cfg: OpenClawConfig = {
