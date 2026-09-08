@@ -44,10 +44,11 @@ export function isDepartmentFolderRejection(
  * The roots this deployment might hold the shares under, most specific first.
  *
  * The compose file fixes the container-side mount point, so the default needs no setting
- * of its own. `OPENCLAW_NAS_ROOT` is deliberately not read here: it names the parent of
- * the shares *on the host*, which is what compose needs it for and which usually does not
- * exist inside the container. A deployment that mounts somewhere else passes its own root
- * instead of relying on a second name for the same thing.
+ * of its own. The share-root variable the compose file reads is deliberately not read
+ * here: it names the parent of the shares *on the host*, which is what compose needs it
+ * for and which usually does not exist inside the container. A deployment that mounts
+ * somewhere else passes its own root instead of relying on a second name for the same
+ * thing (see chris-local/DEPLOY.md section 11.4).
  */
 export function departmentFolderRootCandidates(overrideRoot?: string): string[] {
   const configured = overrideRoot?.trim();
