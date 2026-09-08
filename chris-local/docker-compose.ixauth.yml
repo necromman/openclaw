@@ -240,7 +240,7 @@ services:
   #
   # Two settings ride with this profile and are not optional:
   #   OPENCLAW_PUBLIC_ORIGIN=https://<hostname>   the browser origin is now the tunnel's
-  #   OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12      so the forwarded https is believed
+  #   OPENCLAW_TRUSTED_PROXIES=172.16.240.10      so the forwarded https is believed
   # Procedure, boundaries and rollback: DEPLOY.md 11.7.
   #
   # The image tag is pinned to a real release rather than "latest" so a rebuild cannot
@@ -271,7 +271,13 @@ services:
       - NET_ADMIN
     security_opt:
       - no-new-privileges:true
-    networks: [ix-auth-internal]
+    # A fixed address, so OPENCLAW_TRUSTED_PROXIES can name this container and nothing
+    # else. The Gateway believes a forwarded scheme and a forwarded client address only
+    # from a listed address, and every other member of this network (and every container
+    # on a neighbouring one) would inherit that trust from a range.
+    networks:
+      ix-auth-internal:
+        ipv4_address: 172.16.240.10
 
   # Development inbox. Started only with --profile mail, and used to prove the SMTP
   # branch end to end: set IXAUTH_MAIL_TRANSPORT=SMTP and IXAUTH_MAIL_SMTP_HOST=mailpit
@@ -293,5 +299,17 @@ volumes:
   gateway-state:
 
 networks:
+  # The address range is pinned so cloudflared can hold a fixed address and the trusted
+  # proxy list can name that one address instead of a whole private range. Docker would
+  # otherwise pick a range from its pool at creation time and the address would move.
+  #
+  # 172.16.240.0/24 is inside Docker's usual 172.16.0.0/12 pool but outside the /16 blocks
+  # it hands out by default (172.17-172.31), so it does not collide with other stacks on
+  # the same host. Changing it later requires recreating the network: "docker compose down"
+  # then "up -d". An in-place "up -d" refuses, because a network's addressing cannot be
+  # edited under running containers.
   ix-auth-internal:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.240.0/24

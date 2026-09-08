@@ -167,12 +167,30 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 128m
-    networks: [ix-auth-internal]
+    # A fixed address, so OPENCLAW_TRUSTED_PROXIES can name this container and nothing
+    # else. The Gateway believes a forwarded scheme and a forwarded client address only
+    # from a listed address, and every other member of this network (and every container
+    # on a neighbouring one) would inherit that trust from a range.
+    networks:
+      ix-auth-internal:
+        ipv4_address: 172.16.240.10
 
 volumes:
   ix-auth-db-data:
   gateway-state:
 
 networks:
+  # The address range is pinned so cloudflared can hold a fixed address and the trusted
+  # proxy list can name that one address instead of a whole private range. Docker would
+  # otherwise pick a range from its pool at creation time and the address would move.
+  #
+  # 172.16.240.0/24 is inside Docker's usual 172.16.0.0/12 pool but outside the /16 blocks
+  # it hands out by default (172.17-172.31), so it does not collide with the other stacks
+  # on this host. Changing it later requires recreating the network: "docker-compose down"
+  # then "up -d". An in-place "up -d" refuses, because a network's addressing cannot be
+  # edited under running containers, and deploy.sh only ever runs "up -d".
   ix-auth-internal:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.240.0/24

@@ -147,33 +147,105 @@ IX-Auth 콘솔(`/admin/identity/`)은 **superadmin 에게만** "고급" 링크�
 
 ### 3.3 부서 운영
 
+> **이 납품의 에이전트는 `main` 하나다** (사용자 결정 2026-09-08, 4절 10번). 부서와 부서 소속은 그대로 쓰고, 부서 **에이전트**만 두지 않는다. 정본 템플릿의 `agents.entries` 에는 `main` 만 있고 `rnd-bot`·`qa-bot` 은 없다. 다시 켜는 절차는 3.3-1 이다.
+
 부서 경계는 **에이전트**에 그어진다. 세션은 그 에이전트의 워크스페이스·스킬·지식 안에서만 살기 때문이다. 전체 규칙과 되돌리기는 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).
 
 ```bash
 # 1) 콘솔(/admin/identity/)에서 그룹을 만든다. 코드는 dept-<slug> (예: dept-rnd)
 #    그룹에 역할을 붙이지 마라 - 역할과 부서는 직교해야 한다
 
-# 2) 그 부서 에이전트를 만들고 묶는다
-docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --agent rnd-bot --set rnd
-
-# 3) 확인
-docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --json
-
-# 4) 콘솔에서 사용자를 그룹 멤버로 넣는다. 포크 쪽에 할 일은 없다 -
+# 2) 콘솔에서 사용자를 그룹 멤버로 넣는다. 포크 쪽에 할 일은 없다 -
 #    그 사람의 다음 로그인이 부서 소속을 투영한다
+
+# 3) 확인. 부서와 인원은 설정 > 부서 관리(/settings/departments)에서도 본다
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --json
 ```
 
-| 알아 둘 것                      | 내용                                                                                                             |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 어디에도 안 묶은 에이전트       | 공용이다. 부서가 있는 사람은 기존 규칙대로 쓰고, 미배정자는 자기 세션만 본다                                     |
-| 부서 이동 반영                  | 그 사람의 **다음 로그인**. 즉시 반영하려면 콘솔에서 세션도 종료한다                                              |
-| 에이전트 바인딩 변경 반영       | **즉시**. 재시작이 필요 없다                                                                                     |
-| 남의 부서 세션을 키로 직접 열면 | **404**(없다). 403 이 아니다 - 키 존재 여부를 열거당하지 않기 위해서다                                           |
-| 역할 부여 API                   | `PUT /admin/users/{id}/roles` 의 본문 필드는 `roles` 다. `codes` 로 보내면 서버가 오류 없이 기본 역할로 되돌린다 |
+| 알아 둘 것                      | 내용                                                                                                              |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 어디에도 안 묶은 에이전트       | 공용이다. `main` 이 그것이고, 지금은 그것뿐이다                                                                   |
+| 에이전트가 하나여도 부서는 산다 | 세션 가시성이 부서로 나뉘고(`tools.sessions.visibility: department`) 채팅 첨부 경계도 같은 부서를 읽는다          |
+| 부서 이동 반영                  | 그 사람의 **다음 로그인**. 즉시 반영하려면 콘솔에서 세션도 종료한다                                               |
+| 에이전트 바인딩 변경 반영       | **즉시**. 재시작이 필요 없다                                                                                      |
+| 남의 부서 세션을 키로 직접 열면 | **404**(없다). 403 이 아니다 - 키 존재 여부를 열거당하지 않기 위해서다                                            |
+| 역할 부여 API                   | `PUT /admin/users/{id}/roles` 의 본문 필드는 `roles` 다. `codes` 로 보내면 서버가 오류 없이 기본 역할로 되돌린다  |
+
+### 3.3-1 부서 에이전트를 다시 켤 때
+
+부서마다 자기 폴더만 읽는 에이전트를 두는 구성은 코드로는 전부 살아 있다. 지금 없는 것은 **설정 항목**뿐이고, 아래 순서대로 하면 돌아온다. 이 절이 문서 아래쪽에 흩어져 있는 부서 전용 절들의 입구다.
+
+| 순서 | 할 일                                  | 정본                                                |
+| ---- | -------------------------------------- | --------------------------------------------------- |
+| 1    | 부서 그룹을 만들고 사람을 배치한다     | 3.3, [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 9절 |
+| 2    | 실제 공유 폴더를 호스트에 마운트한다   | **11.4**                                            |
+| 3    | 정본 템플릿에 에이전트 항목을 되살린다 | 아래 (가)                                           |
+| 4    | 모델 키를 준다                         | **3.4 (라)**                                        |
+| 5    | 문서 색인을 만들고 주기 실행을 건다    | **12절**, [KNOWLEDGE.md](KNOWLEDGE.md)              |
+
+11.4(`nas-sample` 자리표시자와 실제 공유 매핑)와 12절(`knowledge-index` 마크다운 사이드카)은 **부서 에이전트가 있을 때만 의미가 있다.** 지금 배치에서는 compose 가 그 폴더들을 마운트만 하고 아무 에이전트도 읽지 않는다. 마운트를 지우지 않고 남긴 이유는 하나다: 쓰지 않는 마운트는 값이 들지 않고, 되켜는 날 필요한 것이 바로 그 배선이다.
+
+#### (가) 템플릿에 에이전트를 되살린다
+
+`chris-local/ixauth-gateway-config/openclaw.json` 의 `agents.entries` 에 넣는다. `start-gateway.sh` 가 더는 워크스페이스를 자리표시자로 렌더하지 않으므로 **경로를 직접 적는다.**
+
+```json
+{
+  "agents": {
+    "entries": {
+      "rnd-bot": {
+        "name": "R&D Bot",
+        "description": "Department agent for R&D",
+        "workspace": "/mnt/nas/rnd",
+        "skipBootstrap": true,
+        "model": "anthropic/claude-sonnet-5",
+        "memory": { "search": { "extraPaths": ["/mnt/knowledge/rnd"] } },
+        "tools": { "profile": "readonly", "permissionMode": "read-only" }
+      }
+    }
+  }
+}
+```
+
+- `skipBootstrap: true` 가 없으면 **첫 턴이 EROFS 로 죽는다.** 읽기 전용 마운트를 워크스페이스로 쓰면 워크스페이스 부트스트랩 파일 쓰기가 실패한다([AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.7).
+- `model` 을 적지 않으면 `agents.defaults.model.primary`(구독 경로)로 떨어지고, 그 경로에서는 **폴더 경계가 서지 않는다**(3.4 (다) 끝의 경고, AUTH-DEPARTMENTS 13.9). 부서 에이전트에는 API 키 모델을 반드시 명시한다.
+- `agents.defaults.modelPolicy.allow` 에 그 모델이 없으면 화면에서 고를 수 없다. 부서 에이전트를 켤 때 그 목록도 함께 넓힌다.
+- 그다음 부서에 묶는다. 이것만은 설정이 아니라 상태 DB 에 있고 CLI 로만 한다. 되돌리기는 `--clear` 다.
+
+  ```bash
+  docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --agent rnd-bot --set rnd
+  ```
 
 ### 3.4 모델 프로바이더
 
-기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 기본 모델(`agents.defaults.model.primary` = `openai/gpt-5.6-sol`)과 그 모델이 요구하는 codex 런타임(`plugins.entries.codex.enabled`)만 켜 두고, 키도 계정도 담지 않는다. 아래 셋 중 하나를 고른다.
+기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 모델 이름만 담고 키도 계정도 담지 않는다. 아래 셋 중 하나를 고른다.
+
+**이 납품이 쓰는 두 모델** (사용자 결정 2026-09-08, 4절 11번). 화면의 모델 선택 목록에는 이 둘만 나온다.
+
+| 자리                | 모델                       | 설정 키                                              | 어떻게 인증하나                                  |
+| ------------------- | -------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| 기본                | `openai/gpt-5.6-luna`      | `agents.defaults.model.primary`                      | ChatGPT 구독 로그인 (다)·(마), 또는 `OPENAI_API_KEY` |
+| 예비                | `anthropic/claude-sonnet-5` | `agents.defaults.model.fallbacks`                    | Claude setup-token, 또는 `ANTHROPIC_API_KEY`     |
+
+- 키 이름은 **복수형 `fallbacks` 이고 배열**이다. 단수 `fallback` 을 적으면 설정 스키마가 거부해 게이트웨이가 뜨지 않는다(`AgentModelSchema` 는 `.strict()`).
+- `agents.defaults.modelPolicy.allow` 에 **두 모델을 모두** 적는다. 예비 모델은 목록에 남기는 것만으로는 사용자가 고를 수 없고, `allow` 에 있어야 직접 고를 수 있다(`src/agents/model-selection-shared.ts` 의 `addConfiguredRef` 주석).
+- `allow` 를 비우거나 빈 배열로 두면 **전부 허용**이다. 차단이 아니다.
+- 세 형제 모델(`gpt-5.6-sol`·`terra`·`luna`)은 같은 라우트를 쓰고 값만 다르다. Luna 가 가장 저렴하고, codex 하네스에서 `thinking=ultra` 만 지원하지 않는다.
+
+세션 사이드바에서 "새 세션 - Claude Code"·"새 세션 - Codex" 항목을 없애는 것은 별개 키다.
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "codex": { "enabled": true, "config": { "sessionCatalog": { "enabled": false } } },
+      "anthropic": { "config": { "sessionCatalog": { "enabled": false } } }
+    }
+  }
+}
+```
+
+`plugins.entries.codex.enabled` 를 `false` 로 하는 것과 **다르다.** `config.sessionCatalog.enabled` 는 세션 카탈로그 provider 등록과 노드 호스트 명령만 건너뛰고, `registerAgentHarness` 는 그 조건문 바깥에 있어 그대로 등록된다(`extensions/codex/index.ts`). 그래서 구독 로그인이 타는 codex 런타임은 살아 있다. 플러그인 자체를 끄면 구독 로그인이 죽는다.
 
 정본 설정 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 매 기동마다 상태 볼륨에 덮어쓴다(5절). 모델 설정도 이 파일에 넣는다.
 
@@ -266,12 +338,14 @@ API 키를 따로 사지 않고, 이미 있는 ChatGPT 유료 구독 계정으�
 
 ```json
 {
-  "plugins": { "entries": { "codex": { "enabled": true } } },
-  "agents": { "defaults": { "model": { "primary": "openai/gpt-5.6-sol" } } }
+  "plugins": {
+    "entries": { "codex": { "enabled": true, "config": { "sessionCatalog": { "enabled": false } } } }
+  },
+  "agents": { "defaults": { "model": { "primary": "openai/gpt-5.6-luna" } } }
 }
 ```
 
-`openai/gpt-5.6-sol` 은 codex 하니스가 실행하는 모델이고, 그 하니스를 소유한 플러그인이 **설정에서 명시적으로 켜져 있어야** 런타임으로 인정된다. 이 키가 없으면 로그인을 해 두어도 `models status` 가 `runtime=unavailable | No enabled plugin owns agent harness "codex"` 로 답한다.
+`openai/gpt-5.6-luna` 는 codex 하니스가 실행하는 모델이고, 그 하니스를 소유한 플러그인이 **설정에서 명시적으로 켜져 있어야** 런타임으로 인정된다. 이 키가 없으면 로그인을 해 두어도 `models status` 가 `runtime=unavailable | No enabled plugin owns agent harness "codex"` 로 답한다. 안쪽의 `config.sessionCatalog.enabled: false` 는 런타임과 무관하다(위 표 아래 설명).
 
 **로그인 절차.** 브라우저 리디렉션이 없는 device-code 흐름을 쓴다. 로그인 명령은 대화형이라 TTY 가 필요하므로 `script` 로 감싸 배경에서 띄우고, 승인 주소와 코드는 로그에서 읽는다.
 
@@ -308,15 +382,15 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 > **부서 에이전트는 이 방식으로 쓰지 마라.** 이 경로의 모델은 codex 하네스에서 돌고, 그 하네스는 파일을 자기 셸로 읽는다. 셸의 읽기 전용 샌드박스는 "쓰기 금지"일 뿐 파일시스템 전체가 읽히므로, `tools.fs.workspaceOnly` 로 선언한 폴더 경계가 서지 않는다(다른 부서 마운트도 읽힌다). 근거와 실측은 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.9 다. 부서 에이전트에는 (가) 외부 API 방식의 자격증명을 준다. 설정에 그 조합이 남아 있으면 `openclaw doctor --lint --only codex/agent-workspace-boundary` 가 경고한다.
 
-#### (라) 배포 후 부서 에이전트 키 세팅 순서
+#### (라) 배포 후 API 키 세팅 순서
 
-사용자 결정(2026-09-08): **API 키는 배포 시점에 넣는다.** 그때까지 `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 는 둘 다 비어 있고, `main` 은 (다) 의 구독 프로필로 답하고 `rnd-bot`·`qa-bot` 은 모델이 없어 답하지 못한다. 다른 기능은 이 상태에서도 전부 동작한다.
+사용자 결정(2026-09-08): **API 키는 배포 시점에 넣는다.** 그때까지 `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 는 둘 다 비어 있고, `main` 은 (다)·(마) 의 구독 프로필로 기본 모델을 답한다. 예비 모델(`anthropic/claude-sonnet-5`)은 Claude setup-token 을 붙였으면 그것으로 답하고, 아무것도 없으면 예비로 넘어갈 때 못 쓴다고 답한다.
 
-키가 생기면 아래 순서로 한다. 둘 중 **한 쪽만** 채우면 된다.
+키가 생기면 아래 순서로 한다.
 
 1. **키를 `.env` 에 넣는다.** `chris-local/ixauth.env` 의 `ANTHROPIC_API_KEY` 또는 `OPENAI_API_KEY`. compose 가 같은 이름으로 게이트웨이 컨테이너에 넘긴다.
 
-2. **정본 템플릿에 프로바이더와 부서 에이전트 모델을 적는다.** 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 값이 아니라 이름만 적는다((가) 의 SecretRef).
+2. **정본 템플릿에 프로바이더를 적는다.** 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 값이 아니라 이름만 적는다((가) 의 SecretRef).
 
    ```json
    {
@@ -324,39 +398,24 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
        "providers": {
          "anthropic": { "baseUrl": "https://api.anthropic.com", "apiKey": "${ANTHROPIC_API_KEY}" }
        }
-     },
-     "agents": {
-       "entries": {
-         "rnd-bot": { "model": "anthropic/claude-sonnet-5" },
-         "qa-bot": { "model": "anthropic/claude-sonnet-5" }
-       }
      }
    }
    ```
 
-   `main` 은 손대지 않는다. 그러면 `agents.defaults.model.primary` 를 그대로 써서 구독 경로로 계속 답한다.
+   `agents.defaults.model` 은 손대지 않는다. 모델 이름은 그대로이고 바뀌는 것은 그 이름을 무엇으로 인증하느냐뿐이다.
 
-   **화면에서는 모델을 바꿀 수 없다.** 설정 > 부서 관리(`/settings/departments`)가 쓰는 `config.patch` 는 워크스페이스·읽기 전용 여부·색인 폴더만 건드린다(`ui/src/pages/departments/departments-gateway.ts`). 그리고 `start-gateway.sh` 가 매 기동마다 템플릿으로 상태 설정을 덮으므로, 화면이나 CLI 로 넣은 설정은 다음 재기동에 사라진다. 모델은 템플릿에 적어야 남는다.
+   **화면에서는 모델 구성을 바꿀 수 없다.** 설정 > 부서 관리(`/settings/departments`)가 쓰는 `config.patch` 는 워크스페이스·읽기 전용 여부·색인 폴더만 건드린다(`ui/src/pages/departments/departments-gateway.ts`). 그리고 `start-gateway.sh` 가 매 기동마다 템플릿으로 상태 설정을 덮으므로, 화면이나 CLI 로 넣은 설정은 다음 재기동에 사라진다. 모델은 템플릿에 적어야 남는다.
 
 3. **재기동한다.** 템플릿만 바뀌었으면 이미지를 다시 빌드할 필요가 없다. 설정 디렉터리는 읽기 전용 바인드 마운트라 파일이 그대로 보인다.
 
    ```bash
-   docker compose --env-file chris-local/ixauth.env \
-     -f chris-local/docker-compose.ixauth.yml up -d gateway
+   docker compose --env-file chris-local/ixauth.env      -f chris-local/docker-compose.ixauth.yml up -d gateway
    ```
 
-4. **확인한다.** 위에서 아래로 하나씩 본다. 앞 단계가 안 되면 뒤는 볼 필요가 없다.
+4. **확인한다.** `models status --agent main` 이 두 프로바이더 모두 `status=usable` 이면 끝이다. 화면에서는 새 세션을 열어 기본 모델로 한 번, 모델 선택에서 예비 모델로 바꿔 한 번 답을 받아 본다.
 
-   | 순서 | 확인                                                 | 어디서                                                                      |
-   | ---- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
-   | 1    | 모델 목록에 새 모델이 보인다                         | 위 "확인" 의 `models list`                                                  |
-   | 2    | 부서 색인이 최신이다                                 | `knowledge sync`(12절) 후 `memory index --force --agent rnd-bot`(3.5)       |
-   | 3    | rnd-bot 이 폴더 문서를 요약하고 **원본 경로**를 낸다 | 로그인 후 rnd-bot 세션에서 질문. 인용 규칙은 [KNOWLEDGE.md](KNOWLEDGE.md)   |
-   | 4    | qa-bot 에게 R&D 자료를 물으면 못 찾는다              | 같은 질문을 qa-bot 에게. 부서 경계는 마운트와 워크스페이스가 만든다         |
-   | 5    | 쓰기 요청이 거부된다                                 | rnd-bot 에게 파일 수정을 시킨다. 공유는 `:ro` 이고 도구 프로필은 `readonly` |
-   | 6    | 경계 경고가 없다                                     | `openclaw doctor --lint --only codex/agent-workspace-boundary`              |
+부서 에이전트에 키를 주는 것은 다른 일이다. 그 에이전트가 지금 없으므로 절차는 3.3-1 에 있다.
 
-   근거와 배경은 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 3-1절과 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.9.
 
 #### (마) 구독 로그인 파일로 main 인증을 넣는다 (키 없이 바로 답하게 하기)
 
@@ -624,7 +683,7 @@ chris-local/reset-seed.sh --accounts delete --invites --audit --yes
 
 | #   | 넣을 것            | 절차                                         | 안 넣으면                                                              |
 | --- | ------------------ | -------------------------------------------- | ---------------------------------------------------------------------- |
-| 1   | 모델 API 키 한 개  | 3.4 (라)                                     | `main` 은 구독으로 답하고 부서 에이전트는 답하지 못한다                |
+| 1   | 모델 API 키 한 개  | 3.4 (라)                                     | `main` 이 구독 로그인·setup-token 에만 의존한다                        |
 | 2   | 고객 SMTP 자격증명 | 3.8                                          | 초대 링크를 관리자가 손으로 전달한다. 비밀번호 재설정 메일이 안 나간다 |
 | 3   | 제품명             | FORK.md 5-1 (`src/brand.ts` 의 `BRAND_NAME`) | 임시값 "Chris Agent" 가 화면과 메일에 그대로 나온다                    |
 | 4   | 약관 문안          | 고객 제공                                    | 가입·초대 화면에 약관 링크가 없다                                      |
@@ -892,6 +951,8 @@ docker compose --env-file chris-local/ixauth.env \
 
 ### 11.4 NAS 공유 마운트 절차
 
+> **이 절은 부서 에이전트를 켤 때만 필요하다** (3.3-1 의 2번). 지금 배치는 에이전트가 `main` 하나뿐이고 `main` 은 이 마운트를 읽지 않는다. compose 는 그래도 마운트를 만든다 - 쓰지 않는 마운트는 값이 들지 않고, 되켜는 날 필요한 것이 그 배선이기 때문이다.
+
 에이전트가 NAS 부서 폴더를 보게 하는 3단계다. 설계는 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13절.
 
 #### (가) 호스트에 마운트한다
@@ -930,17 +991,17 @@ touch /srv/nas/rnd/x           # "Read-only file system" 이 나와야 정상
 OPENCLAW_NAS_ROOT=/srv/nas
 ```
 
-`docker-compose.ixauth.yml` 이 그 아래 `rnd`·`qa` 를 `/mnt/nas/rnd`·`/mnt/nas/qa` 로 `:ro` 마운트하고,\
-`start-gateway.sh` 가 이 값이 비어 있지 않을 때만 `rnd-bot`·`qa-bot` 워크스페이스를 그 경로로 바꾼다.\
-값을 비우면 마운트만 남고 워크스페이스는 상태 디렉터리 안의 기본 경로로 돌아간다.
+`docker-compose.ixauth.yml` 이 그 아래 `rnd`·`qa` 를 `/mnt/nas/rnd`·`/mnt/nas/qa` 로 `:ro` 마운트한다.\
+그 경로를 워크스페이스로 삼는 것은 에이전트 항목이 하는 일이고, 지금 템플릿에는 그런 에이전트가 없다.\
+경로를 워크스페이스로 잇는 자리는 3.3-1 (가) 다.
 
 **인사·급여 폴더는 `volumes:` 에 넣지 않는다.** 안 넣은 폴더는 컨테이너 안에 존재하지 않는다.\
 차단 목록을 관리하는 대신 마운트 목록만 관리하는 것이 이 배포의 폴더 통제 전부다.
 
-**워크스페이스 부트스트랩에 주의한다.** `OPENCLAW_NAS_ROOT` 를 켜면 `rnd-bot`·`qa-bot` 의\
-`skipBootstrap` 이 `true` 로 렌더링된다. 읽기 전용 워크스페이스에서는 `AGENTS.md` 발행이\
-`EROFS` 로 실패해 첫 턴이 죽기 때문이다. G 단계에서 에이전트별 키를 추가해 `main` 은 영향을 받지\
-않는다. 근거는 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.7 에 있다.
+**워크스페이스 부트스트랩에 주의한다.** 읽기 전용 마운트를 워크스페이스로 쓰는 에이전트에는\
+`skipBootstrap: true` 를 함께 적어야 한다. 그러지 않으면 `AGENTS.md` 발행이 `EROFS` 로 실패해\
+첫 턴이 죽는다. 이 키는 에이전트별이라 `main` 은 영향을 받지 않는다.\
+근거는 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.7 에 있다.
 
 #### (다) 컨테이너 안에서 확인한다
 
@@ -1068,7 +1129,7 @@ Cloudflare 대시보드에서 한 번만 한다. 저장소에서 할 일은 없�
 ```bash
 # chris-local/ixauth.env
 OPENCLAW_PUBLIC_ORIGIN=https://jinbio.botops.cloud
-OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12
+OPENCLAW_TRUSTED_PROXIES=172.16.240.10
 CLOUDFLARE_TUNNEL_TOKEN=<대시보드에서 받은 토큰>
 ```
 
@@ -1090,15 +1151,19 @@ docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose
 
 11.2 가 적어 둔 손실 세 가지(세션 쿠키 평문, 자격증명 평문, 무결성 없음)는 브라우저와Cloudflare 사이가 TLS 가 되면서 사라진다. 남는 평문 구간은 cloudflared 컨테이너와 게이트웨이컨테이너 사이, 즉 이 스택의 내부 네트워크뿐이다.
 
-쿠키 모양도 되돌아온다. 게이트웨이는 `x-forwarded-proto: https` 를 **`gateway.trustedProxies` 에등록된 주소에서 온 요청에서만** 읽고(`src/gateway/cookie-header.ts` 의 `isSecureGatewayBrowserContext`),cloudflared 는 compose 네트워크의 컨테이너라 그 주소가 172.x 대역이다. 그래서`OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12` 을 넣어야 `__Host-` 접두와 `Secure` 가 다시 붙는다.`start-gateway.sh` 가 이 값을 `gateway.trustedProxies` 로 렌더링한다.
+쿠키 모양도 되돌아온다. 게이트웨이는 `x-forwarded-proto: https` 를 **`gateway.trustedProxies` 에 등록된 주소에서 온 요청에서만** 읽고(`src/gateway/cookie-header.ts` 의 `isSecureGatewayBrowserContext`), cloudflared 는 이 compose 네트워크의 컨테이너다. 그래서 그 주소를 넣어야 `__Host-` 접두와 `Secure` 가 다시 붙는다. `start-gateway.sh` 가 이 값을 `gateway.trustedProxies` 로 렌더링한다.
 
-172.16.0.0/12 은 Docker 기본 주소 풀을 덮는 범위다. 실제 주소를 확인하려면 아래를 본다.
+**주소는 하나다.** compose 가 네트워크 대역을 `172.16.240.0/24` 로 고정하고 cloudflared 를 `172.16.240.10` 에 못박으므로, 신뢰 목록에 적는 것도 그 한 주소다. 예전에는 `172.16.0.0/12`(Docker 기본 풀 전체)을 적었는데, 그것은 **같은 호스트의 다른 컨테이너까지 프록시로 신뢰한다**는 뜻이었다. 실제로 그 때문에 결함이 하나 났다: 같은 대역에 있는 신원 서버가 게이트웨이로 보내는 내부 호출이 "전달 헤더 없는 프록시" 로 판정돼 403 이 됐고 초대 메일이 사라졌다. 그 판정 자체는 O 단계에서 고쳤지만(서비스 키로 인증하는 서버 간 경로는 브라우저 귀속을 요구하지 않는다), 신뢰 범위를 넓게 두어야 할 이유는 애초에 없었다.
+
+주소를 확인하려면 아래를 본다.
 
 ```bash
-docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose.ixauth.yml exec gateway sh -c 'ip route | head -3'
+docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose.ixauth.yml --profile tunnel   exec cloudflared sh -c 'hostname -i'
 ```
 
-이 목록은 **터널이나 리버스 프록시가 앞에 있을 때만** 채운다. 평문 HTTP 로 직접 여는 배치(11.1)에서같은 값을 넣으면, 그 대역에서 오는 아무 요청이나 HTTPS 를 자칭해 브라우저가 버릴 `Secure` 쿠키를받아 갈 수 있다. 증상은 이유 없이 실패하는 로그인이다.
+이 목록은 **터널이나 리버스 프록시가 앞에 있을 때만** 채운다. 평문 HTTP 로 직접 여는 배치(11.1)에서같은 값을 넣으면, 그 주소에서 오는 아무 요청이나 HTTPS 를 자칭해 브라우저가 버릴 `Secure` 쿠키를받아 갈 수 있다. 증상은 이유 없이 실패하는 로그인이다.
+
+> **대역을 바꾸면 네트워크를 다시 만들어야 한다.** `ipam` 은 돌고 있는 네트워크에 in-place 로 반영되지 않는다. `docker compose down` 다음 `up -d` 로 다시 띄운다(이름 붙은 볼륨은 남는다). NAS 처럼 cron 이 `up -d` 만 부르는 호스트에서는 그 한 번을 손으로 해야 한다.
 
 게이트웨이 쪽에 이것 말고 더 할 설정은 없다. `issuer`·`audience` 는 고정 리터럴이라 주소와 무관하고,`gateway.bind` 는 컨테이너 안에서 계속 `lan` 이면 된다. cloudflared 가 같은 네트워크에서 붙기 때문이다.
 
@@ -1124,6 +1189,8 @@ docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose
 그다음 `.env` 의 `OPENCLAW_PUBLIC_ORIGIN` 을 원래 주소로, `OPENCLAW_TRUSTED_PROXIES` 를 빈 값으로되돌리고 게이트웨이를 다시 띄운다. 이 둘을 되돌리지 않으면 화면이 오리진 불일치로 열리지 않는다.Cloudflare 쪽 터널은 대시보드에서 지운다.
 
 ## 12. NAS 문서를 검색 가능하게 만들기 (마크다운 사이드카 색인)
+
+> **이 절도 부서 에이전트를 켤 때만 필요하다** (3.3-1 의 5번). 지금은 색인을 읽는 에이전트가 없다. `knowledge-index` 폴더는 compose 가 마운트만 하고 비워 둔다.
 
 > 정본은 [KNOWLEDGE.md](KNOWLEDGE.md). 여기에는 설치·운영에 필요한 최소 절차만 둔다.
 
@@ -1336,6 +1403,28 @@ sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
 
 프로젝트 이름 `-p openclaw-ixauth` 를 반드시 준다. 볼륨 이름(`openclaw-ixauth_gateway-state` 등)과 컨테이너 이름이 여기서 나오고, `deploy.sh` 와 4절 백업 절차가 그 이름을 쓴다.
 
+### 13.4-1 compose 파일 자체를 바꿀 때
+
+`deploy.sh` 는 **이미지만** 본다. `docker-compose.nas.yml`·`ixauth-gateway-config/`·`ixauth.env` 는 저장소 사본이 아니라 NAS 위의 별도 파일이고, cron 은 그것들을 갱신하지 않는다. 정본을 고쳤으면 손으로 옮긴다.
+
+```bash
+# 옮기기. NAS 의 sshd 에는 sftp 서브시스템이 없어 scp 대신 표준입력으로 넣는다.
+cat chris-local/nas/docker-compose.nas.yml | ssh <NAS> 'cat > /volume1/docker/openclaw/docker-compose.nas.yml'
+
+# 반영
+sudo /volume1/docker/openclaw/deploy.sh --force
+```
+
+옮기기 전에 백업을 남기고, 옮긴 뒤 `diff` 로 정본과 대조한다.
+
+**네트워크 설정(`networks:` 아래의 `ipam`)을 바꿨다면 `up -d` 로는 반영되지 않는다.** 돌고 있는 네트워크의 주소 대역은 고칠 수 없어서 compose 가 "네트워크를 다시 만들어야 한다" 며 거부한다. 그때는 한 번만 손으로 내렸다 올린다. 이름 붙은 볼륨(`gateway-state`·`ix-auth-db-data`)은 `down` 에서 지워지지 않으므로 설정·인증·계정은 그대로 남는다.
+
+```bash
+cd /volume1/docker/openclaw
+sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth   --env-file ixauth.env -f docker-compose.nas.yml --profile tunnel down
+sudo /volume1/docker/openclaw/deploy.sh --force
+```
+
 ### 13.5 CD: cron 이 5분마다 본다
 
 `deploy.sh` 가 하는 일은 하나다. ghcr 의 `chris-main` 태그가 지금 가리키는 다이제스트를 익명 토큰으로 읽고, 이 호스트에 있는 같은 태그의 다이제스트와 견준다. 같으면 로그에 "변경 없음" 한 줄만 남기고 끝난다. 다르면 `pull` 하고 `up -d --remove-orphans` 하고 헬스를 기다린 뒤, 갈려 나간 옛 이미지를 지운다.
@@ -1421,8 +1510,8 @@ sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
 
 - **NAS 직접 설치는 PoC 다**(11.6). 문서 변환 한 번에 2코어가 포화되고 그동안 NAS 본래의 파일 서비스가 함께 느려진다. 상시 운영은 별도 x86 호스트를 권한다.
 - 도메인과 터널은 감독 개인 Cloudflare 계정의 것이다. 정식 납품 때 고객 도메인·계정으로 옮긴다. 바뀌는 것은 `OPENCLAW_PUBLIC_ORIGIN` 과 터널 토큰뿐이다.
-- `OPENCLAW_NAS_ROOT` 가 아직 샘플 트리를 가리킨다. 실제 공유 폴더 매핑은 11.4 절차로 따로 한다.
-- 모델 API 키가 비어 있어 부서 에이전트(rnd-bot·qa-bot)는 답하지 못한다. 절차는 3.4 (라).
+- `OPENCLAW_NAS_ROOT` 가 아직 샘플 트리를 가리킨다. 읽는 에이전트가 없으므로 지금은 무해하고, 실제 공유 폴더 매핑은 부서 에이전트를 켤 때 11.4 절차로 한다.
+- 모델 API 키가 비어 있다. `main` 은 구독 로그인으로 기본 모델을 답하고, 예비 모델은 Claude setup-token 으로 답한다. 키를 넣는 절차는 3.4 (라).
 - 이미지 태그 `chris-main` 은 브랜치를 따라 움직인다. 검증하지 않은 커밋을 `chris/main` 에 올리면 5분 안에 납품 호스트에 반영된다. 게이트(`pnpm check` + 라이브 실측)를 통과한 것만 머지한다.
 
 ## 용어 설명

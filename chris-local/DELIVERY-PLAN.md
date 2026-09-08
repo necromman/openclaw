@@ -188,6 +188,9 @@
 | 7   | 시드 계정 8개           | 로컬 스택에는 유지, 납품 스택을 세울 때 정리해 관리자 계정만 남긴다 (2026-09-08)                                                | DEPLOY.md 4.1 (다)                                         |
 | 8   | 제품명                  | 임시값 "Chris Agent" 유지. 납품 직전 `src/brand.ts` 한 줄로 바꾼다 (2026-09-08)                                                 | FORK.md 5-1, DEPLOY.md 4.2 3번                             |
 | 9   | 시작 번들 예산          | 기준선을 실측값으로 갱신 (2026-09-08)                                                                                           | `config/control-ui-startup-budget-baseline.json`, 5절 L 행 |
+| 10  | 에이전트 구성           | **`main` 하나만 납품한다.** 부서(`dept-rnd`·`dept-qa`)와 사용자·테스트 계정은 유지하고 부서 에이전트 `rnd-bot`·`qa-bot` 은 뺀다 (2026-09-08) | DEPLOY.md 3.3·3.3-1, AUTH-DEPARTMENTS.md 0절, 정본 템플릿 `agents.entries` |
+| 11  | 모델                    | OpenAI 기본 `openai/gpt-5.6-luna`, Claude 예비 `anthropic/claude-sonnet-5`. 채팅 모델 선택 목록은 이 둘만 (2026-09-08)                        | DEPLOY.md 3.4, 정본 템플릿 `agents.defaults.model`·`modelPolicy.allow`      |
+| 12  | CLI 카탈로그 노출       | 세션 사이드바의 "새 세션 - Claude Code"·"새 세션 - Codex" 를 숨긴다. 런타임은 그대로 둔다 (2026-09-08)                                     | DEPLOY.md 3.4, 정본 템플릿 `plugins.entries.*.config.sessionCatalog`        |
 
 배포 시점에 값만 넣으면 되는 네 가지(모델 API 키·SMTP·제품명·약관)는 [DEPLOY.md](DEPLOY.md) 4.2 "납품 배포 체크리스트" 에 한자리에 모아 두었다.
 

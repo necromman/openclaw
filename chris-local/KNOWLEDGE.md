@@ -174,7 +174,7 @@ compose 가 두 쌍을 마운트한다.
 - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/rnd:/mnt/knowledge/rnd
 ```
 
-`OPENCLAW_KNOWLEDGE_ROOT` 가 비어 있지 않으면 `start-gateway.sh` 가 부서 에이전트의 `memory.search.extraPaths` 를 그 마운트로 렌더링한다. 비어 있으면 빈 목록이라 이 기능이 없던 때와 똑같이 동작한다.
+`OPENCLAW_KNOWLEDGE_ROOT` 는 마운트가 호스트의 어디를 가리킬지만 정한다. 그 마운트를 실제로 읽는 것은 에이전트 항목의 `memory.search.extraPaths` 이고, **현재 납품 템플릿에는 그 에이전트가 없다**(에이전트는 `main` 하나뿐이다). 되켜는 순서는 [DEPLOY.md](DEPLOY.md) 3.3-1 이다.
 
 ```json
 "rnd-bot": {

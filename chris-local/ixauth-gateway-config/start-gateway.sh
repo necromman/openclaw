@@ -3,12 +3,18 @@
 #
 # The template is the single source of truth for this deployment: it is copied over the
 # state copy on every start, so an edit here always takes effect on the next restart.
-# Eight placeholders are substituted: the browser origin, the signup switch, the two
-# department agent workspaces, the bootstrap switch those workspaces require, the two
-# knowledge index folders those agents search, and the trusted proxy list. They are the
-# values that cannot be known when the file is written and are not secrets (secrets ride
-# in as env SecretRefs such as "${IXAUTH_SERVICE_KEY}", which the Gateway resolves
-# itself). The template itself stays valid JSON so it can be read and checked.
+# Three placeholders are substituted: the browser origin, the signup switch, and the
+# trusted proxy list. They are the values that cannot be known when the file is written
+# and are not secrets (secrets ride in as env SecretRefs such as "${IXAUTH_SERVICE_KEY}",
+# which the Gateway resolves itself). The template itself stays valid JSON so it can be
+# read and checked.
+#
+# It used to render five more, for the department agents "rnd-bot" and "qa-bot". This
+# delivery ships one agent, "main", so those placeholders and the agents that needed them
+# are gone (DEPLOY.md 3.3). The compose file still mounts the department shares and the
+# index folders: an unused mount costs nothing and is exactly what a department agent
+# needs back, so taking it away would only make that day harder. Turning the agents back
+# on is DEPLOY.md 3.3-1.
 set -eu
 
 origin="${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}"
@@ -26,45 +32,6 @@ case "${IXAUTH_ACCOUNT_SIGNUP_MODE:-CLOSED}" in
   OPEN | APPROVAL) self_signup="true" ;;
   *) self_signup="false" ;;
 esac
-
-# Department agent workspaces. The compose file always mounts the department shares at
-# /mnt/nas/<slug> read only, but a share only becomes an agent's workspace when the
-# operator names its parent in OPENCLAW_NAS_ROOT. Unset means "no NAS here": each agent
-# keeps the writable workspace the Gateway would resolve for it anyway
-# (<state dir>/workspace-<id>), so the shipped default starts and answers exactly as it
-# did before this switch existed.
-#
-# A read-only workspace also has to have workspace bootstrap files switched off. First
-# turn setup publishes AGENTS.md into the workspace through a staging file it creates
-# inside that same directory (src/agents/workspace.ts:319-393, reached from
-# src/agents/command/prepare.ts:368), and on a ":ro" mount that write fails with EROFS
-# and takes the turn down with it. The switch is per agent
-# (agents.entries.<id>.skipBootstrap, resolved by resolveAgentSkipBootstrap in
-# src/agents/agent-scope-config.ts), so only the two department agents lose their
-# scaffolding here. "main" keeps a writable workspace and keeps its bootstrap files.
-if [ -n "${OPENCLAW_NAS_ROOT:-}" ]; then
-  rnd_workspace="/mnt/nas/rnd"
-  qa_workspace="/mnt/nas/qa"
-  skip_bootstrap="true"
-else
-  rnd_workspace="/home/node/.openclaw/workspace-rnd-bot"
-  qa_workspace="/home/node/.openclaw/workspace-qa-bot"
-  skip_bootstrap="false"
-fi
-
-# Knowledge index folders. A department share holds pdf, docx, xlsx and pptx files, and
-# the memory indexer collects only Markdown, so a share is searchable only through the
-# Markdown sidecars "openclaw knowledge sync" writes beside it. The sidecars live on host
-# local disk, never on the share, and the agent reaches them through extraPaths. Unset
-# means "no index here": the agents get an empty list and search only their own memory,
-# which is exactly what they did before this switch existed. See chris-local/KNOWLEDGE.md.
-if [ -n "${OPENCLAW_KNOWLEDGE_ROOT:-}" ]; then
-  rnd_knowledge='["/mnt/knowledge/rnd"]'
-  qa_knowledge='["/mnt/knowledge/qa"]'
-else
-  rnd_knowledge='[]'
-  qa_knowledge='[]'
-fi
 
 # Trusted proxies. The Gateway believes "x-forwarded-proto: https" only from an address
 # listed here, and that header is the only thing that can tell it the browser reached a
@@ -105,11 +72,6 @@ fi
 mkdir -p /home/node/.openclaw
 sed -e "s|__OPENCLAW_PUBLIC_ORIGIN__|${origin}|g" \
     -e "s|\"__OPENCLAW_SELF_SIGNUP__\"|${self_signup}|g" \
-    -e "s|__OPENCLAW_RND_WORKSPACE__|${rnd_workspace}|g" \
-    -e "s|__OPENCLAW_QA_WORKSPACE__|${qa_workspace}|g" \
-    -e "s|\"__OPENCLAW_NAS_SKIP_BOOTSTRAP__\"|${skip_bootstrap}|g" \
-    -e "s|\"__OPENCLAW_RND_KNOWLEDGE_PATHS__\"|${rnd_knowledge}|g" \
-    -e "s|\"__OPENCLAW_QA_KNOWLEDGE_PATHS__\"|${qa_knowledge}|g" \
     -e "s|\"__OPENCLAW_TRUSTED_PROXIES__\"|${trusted_proxies}|g" /config/openclaw.json \
   > /home/node/.openclaw/openclaw.json
 
