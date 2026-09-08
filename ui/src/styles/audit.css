@@ -109,9 +109,11 @@
  * measured natural widths: those columns whose vocabulary is closed must never
  * ellipsize, because "시스템 관…" is not a rank anybody can read and hovering to
  * find out which one it was is not a table. So the rank and kind columns are sized
- * for "시스템 관리자" and "관리자 행위", the time column for a full localized
- * timestamp, and the two that are genuinely open-ended (the summary, which wraps,
- * and the session key, which nobody reads in full) give up the difference.
+ * for "시스템 관리자" and "관리자 행위", and the time column for a whole localized
+ * timestamp with its padding ("2026. 9. 8. 오후 3:56:21" needs about 145px, so its
+ * share may not fall below 150px in the 788px box this screen actually gets). The
+ * two columns that are genuinely open-ended give up the difference: the summary
+ * wraps, and nobody reads a session key to the end.
  *
  * Ellipsis needs a clipping box, so every cell gets one here; the cells that can
  * lose text carry the full value in a `title`. The summary keeps wrapping, which
@@ -135,12 +137,12 @@
 
   .audit-table th:nth-child(1),
   .audit-table td:nth-child(1) {
-    width: 18%;
+    width: 19%;
   }
 
   .audit-table th:nth-child(2),
   .audit-table td:nth-child(2) {
-    width: 13%;
+    width: 12%;
   }
 
   .audit-table th:nth-child(3),
