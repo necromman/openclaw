@@ -27,6 +27,7 @@ import { buildAuthenticatedPresenceUser } from "../../authenticated-presence-use
 import { shouldUseGatewayOwnerProfile } from "../../gateway-owner-profile.js";
 import { createAuthenticatedGitHubIdentitySync } from "../../github-user-identity.js";
 import { ixAuthConnectionFacts } from "../../ix-auth-audit-actor.js";
+import { resolveIxAuthConnectionScopes } from "../../ix-auth-connection-scopes.js";
 import {
   attachGatewayLocalUserIngress,
   prepareGatewayLocalUserIngress,
@@ -249,15 +250,23 @@ export async function attachAuthenticatedGatewayConnect(
           context.configSnapshot,
         )
       : undefined;
-  const scopes = rolePolicy
-    ? effectiveScopes.scopes.filter((scope) =>
-        roleScopesAllow({
-          role: "operator",
-          requestedScopes: [scope],
-          allowedScopes: rolePolicy.scopes,
-        }),
-      )
-    : effectiveScopes.scopes;
+  // An identity-server session takes its scopes from the role definition itself, not from
+  // what the page requested: see `ix-auth-connection-scopes.ts` for why a request must not
+  // be able to narrow this particular grant.
+  const ixAuthRoleScopes = ixAuthPrincipal
+    ? resolveIxAuthConnectionScopes(rolePolicy)
+    : undefined;
+  const scopes =
+    ixAuthRoleScopes ??
+    (rolePolicy
+      ? effectiveScopes.scopes.filter((scope) =>
+          roleScopesAllow({
+            role: "operator",
+            requestedScopes: [scope],
+            allowedScopes: rolePolicy.scopes,
+          }),
+        )
+      : effectiveScopes.scopes);
   state.scopes = scopes;
   connectParams.scopes = scopes;
   const addedIdentityScopes = effectiveScopes.addedIdentityScopes.filter((scope) =>

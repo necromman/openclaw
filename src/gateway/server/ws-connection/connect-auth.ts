@@ -536,7 +536,11 @@ async function authenticateGatewayConnectCore(
     authOk,
     authMethod,
   });
-  if (trustedProxyAuthOk || ixAuthOk) {
+  // A trusted proxy may narrow what it forwards, so its `x-openclaw-scopes` header still
+  // caps the connection. An identity-server session must not be capped that way: the
+  // grant comes from the role definition alone (see `ix-auth-connection-scopes.ts`), so a
+  // stale header or a stale device-token scope list cannot demote a system administrator.
+  if (trustedProxyAuthOk) {
     scopes = applyConnectionScopeCap({ scopes, upgradeReq });
     connectParams.scopes = scopes;
   }

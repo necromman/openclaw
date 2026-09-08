@@ -13,6 +13,7 @@ import {
   type IxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-client.js";
 import { syncIxAuthDepartments } from "../auth/ix-auth/ix-auth-departments.js";
+import { projectIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-projection.js";
 import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
 import {
   matchesIxAuthCsrfDigest,
@@ -214,6 +215,15 @@ async function completeIxAuthLogin(params: {
     prefix: deps.settings.departmentGroupPrefix,
   });
   syncIxAuthDepartments({ profileId, departments, nowMs });
+  // The mapped rank has to reach the durable profile too. Everything after the
+  // handshake (operator scopes, the session-others cap, the agent allowlist) reads the
+  // role off `user_profiles`, so leaving it unwritten silently applies the default role
+  // to an administrator.
+  projectIxAuthGatewayRole({
+    profileId,
+    roles: session.claims.roles,
+    settings: deps.settings,
+  });
 
   writeIxAuthSessionCookies({ res, deps, session });
   deps.onSecurityEvent?.({
@@ -456,6 +466,14 @@ async function handleIxAuthSessionProbeRoute(params: {
     return;
   }
   const { principal } = resolution;
+  // A session that predates the role projection heals here rather than at the next
+  // sign-in: the Control UI probes this route before it opens the WebSocket, and the
+  // handshake reads the profile row this writes.
+  projectIxAuthGatewayRole({
+    profileId: principal.profileId,
+    roles: principal.claims.roles,
+    settings: params.deps.settings,
+  });
   sendJson(params.res, 200, {
     authenticated: true,
     authMode: "ix-auth",
