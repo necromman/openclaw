@@ -24,6 +24,7 @@
 - 이 포크는 **Node 24.15 이상**을 요구한다(내장 SQLite 3.51.3 가드). 그 아래 Node 에서는 빌드·vitest 가 시작조차 안 된다.
 - 원래 작업 PC(윈도우)는 Windows 체크아웃을 편집·커밋용으로만 쓰고, 빌드·테스트는 WSL Ubuntu `~/openclaw`(같은 origin, Node 24.20) 에서 한다. 푸시하면 WSL 의 2분 타이머가 `chris/main` 을 pull → 빌드 → 재시작한다.
 - 납품형 스택은 `chris-local/docker-compose.ixauth.yml`(gateway + IX-Auth jar + PostgreSQL 16 + mailpit). 로컬 주소 `http://127.0.0.1:18800`, 개발용 메일함 `http://127.0.0.1:18025`. 자격증명·시크릿은 `chris-local/ixauth.env`(git 제외)에 두고 `ixauth.env.example` 을 복사해 만든다.
+- **Windows 에서 vitest·pnpm check 를 직접 돌리지 않는다.** `ui/vitest.config.ts` 가 설정 로드 시 Chrome 을 실행해 화면에 창이 뜬다. 검증은 WSL(또는 리눅스) 전용.
 - 다른 PC 에서 처음 시작할 때: Node 24.15 이상 + `corepack pnpm install` → `pnpm check` 가 0 실패인지 확인 → compose 스택은 `chris-local/DEPLOY.md` 3절대로 기동.
 
 ## 3. 인프라·서버·시크릿 정보 (이 저장소에 없다)
