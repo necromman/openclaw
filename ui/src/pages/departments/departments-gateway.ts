@@ -46,9 +46,10 @@ export async function fetchDepartmentFolders(params: {
   client: GatewayBrowserClient;
   path?: string;
 }): Promise<DepartmentsFoldersListResult> {
-  return params.client.request<DepartmentsFoldersListResult>("departments.folders.list", {
-    ...(params.path === undefined ? {} : { path: params.path }),
-  });
+  return params.client.request<DepartmentsFoldersListResult>(
+    "departments.folders.list",
+    params.path === undefined ? {} : { path: params.path },
+  );
 }
 
 function readRestartOutcome(ack: unknown): DepartmentConfigWriteOutcome {
@@ -111,7 +112,7 @@ export async function saveDepartmentAgentAccess(params: {
   draft: DepartmentAgentAccessDraft;
 }): Promise<DepartmentConfigWriteOutcome> {
   const snapshot = await params.client.request<{ hash?: string | null }>("config.get", {});
-  const ack = await params.client.request<unknown>("config.patch", {
+  const ack = await params.client.request("config.patch", {
     ...(snapshot.hash ? { baseHash: snapshot.hash } : {}),
     raw: buildDepartmentAgentPatch(params.draft),
     note: `departments: ${params.draft.agentId}`,

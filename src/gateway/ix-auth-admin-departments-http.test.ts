@@ -140,20 +140,22 @@ function stubIdentityServer(
   const calls: UpstreamCall[] = [];
   vi.stubGlobal("fetch", (url: URL | string, init: RequestInit | undefined) => {
     const href = typeof url === "string" ? url : url.toString();
-    const call: UpstreamCall = {
+    const upstreamCall: UpstreamCall = {
       path: new URL(href).pathname,
       method: init?.method ?? "GET",
       body: typeof init?.body === "string" ? init.body : "",
     };
-    calls.push(call);
-    if (call.path === "/.well-known/jwks.json") {
+    calls.push(upstreamCall);
+    if (upstreamCall.path === "/.well-known/jwks.json") {
       return Promise.resolve(jwksDocument());
     }
-    const route = routes[`${call.method} ${call.path}`];
+    const route = routes[`${upstreamCall.method} ${upstreamCall.path}`];
     if (!route) {
-      throw new Error(`unexpected identity-server call to ${call.method} ${call.path}`);
+      throw new Error(
+        `unexpected identity-server call to ${upstreamCall.method} ${upstreamCall.path}`,
+      );
     }
-    return Promise.resolve(route(call));
+    return Promise.resolve(route(upstreamCall));
   });
   return calls;
 }

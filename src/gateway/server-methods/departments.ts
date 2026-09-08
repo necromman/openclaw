@@ -60,7 +60,7 @@ const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/u;
 export function mayAdministerDepartments(client: GatewayClient | null): boolean {
   const actor = readClientAuditActor(client);
   if (actor) {
-    return actor.isSuperAdmin === true;
+    return Boolean(actor.isSuperAdmin);
   }
   const scopes = Array.isArray(client?.connect.scopes) ? client.connect.scopes : [];
   return scopes.includes(ADMIN_SCOPE);
@@ -79,24 +79,39 @@ function readDepartmentAgents(
   cfg: Parameters<typeof listAgentEntries>[0],
   bindings: ReadonlyMap<string, string>,
 ): DepartmentAgent[] {
-  return listAgentEntries(cfg).map((entry) => {
+  const agents: DepartmentAgent[] = [];
+  for (const entry of listAgentEntries(cfg)) {
     const department = bindings.get(entry.id);
     // An extra path is either a bare folder or a folder with a glob. The screen shows
     // folders, so the glob form is reduced to the folder it sits under.
     const extraPaths = (entry.memory?.search?.extraPaths ?? []).map((value) =>
       typeof value === "string" ? value : value.path,
     );
-    return {
+    const agent: DepartmentAgent = {
       agentId: entry.id,
-      ...(entry.name ? { name: entry.name } : {}),
-      ...(department ? { department } : {}),
-      ...(entry.workspace ? { workspace: entry.workspace } : {}),
-      ...(entry.tools?.profile ? { toolsProfile: entry.tools.profile } : {}),
-      ...(entry.tools?.permissionMode ? { permissionMode: entry.tools.permissionMode } : {}),
       indexPaths: extraPaths.filter((value) => value.length > 0),
-      ...(entry.skipBootstrap === undefined ? {} : { skipBootstrap: entry.skipBootstrap }),
     };
-  });
+    if (entry.name) {
+      agent.name = entry.name;
+    }
+    if (department) {
+      agent.department = department;
+    }
+    if (entry.workspace) {
+      agent.workspace = entry.workspace;
+    }
+    if (entry.tools?.profile) {
+      agent.toolsProfile = entry.tools.profile;
+    }
+    if (entry.tools?.permissionMode) {
+      agent.permissionMode = entry.tools.permissionMode;
+    }
+    if (entry.skipBootstrap !== undefined) {
+      agent.skipBootstrap = entry.skipBootstrap;
+    }
+    agents.push(agent);
+  }
+  return agents;
 }
 
 /**
