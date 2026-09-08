@@ -127,8 +127,9 @@
 
 /* Narrow windows: the table keeps its columns and scrolls, which is the honest
  * shape for a directory, but the padding that reads well at desktop width wastes
- * most of a phone screen. */
-@media (max-width: 720px) {
+ * most of a phone screen. 768px is the rung the shared breakpoint ladder offers
+ * here (config/stylelint.config.mjs). */
+@media (max-width: 768px) {
   .users-table th,
   .users-table td {
     padding: var(--space-1) var(--space-2);
