@@ -10,6 +10,9 @@
 #   - Runs `pnpm install` only when pnpm-lock.yaml actually changed.
 #   - Restarts the Gateway ONLY when the build succeeded. A failed build leaves the
 #     running Gateway on its previous in-memory build and writes the reason to the log.
+#   - Reverts the tracked files the build itself rewrites before pulling, and names them
+#     in the log. Anything else that is dirty still stops the pull, and the log carries
+#     `git status --short` so the next session can see what it was.
 #   - Appends every outcome to chris-local/auto-deploy.log with a KST timestamp + SHA.
 #
 # Usage:
@@ -69,9 +72,64 @@ log "deploy start: ${LOCAL_SHA:0:12} -> ${REMOTE_SHA:0:12} (origin/$BRANCH, mode
 
 LOCK_BEFORE="$(git rev-parse "HEAD:pnpm-lock.yaml" 2>/dev/null || echo none)"
 
+# Some tracked files are build outputs. `pnpm build` rewrites them in place, so a
+# checkout that has ever built is dirty in exactly those paths, and the next
+# `git pull --ff-only` refuses. The refusal is silent from the outside: the timer keeps
+# ticking, the log keeps saying FAIL, and the Gateway keeps serving a build that falls
+# further behind every push. That is how this checkout ended up 35 commits behind in
+# 2026-09-08. Reverting them here is safe because the next build writes them again.
+#
+# The list is not hardcoded. A package declares its own build outputs in
+# package.json under openclaw.assetScripts.buildOutputs (workboard's plugin manifest
+# carries a content hash of its Control UI bundle; canvas ships a vendored bundle and its
+# hash), and a package added later declares them the same way. Node is present because
+# the build needs it; if it somehow is not, fall back to the two known packages rather
+# than skipping the step.
+build_outputs() {
+  node -e '
+    const fs = require("node:fs");
+    const path = require("node:path");
+    for (const root of ["extensions", "packages"]) {
+      let dirs = [];
+      try { dirs = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
+      for (const dir of dirs) {
+        if (!dir.isDirectory()) continue;
+        const manifest = path.join(root, dir.name, "package.json");
+        let pkg;
+        try { pkg = JSON.parse(fs.readFileSync(manifest, "utf8")); } catch { continue; }
+        const outputs = pkg?.openclaw?.assetScripts?.buildOutputs;
+        if (!Array.isArray(outputs)) continue;
+        for (const out of outputs) {
+          if (typeof out === "string" && out.length > 0) {
+            console.log(path.posix.join(root, dir.name, out));
+          }
+        }
+      }
+    }
+  ' 2>/dev/null || printf '%s\n' \
+    "extensions/workboard/openclaw.plugin.json" \
+    "extensions/canvas/src/host/a2ui/.bundle.hash" \
+    "extensions/canvas/src/host/a2ui/a2ui.bundle.js" \
+    "extensions/canvas/src/host/a2ui/a2ui-v0.9.bundle.js"
+}
+
+REVERTED=""
+for output in $(build_outputs); do
+  # Only touch what is actually modified, so the log names what really drifted.
+  if ! git diff --quiet -- "$output" 2>/dev/null; then
+    if git checkout --quiet -- "$output" 2>>"$LOG"; then
+      REVERTED="$REVERTED $output"
+    fi
+  fi
+done
+[ -n "$REVERTED" ] && log "reverted build outputs before pull:$REVERTED"
+
 if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
   if ! git pull --quiet --ff-only origin "$BRANCH" 2>>"$LOG"; then
     log "FAIL: git pull --ff-only rejected (local commits or diverged history). Gateway left running on ${LOCAL_SHA:0:12}"
+    # Name what is in the way. Without this the log says only that the pull was refused,
+    # and the reason has to be dug out by hand on a later day.
+    git status --short >> "$LOG" 2>&1
     exit 1
   fi
 fi

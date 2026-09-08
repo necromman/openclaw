@@ -12,7 +12,7 @@
 
 ## 1. 왜 포크했나
 
-npm 배포본(`npm i -g openclaw`)은 바이너리라 **고칠 수가 없다.** 홈랩 게이트웨이 claw01 은 배포본을 쓰고 있어서 동작을 바꾸려면 업스트림이 고쳐 주기를 기다려야 한다. 이 포크의 목적은 세 가지다.
+npm 배포본(`npm i -g openclaw`)은 바이너리라 **고칠 수가 없다.** 홈랩 게이트웨이[<sup>1</sup>](#g1) claw01 은 배포본을 쓰고 있어서 동작을 바꾸려면 업스트림이 고쳐 주기를 기다려야 한다. 이 포크의 목적은 세 가지다.
 
 1. **소스 소유권.** 전체 모노레포를 로컬에 두고 직접 빌드해서, 원하는 지점을 바로 고칠 수 있게 한다.
 2. **개조 가능성 실증.** Control UI 브랜딩처럼 설정 키가 없는 지점을 소스 수정으로 바꿀 수 있는지 실제로 확인한다.
@@ -55,11 +55,11 @@ upstream/main ──────────────────────
 - `main` 은 **직접 고치지 않는다.** 항상 "우리가 올라타 있는 업스트림 릴리스 태그" 와 같은 커밋을 가리킨다.
 - 모든 변경은 `chris/main` 에 쌓는다.
 - 릴리스 태그는 업스트림 `main` 의 조상이 아니다 (릴리스는 `release/<버전>` 브랜치에서 잘린다).
-  그래서 "업스트림 main 을 따라간다" 가 아니라 **"다음 릴리스 태그로 갈아탄다"** 가 우리 동기화 모델이다.
+  그래서 우리 동기화 모델은 **"다음 릴리스 태그로 갈아탄다"** 다.
 
 ### 3-1. 포크 push 함정 (겪은 것, 재발 방지)
 
-gh CLI 토큰 스코프가 `repo` 뿐이고 `workflow` 가 없으면, `.github/workflows/` 내용이 달라지는 push 가 이 메시지로 거부된다.
+gh CLI 토큰[<sup>2</sup>](#g2) 스코프가 `repo` 뿐이고 `workflow` 가 없으면, `.github/workflows/` 내용이 달라지는 push 가 이 메시지로 거부된다.
 
 ```
 ! [remote rejected] main -> main
@@ -391,7 +391,7 @@ cd ~/openclaw
 bash chris-local/install.sh
 ```
 
-`chris-local/install.sh` 가 하는 일 (멱등): 게이트웨이 토큰 생성 → 설정 patch → `config validate` → systemd user 서비스 설치·기동.
+`chris-local/install.sh` 가 하는 일 (멱등[<sup>3</sup>](#g3)): 게이트웨이 토큰 생성 → 설정 patch → `config validate` → systemd user 서비스 설치·기동.
 
 ### 7-2. 일상 운영
 
@@ -479,6 +479,7 @@ wsl -d Ubuntu -- bash -lc '~/openclaw/chris-local/auto-deploy.sh --force'
 | 원격 SHA 가 로컬과 같으면 아무것도 안 한다            | 평상시 타이머는 `git fetch` 한 번으로 끝난다                                                  |
 | `pnpm install` 은 `pnpm-lock.yaml` 이 바뀐 커밋에서만 | 매번 install 하면 2분 주기를 못 지킨다                                                        |
 | `git pull --ff-only`                                  | WSL 쪽에 로컬 커밋이 생겨 히스토리가 갈라지면 조용히 머지하지 않고 **실패로 남긴다**          |
+| pull 전에 빌드 산출물만 되돌린다                      | 빌드가 다시 쓰는 추적 파일(아래) 때문에 `--ff-only` 가 계속 거절되는 것을 막는다. 되돌린 파일은 로그에 이름이 남고, 그 밖의 더러움은 예전처럼 FAIL 로 남되 `git status --short` 가 로그에 함께 찍힌다 |
 | 빌드 성공했을 때만 재시작                             | 빌드가 깨지면 돌던 게이트웨이는 **이전 빌드 그대로 계속 서비스**하고 로그에만 사유가 남는다   |
 | 재시작 후 HTTP 200 확인                               | 재시작은 됐는데 안 뜨는 경우를 `WARN` 으로 구분한다                                           |
 
@@ -524,7 +525,7 @@ Windows 체크아웃에서 Control UI 제목에 `v2` 를 붙인 커밋 `14513fde
 ```
 
 - 푸시 시각 약 15:56 -> 타이머가 15:57:02 에 잡음(주기 2분) -> 빌드 3분 41초 -> 16:00:51 재시작 완료. **push 에서 반영까지 약 4분.**
-- 그 직전 15:54:58 타이머 tick 은 SHA 가 안 움직여서 로그 한 줄 없이 조용히 빠졌다(설계대로).
+- 그 직전 15:54:58 타이머 tick 은 SHA 가 안 움직여서 로그 한 줄 없이 넘어갔다(설계대로).
 - 반영 확인: `curl -s http://127.0.0.1:18789/ | grep -oE '<title>[^<]*</title>'` -> `<title>OpenClaw Control (Chris fork v2)</title>`
 
 ### 실제로 한 번 실패했고, 그 실패가 설계대로였다
@@ -540,7 +541,7 @@ Windows 체크아웃에서 Control UI 제목에 `v2` 를 붙인 커밋 `14513fde
 
 원인은 **파일 실행권한 드리프트**였다. 설치 스크립트가 `chmod +x chris-local/*.sh` 를 하는데 git 에는 `100644` 로 들어가 있어서, pull 할 때마다 워크트리가 `mode change 100644 => 100755` 로 더러워졌다. 그 상태에서 같은 파일의 모드를 바꾸는 커밋이 들어오자 `--ff-only` 가 거부했다.
 
-**중요한 건 이때 게이트웨이가 멀쩡히 이전 빌드로 계속 돌았다는 것이다.** 설계 의도대로 조용히 머지하지도, 반쯤 반영하지도 않았다.
+**중요한 건 이때 게이트웨이가 멀쩡히 이전 빌드로 계속 돌았다는 것이다.** 설계 의도대로 임의 머지도, 부분 반영도 하지 않았다.
 
 복구:
 
@@ -652,9 +653,9 @@ Error: EACCES: permission denied, mkdtemp '/oc-default-empty-XXXXXX'
   at makeTempDir test/helpers/temp-dir.ts:38
 ```
 
-임시 디렉터리 루트가 `/tmp` 가 아니라 **파일시스템 루트 `/`** 로 잡혔다. 재실행을 `pnpm vitest run --config ...` 로 **직접** 돌리면서 저장소 공식 러너 `scripts/test-projects.mts` 가 세팅하는 temp/state 환경을 건너뛴 탓이다.
+임시 디렉터리 루트가 **파일시스템 루트 `/`** 로 잡혔다(`/tmp` 여야 한다). 재실행을 `pnpm vitest run --config ...` 로 **직접** 돌리면서 저장소 공식 러너 `scripts/test-projects.mts` 가 세팅하는 temp/state 환경을 건너뛴 탓이다.
 
-근거는 명확하다. 문제의 `test/scripts/test-projects-empty-native.test.ts` 는 **공식 `pnpm test` 실행에서 38개 케이스 전부 통과했고 실패 0건**이었다. 즉 소스 문제가 아니라 호출 방식 문제다.
+근거는 명확하다. 문제의 `test/scripts/test-projects-empty-native.test.ts` 는 **공식 `pnpm test` 실행에서 38개 케이스 전부 통과했고 실패 0건**이었다. 즉 호출 방식 문제다.
 
 **결론: `jq` 가 있고 공식 러너(`pnpm test`)로 돌리면 tooling 레인 실패는 사라진다.** 레인만 따로 검증할 때도 `pnpm vitest` 직접 호출 대신 `pnpm test` 를 쓰는 것이 맞다.
 
@@ -768,3 +769,11 @@ Docker 경로로 배포하고 싶다면 이 레포의 `Dockerfile` 로 이미지
 | [ix-auth/MODULE.md](ix-auth/MODULE.md)                                 | 포크가 수정해도 되는 구역, 지켜야 할 계약, 설계 불변식 준수 상태                                   |
 
 `ix-auth/` 는 별도 제품 IX-Auth 의 벤더 복사본이다(원본 `D:\PROJECT\ix-auth` 커밋 `da66bda`). 포크의 oxfmt·oxlint·dup:check 는 이 트리를 건너뛰도록 설정돼 있다.
+
+---
+
+## 용어 설명
+
+1. <a id="g1"></a>**게이트웨이** - 모든 요청이 먼저 닿는 앞단 서버. 이 포크에서는 화면·인증·에이전트 실행을 한꺼번에 맡는 본체를 가리킨다.
+2. <a id="g2"></a>**토큰** - 신원을 증명하는 문자열. 가진 쪽은 그 신원으로 접속할 수 있으므로 비밀번호처럼 다룬다.
+3. <a id="g3"></a>**멱등** - 같은 명령을 여러 번 실행해도 결과가 한 번 실행한 것과 같아지는 성질. 설치 스크립트를 다시 돌려도 안전하다는 뜻이다.
