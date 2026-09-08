@@ -216,7 +216,7 @@ describe("openclaw audit users", () => {
         events: Array<Record<string, unknown>>;
       };
       // The local reader emits the protocol event shape, not the stored row shape.
-      expect(Object.keys(page.events[0] ?? {}).sort()).toEqual(
+      expect(Object.keys(page.events[0] ?? {}).toSorted()).toEqual(
         [
           "actorSource",
           "agentId",
@@ -229,7 +229,7 @@ describe("openclaw audit users", () => {
           "kind",
           "profileId",
           "sequence",
-        ].sort(),
+        ].toSorted(),
       );
 
       const remote = fakeRuntime();

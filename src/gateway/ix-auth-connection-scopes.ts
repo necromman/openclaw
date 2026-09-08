@@ -69,3 +69,30 @@ export function resolveIxAuthConnectionScopes(
     }),
   );
 }
+
+/**
+ * The scopes one operator connection ends up holding.
+ *
+ * Two answers behind one call. An identity session reads its role definition and ignores
+ * the request entirely; every other connection keeps the long-standing order, where the
+ * request is capped by the role.
+ */
+export function resolveOperatorConnectionScopes(params: {
+  hasIxAuthPrincipal: boolean;
+  rolePolicy: GatewayOperatorRoleDefinition | undefined;
+  requestedScopes: string[];
+}): string[] {
+  const ixAuthScopes = params.hasIxAuthPrincipal
+    ? resolveIxAuthConnectionScopes(params.rolePolicy)
+    : undefined;
+  if (ixAuthScopes) {
+    return ixAuthScopes;
+  }
+  const allowedScopes = params.rolePolicy?.scopes;
+  if (!allowedScopes) {
+    return params.requestedScopes;
+  }
+  return params.requestedScopes.filter((scope) =>
+    roleScopesAllow({ role: "operator", requestedScopes: [scope], allowedScopes }),
+  );
+}
