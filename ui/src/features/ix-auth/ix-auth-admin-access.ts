@@ -36,9 +36,9 @@ export function setIxAuthAdminAccess(value: boolean): void {
 /**
  * Record whether the last probe reported the top rank.
  *
- * Kept apart from the flag above because the two answer different questions. An ordinary
- * administrator manages people; only a system administrator moves the department fence,
- * and a fence its occupants can move is not a fence (AUTH-DEPARTMENTS 7).
+ * Kept apart from the flag above because the two answer different questions. An
+ * administrator runs the company on this deployment; a system administrator runs the
+ * deployment itself, and only that rank reaches the screens that reconfigure the Gateway.
  */
 export function setIxAuthSuperAdminAccess(value: boolean): void {
   ixAuthSuperAdminAccess = value;
@@ -76,17 +76,6 @@ export function canManageIxAuthUsers(): boolean {
  */
 export function canManageIxAuthDepartments(): boolean {
   return ixAuthAdminAccess;
-}
-
-/**
- * True when the signed-in account may open the system-administrator screens.
- *
- * Kept apart from the flag above because the two answer different questions: an
- * administrator runs the company on this deployment, a system administrator runs the
- * deployment itself.
- */
-export function canManageIxAuthSystem(): boolean {
-  return ixAuthSuperAdminAccess;
 }
 
 /**
