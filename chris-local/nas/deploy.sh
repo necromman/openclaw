@@ -93,8 +93,12 @@ local_digest() {
 
 # 컨테이너가 없으면 docker inspect 는 빈 줄을 내고 실패한다. 그 빈 줄이 그대로 나가면
 # 상태 표시가 한 줄 어긋나고 비교도 빗나가므로 여기서 걸러 "missing" 으로 통일한다.
+# cloudflared 이미지에는 healthcheck 가 없어 .State.Health 자체가 비어 있다. 그때는
+# 실행 상태(running 등)를 대신 보여 준다. 없는 것과 헬스가 없는 것은 다른 일이다.
 health_of() {
-  state=$("$DOCKER_BIN" inspect --format '{{.State.Health.Status}}' "$1" 2>/dev/null | head -1)
+  state=$("$DOCKER_BIN" inspect \
+    --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+    "$1" 2>/dev/null | head -1)
   [ -n "$state" ] || state=missing
   echo "$state"
 }

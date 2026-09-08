@@ -142,9 +142,13 @@ services:
     image: cloudflare/cloudflared:2026.8.3
     profiles: ["tunnel"]
     restart: unless-stopped
+    # 여기만 짧은 형식이다. docker-compose 1.28.5 는 의존 서비스가 아직 healthy 가
+    # 아니면 기다리지 않고 "Container ... is unhealthy" 로 up 전체를 실패시킨다.
+    # 게이트웨이는 첫 기동에 1~3분이 걸리므로 조건을 걸면 첫 배포가 반드시 실패한다
+    # (2026-09-08 NAS 실측). cloudflared 는 원본이 아직 안 뜬 동안 요청에 502 를 내고
+    # 계속 재시도하므로, 순서만 정해 주면 충분하다.
     depends_on:
-      gateway:
-        condition: service_healthy
+      - gateway
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
