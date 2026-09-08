@@ -1194,16 +1194,16 @@ NAS 는 2코어 Celeron 이라 게이트웨이 이미지를 스스로 빌드할 
 
 워크플로 `.github/workflows/chris-deliver-images.yml`. 업스트림 워크플로는 건드리지 않았고, 이 포크가 더한 CI 는 이 파일 하나다.
 
-| 항목      | 값                                                                                               |
-| --------- | ------------------------------------------------------------------------------------------------ |
-| 트리거    | `chris/main` 푸시, 그리고 수동 실행                                                              |
-| 동시 실행 | `concurrency` 로 최신 것만 남긴다. 늦게 끝난 옛 빌드가 `chris-main` 을 뒤로 돌리는 일을 막는다   |
-| 잡        | `gateway image`(저장소 루트 `Dockerfile`), `ix-auth image`(`ix-auth/docker/Dockerfile`)          |
-| 빌드 인자 | compose 의 `gateway.build.args` 와 같은 값. 브라우저·한글 폰트·LibreOffice 가 여기서 들어간다    |
-| 대상      | `ghcr.io/necromman/openclaw-gateway`, `ghcr.io/necromman/openclaw-ix-auth` (둘 다 public)        |
-| 태그      | `chris-main`(움직인다, NAS 가 보는 것) + `sha-<짧은 커밋>`(움직이지 않는다, 되돌릴 때 쓴다)      |
-| 캐시      | 레지스트리 캐시 `:buildcache` (`mode=max`)                                                       |
-| 인증      | `GITHUB_TOKEN` + `permissions: packages: write`                                                  |
+| 항목      | 값                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| 트리거    | `chris/main` 푸시, 그리고 수동 실행                                                            |
+| 동시 실행 | `concurrency` 로 최신 것만 남긴다. 늦게 끝난 옛 빌드가 `chris-main` 을 뒤로 돌리는 일을 막는다 |
+| 잡        | `gateway image`(저장소 루트 `Dockerfile`), `ix-auth image`(`ix-auth/docker/Dockerfile`)        |
+| 빌드 인자 | compose 의 `gateway.build.args` 와 같은 값. 브라우저·한글 폰트·LibreOffice 가 여기서 들어간다  |
+| 대상      | `ghcr.io/necromman/openclaw-gateway`, `ghcr.io/necromman/openclaw-ix-auth` (둘 다 public)      |
+| 태그      | `chris-main`(움직인다, NAS 가 보는 것) + `sha-<짧은 커밋>`(움직이지 않는다, 되돌릴 때 쓴다)    |
+| 캐시      | 레지스트리 캐시 `:buildcache` (`mode=max`)                                                     |
+| 인증      | `GITHUB_TOKEN` + `permissions: packages: write`                                                |
 
 러너에서 먼저 하는 일이 디스크 확보다. 게이트웨이 이미지는 Chromium 과 LibreOffice 를 포함해 압축 전 7 GB 대이고, 기본 러너에는 buildx 캐시와 내보내기를 함께 둘 자리가 없다. 쓰지 않는 SDK(dotnet·android·ghc 등)를 지워 약 25 GB 를 돌려받는다.
 
@@ -1346,8 +1346,8 @@ sudo /var/packages/Docker/target/usr/bin/docker-compose -p openclaw-ixauth \
 
 ### 13.7 확인 항목
 
-| 확인                 | 방법                                                                              |
-| -------------------- | --------------------------------------------------------------------------------- |
+| 확인                 | 방법                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------- |
 | 컨테이너 4개 healthy | `sudo /volume1/docker/openclaw/deploy.sh --status`                                 |
 | 밖에서 열리나        | `curl -sI https://jinbio.botops.cloud/`                                            |
 | 쿠키 모양            | 로그인 뒤 개발자 도구에서 `__Host-openclaw-session` 과 `Secure` 확인 (11.7 (다))   |
