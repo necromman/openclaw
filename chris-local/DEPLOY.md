@@ -408,6 +408,61 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 `IXAUTH_SERVICE_KEY` 를 바꾸면 등록된 TOTP 가 전부 무효가 된다(서버가 MFA 암호화 키를 이 값에서 파생한다). 키 회전은 2단계 인증 재등록 안내와 함께 한다.
 
+### 4.1 납품 전 초기화
+
+시연과 예행연습이 남긴 것을 걷어내는 절차다. 두 갈래가 있고, 고르는 기준은 하나다.
+**계정을 다시 만들 수 있으면 볼륨을 새로 만들고, 그럴 수 없으면 골라서 지운다.**
+
+#### (가) 볼륨 재생성 - 가장 확실하다
+
+계정·역할·감사 원장·대화가 전부 사라지고 첫 기동 직후 상태로 돌아간다. 관리자 계정은
+`ixauth.env` 의 `IXAUTH_ADMIN_EMAIL`·`IXAUTH_ADMIN_PASSWORD` 로 다시 만들어진다.
+
+```bash
+cd <저장소 루트>
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml down -v
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml up -d
+```
+
+- `down -v` 는 두 볼륨을 **모두** 지운다. 남길 것이 하나라도 있으면 4절 백업을 먼저 뜬다.
+- NAS 마운트와 색인 폴더는 볼륨이 아니라 호스트 경로라 그대로 남는다. 색인은 12절 절차로
+  다시 만든다.
+- 서명 키가 새로 생기므로 열려 있던 탭은 전부 로그인 화면으로 떨어진다. 정상이다.
+
+#### (나) 골라서 지우기 - 계정을 살려야 할 때
+
+`chris-local/reset-seed.sh` 가 관리자로 로그인해 화면과 같은 경로로 지운다. 인자가 없으면
+무엇을 지울지 보여 주기만 하고, `--yes` 를 줘야 실제로 지운다.
+
+```bash
+# 무엇이 남아 있는지 본다 (아무것도 바꾸지 않는다)
+chris-local/reset-seed.sh --sessions --accounts disable --audit --invites
+
+# 시연 대화만 지운다
+chris-local/reset-seed.sh --session-key 'agent:main:dashboard:<세션 id>' --yes
+
+# 시험 계정을 잠그고, 초대 링크와 활동 원장을 비운다
+chris-local/reset-seed.sh --accounts disable --invites --audit --yes
+```
+
+| 단계        | 무엇을 쓰나                                                        | 되돌릴 수 있나                    |
+| ----------- | ------------------------------------------------------------------ | --------------------------------- |
+| `--sessions`| 게이트웨이 세션 삭제 RPC(화면의 삭제와 같은 경로)                   | 아니다. 전사는 보관본으로 남는다  |
+| `--accounts disable` | 계정 상태를 DISABLED 로 (`/auth/admin/users/{id}`)        | 그렇다. 화면에서 다시 활성화한다  |
+| `--accounts delete`  | 계정 삭제                                                  | 아니다                            |
+| `--invites` | 남아 있는 초대 링크를 잊는다                                       | 아니다. 초대는 다시 발급하면 된다 |
+| `--audit`   | 활동 원장 비우기                                                   | 아니다                            |
+
+- **활동 원장에는 비우는 화면이 없다.** 감사 기록을 화면에서 지울 수 있으면 감사가 아니기
+  때문이다. 납품 직전 초기화만 정당한 순간이라 이 스크립트에만 있고, 상태 DB 를 직접 지운다.
+- 삭제해도 활동 원장과 전사 보관본(`session_transcript_archives`)은 남는다. 대화 창과 실행
+  상태만 사라진다. 전사까지 지우려면 (가) 로 간다.
+- 세션 키는 설정 > 세션 목록에서 얻는다.
+  에이전트의 main 세션은 게이트웨이가 삭제를 거부하므로 목록에 넣지 않는다.
+- 이 스크립트는 ix-auth 모드에서 CLI 가 자기 게이트웨이 RPC 에 인증할 수 없다는 제약을 우회
+  하려고, 관리자 로그인 쿠키를 그대로 한 번의 핸드셰이크에 실어 보낸다. 근거와 코드는
+  `chris-local/reset-seed-rpc.mjs` 주석에 있다.
+
 ## 5. 업그레이드
 
 ```bash
