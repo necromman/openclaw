@@ -333,6 +333,28 @@ export function createGatewayHttpServer(opts: {
       const nodeCapability = resolvePluginNodeCapabilityRoute?.(pluginPathContext);
       if (ingressAttribution.kind === "unattributable-proxy") {
         opts.reportUnattributableProxy?.(ingressAttribution);
+        // Server-to-server routes that carry their own service key run before this refusal.
+        // Client attribution is a browser question, and there is no browser here: the
+        // identity server calls in over the container network with the shared key and no
+        // forwarded headers, which is exactly the shape this branch otherwise rejects.
+        // The planner claims nothing else in the namespace, so a session route arriving
+        // the same way is still refused below.
+        for (const stage of planIxAuthHttpStages({
+          authMode: getResolvedAuth().mode,
+          req,
+          res,
+          pathname: scopedRequestPath,
+          config: configSnapshot,
+          trustedProxies,
+          clientIp: ingressAttribution.remoteAddress,
+          rateLimiter: joinRateLimiter,
+          respondNotFound,
+          serviceKeyRoutesOnly: true,
+        })) {
+          if (await stage()) {
+            return;
+          }
+        }
         if (
           !nodeCapability &&
           handlePluginRequest &&

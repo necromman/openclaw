@@ -20,6 +20,27 @@ function claimsIxAuthHttpRequest(params: { authMode: string; pathname: string })
 }
 
 /**
+ * True when this request is a server-to-server call the identity server authenticates with
+ * the shared service key rather than with a browser session.
+ *
+ * There is exactly one such route today: the identity server posts mail it could not send
+ * to `/auth/mail-hook`, carrying `x-ixauth-key` and nothing else. It is the only namespace
+ * member with no browser on the other end, so it is the only one that may run where the
+ * ingress cannot name a browser client.
+ *
+ * Why this predicate exists: a deployment behind a tunnel lists the container network in
+ * `gateway.trustedProxies` so the forwarded scheme is believed (DEPLOY.md 11.7). The
+ * identity server is on that same network, so its call is judged "relayed by a proxy that
+ * forgot to say whom for" and refused before any route runs -- the service key is never
+ * even read. Invitation mail then vanishes with only a log line on the identity side.
+ * Naming the route class here keeps that from depending on how narrowly the proxy list
+ * happens to be drawn.
+ */
+function claimsIxAuthServiceKeyRequest(params: { authMode: string; pathname: string }): boolean {
+  return params.authMode === "ix-auth" && classifyIxAuthHttpPath(params.pathname) === "mail-hook";
+}
+
+/**
  * Answer one `/auth/*` request.
  *
  * Returns true whenever the request was handled, including the not-found case: a path
@@ -169,8 +190,18 @@ export function planIxAuthHttpStages(params: {
   /** Reaches the live connection set so signing out can close that person's sockets. */
   disconnectClientsForUserProfile?: (profileId: string) => void;
   respondNotFound: (res: ServerResponse) => void;
+  /**
+   * Plan only the service-key routes, for the ingress path that could not attribute the
+   * request to a browser client. Everything else in the namespace stays refused there.
+   */
+  serviceKeyRoutesOnly?: boolean;
 }): Array<() => Promise<boolean>> {
-  const { authMode: _authMode, ...stageParams } = params;
+  const { authMode: _authMode, serviceKeyRoutesOnly: _serviceOnly, ...stageParams } = params;
+  if (params.serviceKeyRoutesOnly === true) {
+    return claimsIxAuthServiceKeyRequest({ authMode: params.authMode, pathname: params.pathname })
+      ? [() => runIxAuthHttpStage(stageParams)]
+      : [];
+  }
   if (claimsIxAuthHttpRequest({ authMode: params.authMode, pathname: params.pathname })) {
     return [() => runIxAuthHttpStage(stageParams)];
   }
