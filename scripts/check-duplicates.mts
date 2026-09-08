@@ -35,7 +35,7 @@ const testPattern = "**/*.{test,e2e.test,live.test}.{ts,tsx,js,mjs,cjs}";
 // Keep local agent support trees and vendored snapshots classified but outside jscpd.
 // ix-auth/ is the vendored IX-Auth identity server (see ix-auth/VENDOR.md); upstream owns
 // its sources, so duplication inside it is not this repository's to resolve.
-const intentionallyUnscannedPrefixes = [".agents/", "ix-auth/", "vendor/"];
+const intentionallyUnscannedPrefixes = [".agents/", "chris-local/", "ix-auth/", "vendor/"];
 
 const generatedIgnores = [
   "**/node_modules/**",
