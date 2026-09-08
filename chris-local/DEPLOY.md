@@ -362,13 +362,13 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 (다) 를 컨테이너 안에서 대화형으로 돌리기 어려운 배포(NAS 등)에서는, **이미 로그인한 PC 의 Codex CLI 로그인 파일 하나**를 옮기는 것으로 같은 결과를 얻는다. 게이트웨이는 그 파일을 읽어 ChatGPT 구독 OAuth 프로필 `openai:default` 을 만든다.
 
-| 항목        | 값                                                                                                        |
-| ----------- | --------------------------------------------------------------------------------------------------------- |
-| 원본        | 로그인한 PC 의 `~/.codex/auth.json`                                                                       |
-| 컨테이너 경로 | `/home/node/.openclaw/codex-cli/auth.json` (상태 볼륨 안)                                                 |
-| 호스트 경로 | `<볼륨>/_data/codex-cli/auth.json` (NAS: `/volume1/@docker/volumes/openclaw-ixauth_gateway-state/_data/...`) |
-| 소유자·권한 | 컨테이너의 `node` 사용자(uid 1000), `0600`                                                                |
-| 읽는 코드   | `src/agents/cli-credentials.ts` 의 `resolveCodexCliHomePath` → `CODEX_HOME` 없으면 `~/.codex`             |
+| 항목          | 값                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| 원본          | 로그인한 PC 의 `~/.codex/auth.json`                                                                          |
+| 컨테이너 경로 | `/home/node/.openclaw/codex-cli/auth.json` (상태 볼륨 안)                                                    |
+| 호스트 경로   | `<볼륨>/_data/codex-cli/auth.json` (NAS: `/volume1/@docker/volumes/openclaw-ixauth_gateway-state/_data/...`) |
+| 소유자·권한   | 컨테이너의 `node` 사용자(uid 1000), `0600`                                                                   |
+| 읽는 코드     | `src/agents/cli-credentials.ts` 의 `resolveCodexCliHomePath` → `CODEX_HOME` 없으면 `~/.codex`                |
 
 **왜 `~/.codex` 가 아니라 볼륨 안인가.** `~/.codex` 는 상태 볼륨 밖이라 다음 배포에서 컨테이너가 새로 만들어지면 사라진다. 그래서 compose 의 게이트웨이 환경에 `CODEX_HOME: /home/node/.openclaw/codex-cli` 를 박아 두었다. 이 값은 codex 하네스와 충돌하지 않는다: 하네스는 `appServer.homeScope` 기본값 `agent` 로 `<agentDir>/codex-home` 을 따로 쓰고, 실행 전에 주변 `CODEX_HOME` 을 걸러낸다.
 
