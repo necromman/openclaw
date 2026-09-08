@@ -78,6 +78,35 @@
   max-width: var(--page-max-width) !important;
 }
 
+/* ── 1b. Wide page blocks fill their settings row ──
+ *
+ * Removing the page cap is not enough for the tables on /settings/users and
+ * /settings/audit. Both render through renderSettingsRow({ stacked: true }),
+ * and .settings-row__control is a flex container: its children are flex items
+ * that size shrink-to-fit, so a scroll box holding a `width: 100%` table
+ * collapses to the table's max-content width and the row ends up roughly half
+ * the page. The stacked variant in settings.css only lifts `max-width: 60%`
+ * and the right alignment; it never hands the control a definite width.
+ *
+ * So give the control the whole row, and let the scroll box grow into it (the
+ * matching `flex`/`width` lives next to each table in users.css and audit.css).
+ * Scoped by the block each control carries rather than by .settings-row--stacked
+ * alone: that variant also wraps single inputs, textareas and button clusters on
+ * many other settings screens, and widening those would change layouts this
+ * fork has no reason to touch.
+ *
+ * No !important here, unlike the block above: nothing in settings.css or the
+ * page sheets sets a width on this control, and the :has() selector already
+ * outranks the two-class stacked rule it refines. */
+.settings-row--stacked > .settings-row__control:has(> .users-table-scroll),
+.settings-row--stacked > .settings-row__control:has(> .users-toolbar),
+.settings-row--stacked > .settings-row__control:has(> .users-pager),
+.settings-row--stacked > .settings-row__control:has(> .audit-table-scroll),
+.settings-row--stacked > .settings-row__control:has(> .audit-toolbar),
+.settings-row--stacked > .settings-row__control:has(> .audit-pager) {
+  width: 100%;
+}
+
 /* ── 2. Pills and chips flatten to the 5px ceiling ──
  *
  * These read --radius-full upstream because they were meant to be pills. Only

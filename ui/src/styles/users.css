@@ -4,12 +4,20 @@
  * identity server never downloads it. Everything here uses the shared tokens; the
  * radius cap in fork-style.css applies as it does everywhere else. */
 
+/* The three blocks below sit inside a stacked settings row, whose control is a
+ * flex container; without a width they shrink to their content and leave the
+ * page half empty (see section 1b of fork-style.css, which widens the control
+ * itself). `min-width: 0` keeps the shrink floor off the content's max-content
+ * size so long cell text scrolls instead of pushing the page sideways. */
 .users-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-2) var(--space-3);
   padding: var(--space-3) var(--space-4);
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .users-toolbar__field {
@@ -38,6 +46,9 @@
  * box rather than widening the page, which section 1 of fork-style.css forbids. */
 .users-table-scroll {
   overflow-x: auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .users-table {
@@ -118,6 +129,9 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   font-size: var(--control-ui-text-sm);
   color: var(--muted);
 }
