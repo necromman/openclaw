@@ -81,10 +81,12 @@ export function createMediaListTool(opts?: {
       const params = asToolParamsRecord(rawArgs);
       const caller = getGatewayToolCallerIdentity();
       const context = await resolveMediaReferenceContext({
-        ...(opts?.agentSessionKey ?? caller?.sessionKey
+        ...((opts?.agentSessionKey ?? caller?.sessionKey)
           ? { sessionKey: opts?.agentSessionKey ?? caller?.sessionKey }
           : {}),
-        ...(opts?.agentId ?? caller?.agentId ? { agentId: opts?.agentId ?? caller?.agentId } : {}),
+        ...((opts?.agentId ?? caller?.agentId)
+          ? { agentId: opts?.agentId ?? caller?.agentId }
+          : {}),
       });
       const search = readToolStringParam(params, "search");
       const limit =

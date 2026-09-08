@@ -97,18 +97,20 @@ describe("inbound media store", () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       record({ id: "gone", sessionKey: "agent:main:web" });
       record({ id: "kept", sessionKey: "agent:main:cli" });
-      expect(
-        softDeleteInboundMediaForSession({ sessionKey: "agent:main:web", nowMs: 9_000 }),
-      ).toBe(1);
+      expect(softDeleteInboundMediaForSession({ sessionKey: "agent:main:web", nowMs: 9_000 })).toBe(
+        1,
+      );
       expect(getInboundMediaOwnership("gone")).toMatchObject({
         profileId: "p1",
         deletedAt: 9_000,
       });
-      expect(listInboundMediaForProfile({ profileId: "p1" }).map((row) => row.id)).toEqual(["kept"]);
+      expect(listInboundMediaForProfile({ profileId: "p1" }).map((row) => row.id)).toEqual([
+        "kept",
+      ]);
       // A second pass changes nothing: the tombstone is already set.
-      expect(
-        softDeleteInboundMediaForSession({ sessionKey: "agent:main:web", nowMs: 9_001 }),
-      ).toBe(0);
+      expect(softDeleteInboundMediaForSession({ sessionKey: "agent:main:web", nowMs: 9_001 })).toBe(
+        0,
+      );
     });
   });
 });

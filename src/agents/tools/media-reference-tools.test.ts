@@ -87,9 +87,8 @@ describe("attachment reference scope", () => {
         sizeBytes: 1,
         createdAt: 1,
       });
-      const { softDeleteInboundMediaForSession } = await import(
-        "../../state/inbound-media-store.js"
-      );
+      const { softDeleteInboundMediaForSession } =
+        await import("../../state/inbound-media-store.js");
       softDeleteInboundMediaForSession({ sessionKey: SESSION_KEY, nowMs: 5 });
       expect(await resolveReferenceableInboundMedia({ context: context(), id: "gone" })).toEqual({
         ok: false,

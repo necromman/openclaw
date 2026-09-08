@@ -80,10 +80,12 @@ export function createMediaReadTool(opts?: {
       const id = readToolStringParam(params, "id", { required: true });
       const caller = getGatewayToolCallerIdentity();
       const context = await resolveMediaReferenceContext({
-        ...(opts?.agentSessionKey ?? caller?.sessionKey
+        ...((opts?.agentSessionKey ?? caller?.sessionKey)
           ? { sessionKey: opts?.agentSessionKey ?? caller?.sessionKey }
           : {}),
-        ...(opts?.agentId ?? caller?.agentId ? { agentId: opts?.agentId ?? caller?.agentId } : {}),
+        ...((opts?.agentId ?? caller?.agentId)
+          ? { agentId: opts?.agentId ?? caller?.agentId }
+          : {}),
       });
       const resolved = await resolveReferenceableInboundMedia({ context, id });
       if (!resolved.ok) {

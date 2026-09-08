@@ -49,8 +49,6 @@ import {
 } from "./assistant-avatar.js";
 import { DEFAULT_ASSISTANT_IDENTITY, resolveAssistantIdentity } from "./assistant-identity.js";
 import { buildAssistantMediaContentDisposition } from "./assistant-media-content-disposition.js";
-import { authorizeInboundMediaSource } from "./inbound-media-access.js";
-import { recordInboundMediaDeniedActivity } from "./session-view-activity-audit.js";
 import {
   resolveAssistantMediaPolicy,
   type AssistantMediaSession,
@@ -111,6 +109,8 @@ import {
   startsWithSvgRootElement,
 } from "./http-image-response.js";
 import { authorizeControlUiReadRequestOrReply } from "./http-utils.js";
+import { authorizeInboundMediaSource } from "./inbound-media-access.js";
+import { recordInboundMediaDeniedActivity } from "./session-view-activity-audit.js";
 import { isTerminalConfigEnabled } from "./terminal/enabled.js";
 
 const ROOT_PREFIX = "/";

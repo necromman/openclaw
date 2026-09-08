@@ -211,7 +211,7 @@ CREATE INDEX IF NOT EXISTS idx_department_agents_department
 | `src/gateway/session-utils-store.ts`                       | 로스터 투영 상한 + 걸러진 `defaultId` 재지정                                |
 | `src/gateway/server-methods/session-catalog-visibility.ts` | 외부 CLI 카탈로그는 부서 강제 시 생성자 전용으로 내려간다                   |
 | `src/gateway/auth.ts` · `http-auth-utils.ts`               | 검증된 부서를 **생산 지점에서** HTTP 요청 인가에 싣는다                     |
-| `src/gateway/inbound-media-access.ts`                      | **채팅 첨부 열람.** 참조 자체로 판정한다(7-1)                              |
+| `src/gateway/inbound-media-access.ts`                      | **채팅 첨부 열람.** 참조 자체로 판정한다(7-1)                               |
 | `src/gateway/openai-http.ts` · `openresponses-http.ts`     | Gateway 클라이언트가 없는 표면도 생성 게이트를 지나게 한다                  |
 
 계획 3.2 의 훅 10곳 표 대비:
@@ -248,11 +248,11 @@ SQLite 파일을 직접 열 수도 있으므로 애초에 경계 안쪽이 아�
 
 무엇이 뚫려 있었나:
 
-| 지점 | 문제 |
-| --- | --- |
+| 지점                                                           | 문제                                                                                |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `src/gateway/control-ui.ts` 의 `/__openclaw__/assistant-media` | `sessionKey` 가 **선택** 파라미터라, 빼고 부르면 세션 검사가 아예 만들어지지 않았다 |
-| `src/media/local-media-access.ts` | 인바운드 참조는 자기 부모 디렉터리를 루트로 삼아 폴더 컨테인먼트를 항상 통과한다 |
-| 저장 시점 | 전사에 `media://inbound/<id>` 만 남고 누가 어느 세션에서 올렸는지가 어디에도 없었다 |
+| `src/media/local-media-access.ts`                              | 인바운드 참조는 자기 부모 디렉터리를 루트로 삼아 폴더 컨테인먼트를 항상 통과한다    |
+| 저장 시점                                                      | 전사에 `media://inbound/<id>` 만 남고 누가 어느 세션에서 올렸는지가 어디에도 없었다 |
 
 ### 7-1-1. 소유권을 먼저 기록한다
 

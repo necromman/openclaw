@@ -62,9 +62,12 @@ export async function resolveMediaReferenceContext(params: {
   if (!params.sessionKey) {
     return { ...base, ...(departmentSlug ? { departmentSlug } : {}) };
   }
-  const loaded = (await getSessionStoreModule()).loadGatewaySessionEntryReadOnly(params.sessionKey, {
-    ...(params.agentId ? { agentId: params.agentId } : {}),
-  });
+  const loaded = (await getSessionStoreModule()).loadGatewaySessionEntryReadOnly(
+    params.sessionKey,
+    {
+      ...(params.agentId ? { agentId: params.agentId } : {}),
+    },
+  );
   const profileId = (await getSessionProvenanceModule()).sessionCreatorProfileId(
     loaded.entry?.createdActor,
   );

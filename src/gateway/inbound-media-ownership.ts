@@ -10,14 +10,12 @@
 // missing ownership row costs the uploader the two reference tools and denies non-owners
 // the file, which is the safe direction to fail in.
 import { logVerbose } from "../globals.js";
+import { recordInboundMediaOwnership } from "../state/inbound-media-store.js";
 import type { persistInboundImagesForTranscript } from "./chat-attachments.js";
 import { readClientAuditActor } from "./ix-auth-audit-actor.js";
-import { recordInboundMediaOwnership } from "../state/inbound-media-store.js";
 import type { GatewayClient } from "./server-methods/client-types.js";
 
-type PersistedEntries = Awaited<
-  ReturnType<typeof persistInboundImagesForTranscript>
->["entries"];
+type PersistedEntries = Awaited<ReturnType<typeof persistInboundImagesForTranscript>>["entries"];
 
 /** Write one ownership row per attachment this turn persisted. */
 export function recordChatSendInboundMediaOwnership(params: {
