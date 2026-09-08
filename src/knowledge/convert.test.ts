@@ -32,12 +32,18 @@ async function buildDocx(bodyXml: string): Promise<Buffer> {
   return await zip.generateAsync({ type: "nodebuffer" });
 }
 
-async function buildXlsx(sheets: { name: string; rowsXml: string }[]): Promise<Buffer> {
+async function buildXlsx(
+  sheets: { name: string; rowsXml: string }[],
+  stylesXml?: string,
+): Promise<Buffer> {
   const zip = new JSZip();
   const tags = sheets
     .map((sheet, index) => `<sheet name="${sheet.name}" sheetId="${index + 1}"/>`)
     .join("");
   zip.file("xl/workbook.xml", `<workbook><sheets>${tags}</sheets></workbook>`);
+  if (stylesXml) {
+    zip.file("xl/styles.xml", stylesXml);
+  }
   for (const [index, sheet] of sheets.entries()) {
     zip.file(
       `xl/worksheets/sheet${index + 1}.xml`,
@@ -124,6 +130,38 @@ describe("office sources", () => {
     expect(result.converter).toBe("xlsx-html");
     expect(result.body).toContain("## 재고");
     expect(result.body).toContain("## 발주");
+  });
+
+  test("writes a date cell as a date, not as the serial underneath it", async () => {
+    // Three formats for the same number: none, the builtin short date, and a Korean
+    // custom one. Only the two date-formatted cells may change.
+    const styles =
+      "<styleSheet>" +
+      '<numFmts count="1">' +
+      '<numFmt numFmtId="164" formatCode="yyyy&quot;년&quot; mm&quot;월&quot; dd&quot;일&quot;"/>' +
+      "</numFmts>" +
+      '<cellXfs count="3"><xf numFmtId="0"/><xf numFmtId="14"/><xf numFmtId="164"/></cellXfs>' +
+      "</styleSheet>";
+    const xlsx = await buildXlsx(
+      [
+        {
+          name: "일정",
+          rowsXml:
+            `<row>${inlineCell("납기")}` +
+            '<c s="0"><v>46023</v></c>' +
+            '<c s="1"><v>46023</v></c>' +
+            '<c s="2"><v>46023.5</v></c></row>',
+        },
+      ],
+      styles,
+    );
+    const result = await convertKnowledgeSource({ buffer: xlsx, extension: "xlsx" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.converter).toBe("xlsx-html");
+    expect(result.body).toContain("| 납기 | 46023 | 2026-01-01 | 2026-01-01 12:00 |");
   });
 
   test("falls back to LibreOffice when the archive reader cannot open a docx", async () => {

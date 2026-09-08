@@ -2,6 +2,11 @@
 // It runs when no external converter is available, so it must never shell out and
 // must never emit markup a preview iframe could execute.
 import type JSZipArchive from "jszip";
+import {
+  formatXlsxDateCell,
+  readXlsxDateStyles,
+  type XlsxDateKind,
+} from "./document-xlsx-dates.js";
 
 /** Only the two OOXML families whose part layout is simple enough to scan without a parser. */
 const SUPPORTED_EXTENSIONS = new Set(["docx", "xlsx"]);
@@ -354,7 +359,14 @@ function readSharedStrings(xml: string | undefined): string[] {
   return entries;
 }
 
-function readCellText(cellInner: string, type: string | undefined, shared: string[]): string {
+function readCellText(params: {
+  cellInner: string;
+  type: string | undefined;
+  styleIndex: number | undefined;
+  shared: string[];
+  dateStyles: readonly (XlsxDateKind | undefined)[];
+}): string {
+  const { cellInner, type, shared } = params;
   if (type === "inlineStr") {
     const isStart = findTagStart(cellInner, "is", 0);
     const isElement = isStart >= 0 ? readElement(cellInner, "is", isStart) : undefined;
@@ -374,7 +386,14 @@ function readCellText(cellInner: string, type: string | undefined, shared: strin
     ? decodeXmlText(cellInner.slice(valueElement.contentStart, valueElement.contentEnd))
     : "";
   if (type !== "s") {
-    return raw;
+    // A number whose cell format is a date is a date; the digits alone never say so.
+    return (
+      formatXlsxDateCell({
+        raw,
+        styleIndex: params.styleIndex,
+        styles: params.dateStyles,
+      }) ?? raw
+    );
   }
   const index = Number.parseInt(raw, 10);
   return Number.isInteger(index) ? (shared[index] ?? "") : "";
@@ -385,6 +404,7 @@ function renderSheet(params: {
   name: string;
   shared: string[];
   sheetXml: string;
+  dateStyles: readonly (XlsxDateKind | undefined)[];
 }): void {
   const rows = collectElements(params.sheetXml, "row", MAX_ROWS_PER_SHEET + 1);
   const rowsTruncated = rows.length > MAX_ROWS_PER_SHEET;
@@ -404,7 +424,14 @@ function renderSheet(params: {
     }
     for (const cell of cells.slice(0, MAX_COLUMNS_PER_ROW)) {
       const cellInner = rowInner.slice(cell.contentStart, cell.contentEnd);
-      const text = readCellText(cellInner, attributeValue(cell.openTag, "t"), params.shared);
+      const style = Number.parseInt(attributeValue(cell.openTag, "s") ?? "", 10);
+      const text = readCellText({
+        cellInner,
+        type: attributeValue(cell.openTag, "t"),
+        styleIndex: Number.isInteger(style) ? style : undefined,
+        shared: params.shared,
+        dateStyles: params.dateStyles,
+      });
       if (!params.body.push(`<td>${escapeHtml(text)}</td>`)) {
         return;
       }
@@ -449,6 +476,8 @@ async function extractXlsxBody(zip: JSZipArchive): Promise<string | undefined> {
   }
   const sheetsTruncated = sheetNames.length > MAX_SHEETS;
   const shared = readSharedStrings(await readZipText(zip, "xl/sharedStrings.xml"));
+  // Read once for the workbook: every sheet indexes into the same style table.
+  const dateStyles = readXlsxDateStyles(await readZipText(zip, "xl/styles.xml"));
   const body = new HtmlBody();
   const visibleSheets = sheetsTruncated ? sheetNames.slice(0, MAX_SHEETS) : sheetNames;
   for (const [index, name] of visibleSheets.entries()) {
@@ -458,7 +487,7 @@ async function extractXlsxBody(zip: JSZipArchive): Promise<string | undefined> {
     if (!sheetXml) {
       continue;
     }
-    renderSheet({ body, name: name || `Sheet ${index + 1}`, shared, sheetXml });
+    renderSheet({ body, dateStyles, name: name || `Sheet ${index + 1}`, shared, sheetXml });
     if (body.exhausted) {
       break;
     }
