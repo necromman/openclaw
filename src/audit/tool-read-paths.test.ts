@@ -33,6 +33,13 @@ describe("tool read paths", () => {
     ).toEqual(["/a.md"]);
   });
 
+  it("records the attachment media_read opened, and nothing media_list listed", () => {
+    expect(projectToolReadPaths("media_read", { id: "예산---uuid.xlsx" })).toEqual([
+      "예산---uuid.xlsx",
+    ]);
+    expect(projectToolReadPaths("media_list", { search: "예산" })).toEqual([]);
+  });
+
   it("returns nothing for a tool outside the allowlist", () => {
     expect(projectToolReadPaths("write", { path: "/a.md" })).toEqual([]);
     expect(projectToolReadPaths("read", "not-an-object")).toEqual([]);

@@ -22,10 +22,20 @@ const READ_TOOL_NAMES: ReadonlySet<string> = new Set([
   "sessions_files",
   "session_files",
   "workspace_read",
+  // Opening a chat attachment is the same event as opening a file. Its companion
+  // `media_list` is not here: a listing of one's own uploads reveals names, not content.
+  "media_read",
 ]);
 
-/** Argument names that name a file. `execute-plugin.ts` already folds file_path onto path. */
-const PATH_PARAM_NAMES = ["path", "file_path", "filePath", "paths", "files"] as const;
+/**
+ * Argument names that name a file. `execute-plugin.ts` already folds file_path onto path.
+ *
+ * `id` is here for `media_read`, whose file is addressed by its media-store id rather than
+ * a path. The id carries the uploader's own file name, which is what the ledger needs to
+ * say what was opened. Only tools in the closed list above are ever read, so no other
+ * tool's `id` argument can reach the ledger through it.
+ */
+const PATH_PARAM_NAMES = ["path", "file_path", "filePath", "paths", "files", "id"] as const;
 
 /** No ledger row needs more than this to say what was opened. */
 const MAX_RECORDED_PATHS = 8;
