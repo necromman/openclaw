@@ -48,6 +48,8 @@ import {
 } from "./tools/conversation-tools.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createDashboardTool } from "./tools/dashboard-tool.js";
+import { createMediaListTool } from "./tools/media-list-tool.js";
+import { createMediaReadTool } from "./tools/media-read-tool.js";
 import { createEmbeddedCallGateway } from "./tools/embedded-gateway-stub.js";
 import { createGatewayToolCallerWrapper } from "./tools/gateway-caller-context.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
@@ -634,6 +636,14 @@ export function createOpenClawTools(options?: OpenClawToolsOptions): AnyAgentToo
       },
     }),
     ...collectPresentOpenClawTools([webSearchTool, webFetchTool, imageTool, pdfTool]),
+    createMediaListTool({
+      agentSessionKey: options?.runSessionKey ?? options?.agentSessionKey,
+      agentId: sessionAgentId,
+    }),
+    createMediaReadTool({
+      agentSessionKey: options?.runSessionKey ?? options?.agentSessionKey,
+      agentId: sessionAgentId,
+    }),
   ];
   options?.recordToolPrepStage?.("openclaw-tools:core-tool-list");
   let allTools = tools;

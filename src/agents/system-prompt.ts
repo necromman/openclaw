@@ -902,6 +902,8 @@ export function buildAgentSystemPrompt(params: {
     skill_workshop: "Author reusable skills",
     image: "Analyze images",
     image_generate: "Generate/edit images",
+    media_list: "List files the user attached to chat",
+    media_read: "Open one uploaded attachment as model input",
   };
 
   const toolOrder = [
@@ -940,6 +942,8 @@ export function buildAgentSystemPrompt(params: {
     "skill_workshop",
     "view_image",
     "image_generate",
+    "media_list",
+    "media_read",
   ];
 
   const rawToolNames = (params.toolNames ?? []).map((tool) => tool.trim());
@@ -1236,6 +1240,14 @@ export function buildAgentSystemPrompt(params: {
               : []),
             ...(availableTools.has("screen")
               ? ["`screen` present: web/app turn may drive UI; messaging turn: don't."]
+              : []),
+            // An attachment leaves only an opaque `media://inbound/...` marker in the
+            // transcript, so once the turn that carried it falls out of the window the
+            // model has no way to guess the file is still reachable. Say the order here.
+            ...(availableTools.has("media_list") && availableTools.has("media_read")
+              ? [
+                  "Looking for a file the user uploaded earlier: `media_list` first, then `media_read` with that id.",
+                ]
               : []),
             // The repeat is noticed during ordinary work, not while reading the
             // automations schema, so this trigger cannot live in that tool's

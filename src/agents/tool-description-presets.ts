@@ -22,6 +22,15 @@ export const DISMISS_TASK_TOOL_DISPLAY_SUMMARY = "Withdraw a pending task sugges
 export const SKILL_WORKSHOP_TOOL_DISPLAY_SUMMARY =
   "Author reusable skills under the available tool's publication and review policy. Read one complete artifact when it fits the model budget.";
 
+/**
+ * The one line both attachment reference tools carry.
+ *
+ * Kept here rather than written twice so the pairing stays a single fact: a model that
+ * reads either description learns the order to use them in.
+ */
+export const MEDIA_REFERENCE_TOOL_HINT =
+  "To find a file the user uploaded earlier, call media_list first and then media_read.";
+
 export function describeAgentsListTool(sessionsSpawnAvailable: boolean): string {
   return sessionsSpawnAvailable
     ? 'List configured agent ids with name/model/runtime metadata, allowed as `sessions_spawn(runtime:"subagent")` targets.'

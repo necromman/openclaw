@@ -10,6 +10,7 @@ import {
   INLINE_IMAGE_DURABLE_OMISSION_MARKER,
   persistInboundImagesForTranscript,
 } from "../chat-attachments.js";
+import { recordChatSendInboundMediaOwnership } from "../inbound-media-ownership.js";
 import { resolveCreatorSandbox } from "../operator-role-policy.js";
 import { resolveGatewayInputParticipant } from "../session-input-participant.js";
 import { prepareSkillLibrarySessionCreation } from "../skill-library-session.js";
@@ -42,6 +43,8 @@ async function persistChatSendImages(params: {
   offloadedRefs: OffloadedRef[];
   client: GatewayRequestHandlerOptions["client"];
   logGateway: GatewayRequestContext["logGateway"];
+  sessionKey?: string;
+  agentId?: string;
 }): Promise<Awaited<ReturnType<typeof persistInboundImagesForTranscript>>> {
   if (
     (params.images.length === 0 && params.offloadedRefs.length === 0) ||
@@ -49,12 +52,22 @@ async function persistChatSendImages(params: {
   ) {
     return { entries: [], omission: "none" };
   }
-  return await persistInboundImagesForTranscript({
+  const persisted = await persistInboundImagesForTranscript({
     images: params.images,
     offloadedRefs: params.offloadedRefs,
     log: params.logGateway,
     logContext: "chat.send",
   });
+  // Attribution rides the same seam as the durable file, so a stored attachment and its
+  // owner are written together or the owner is missing and nobody but a super
+  // administrator can reach it.
+  recordChatSendInboundMediaOwnership({
+    entries: persisted.entries,
+    client: params.client,
+    ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
+    ...(params.agentId ? { agentId: params.agentId } : {}),
+  });
+  return persisted;
 }
 
 function resolveChatSendManagedMedia(entries: PersistedChatSendMedia): MediaFact[] {
@@ -108,6 +121,8 @@ export function prepareChatSendUserTurn(params: {
     offloadedRefs: attachments.offloadedRefs,
     client,
     logGateway,
+    ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
+    ...(session.agentId ? { agentId: session.agentId } : {}),
   });
   userTurn.setInputPromise(
     persistedMediaForTranscriptPromise.then((result) => {

@@ -49,6 +49,8 @@ import {
 } from "./assistant-avatar.js";
 import { DEFAULT_ASSISTANT_IDENTITY, resolveAssistantIdentity } from "./assistant-identity.js";
 import { buildAssistantMediaContentDisposition } from "./assistant-media-content-disposition.js";
+import { authorizeInboundMediaSource } from "./inbound-media-access.js";
+import { recordInboundMediaDeniedActivity } from "./session-view-activity-audit.js";
 import {
   resolveAssistantMediaPolicy,
   type AssistantMediaSession,
@@ -586,6 +588,33 @@ export async function handleControlUiAssistantMediaRequest(
     reader: isMetaRequest ? undefined : ticket?.reader,
   });
   if (!policy) {
+    respondControlUiNotFound(res);
+    return true;
+  }
+  // Attachment ownership is checked from the reference itself, never from the optional
+  // sessionKey parameter: omitting that parameter used to skip every session check while
+  // the inbound containment rule still rooted the file at its own directory, which let any
+  // signed-in person read any attachment id.
+  const inboundDecision = await authorizeInboundMediaSource({
+    cfg: opts?.config,
+    source,
+    reader: {
+      ...(policy.reader.profileId ? { profileId: policy.reader.profileId } : {}),
+      ...(policy.reader.departments ? { departments: policy.reader.departments } : {}),
+      isGatewayAdmin: policy.canAllow,
+    },
+  });
+  if (!inboundDecision.allowed) {
+    recordInboundMediaDeniedActivity({
+      ...(policy.reader.profileId ? { profileId: policy.reader.profileId } : {}),
+      ...(inboundDecision.mediaId ? { mediaId: inboundDecision.mediaId } : {}),
+      reason: inboundDecision.reason,
+      surface: "assistant-media",
+      ...(inboundDecision.ownership?.sessionKey
+        ? { sessionKey: inboundDecision.ownership.sessionKey }
+        : {}),
+      ...(inboundDecision.ownership?.agentId ? { agentId: inboundDecision.ownership.agentId } : {}),
+    });
     respondControlUiNotFound(res);
     return true;
   }

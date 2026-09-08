@@ -36,6 +36,8 @@ export type ChatImageContent = {
   data: string;
   mimeType: string;
   sourceIndex: number;
+  /** Original client-supplied name, retained for attachment ownership rather than prompts. */
+  fileName?: string;
 };
 
 export type OffloadedRef = {
@@ -95,6 +97,8 @@ type PersistInboundImagesResult = {
     path: string;
     sourceIndex: number;
     imageKind?: PromptImageOrderEntry;
+    /** Name the uploader saw. Kept beside the fact so prompt rendering stays unchanged. */
+    originalName?: string;
     fact: MediaFact;
   }>;
   omission: "none" | "inline-image-save-failed";
@@ -169,6 +173,7 @@ export async function persistInboundImagesForTranscript(params: {
         path: trusted.path,
         sourceIndex: image.sourceIndex,
         imageKind: "inline",
+        ...(image.fileName ? { originalName: image.fileName } : {}),
         fact: {
           url: trusted.mediaRef,
           contentType: saved.contentType ?? image.mimeType,
@@ -200,6 +205,7 @@ export async function persistInboundImagesForTranscript(params: {
       id: ref.id,
       path: ref.path,
       sourceIndex: ref.sourceIndex,
+      ...(ref.label ? { originalName: ref.label } : {}),
       ...(ref.mimeType.startsWith("image/") ? { imageKind: "offloaded" as const } : {}),
       fact,
     });
@@ -473,7 +479,13 @@ export async function parseMessageWithAttachments(
         shouldForceImageOffload || !isImage || sizeBytes > OFFLOAD_THRESHOLD_BYTES;
 
       if (!shouldOffload) {
-        images.push({ type: "image", data: b64, mimeType: finalMime, sourceIndex: idx });
+        images.push({
+          type: "image",
+          data: b64,
+          mimeType: finalMime,
+          sourceIndex: idx,
+          ...(att.fileName ? { fileName: att.fileName } : {}),
+        });
         imageOrder.push("inline");
         continue;
       }

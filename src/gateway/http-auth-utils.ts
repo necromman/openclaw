@@ -128,6 +128,8 @@ type GatewayHttpConnectAuthorizer = (
 export type AuthorizedControlUiReadRequest = AuthenticatedHttpUserProfile & {
   authMethod: NonNullable<GatewayAuthResult["method"]>;
   operatorScopes: string[];
+  /** Verified IX-Auth department facts; absent outside ix-auth mode. */
+  ixAuthDepartments?: AuthorizedGatewayHttpRequest["ixAuthDepartments"];
 };
 
 type ControlUiReadAuthParams = Omit<GatewayHttpRequestAuthParams, "auth"> & {
@@ -357,7 +359,14 @@ export async function authorizeControlUiReadRequestOrReply(
       sendMissingScopeForbidden(params.res, scopeAuth.missingScope);
       return null;
     }
-    return { authMethod, operatorScopes, ...authenticatedProfile };
+    return {
+      authMethod,
+      operatorScopes,
+      ...(resolvedAuthResult.ixAuthDepartments
+        ? { ixAuthDepartments: resolvedAuthResult.ixAuthDepartments }
+        : {}),
+      ...authenticatedProfile,
+    };
   };
 
   if (!canUseDeviceTokenFallback || !params.rateLimiter) {

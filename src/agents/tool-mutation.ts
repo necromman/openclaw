@@ -63,6 +63,8 @@ const REPLAY_SAFE_TOOL_NAMES = new Set([
   "grep",
   "view_image",
   "ls",
+  "media_list",
+  "media_read",
   "memory_get",
   "pdf",
   "read",

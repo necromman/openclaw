@@ -442,6 +442,16 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
       title: "View Image",
       detailKeys: ["path", "paths", "url", "urls", "prompt", "model"],
     },
+    media_list: {
+      emoji: "📎",
+      title: "Attachments",
+      detailKeys: ["scope", "count"],
+    },
+    media_read: {
+      emoji: "📎",
+      title: "Attachment",
+      detailKeys: ["id", "name", "mime", "sizeBytes", "status"],
+    },
     image_generate: {
       emoji: "🎨",
       title: "Image Generation",

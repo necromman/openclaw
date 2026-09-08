@@ -27,6 +27,12 @@ export type AssistantMediaReader = Pick<
   "authMethod" | "operatorScopes"
 > & {
   profileId?: string;
+  /**
+   * Verified department facts, carried so the attachment boundary can be applied on the
+   * ticket path too. Signed into the ticket like the rest of the reader: these are the
+   * same codes the connection already holds, and nothing here is bearer-like.
+   */
+  departments?: AuthorizedControlUiReadRequest["ixAuthDepartments"];
 };
 
 function resolveAssistantMediaReaderAuth(
@@ -42,7 +48,12 @@ function resolveAssistantMediaReaderAuth(
     if (!authorizeOperatorScopesForMethod("assistant.media.get", operatorScopes).allowed) {
       return undefined;
     }
-    return { authMethod: reader.authMethod, operatorScopes, ...currentProfile };
+    return {
+      authMethod: reader.authMethod,
+      operatorScopes,
+      ...(reader.departments ? { ixAuthDepartments: reader.departments } : {}),
+      ...currentProfile,
+    };
   } catch {
     return undefined;
   }
@@ -76,6 +87,9 @@ export function resolveAssistantMediaPolicy(params: {
           operatorScopes: params.requestAuth.operatorScopes,
           ...(params.requestAuth.authenticatedUserProfile
             ? { profileId: params.requestAuth.authenticatedUserProfile.profileId }
+            : {}),
+          ...(params.requestAuth.ixAuthDepartments
+            ? { departments: params.requestAuth.ixAuthDepartments }
             : {}),
         }
       : undefined);

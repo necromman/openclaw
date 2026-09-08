@@ -30,6 +30,7 @@ import { removeSessionWorktree } from "../../sessions/session-worktree-lifecycle
 import { resolvePluginSessionOwnershipError } from "../session-plugin-ownership.js";
 import { resolveRequestedSessionAgentId as resolveRequestedGlobalAgentId } from "../session-request-agent.js";
 import { resolveSessionStoreAgentId } from "../session-store-key.js";
+import { softDeleteInboundMediaForSession } from "../../state/inbound-media-store.js";
 import { loadGatewaySessionEntryReadOnly, loadSessionEntry } from "../session-utils.js";
 import { prepareSessionWorkerPlacementRetirement } from "../worker-environments/session-placement-lifecycle.js";
 import { emitSessionsChanged } from "./session-change-event.js";
@@ -320,6 +321,14 @@ export const sessionDeleteHandlers: GatewayRequestHandlers = {
               // generation-scoped purge and checkout cleanup still finish before
               // this fence opens, so a same-key successor cannot be mistaken for it.
               const deletedSessionKey = target.canonicalKey ?? key;
+              // Attachments are tombstoned, not erased: the reference tools must stop
+              // offering a deleted conversation's files, while the activity ledger keeps
+              // its retention window able to explain a read that already happened. The
+              // bytes stay under the media store's own lifecycle.
+              softDeleteInboundMediaForSession({
+                sessionKey: deletedSessionKey,
+                nowMs: Date.now(),
+              });
               handleSessionStateSessionDeleted(
                 deletedSessionKey,
                 requestedAgentId ?? resolveSessionStoreAgentId(cfg, deletedSessionKey),

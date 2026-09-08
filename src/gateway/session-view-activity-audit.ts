@@ -49,6 +49,39 @@ export function recordFileDownloadActivity(params: {
   });
 }
 
+/**
+ * Record one refused attachment read.
+ *
+ * Attachment refusals get their own recording point rather than reusing the client-shaped
+ * helper below: the media route answers ticket-authenticated requests that never build a
+ * Gateway client, so the account has to be passed in directly. The reason is stored, the
+ * verdict is not sent to the caller - they get a plain not-found (AUTH-DEPARTMENTS 4).
+ */
+export function recordInboundMediaDeniedActivity(params: {
+  profileId?: string;
+  mediaId?: string;
+  reason: string;
+  surface: string;
+  sessionKey?: string;
+  agentId?: string;
+  remoteIp?: string;
+}): void {
+  recordUserActivity({
+    kind: "access_denied",
+    actor: params.profileId
+      ? { source: "profile", profileId: params.profileId }
+      : { source: "operator" },
+    ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
+    ...(params.agentId ? { agentId: params.agentId } : {}),
+    detail: {
+      reason: params.reason,
+      surface: params.surface,
+      ...(params.mediaId ? { mediaId: params.mediaId } : {}),
+    },
+    ...(params.remoteIp ? { remoteIp: params.remoteIp } : {}),
+  });
+}
+
 /** Record one refused read, with the reason the boundary gave. */
 export function recordAccessDeniedActivity(params: {
   client: GatewayClient | null;

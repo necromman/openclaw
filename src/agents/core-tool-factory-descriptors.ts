@@ -38,6 +38,8 @@ const CORE_TOOL_FACTORY_DESCRIPTORS = [
   { name: "heartbeat_respond", family: "openclaw" },
   { name: "view_image", family: "openclaw" },
   { name: "image_generate", family: "openclaw" },
+  { name: "media_list", family: "openclaw" },
+  { name: "media_read", family: "openclaw" },
   { name: "message", family: "openclaw" },
   { name: "mobile_ui", family: "openclaw" },
   { name: "music_generate", family: "openclaw" },

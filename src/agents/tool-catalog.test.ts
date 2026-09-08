@@ -85,6 +85,8 @@ describe("tool-catalog", () => {
       "ask_user",
       "skill_workshop",
       "view_image",
+      "media_list",
+      "media_read",
       "image_generate",
       "music_generate",
       "video_generate",
@@ -110,6 +112,8 @@ describe("tool-catalog", () => {
       "session_status",
       "message",
       "ask_user",
+      "media_list",
+      "media_read",
       "bundle-mcp",
     ]);
     expect(requirePolicyAllow("minimal")).toEqual(["session_status"]);
@@ -124,6 +128,8 @@ describe("tool-catalog", () => {
       "memory_get",
       "session_status",
       "view_image",
+      "media_list",
+      "media_read",
     ]);
   });
 

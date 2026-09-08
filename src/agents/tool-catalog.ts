@@ -425,6 +425,20 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     includeInOpenClawGroup: true,
   },
   {
+    id: "media_list",
+    description: "List files the user attached to chat",
+    sectionId: "media",
+    profiles: ["readonly", "coding", "messaging"],
+    includeInOpenClawGroup: true,
+  },
+  {
+    id: "media_read",
+    description: "Open one attachment the user uploaded",
+    sectionId: "media",
+    profiles: ["readonly", "coding", "messaging"],
+    includeInOpenClawGroup: true,
+  },
+  {
     id: "image_generate",
     description: "Image generation",
     sectionId: "media",
