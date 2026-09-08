@@ -60,7 +60,7 @@ const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/u;
 export function mayAdministerDepartments(client: GatewayClient | null): boolean {
   const actor = readClientAuditActor(client);
   if (actor) {
-    return Boolean(actor.isSuperAdmin);
+    return actor.isSuperAdmin;
   }
   const scopes = Array.isArray(client?.connect.scopes) ? client.connect.scopes : [];
   return scopes.includes(ADMIN_SCOPE);
