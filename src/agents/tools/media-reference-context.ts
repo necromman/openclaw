@@ -64,9 +64,7 @@ export async function resolveMediaReferenceContext(params: {
   }
   const loaded = (await getSessionStoreModule()).loadGatewaySessionEntryReadOnly(
     params.sessionKey,
-    {
-      ...(params.agentId ? { agentId: params.agentId } : {}),
-    },
+    params.agentId ? { agentId: params.agentId } : undefined,
   );
   const profileId = (await getSessionProvenanceModule()).sessionCreatorProfileId(
     loaded.entry?.createdActor,

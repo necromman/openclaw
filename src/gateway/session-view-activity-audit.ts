@@ -5,6 +5,7 @@
 // tried to open what and was told no" is the half of the department boundary that leaves
 // no other trace, because the caller is answered with a plain not-found.
 import { recordUserActivity } from "../audit/user-activity-audit-recorder.js";
+import { getUserProfileListItem } from "../state/user-profiles.js";
 import { clientActivityActor } from "./ix-auth-audit-actor.js";
 import type { GatewayClient } from "./server-methods/client-types.js";
 
@@ -50,6 +51,25 @@ export function recordFileDownloadActivity(params: {
 }
 
 /**
+ * Name the account behind a refusal so the ledger reads like every other row.
+ *
+ * The refusal path only ever proves a profile id; the ledger's own screen shows an address
+ * and a name. Looking them up here keeps that column filled without teaching the media
+ * route about profiles, and a lookup failure just leaves the columns empty.
+ */
+function describeProfile(profileId: string): { email?: string; displayName?: string } {
+  try {
+    const profile = getUserProfileListItem(profileId);
+    return {
+      ...(profile.emails[0] ? { email: profile.emails[0] } : {}),
+      ...(profile.displayName ? { displayName: profile.displayName } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Record one refused attachment read.
  *
  * Attachment refusals get their own recording point rather than reusing the client-shaped
@@ -69,7 +89,7 @@ export function recordInboundMediaDeniedActivity(params: {
   recordUserActivity({
     kind: "access_denied",
     actor: params.profileId
-      ? { source: "profile", profileId: params.profileId }
+      ? { source: "profile", profileId: params.profileId, ...describeProfile(params.profileId) }
       : { source: "operator" },
     ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
     ...(params.agentId ? { agentId: params.agentId } : {}),

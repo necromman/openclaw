@@ -102,9 +102,10 @@ function isSessionVisibleToReader(params: {
   sessionKey: string;
   agentId?: string;
 }): boolean {
-  const loaded = loadGatewaySessionEntryReadOnly(params.sessionKey, {
-    ...(params.agentId ? { agentId: params.agentId } : {}),
-  });
+  const loaded = loadGatewaySessionEntryReadOnly(
+    params.sessionKey,
+    params.agentId ? { agentId: params.agentId } : undefined,
+  );
   const entry = loaded.entry;
   if (!entry) {
     // The session is gone. Its attachment keeps its uploader, and the uploader path
