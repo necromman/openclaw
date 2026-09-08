@@ -5,6 +5,8 @@
 // a table saves. It scrolls inside its own box so a long department list never widens
 // the page.
 import { html, nothing, type TemplateResult } from "lit";
+import type { IxAuthDepartmentOption } from "../../features/ix-auth/ix-auth-admin-api.ts";
+import { ixAuthDepartmentLabels } from "../../features/ix-auth/ix-auth-department-labels.ts";
 import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import type { IxAuthManagedUser } from "../../features/ix-auth/ix-auth-users-api.ts";
 import { t } from "../../i18n/index.ts";
@@ -20,8 +22,30 @@ function formatMoment(value: string | undefined): string {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
+/**
+ * The departments cell: names to read, codes one hover away.
+ *
+ * The code is what a CSV import and an audit row speak, so it stays reachable; it just
+ * stops being the thing an administrator has to decode while scanning the column. A code
+ * the directory did not list prints itself, which is how a membership in a renamed or
+ * removed group stays visible instead of reading as "no departments".
+ */
+function renderDepartments(
+  codes: readonly string[],
+  departments: readonly IxAuthDepartmentOption[],
+): TemplateResult {
+  if (codes.length === 0) {
+    return html`${t("ixAuth.users.noDepartments")}`;
+  }
+  return html`${ixAuthDepartmentLabels(codes, departments).map(
+    (label, index) =>
+      html`${index > 0 ? ", " : nothing}<span title=${label.code}>${label.name}</span>`,
+  )}`;
+}
+
 function renderRow(params: {
   user: IxAuthManagedUser;
+  departments: readonly IxAuthDepartmentOption[];
   selected: boolean;
   onSelect: (userId: string) => void;
 }): TemplateResult {
@@ -40,9 +64,7 @@ function renderRow(params: {
       </td>
       <td class="users-table__email">${user.email}</td>
       <td>${user.gatewayRole ? ixAuthRoleLabel(user.gatewayRole) : user.roles.join(", ")}</td>
-      <td>
-        ${user.departments.length > 0 ? user.departments.join(", ") : t("ixAuth.users.noDepartments")}
-      </td>
+      <td>${renderDepartments(user.departments, params.departments)}</td>
       <td>
         <span
           class=${
@@ -61,6 +83,8 @@ function renderRow(params: {
 /** Draw the directory, or the one sentence that replaces it. */
 export function renderUsersTable(params: {
   users: readonly IxAuthManagedUser[];
+  /** The directory the Gateway answered with. Empty until it arrives, or if it failed. */
+  departments?: readonly IxAuthDepartmentOption[];
   loading: boolean;
   selectedId?: string;
   onSelect: (userId: string) => void;
@@ -87,6 +111,7 @@ export function renderUsersTable(params: {
           ${params.users.map((user) =>
             renderRow({
               user,
+              departments: params.departments ?? [],
               selected: user.id === params.selectedId,
               onSelect: params.onSelect,
             }),

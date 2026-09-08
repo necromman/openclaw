@@ -502,6 +502,7 @@ export class UsersPage extends OpenClawLightDomElement {
                 stacked: true,
                 control: renderUsersTable({
                   users: this.users,
+                  departments: this.departments,
                   loading: this.loading,
                   selectedId: this.selected?.user.id,
                   onSelect: (userId) => void this.selectUser(userId),

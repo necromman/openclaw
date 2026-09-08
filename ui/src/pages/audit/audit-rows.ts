@@ -3,7 +3,11 @@
 // Kept out of the component so the interesting decisions - which detail field makes a
 // kind legible, how a filter becomes a query - are testable without a DOM.
 import type { AuditUserActivityEvent } from "../../../../packages/gateway-protocol/src/schema/audit-user-activity.js";
+import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import { t } from "../../i18n/index.ts";
+
+/** What an empty cell reads as, so a missing value never looks like a blank column. */
+const AUDIT_MISSING_VALUE = "-";
 
 export const AUDIT_ACTIVITY_KIND_OPTIONS = [
   "login",
@@ -98,4 +102,21 @@ export function auditRowSummary(event: AuditUserActivityEvent): string {
 /** Who the row is about, preferring what a person would recognize. */
 export function auditRowPerson(event: AuditUserActivityEvent): string {
   return event.displayName ?? event.email ?? event.profileId ?? event.actorSource;
+}
+
+/**
+ * The rank a row records, in the words the rest of the screens use.
+ *
+ * The ledger stores the Gateway role name as it stood when the row was written, which is
+ * a code. A reader scanning for "who was an administrator" should not have to know that
+ * `superadmin` is the top rank, so the same table the invitation and directory screens
+ * read from names it here too.
+ *
+ * A row with no role (an operator shell, a channel sender) keeps the placeholder the
+ * column already used, and a role this build has no word for keeps its configured name:
+ * a deployment may map its own codes through `gateway.auth.ixAuth.roleMap`.
+ */
+export function auditRowRole(event: AuditUserActivityEvent): string {
+  const role = event.gatewayRole?.trim();
+  return role ? ixAuthRoleLabel(role) : AUDIT_MISSING_VALUE;
 }

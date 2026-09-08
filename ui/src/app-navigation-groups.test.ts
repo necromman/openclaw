@@ -1,5 +1,5 @@
 // Control UI tests cover sidebar entry customization behavior.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_SIDEBAR_ENTRIES,
   SIDEBAR_NAV_ROUTES,
@@ -16,6 +16,7 @@ import {
 import type { NativeDeviceSettingsCapability } from "./app/native-device-settings.ts";
 import { readGatewayOperatorAccess } from "./app/operator-access.ts";
 import { getStaticCommandPaletteCatalogItems } from "./components/command-palette-catalog-search.ts";
+import { setIxAuthAdminAccess } from "./features/ix-auth/ix-auth-admin-access.ts";
 import { findSettingsSearchBlocks } from "./pages/config/settings-search.ts";
 import { createNativeDeviceSettingsSnapshot } from "./test-helpers/native-device-settings.ts";
 
@@ -225,5 +226,45 @@ describe("sidebar entries", () => {
     expect(more).not.toContain("tasks");
     expect(more).not.toContain("usage");
     expect(new Set(["tasks", "usage", ...more])).toEqual(new Set(SIDEBAR_NAV_ROUTES));
+  });
+});
+
+describe("identity-server administration entries", () => {
+  afterEach(() => {
+    // The flag is module state the session probe owns; leaving it set would hand the
+    // next test a sidebar it did not ask for.
+    setIxAuthAdminAccess(false);
+  });
+
+  it.each([true, false])(
+    "hides both administration screens until the session says otherwise, admin=%s",
+    (canAdmin) => {
+      setIxAuthAdminAccess(false);
+      const routes = visibleSettingsNavigationGroups(canAdmin).flatMap((group) => group.routes);
+      expect(routes).not.toContain("audit");
+      expect(routes).not.toContain("users");
+      expect(isSettingsNavigationRouteVisible("audit", canAdmin)).toBe(false);
+    },
+  );
+
+  it.each([true, false])(
+    "offers the audit log wherever it offers user management, admin=%s",
+    (canAdmin) => {
+      // An identity-server administrator holds no Gateway operator scope, so the entry
+      // has to survive canAdmin=false or the ledger is address-bar only for them.
+      setIxAuthAdminAccess(true);
+      const groups = visibleSettingsNavigationGroups(canAdmin);
+      const routes = groups.flatMap((group) => group.routes);
+      expect(routes).toContain("audit");
+      expect(routes).toContain("users");
+      expect(isSettingsNavigationRouteVisible("audit", canAdmin)).toBe(true);
+      const security = groups.find((group) => group.labelKey === "nav.settingsGroupSecurity");
+      expect(security?.routes).toContain("audit");
+    },
+  );
+
+  it("keeps the audit log a lazily routed settings destination, not a sidebar pin", () => {
+    expect(isSettingsNavigationRoute("audit")).toBe(true);
+    expect(SIDEBAR_NAV_ROUTES).not.toContain("audit");
   });
 });

@@ -235,7 +235,11 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
     labelKey: "nav.settingsGroupAgents",
     routes: ["agents", "model-providers", "memory"],
   },
-  { labelKey: "nav.settingsGroupSecurity", routes: ["approvals"] },
+  // The audit log rides here for the same reason Users does: an identity-server
+  // administrator holds no Gateway operator scope, so without an entry in this list the
+  // ledger would be reachable only by typing its address. Visibility still comes from
+  // isSettingsNavigationRouteVisible, which asks the identity session.
+  { labelKey: "nav.settingsGroupSecurity", routes: ["audit", "approvals"] },
   {
     labelKey: "nav.settingsGroupSystem",
     routes: ["advanced", "debug", "logs", "updates", "about"],

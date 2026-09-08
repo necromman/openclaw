@@ -39,6 +39,7 @@ import {
   auditFilterQuery,
   auditKindLabel,
   auditRowPerson,
+  auditRowRole,
   auditRowSummary,
   EMPTY_AUDIT_ACTIVITY_FILTERS,
   type AuditActivityFilters,
@@ -210,7 +211,7 @@ export class AuditPage extends OpenClawLightDomElement {
       <tr>
         <td>${new Date(event.at).toLocaleString()}</td>
         <td>${auditRowPerson(event)}</td>
-        <td>${event.gatewayRole ?? "-"}</td>
+        <td>${auditRowRole(event)}</td>
         <td>${event.departments.join(", ") || "-"}</td>
         <td>${auditKindLabel(event.kind)}</td>
         <td class="audit-table__summary">

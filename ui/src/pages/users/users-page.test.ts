@@ -55,6 +55,61 @@ describe("users table", () => {
     expect(host.textContent).toContain("Never");
   });
 
+  it("shows a department by name and keeps its code in the title", () => {
+    const host = draw(
+      renderUsersTable({
+        users: [managedUser({ departments: ["dept-rnd", "dept-qa"] })],
+        departments: [
+          { code: "dept-rnd", name: "연구개발" },
+          { code: "dept-qa", name: "품질보증" },
+        ],
+        loading: false,
+        onSelect: () => {},
+      }),
+    );
+    const cells = [...host.querySelectorAll<HTMLElement>("tbody td")];
+    const departmentCell = cells[3];
+    expect(departmentCell?.textContent).toContain("연구개발");
+    expect(departmentCell?.textContent).toContain("품질보증");
+    expect(departmentCell?.textContent).not.toContain("dept-rnd");
+    expect(
+      [...(departmentCell?.querySelectorAll("span[title]") ?? [])].map((span) =>
+        span.getAttribute("title"),
+      ),
+    ).toEqual(["dept-rnd", "dept-qa"]);
+  });
+
+  it("keeps a code the directory does not name, and says so when there is none", () => {
+    const host = draw(
+      renderUsersTable({
+        users: [
+          managedUser({ departments: ["dept-legal"] }),
+          managedUser({ id: "3002", departments: [] }),
+        ],
+        departments: [{ code: "dept-rnd", name: "연구개발" }],
+        loading: false,
+        onSelect: () => {},
+      }),
+    );
+    const cells = [...host.querySelectorAll<HTMLElement>("tbody tr")].map(
+      (row) => row.children[3] as HTMLElement | undefined,
+    );
+    expect(cells[0]?.textContent).toContain("dept-legal");
+    expect(cells[0]?.querySelector("span[title]")?.getAttribute("title")).toBe("dept-legal");
+    expect(cells[1]?.textContent).toContain("None");
+  });
+
+  it("falls back to the codes while the directory has not arrived", () => {
+    const host = draw(
+      renderUsersTable({
+        users: [managedUser({ departments: ["dept-rnd"] })],
+        loading: false,
+        onSelect: () => {},
+      }),
+    );
+    expect(host.textContent).toContain("dept-rnd");
+  });
+
   it("marks the signed-in administrator's own row", () => {
     const host = draw(
       renderUsersTable({

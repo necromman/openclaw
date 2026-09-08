@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { AuditUserActivityEvent } from "../../../../packages/gateway-protocol/src/schema/audit-user-activity.js";
+import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import {
   auditExportSearch,
   auditFilterQuery,
   auditKindLabel,
   auditRowPerson,
+  auditRowRole,
   auditRowSummary,
   EMPTY_AUDIT_ACTIVITY_FILTERS,
 } from "./audit-rows.ts";
+
+// The role words live in the lazily loaded identity catalog, exactly as the page loads it.
+registerIxAuthEnglish();
 
 function event(overrides: Partial<AuditUserActivityEvent> = {}): AuditUserActivityEvent {
   return {
@@ -83,11 +88,35 @@ describe("audit row projection", () => {
     // The deployment default records only a question's shape; the row still has to read
     // as "a question happened" rather than as an empty cell.
     expect(auditRowSummary(event({ kind: "prompt", detail: { chars: 12, digest: "abc" } }))).toBe(
-      "ixAuth.audit.promptHidden",
+      "Question text is not stored on this deployment.",
     );
   });
 
   it("keeps an unknown kind readable instead of blanking it", () => {
     expect(auditKindLabel("some_future_kind")).toBe("some_future_kind");
+  });
+});
+
+describe("audit row role", () => {
+  it("names the rank instead of printing its code", () => {
+    expect(auditRowRole(event({ gatewayRole: "superadmin" }))).toBe("System administrator");
+    expect(auditRowRole(event({ gatewayRole: "admin" }))).toBe("Administrator");
+    expect(auditRowRole(event({ gatewayRole: "member" }))).toBe("Staff");
+  });
+
+  it("reads an identity-server role code too, since both vocabularies reach the ledger", () => {
+    expect(auditRowRole(event({ gatewayRole: "EXECUTIVE" }))).toBe("Executive");
+  });
+
+  it("keeps the placeholder for a row written without a rank", () => {
+    // An operator shell and a channel sender both leave the column empty.
+    expect(auditRowRole(event())).toBe("-");
+    expect(auditRowRole(event({ gatewayRole: "" }))).toBe("-");
+    expect(auditRowRole(event({ gatewayRole: "   " }))).toBe("-");
+  });
+
+  it("prints a configured role this build has no word for", () => {
+    // A deployment may map its own codes through gateway.auth.ixAuth.roleMap.
+    expect(auditRowRole(event({ gatewayRole: "auditor" }))).toBe("auditor");
   });
 });
