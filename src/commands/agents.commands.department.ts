@@ -45,6 +45,13 @@ function renderText(params: {
   lines.push(
     `Shared agents (no department; sessions stay private to their creator): ${shared.length > 0 ? shared.join(", ") : "-"}`,
   );
+  const stale = [...params.bindings.keys()].filter((agentId) => !params.agentIds.includes(agentId));
+  if (stale.length > 0) {
+    lines.push("");
+    lines.push(
+      `Bindings for agents no longer configured (clear them): ${stale.join(", ")}`,
+    );
+  }
   return lines;
 }
 
@@ -64,7 +71,12 @@ export async function agentsDepartmentCommand(
       runtime.exit(1);
       return;
     }
-    if (!listAgentIds(cfg).includes(agentId)) {
+    // Clearing is also how a binding left behind by a removed agent is cleaned up, so it
+    // is allowed for an id the config no longer names. Binding is not: pointing a
+    // department at an agent that does not exist would look done and do nothing.
+    const configured = listAgentIds(cfg).includes(agentId);
+    const bound = readDepartmentAgentBindings().has(agentId);
+    if (!configured && !(opts.clear === true && bound)) {
       runtime.error(`unknown agent "${agentId}"; run "openclaw agents list" to see configured ids`);
       runtime.exit(1);
       return;
@@ -95,6 +107,11 @@ export async function agentsDepartmentCommand(
         agents: agentIds.filter((id) => bindings.get(id) === department.slug),
       })),
       agents: agentIds.map((id) => ({ id, department: bindings.get(id) ?? null })),
+      // Rows whose agent the config no longer names. They bind nothing today, but an
+      // agent later created with the same id would silently inherit the old department.
+      staleBindings: [...bindings.entries()]
+        .filter(([id]) => !agentIds.includes(id))
+        .map(([id, department]) => ({ id, department })),
     });
     return;
   }
