@@ -89,8 +89,23 @@
 [WS connect]  connect-policy.ts   isControlUi && (trustedProxyAuthOk || ixAuthOk) => device 면제
               connect-device-tokens.ts  !trustedProxyAuthOk && !ixAuthOk => 기기 토큰 미발급
               connect-user-profile.ts   boundProfileId 로 로그인 때 확정한 프로필에 직결
-              connect-auth.ts    브라우저 자기 선언 스코프를 버리고 역할 상한만 적용
+              connect-session.ts ix-auth 세션이면 역할 정의에서 스코프를 그대로 펼친다
+                                 (브라우저가 무엇을 요청했든 상관없다)
 ```
+
+**역할이 프로필에 닿아야 한다.** 핸드셰이크 이후의 판정(연결 스코프, 타인 세션 상한,
+에이전트 허용)은 전부 `user_profiles.role` 을 읽는 `resolveOperatorRolePolicyForProfile`
+을 거친다. 로그인이 그 행을 쓰지 않으면 `gateway.roles.default` 가 적용되고, 시스템
+관리자도 기본 역할의 스코프로 붙는다. 그래서 로그인과 `/auth/me` 가 매핑된 역할을
+프로필에 투영한다(`src/auth/ix-auth/ix-auth-role-projection.ts`). IX-Auth 가 정본이므로
+투영은 갓 검증한 토큰이 말하는 것만 쓰고, 매핑되지 않는 코드는 저장된 역할을 건드리지
+않는다.
+
+**연결 스코프는 요청이 아니라 역할이다.** 다른 인증 경로에서 `connect.scopes` 는 요청이고
+기기·프록시 헤더·역할 정의가 차례로 상한이 된다. ix-auth 세션에서는 역할 정의 하나가
+답이다(`src/gateway/ix-auth-connection-scopes.ts`). 오래된 기기 토큰의 스코프 목록이나
+`x-openclaw-scopes` 헤더가 관리자를 조용히 강등하지 못하게 하려는 것이다. trusted-proxy
+경로는 종전대로 헤더 상한을 지킨다.
 
 ### 3.3 로그아웃
 
@@ -308,6 +323,8 @@ docker compose --env-file chris-local/ixauth.env \
 | `src/auth/ix-auth/ix-auth-client.ts`                 | IX-Auth `/auth/*` 중계. 서비스 키·실방문자 IP 전달   |
 | `src/auth/ix-auth/ix-auth-role-map.ts`               | 역할 코드 -> 게이트웨이 역할, 콘솔·관리 API 판정 2종 |
 | `src/auth/ix-auth/ix-auth-sessions.ts`               | 세션 발급·검증·갱신·폐기                             |
+| `src/auth/ix-auth/ix-auth-role-projection.ts`        | 매핑된 역할을 `user_profiles.role` 에 투영            |
+| `src/gateway/ix-auth-connection-scopes.ts`           | 역할 정의 -> 연결 스코프 (요청은 상한이 아니다)      |
 | `src/auth/ix-auth/ix-auth-settings.ts`               | 설정 해석·기본값·서비스 키 캐시                      |
 | `src/state/ix-auth-sessions-schema.ts`               | feature-local DDL (`user_profiles` 와 같은 방식)     |
 | `src/state/ix-auth-sessions-store.ts`                | Kysely 행 접근                                       |
