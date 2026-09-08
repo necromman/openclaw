@@ -147,6 +147,53 @@ export async function createIxAuthGroup(
   return { ok: true, groupId };
 }
 
+/**
+ * How many accounts the identity server holds in one group.
+ *
+ * The fork's own projection only knows people who have signed in since the group was
+ * made, so it cannot answer "is this department empty" on its own. This can: the identity
+ * server is canonical for membership, and a delete that trusted the projection would drop
+ * a department somebody was still in without ever having seen them.
+ */
+export async function countIxAuthGroupMembers(
+  params: IxAuthAdminCall & { groupId: string },
+): Promise<{ ok: true; count: number } | IxAuthRelayFailure> {
+  const result = await callIxAuthEndpoint({
+    settings: params.settings,
+    path: `admin/groups/${encodeURIComponent(params.groupId)}/members`,
+    method: "GET",
+    accessToken: params.accessToken,
+    meta: params.meta,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  // The list shape differs between routes (a bare array under `data`, or `data.items`),
+  // so both are read rather than assuming one and counting zero for the other.
+  const nested = result.data.items;
+  const items = result.items ?? (Array.isArray(nested) ? nested : []);
+  return { ok: true, count: items.length };
+}
+
+/**
+ * Delete one group, which is how a department stops existing.
+ *
+ * The caller must have already established that nobody is in it. The identity server has
+ * no undo here: memberships attached to the group go with it.
+ */
+export async function deleteIxAuthGroup(
+  params: IxAuthAdminCall & { groupId: string },
+): Promise<{ ok: true } | IxAuthRelayFailure> {
+  const result = await callIxAuthEndpoint({
+    settings: params.settings,
+    path: `admin/groups/${encodeURIComponent(params.groupId)}`,
+    method: "DELETE",
+    accessToken: params.accessToken,
+    meta: params.meta,
+  });
+  return result.ok ? { ok: true } : result;
+}
+
 /** Put one account into one group, which is how a department is granted. */
 export async function addIxAuthGroupMember(
   params: IxAuthAdminCall & { groupId: string; userId: string },

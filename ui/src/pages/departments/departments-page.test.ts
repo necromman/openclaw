@@ -15,7 +15,10 @@ import { renderDepartmentAccessPanel } from "./department-access-panel.ts";
 import { renderDepartmentAgentsTable } from "./department-agents-panel.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
 import { buildDepartmentAgentPatch } from "./departments-gateway.ts";
-import { renderDepartmentsTable } from "./departments-table.ts";
+import {
+  renderDepartmentDeleteForm,
+  renderDepartmentsTable,
+} from "./departments-table.ts";
 
 registerIxAuthEnglish();
 
@@ -101,6 +104,71 @@ describe("department table", () => {
       renderDepartmentsTable({ departments: [], loading: false, onSelect: () => {} }),
     );
     expect(host.textContent).toContain("No department has been created yet.");
+  });
+});
+
+describe("department delete", () => {
+  const department = {
+    code: "dept-rnd",
+    slug: "rnd",
+    name: "Research",
+    memberCount: 0,
+    agents: ["rnd-bot"],
+  };
+
+  it("names the agents that lose their folder and asks before deleting", () => {
+    let armed = false;
+    const host = draw(
+      renderDepartmentDeleteForm({
+        department,
+        armed: false,
+        busy: false,
+        onArm: () => {
+          armed = true;
+        },
+        onCancel: () => {},
+        onConfirm: () => {},
+      }),
+    );
+    expect(host.textContent).toContain("rnd-bot");
+    const button = host.querySelector("button");
+    expect(button?.hasAttribute("disabled")).toBe(false);
+    button?.click();
+    expect(armed).toBe(true);
+  });
+
+  it("refuses to arm while somebody is still in the department", () => {
+    const host = draw(
+      renderDepartmentDeleteForm({
+        department: { ...department, memberCount: 2 },
+        armed: false,
+        busy: false,
+        onArm: () => {},
+        onCancel: () => {},
+        onConfirm: () => {},
+      }),
+    );
+    expect(host.querySelector("button")?.hasAttribute("disabled")).toBe(true);
+    expect(host.textContent).toContain("2 people are still in this department");
+  });
+
+  it("only calls back on the second press", () => {
+    let confirmed = 0;
+    const host = draw(
+      renderDepartmentDeleteForm({
+        department,
+        armed: true,
+        busy: false,
+        onArm: () => {},
+        onCancel: () => {},
+        onConfirm: () => {
+          confirmed += 1;
+        },
+      }),
+    );
+    expect(host.textContent).toContain("Delete Research?");
+    host.querySelector("button")?.click();
+    expect(confirmed).toBe(1);
   });
 });
 

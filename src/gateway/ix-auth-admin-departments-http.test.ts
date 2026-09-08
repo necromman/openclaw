@@ -8,6 +8,7 @@ import { IX_AUTH_DEFAULT_ROLE_MAP } from "../auth/ix-auth/ix-auth-role-map.js";
 import type { IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
 import {
   listDepartments,
+  readDepartmentAgentBindings,
   setDepartmentAgent,
   upsertDepartment,
 } from "../state/departments-store.js";
@@ -351,5 +352,62 @@ describe("PATCH /auth/admin/departments", () => {
       body: { slug: "ghost", name: "Nowhere" },
     });
     expect(answer.status()).toBe(404);
+  });
+});
+
+describe("DELETE /auth/admin/departments", () => {
+  it("removes the group and everything the projection held for it", async () => {
+    const cookie = seedSession(["SUPERADMIN"]);
+    upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
+    setDepartmentAgent({ agentId: "rnd-bot", departmentSlug: "rnd", nowMs: Date.now() });
+    const calls = stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      "GET /admin/groups/7/members": () => jsonResponse({ data: [] }),
+      "DELETE /admin/groups/7": () => jsonResponse({ data: {} }),
+    });
+    const answer = await call({ method: "DELETE", cookie, body: { slug: "rnd" } });
+    expect(answer.status()).toBe(200);
+    expect(JSON.parse(answer.body())).toEqual({ slug: "rnd", unboundAgents: ["rnd-bot"] });
+    expect(listDepartments()).toEqual([]);
+    expect(readDepartmentAgentBindings().has("rnd-bot")).toBe(false);
+    expect(calls.some((entry) => entry.method === "DELETE" && entry.path === "/admin/groups/7")).toBe(
+      true,
+    );
+  });
+
+  it("refuses while the identity server still holds members, and deletes nothing", async () => {
+    const cookie = seedSession(["SUPERADMIN"]);
+    upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
+    const calls = stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      "GET /admin/groups/7/members": () => jsonResponse({ data: [{ id: 3 }] }),
+    });
+    const answer = await call({ method: "DELETE", cookie, body: { slug: "rnd" } });
+    expect(answer.status()).toBe(409);
+    expect(JSON.parse(answer.body())).toEqual({
+      error: "department_has_members",
+      memberCount: 1,
+    });
+    expect(listDepartments().map((row) => row.slug)).toEqual(["rnd"]);
+    expect(calls.some((entry) => entry.method === "DELETE")).toBe(false);
+  });
+
+  it("clears an orphan row without calling the identity server for a delete", async () => {
+    const cookie = seedSession(["SUPERADMIN"]);
+    upsertDepartment({ slug: "legacy", displayName: "Old Team", nowMs: Date.now() });
+    const calls = stubIdentityServer({ "GET /admin/groups": groupListing });
+    const answer = await call({ method: "DELETE", cookie, body: { slug: "legacy" } });
+    expect(answer.status()).toBe(200);
+    expect(listDepartments()).toEqual([]);
+    expect(calls.some((entry) => entry.method === "DELETE")).toBe(false);
+  });
+
+  it("refuses an ordinary administrator", async () => {
+    const cookie = seedSession(["ADMIN"]);
+    upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
+    stubIdentityServer({});
+    const answer = await call({ method: "DELETE", cookie, body: { slug: "rnd" } });
+    expect(answer.status()).toBe(403);
+    expect(listDepartments().map((row) => row.slug)).toEqual(["rnd"]);
   });
 });

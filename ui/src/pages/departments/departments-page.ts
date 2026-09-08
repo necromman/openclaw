@@ -33,6 +33,7 @@ import { renderSettingsWorkspace } from "../../components/settings-workspace.ts"
 import { canManageIxAuthDepartments } from "../../features/ix-auth/ix-auth-admin-access.ts";
 import {
   createIxAuthDepartment,
+  deleteIxAuthDepartment,
   fetchIxAuthDepartmentDirectory,
   renameIxAuthDepartment,
   type IxAuthDepartmentDirectory,
@@ -52,12 +53,14 @@ import { renderDepartmentAgentsTable } from "./department-agents-panel.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
 import {
   bindDepartmentAgent,
+  clearDepartmentAgentAccess,
   fetchDepartmentAgents,
   fetchDepartmentFolders,
   saveDepartmentAgentAccess,
 } from "./departments-gateway.ts";
 import {
   renderDepartmentCreateForm,
+  renderDepartmentDeleteForm,
   renderDepartmentRenameForm,
   renderDepartmentsTable,
   renderOrphanDepartments,
@@ -99,6 +102,8 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   @state() private createSlug = "";
   @state() private createName = "";
   @state() private renameDraft = "";
+  /** Slug whose delete button has been armed once. Cleared on any other action. */
+  @state() private deleteArmedSlug: string | undefined;
   @state() private folders: DepartmentsFoldersListResult | undefined;
   @state() private accessDraft = {
     workspace: "",
@@ -209,6 +214,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   private async selectDepartment(slug: string): Promise<void> {
     this.selectedSlug = slug;
     this.notice = undefined;
+    this.deleteArmedSlug = undefined;
     this.searched = false;
     this.searchResults = [];
     this.renameDraft = this.selectedDepartment()?.name ?? "";
@@ -279,6 +285,40 @@ export class DepartmentsPage extends OpenClawLightDomElement {
         this.notice = t("ixAuth.departments.renamed");
       }
       return renamed;
+    });
+  }
+
+  /**
+   * Delete the selected department, then take back what it had handed out.
+   *
+   * The Gateway removes the group and the projection; it cannot touch the configuration,
+   * so the agents it names still have this department's folder as their workspace and its
+   * index paths in their search. Clearing those here is the part that actually closes the
+   * access, and it runs one agent at a time because each is a separate config write with
+   * its own base hash.
+   */
+  private async deleteDepartment(): Promise<void> {
+    const slug = this.selectedSlug;
+    const client = this.client;
+    if (!slug) {
+      return;
+    }
+    await this.mutate(async () => {
+      const removed = await deleteIxAuthDepartment({ basePath: this.basePath, slug });
+      if (isFailure(removed)) {
+        return removed;
+      }
+      if (client) {
+        await clearDepartmentAgentAccess({ client, agentIds: removed.unboundAgents });
+      }
+      this.notice = t("ixAuth.departments.deleted", {
+        agents: removed.unboundAgents.join(", ") || t("ixAuth.departments.none"),
+      });
+      this.selectedSlug = undefined;
+      this.deleteArmedSlug = undefined;
+      this.members = [];
+      this.selectedAgentId = undefined;
+      return removed;
     });
   }
 
@@ -463,6 +503,24 @@ export class DepartmentsPage extends OpenClawLightDomElement {
                   this.renameDraft = value;
                 },
                 onSubmit: () => void this.renameDepartment(),
+              }),
+            })
+          : nothing,
+        selected
+          ? renderSettingsRow({
+              title: t("ixAuth.departments.deleteTitle"),
+              stacked: true,
+              control: renderDepartmentDeleteForm({
+                department: selected,
+                armed: this.deleteArmedSlug === (selected.slug ?? selected.code),
+                busy: this.busy,
+                onArm: () => {
+                  this.deleteArmedSlug = selected.slug ?? selected.code;
+                },
+                onCancel: () => {
+                  this.deleteArmedSlug = undefined;
+                },
+                onConfirm: () => void this.deleteDepartment(),
               }),
             })
           : nothing,

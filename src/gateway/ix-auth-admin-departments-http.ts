@@ -10,10 +10,20 @@
 // for groups and nothing in between (`AccessAdminController`, `/admin/groups`), so there
 // is no rename to relay; inventing one by deleting and recreating the group would drop
 // every membership it holds. The code, which is what authorization reads, never changes.
+//
+// Deleting relays both ways: the group goes on the identity server and the projection
+// goes here. It is refused while anyone is still in the group, because a department is
+// the shape of a boundary and emptying one silently is how people lose access without
+// anybody deciding they should.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
-import { createIxAuthGroup } from "../auth/ix-auth/ix-auth-admin-client.js";
 import {
+  countIxAuthGroupMembers,
+  createIxAuthGroup,
+  deleteIxAuthGroup,
+} from "../auth/ix-auth/ix-auth-admin-client.js";
+import {
+  deleteDepartment,
   listDepartmentMembers,
   listDepartments,
   normalizeDepartmentSlug,
@@ -240,6 +250,76 @@ async function handleRename(params: DepartmentsRouteParams): Promise<void> {
   sendJson(params.res, 200, { slug: read.slug, name: read.name });
 }
 
+/**
+ * Delete one department.
+ *
+ * Two stores have to agree afterwards, and they are removed in the order that leaves the
+ * safe state if the second step never runs: the identity group goes first, so a failure
+ * after it leaves a department the fork still lists but nobody can be granted, which the
+ * screen already shows as an orphan. Removing the projection first would instead leave a
+ * live group that the fork has forgotten, and people would keep being placed into a
+ * department no operator can see.
+ *
+ * The agents that lose their binding are named in the answer. Their configured workspace
+ * and index folders still point at this department's folders, and only the caller holding
+ * the config write can clear those.
+ */
+async function handleDelete(params: DepartmentsRouteParams): Promise<void> {
+  if (rejectNonSuperAdmin(params)) {
+    return;
+  }
+  const body = await readIxAuthJsonBody(params.req, params.res);
+  if (!body) {
+    return;
+  }
+  const slug = normalizeDepartmentSlug(normalizeOptionalString(body.slug) ?? "");
+  if (!DEPARTMENT_SLUG_PATTERN.test(slug)) {
+    sendJson(params.res, 400, { error: "invalid_body" });
+    return;
+  }
+  const listing = await listIxAuthDepartmentGroups({ deps: params.deps, admin: params.admin });
+  if (!listing.ok) {
+    sendRelayFailure(params.res, listing.failure);
+    return;
+  }
+  const prefix = params.deps.settings.departmentGroupPrefix;
+  const group = listing.departments.find(
+    (entry) => slugForGroupCode(entry.code, prefix) === slug,
+  );
+  // A department the identity server no longer lists is an orphan row: there is no group
+  // to delete, and clearing the projection is the whole job.
+  if (group) {
+    const members = await countIxAuthGroupMembers({ ...params.admin.call, groupId: group.groupId });
+    // A membership count the identity server would not answer is not proof of emptiness,
+    // so the local projection carries the check on its own rather than the delete
+    // proceeding on a missing answer.
+    const occupied = members.ok ? members.count : listDepartmentMembers(slug).length;
+    if (occupied > 0) {
+      sendJson(params.res, 409, { error: "department_has_members", memberCount: occupied });
+      return;
+    }
+    const removed = await deleteIxAuthGroup({ ...params.admin.call, groupId: group.groupId });
+    if (!removed.ok) {
+      sendRelayFailure(params.res, removed);
+      return;
+    }
+  } else {
+    const projected = listDepartmentMembers(slug).length;
+    if (projected > 0) {
+      sendJson(params.res, 409, { error: "department_has_members", memberCount: projected });
+      return;
+    }
+  }
+  const { unboundAgents } = deleteDepartment(slug);
+  recordIxAuthAdminAction({
+    deps: params.deps,
+    admin: params.admin,
+    action: "department-delete",
+    detail: { slug, code: group?.code ?? null, unboundAgents },
+  });
+  sendJson(params.res, 200, { slug, unboundAgents });
+}
+
 /** Dispatch one `/auth/admin/departments` request for an already-resolved administrator. */
 export async function handleIxAuthAdminDepartmentsRequest(
   params: DepartmentsRouteParams,
@@ -254,6 +334,10 @@ export async function handleIxAuthAdminDepartmentsRequest(
   }
   if (params.req.method === "PATCH") {
     await handleRename(params);
+    return;
+  }
+  if (params.req.method === "DELETE") {
+    await handleDelete(params);
     return;
   }
   sendJson(params.res, 404, { error: "not_found" });

@@ -207,6 +207,41 @@ export function setDepartmentAgent(
   );
 }
 
+/**
+ * Forget one department: its row, its projected members, and its agent bindings.
+ *
+ * The identity server owns whether the group exists; this only removes what the fork
+ * itself holds. Bindings are returned rather than dropped silently, because an agent that
+ * has just lost its department still carries the workspace and index folders that
+ * department gave it, and the caller has to clear those too.
+ */
+export function deleteDepartment(
+  slug: string,
+  options: OpenClawStateDatabaseOptions = {},
+): { unboundAgents: string[] } {
+  const normalized = normalizeDepartmentSlug(slug);
+  const unboundAgents = [...readDepartmentAgentBindings(options).entries()]
+    .filter(([, bound]) => bound === normalized)
+    .map(([agentId]) => agentId);
+  runOpenClawStateWriteTransaction(
+    ({ db }) => {
+      const kysely = departmentsDb(db);
+      executeSqliteQuerySync(
+        db,
+        kysely.deleteFrom("department_agents").where("department_slug", "=", normalized),
+      );
+      executeSqliteQuerySync(
+        db,
+        kysely.deleteFrom("department_members").where("department_slug", "=", normalized),
+      );
+      executeSqliteQuerySync(db, kysely.deleteFrom("departments").where("slug", "=", normalized));
+    },
+    options,
+    { operationLabel: "departments.delete" },
+  );
+  return { unboundAgents };
+}
+
 /** Remove one agent's department binding, returning it to the shared pool. */
 export function clearDepartmentAgent(
   agentId: string,

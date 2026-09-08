@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import {
   clearDepartmentAgent,
+  deleteDepartment,
   listDepartmentMembers,
   listDepartments,
   listDepartmentsForProfile,
@@ -62,6 +63,25 @@ describe("departments store", () => {
       expect(readDepartmentAgentBindings().get("rnd-bot")).toBe("qa");
       clearDepartmentAgent("rnd-bot");
       expect(readDepartmentAgentBindings().has("rnd-bot")).toBe(false);
+    });
+  });
+
+  it("deletes a department with its members and bindings, naming the freed agents", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async () => {
+      upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: 1 });
+      upsertDepartment({ slug: "qa", displayName: "Quality", nowMs: 1 });
+      syncDepartmentMembership({ profileId: "p1", departments: ["rnd", "qa"], nowMs: 2 });
+      setDepartmentAgent({ agentId: "rnd-bot", departmentSlug: "rnd", nowMs: 3 });
+      setDepartmentAgent({ agentId: "qa-bot", departmentSlug: "qa", nowMs: 3 });
+
+      expect(deleteDepartment("RND")).toEqual({ unboundAgents: ["rnd-bot"] });
+
+      expect(listDepartments().map((row) => row.slug)).toEqual(["qa"]);
+      expect(listDepartmentMembers("rnd")).toEqual([]);
+      expect(readDepartmentAgentBindings().has("rnd-bot")).toBe(false);
+      // Nothing that named a different department may be touched by the delete.
+      expect(listDepartmentsForProfile("p1")).toEqual(["qa"]);
+      expect(readDepartmentAgentBindings().get("qa-bot")).toBe("qa");
     });
   });
 

@@ -166,6 +166,9 @@ const enIxAuth = {
       columnLastLogin: "Last sign-in",
       neverSignedIn: "Never",
       noDepartments: "None",
+      // An account the identity server has granted no role at all. Drawn as a word so an
+      // empty role cell never reads as a rendering fault.
+      noRole: "Unassigned",
       selfMarker: "You",
       status: {
         ACTIVE: "Active",
@@ -252,6 +255,19 @@ const enIxAuth = {
       renamed: "Renamed.",
       renameHint:
         "Only the display name changes. The group code stays as it is, because that code is what decides who is in this department.",
+      deleteTitle: "Delete",
+      deleteSubmit: "Delete this department",
+      deleteConfirm:
+        "Delete {name}? The group goes from the identity server, and every agent bound to it loses its folder.",
+      deleteConfirmSubmit: "Yes, delete it",
+      deleteCancel: "Keep it",
+      deleteHint:
+        "Only an empty department can be deleted. The group code is released with it, so a department created again later starts with nobody in it.",
+      deleteBlocked:
+        "{count} people are still in this department. Remove them below, then delete it.",
+      deleteAgentsHint:
+        "These agents lose their department and their folder: {agents}. Their workspace and index folders are cleared with the department.",
+      deleted: "Deleted. Agents returned to the shared pool: {agents}.",
       orphanTitle: "Not on the identity server",
       orphanBody:
         "These departments are still recorded here, but no group answers to them any more. Bindings that name one keep working; new members cannot be added until the group exists again.",
@@ -334,6 +350,7 @@ const enIxAuth = {
       usersEmptyFile: "The file has no rows.",
       usersNotFound: "That account no longer exists.",
       departmentsRejected: "The change was refused. Reload the page and try again.",
+      departmentHasMembers: "Somebody is still in that department, so it was not deleted.",
       accountLocked: "This account is locked. Contact an administrator.",
       accountLockedUntil: "Too many attempts. Try again after {time}.",
       accountDisabled: "This account is disabled.",

@@ -83,6 +83,8 @@ function mapAdminErrorToKey(status: number, code: string): string {
       return "adminForbidden";
     case "conflict":
       return "adminConflict";
+    case "department_has_members":
+      return "departmentHasMembers";
     case "identity_unavailable":
       return "identityUnavailable";
     default:
@@ -259,6 +261,32 @@ export async function renameIxAuthDepartment(params: {
   return {
     slug: readStringField(result.body, "slug") ?? params.slug,
     name: readStringField(result.body, "name") ?? params.name,
+  };
+}
+
+/**
+ * Delete one department.
+ *
+ * Answers with the agents whose binding the delete removed. Their workspace and index
+ * folders still name this department's folders, so the caller clears those next; the
+ * Gateway cannot, because a config write is a different surface with its own checks.
+ */
+export async function deleteIxAuthDepartment(params: {
+  basePath: string;
+  slug: string;
+}): Promise<{ slug: string; unboundAgents: string[] } | IxAuthAdminFailure> {
+  const result = await callAdminRoute({
+    basePath: params.basePath,
+    route: "departments",
+    method: "DELETE",
+    body: { slug: params.slug },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    slug: readStringField(result.body, "slug") ?? params.slug,
+    unboundAgents: readStringListField(result.body, "unboundAgents"),
   };
 }
 

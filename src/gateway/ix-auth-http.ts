@@ -518,10 +518,11 @@ const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> =
   ["mail-hook", new Set(["POST"])],
   ["admin-invites", new Set(["GET", "POST", "DELETE"])],
   ["admin-approvals", new Set(["GET", "POST"])],
-  // POST creates a department group; PATCH renames the fork's own display name for one.
-  // Deletion is deliberately absent: removing a group orphans every membership and every
-  // agent binding that names it, and the identity console is the place to do that.
-  ["admin-departments", new Set(["GET", "POST", "PATCH"])],
+  // POST creates a department group; PATCH renames the fork's own display name for one;
+  // DELETE removes an empty one from both the identity server and the projection. The
+  // route refuses a department anybody is still in, which is what keeps a delete from
+  // orphaning memberships the way deleting the group in the console does.
+  ["admin-departments", new Set(["GET", "POST", "PATCH", "DELETE"])],
   ["admin-users", new Set(["GET", "POST", "PATCH", "PUT", "DELETE"])],
   ["admin-audit-export", new Set(["GET"])],
 ]);

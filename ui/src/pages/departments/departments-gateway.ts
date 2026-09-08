@@ -107,6 +107,33 @@ export function buildDepartmentAgentPatch(draft: DepartmentAgentAccessDraft): st
  * the Gateway rather than silently overwritten. There is no retry: an operator who lost
  * the race should see what changed underneath them.
  */
+/**
+ * Take back the folders a deleted department had handed to its agents.
+ *
+ * One write per agent, in order: each config patch carries the hash it read, so batching
+ * them would make every write after the first lose its own race. A single failure stops
+ * the loop rather than being swallowed, because an agent left holding a workspace under a
+ * department that no longer exists is exactly what this call is for.
+ */
+export async function clearDepartmentAgentAccess(params: {
+  client: GatewayBrowserClient;
+  agentIds: readonly string[];
+}): Promise<void> {
+  for (const agentId of params.agentIds) {
+    await saveDepartmentAgentAccess({
+      client: params.client,
+      draft: {
+        agentId,
+        workspace: "",
+        workspaceIsShared: false,
+        readonlyTools: false,
+        readonlySessions: false,
+        indexPaths: [],
+      },
+    });
+  }
+}
+
 export async function saveDepartmentAgentAccess(params: {
   client: GatewayBrowserClient;
   draft: DepartmentAgentAccessDraft;

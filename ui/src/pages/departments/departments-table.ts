@@ -150,6 +150,63 @@ export function renderDepartmentCreateForm(params: {
   `;
 }
 
+/**
+ * The delete control.
+ *
+ * Two steps, not a browser confirm dialog: the first click states what will happen in the
+ * words of this screen, and the second is the decision. A department is where an access
+ * boundary is drawn, so the count of people still in it is shown next to the button
+ * rather than discovered as a server error.
+ */
+export function renderDepartmentDeleteForm(params: {
+  department: IxAuthDepartmentOption;
+  armed: boolean;
+  busy: boolean;
+  onArm: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}): TemplateResult {
+  const memberCount = params.department.memberCount ?? 0;
+  const agents = params.department.agents ?? [];
+  const blocked = memberCount > 0;
+  return html`
+    <div class="departments-form">
+      ${
+        params.armed
+          ? html`
+              <p class="departments-form__hint">
+                ${t("ixAuth.departments.deleteConfirm", { name: params.department.name })}
+              </p>
+              <button class="btn danger" ?disabled=${params.busy} @click=${() => params.onConfirm()}>
+                ${t("ixAuth.departments.deleteConfirmSubmit")}
+              </button>
+              <button class="btn" ?disabled=${params.busy} @click=${() => params.onCancel()}>
+                ${t("ixAuth.departments.deleteCancel")}
+              </button>
+            `
+          : html`
+              <button
+                class="btn danger"
+                ?disabled=${params.busy || blocked}
+                @click=${() => params.onArm()}
+              >
+                ${t("ixAuth.departments.deleteSubmit")}
+              </button>
+            `
+      }
+      <p class="departments-form__hint">
+        ${
+          blocked
+            ? t("ixAuth.departments.deleteBlocked", { count: String(memberCount) })
+            : agents.length > 0
+              ? t("ixAuth.departments.deleteAgentsHint", { agents: agents.join(", ") })
+              : t("ixAuth.departments.deleteHint")
+        }
+      </p>
+    </div>
+  `;
+}
+
 /** The rename form. Only the display name moves; the code is left alone on purpose. */
 export function renderDepartmentRenameForm(params: {
   name: string;
