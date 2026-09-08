@@ -91,8 +91,12 @@ local_digest() {
     sed -n 's/.*@//p'
 }
 
+# 컨테이너가 없으면 docker inspect 는 빈 줄을 내고 실패한다. 그 빈 줄이 그대로 나가면
+# 상태 표시가 한 줄 어긋나고 비교도 빗나가므로 여기서 걸러 "missing" 으로 통일한다.
 health_of() {
-  "$DOCKER_BIN" inspect --format '{{.State.Health.Status}}' "$1" 2>/dev/null || echo missing
+  state=$("$DOCKER_BIN" inspect --format '{{.State.Health.Status}}' "$1" 2>/dev/null | head -1)
+  [ -n "$state" ] || state=missing
+  echo "$state"
 }
 
 print_status() {
@@ -144,7 +148,9 @@ fi
 
 log "배포 시작: gateway ${gateway_local:-없음} -> ${gateway_remote}, ix-auth ${ix_auth_local:-없음} -> ${ix_auth_remote}, force=${force}"
 
-if ! compose pull >>"$LOG" 2>&1; then
+# --quiet 를 준다. 주지 않으면 압축 해제 진행률이 1초에 수십 줄씩 로그로 들어가
+# 7GB 이미지 한 번에 로그가 수 메가바이트가 된다.
+if ! compose pull --quiet >>"$LOG" 2>&1; then
   log "FAIL: docker-compose pull 실패. 돌던 컨테이너는 그대로 둔다"
   exit 1
 fi
