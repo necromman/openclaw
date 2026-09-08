@@ -123,6 +123,14 @@ services:
       OPENCLAW_CONFIG_DIR: /home/node/.openclaw
       OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
       OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      # Where the Codex CLI login file lives. Default is "~/.codex", which is outside the
+      # state volume and therefore disappears the moment the container is recreated. The
+      # Gateway reads this file to bootstrap the ChatGPT-subscription OAuth profile
+      # ("openai:default"), so the delivery stack keeps it inside the volume instead.
+      # The Codex harness is unaffected: it runs with appServer.homeScope "agent" and an
+      # explicit per-agent CODEX_HOME (<agentDir>/codex-home), and it strips the ambient
+      # value before launching. Setup: DEPLOY.md 3.4 (마).
+      CODEX_HOME: /home/node/.openclaw/codex-cli
       OPENCLAW_GATEWAY_PORT: "18789"
       # Read by the committed config through its "${IXAUTH_SERVICE_KEY}" env SecretRef,
       # so the shared secret never has to be written into a tracked file.

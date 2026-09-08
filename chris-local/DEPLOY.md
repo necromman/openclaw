@@ -358,6 +358,36 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
    근거와 배경은 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 3-1절과 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.9.
 
+#### (마) 구독 로그인 파일로 main 인증을 넣는다 (키 없이 바로 답하게 하기)
+
+(다) 를 컨테이너 안에서 대화형으로 돌리기 어려운 배포(NAS 등)에서는, **이미 로그인한 PC 의 Codex CLI 로그인 파일 하나**를 옮기는 것으로 같은 결과를 얻는다. 게이트웨이는 그 파일을 읽어 ChatGPT 구독 OAuth 프로필 `openai:default` 을 만든다.
+
+| 항목        | 값                                                                                                        |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| 원본        | 로그인한 PC 의 `~/.codex/auth.json`                                                                       |
+| 컨테이너 경로 | `/home/node/.openclaw/codex-cli/auth.json` (상태 볼륨 안)                                                 |
+| 호스트 경로 | `<볼륨>/_data/codex-cli/auth.json` (NAS: `/volume1/@docker/volumes/openclaw-ixauth_gateway-state/_data/...`) |
+| 소유자·권한 | 컨테이너의 `node` 사용자(uid 1000), `0600`                                                                |
+| 읽는 코드   | `src/agents/cli-credentials.ts` 의 `resolveCodexCliHomePath` → `CODEX_HOME` 없으면 `~/.codex`             |
+
+**왜 `~/.codex` 가 아니라 볼륨 안인가.** `~/.codex` 는 상태 볼륨 밖이라 다음 배포에서 컨테이너가 새로 만들어지면 사라진다. 그래서 compose 의 게이트웨이 환경에 `CODEX_HOME: /home/node/.openclaw/codex-cli` 를 박아 두었다. 이 값은 codex 하네스와 충돌하지 않는다: 하네스는 `appServer.homeScope` 기본값 `agent` 로 `<agentDir>/codex-home` 을 따로 쓰고, 실행 전에 주변 `CODEX_HOME` 을 걸러낸다.
+
+```bash
+# 값이 로그·프로세스 목록에 남지 않도록 표준입력으로만 넣는다. docker cp 는 root 소유가 돼서 안 된다.
+cat ~/.codex/auth.json | docker exec -i -u node openclaw-ixauth-gateway-1   sh -c 'umask 077; mkdir -p /home/node/.openclaw/codex-cli; cat > /home/node/.openclaw/codex-cli/auth.json'
+
+# 확인
+docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs models status --agent main
+# -> openai:default = OAuth, status=usable
+```
+
+**이 파일은 부트스트랩일 뿐이다.** codex 외부 CLI 공급자는 `bootstrapOnly` 라 처음 읽은 자격증명이 **runtime-only** 로만 얹힌다(`src/agents/auth-profiles/external-cli-sync.ts`). 게이트웨이가 토큰을 한 번 갱신하고 나면 갱신본은 상태 볼륨 안 인증 프로필 저장소에 **영구 저장**되고(`shouldPersistRuntimeExternalOAuthProfile`), 그 뒤로는 저장본이 이 파일보다 우선한다. 게이트웨이는 `auth.json` 을 **읽기만 하고 되쓰지 않으므로** 파일 쪽 refresh 토큰은 시간이 지나면 낡는다. 저장본이 살아 있는 동안에는 문제가 없고, 저장본까지 못 쓰게 되면 낡은 파일로는 복구되지 않으니 그때는 PC 에서 `codex login` 을 다시 하고 파일을 갈아끼운다.
+
+**한계 두 가지.**
+
+- **부서 봇에는 못 쓴다.** 구독 런타임에서는 폴더 경계가 지켜지지 않는다(AUTH-DEPARTMENTS 13.9). `rnd-bot`·`qa-bot` 은 (라) 의 API 키가 필요하다. 이 방식은 부서에 묶이지 않은 `main` 전용이다.
+- **같은 로그인을 두 곳에서 쓰지 않는다.** 같은 파일을 원래 PC 와 서버가 동시에 쓰면 한쪽의 갱신이 다른 쪽의 refresh 토큰을 무효화할 수 있다. 서버로 옮겼으면 그 로그인은 서버 것으로 본다.
+
 #### 확인
 
 ```bash
