@@ -230,13 +230,19 @@ export class AuditPage extends OpenClawLightDomElement {
 
   private renderRow(event: AuditUserActivityEvent): TemplateResult {
     const open = this.expanded === event.sequence;
+    // Every cell that a fixed column can cut short carries its own full value, so
+    // a truncated name or rank is one hover away from being readable.
+    const moment = new Date(event.at).toLocaleString();
+    const person = auditRowPerson(event);
+    const role = auditRowRole(event);
+    const kind = auditKindLabel(event.kind);
     return html`
       <tr>
-        <td>${new Date(event.at).toLocaleString()}</td>
-        <td>${auditRowPerson(event)}</td>
-        <td>${auditRowRole(event)}</td>
+        <td title=${moment}>${moment}</td>
+        <td title=${person}>${person}</td>
+        <td title=${role}>${role}</td>
         <td>${this.renderDepartments(event.departments)}</td>
-        <td>${auditKindLabel(event.kind)}</td>
+        <td title=${kind}>${kind}</td>
         <td class="audit-table__summary">
           <button
             class="audit-table__expand"

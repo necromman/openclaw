@@ -125,6 +125,75 @@
   min-width: 0;
 }
 
+/* Desktop: the directory fits, so nobody has to find a scrollbar.
+ *
+ * The same treatment the ledger needs (audit.css), applied here for the same
+ * reason and to keep the two admin tables behaving alike: fixed layout makes the
+ * declared widths binding, and the widest realistic values (a long address, a
+ * person in several departments) then give way instead of pushing the last column
+ * out of the box. Six columns leave more room than the ledger's seven, so nothing
+ * here is tight; this is what stops it becoming tight as names get longer.
+ * 1121px is the rung the shared breakpoint ladder offers
+ * (config/stylelint.config.mjs). */
+@media (min-width: 1121px) {
+  .users-table {
+    table-layout: fixed;
+  }
+
+  .users-table th,
+  .users-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .users-table th:nth-child(1),
+  .users-table td:nth-child(1) {
+    width: 18%;
+  }
+
+  .users-table th:nth-child(2),
+  .users-table td:nth-child(2) {
+    width: 20%;
+  }
+
+  .users-table th:nth-child(3),
+  .users-table td:nth-child(3) {
+    width: 12%;
+  }
+
+  .users-table th:nth-child(4),
+  .users-table td:nth-child(4) {
+    width: 16%;
+  }
+
+  .users-table th:nth-child(5),
+  .users-table td:nth-child(5) {
+    width: 14%;
+  }
+
+  .users-table th:nth-child(6),
+  .users-table td:nth-child(6) {
+    width: 20%;
+  }
+
+  /* The column decides the width now, so the fixed cap would only clip earlier
+   * than it has to. */
+  .users-table__email > span,
+  .users-table__departments > span {
+    max-width: 100%;
+  }
+
+  /* The name is a button, which is what makes the row openable. Without a block
+   * box of its own it would be clipped at the column edge with no sign that
+   * anything was cut. */
+  .users-table__select {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* Narrow windows: the table keeps its columns and scrolls, which is the honest
  * shape for a directory, but the padding that reads well at desktop width wastes
  * most of a phone screen. 768px is the rung the shared breakpoint ladder offers

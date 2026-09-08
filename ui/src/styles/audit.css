@@ -86,15 +86,90 @@
 /* The session key is the last column and the only one whose value is a machine
  * identifier: long, unbreakable, and read only when something has to be traced. It
  * is capped and clipped rather than allowed to push the table past the right edge,
- * and the whole key stays available in the cell's title. */
-/* The cap lives on an inner block, not on the cell: auto table layout treats a
- * max-width on a `td` as a hint it may ignore, and it does. */
+ * and the whole key stays available in the cell's title. The cap lives on an inner
+ * block, not on the cell: auto table layout treats a max-width on a `td` as a hint
+ * it may ignore, and it does. */
 .audit-table__session > span {
   display: inline-block;
   max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: bottom;
+}
+
+/* Desktop: the whole ledger fits, so nobody has to find a scrollbar.
+ *
+ * Capping one cell was not enough. Under automatic layout the table is as wide as
+ * its content wants (978px measured at a 1280px viewport, in a 788px box), so the
+ * last column sat outside the visible box and the only way to read it was a
+ * horizontal scrollbar that nothing announces. Fixed layout is what makes the
+ * declared widths binding instead of advisory, and the ratios below are the
+ * measured natural widths compressed into the space that actually exists.
+ *
+ * Ellipsis needs a clipping box, so every cell gets one here; the cells that can
+ * lose text carry the full value in a `title`. The summary keeps wrapping, which
+ * is why it can take the smallest share, and the expanded record below it wraps
+ * too rather than being cut off.
+ *
+ * Below this width the table goes back to scrolling: seven columns squeezed into
+ * a phone is not a table anybody can read, and a scrollbar is the honest answer
+ * there. 1121px is the rung the shared breakpoint ladder offers
+ * (config/stylelint.config.mjs). */
+@media (min-width: 1121px) {
+  .audit-table {
+    table-layout: fixed;
+  }
+
+  .audit-table th,
+  .audit-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .audit-table th:nth-child(1),
+  .audit-table td:nth-child(1) {
+    width: 19%;
+  }
+
+  .audit-table th:nth-child(2),
+  .audit-table td:nth-child(2) {
+    width: 15%;
+  }
+
+  .audit-table th:nth-child(3),
+  .audit-table td:nth-child(3) {
+    width: 11%;
+  }
+
+  .audit-table th:nth-child(4),
+  .audit-table td:nth-child(4) {
+    width: 9%;
+  }
+
+  .audit-table th:nth-child(5),
+  .audit-table td:nth-child(5) {
+    width: 10%;
+  }
+
+  .audit-table th:nth-child(6),
+  .audit-table td:nth-child(6) {
+    width: 17%;
+  }
+
+  .audit-table th:nth-child(7),
+  .audit-table td:nth-child(7) {
+    width: 19%;
+  }
+
+  .audit-table__summary {
+    max-width: none;
+  }
+
+  /* The column decides the width now, so the fixed cap would only clip earlier
+   * than it has to. */
+  .audit-table__session > span {
+    max-width: 100%;
+  }
 }
 
 .audit-table__expand {

@@ -70,7 +70,7 @@ function renderRow(params: {
   const { user } = params;
   return html`
     <tr class="users-table__row" aria-selected=${params.selected ? "true" : "false"}>
-      <td>
+      <td title=${user.displayName}>
         <button class="users-table__select" @click=${() => params.onSelect(user.id)}>
           <span class="users-table__name">
             <span>
