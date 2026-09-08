@@ -35,7 +35,8 @@ export type IxAuthAdminActionName =
   | "user-disabled"
   | "users-imported"
   | "department-create"
-  | "department-rename";
+  | "department-rename"
+  | "department-delete";
 
 /** Record one administrator action against one target account. */
 export function recordIxAuthAdminAction(params: {
