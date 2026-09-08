@@ -15,7 +15,6 @@ import {
 import { sendJson } from "./http-common.js";
 import {
   grantIxAuthDepartments,
-  listIxAuthDepartmentGroups,
   readIxAuthDepartmentCodesFromBody,
   resolveIxAuthAdminContext,
   sendRelayFailure,
@@ -51,21 +50,6 @@ const IX_AUTH_DEFAULT_INVITE_ROLE_CODE = "MEMBER";
  * an empty list gets the real departments, never a list it invented.
  */
 const IX_AUTH_ALL_DEPARTMENT_ROLE_CODES: ReadonlySet<string> = new Set(["EXECUTIVE"]);
-
-async function handleListDepartments(params: {
-  res: ServerResponse;
-  deps: IxAuthHttpDependencies;
-  admin: IxAuthAdminContext;
-}): Promise<void> {
-  const listing = await listIxAuthDepartmentGroups({ deps: params.deps, admin: params.admin });
-  if (!listing.ok) {
-    sendRelayFailure(params.res, listing.failure);
-    return;
-  }
-  sendJson(params.res, 200, {
-    departments: listing.departments.map((group) => ({ code: group.code, name: group.name })),
-  });
-}
 
 /**
  * Read the role code an invitation should grant.
@@ -307,7 +291,10 @@ export async function handleIxAuthAdminHttpRequest(params: {
     return;
   }
   if (params.route === "admin-departments") {
-    await handleListDepartments({ res: params.res, deps: params.deps, admin });
+    // Loaded on demand: only the department screen reads or writes this surface, and the
+    // invitation form's one call for the list can afford the import.
+    const departmentsModule = await import("./ix-auth-admin-departments-http.js");
+    await departmentsModule.handleIxAuthAdminDepartmentsRequest({ ...params, admin });
     return;
   }
   if (params.route === "admin-invites") {

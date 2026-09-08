@@ -41,6 +41,7 @@ import { page as cronPage } from "./pages/cron/route.ts";
 import { page as custodianPage } from "./pages/custodian/route.ts";
 import { page as dashboardsPage } from "./pages/dashboards/route.ts";
 import { page as debugPage } from "./pages/debug/route.ts";
+import { page as departmentsPage } from "./pages/departments/route.ts";
 import {
   page as devicePage,
   permissionsPage as devicePermissionsPage,
@@ -100,6 +101,7 @@ const APP_ROUTE_TREE = [
   cloudWorkersPage,
   connectionPage,
   usersPage,
+  departmentsPage,
   auditPage,
   labsPage,
   aboutPage,

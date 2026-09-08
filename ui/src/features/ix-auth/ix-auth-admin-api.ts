@@ -8,8 +8,41 @@ import { readIxAuthCsrfToken } from "./ix-auth-session-api.ts";
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
 const IX_AUTH_CSRF_HEADER = "x-openclaw-csrf";
 
-/** One department the identity server knows about. */
-export type IxAuthDepartmentOption = { code: string; name: string };
+/**
+ * One department the identity server knows about.
+ *
+ * `code` is what authorization reads and never changes; `name` is what people read and
+ * an operator may rename. The projection fields are decoration for the department screen
+ * and every other caller can ignore them.
+ */
+export type IxAuthDepartmentOption = {
+  code: string;
+  name: string;
+  /** Code with the department prefix removed, which is what a binding names. */
+  slug?: string;
+  /** The identity server's own group name, before any local rename. */
+  identityName?: string;
+  /** People projected into this department at sign-in, not a live directory count. */
+  memberCount?: number;
+  /** Agents bound to this department. */
+  agents?: string[];
+};
+
+/** A department the fork still holds but the identity server no longer lists. */
+export type IxAuthOrphanDepartment = {
+  slug: string;
+  name: string;
+  memberCount: number;
+  agents: string[];
+};
+
+/** Everything the department screen reads in one call. */
+export type IxAuthDepartmentDirectory = {
+  /** Group-code prefix that marks a department, `"dept-"` by default. */
+  prefix: string;
+  departments: IxAuthDepartmentOption[];
+  orphans: IxAuthOrphanDepartment[];
+};
 
 /** One invitation link the Gateway is still holding. */
 export type IxAuthInviteLink = { email: string; link: string; capturedAtMs: number };
@@ -60,7 +93,7 @@ function mapAdminErrorToKey(status: number, code: string): string {
 async function callAdminRoute(params: {
   basePath: string;
   route: string;
-  method: "GET" | "POST" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   body?: Record<string, string | string[] | undefined>;
 }): Promise<{ kind: "ok"; body: Record<string, unknown> } | IxAuthAdminFailure> {
   const csrfToken = readIxAuthCsrfToken();
@@ -118,10 +151,19 @@ function readStringField(record: unknown, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** List the departments an invitation may place someone into. */
-export async function fetchIxAuthDepartments(
+function readCountField(record: unknown, key: string): number {
+  if (record === null || typeof record !== "object") {
+    return 0;
+  }
+  // SAFETY: the null and typeof guard directly above proves this is an object.
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/** Departments, their projection, and any the identity server no longer lists. */
+export async function fetchIxAuthDepartmentDirectory(
   basePath: string,
-): Promise<IxAuthDepartmentOption[] | IxAuthAdminFailure> {
+): Promise<IxAuthDepartmentDirectory | IxAuthAdminFailure> {
   const result = await callAdminRoute({ basePath, route: "departments", method: "GET" });
   if (result.kind === "failed") {
     return result;
@@ -130,11 +172,94 @@ export async function fetchIxAuthDepartments(
   const departments: IxAuthDepartmentOption[] = [];
   for (const entry of raw) {
     const code = readStringField(entry, "code");
-    if (code) {
-      departments.push({ code, name: readStringField(entry, "name") ?? code });
+    if (!code) {
+      continue;
     }
+    departments.push({
+      code,
+      name: readStringField(entry, "name") ?? code,
+      slug: readStringField(entry, "slug"),
+      identityName: readStringField(entry, "identityName"),
+      memberCount: readCountField(entry, "memberCount"),
+      agents: readStringListField(entry, "agents"),
+    });
   }
-  return departments;
+  const rawOrphans = Array.isArray(result.body.orphans) ? result.body.orphans : [];
+  const orphans: IxAuthOrphanDepartment[] = [];
+  for (const entry of rawOrphans) {
+    const slug = readStringField(entry, "slug");
+    if (!slug) {
+      continue;
+    }
+    orphans.push({
+      slug,
+      name: readStringField(entry, "name") ?? slug,
+      memberCount: readCountField(entry, "memberCount"),
+      agents: readStringListField(entry, "agents"),
+    });
+  }
+  return { prefix: readStringField(result.body, "prefix") ?? "", departments, orphans };
+}
+
+/** List the departments an invitation may place someone into. */
+export async function fetchIxAuthDepartments(
+  basePath: string,
+): Promise<IxAuthDepartmentOption[] | IxAuthAdminFailure> {
+  const directory = await fetchIxAuthDepartmentDirectory(basePath);
+  return "kind" in directory ? directory : directory.departments;
+}
+
+/**
+ * Create one department.
+ *
+ * The Gateway mints the group code from the slug, so a caller cannot name a group outside
+ * the department prefix and quietly create an ordinary one.
+ */
+export async function createIxAuthDepartment(params: {
+  basePath: string;
+  slug: string;
+  name: string;
+}): Promise<{ code: string; slug: string; name: string } | IxAuthAdminFailure> {
+  const result = await callAdminRoute({
+    basePath: params.basePath,
+    route: "departments",
+    method: "POST",
+    body: { slug: params.slug, name: params.name },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    code: readStringField(result.body, "code") ?? "",
+    slug: readStringField(result.body, "slug") ?? params.slug,
+    name: readStringField(result.body, "name") ?? params.name,
+  };
+}
+
+/**
+ * Rename one department.
+ *
+ * Only the display name moves. The group code is what the department fence reads, and
+ * changing it would move everyone out of the department they are in.
+ */
+export async function renameIxAuthDepartment(params: {
+  basePath: string;
+  slug: string;
+  name: string;
+}): Promise<{ slug: string; name: string } | IxAuthAdminFailure> {
+  const result = await callAdminRoute({
+    basePath: params.basePath,
+    route: "departments",
+    method: "PATCH",
+    body: { slug: params.slug, name: params.name },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    slug: readStringField(result.body, "slug") ?? params.slug,
+    name: readStringField(result.body, "name") ?? params.name,
+  };
 }
 
 /** Create one invited account and, when there is no mail server, get its link back. */

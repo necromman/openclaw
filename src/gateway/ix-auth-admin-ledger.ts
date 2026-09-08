@@ -33,7 +33,9 @@ export type IxAuthAdminActionName =
   | "user-mfa-reset"
   | "user-sessions-revoked"
   | "user-disabled"
-  | "users-imported";
+  | "users-imported"
+  | "department-create"
+  | "department-rename";
 
 /** Record one administrator action against one target account. */
 export function recordIxAuthAdminAction(params: {

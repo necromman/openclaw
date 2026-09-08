@@ -1,0 +1,213 @@
+/* Departments: three tables, a folder picker, and the forms between them.
+ *
+ * Loaded with the page, not from the shared sheet, so a deployment without an
+ * identity server never downloads it. Everything here uses the shared tokens; the
+ * radius cap in fork-style.css applies as it does everywhere else. */
+
+/* Section 1b of fork-style.css widens a stacked settings row's control for the
+ * users and audit blocks, and this repeats that fix for the blocks on this page.
+ * The rule lives here rather than there because fork-style.css is shared and this
+ * page is lazily loaded: a selector for a block that only exists on one route
+ * belongs with that route. Same shape, same reason, no !important, and the
+ * :has() selector still outranks the two-class stacked rule it refines. */
+.settings-row--stacked > .settings-row__control:has(> .departments-table-scroll),
+.settings-row--stacked > .settings-row__control:has(> .departments-form),
+.settings-row--stacked > .settings-row__control:has(> .departments-members),
+.settings-row--stacked > .settings-row__control:has(> .departments-access),
+.settings-row--stacked > .settings-row__control:has(> .departments-orphans) {
+  width: 100%;
+}
+
+/* The tables are genuinely tabular and scroll inside their own box rather than
+ * widening the page, which section 1 of fork-style.css forbids. `min-width: 0`
+ * keeps the shrink floor off the content's max-content size. */
+.departments-table-scroll {
+  overflow-x: auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.departments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--control-ui-text-sm);
+}
+
+.departments-table th,
+.departments-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.departments-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+  border-bottom: 1px solid var(--border);
+}
+
+.departments-table tbody tr {
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
+.departments-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.departments-table__row[aria-selected="true"] {
+  background: var(--surface-2, var(--surface));
+}
+
+.departments-table__muted {
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.departments-table__select {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.departments-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--control-ui-text-xs);
+}
+
+.departments-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.departments-form__field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.departments-form__field--grow {
+  flex: 1 1 220px;
+}
+
+.departments-form__label {
+  font-size: var(--control-ui-text-xs);
+  color: var(--muted);
+}
+
+.departments-form__hint {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.departments-members,
+.departments-access,
+.departments-orphans {
+  display: grid;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.departments-orphans__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm);
+}
+
+.departments-orphans__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--control-ui-text-sm);
+}
+
+.departments-browser {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.departments-browser__root {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--control-ui-text-xs);
+}
+
+.departments-browser__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.departments-browser__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.departments-browser__open {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.departments-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.departments-toggle__label {
+  display: block;
+  font-size: var(--control-ui-text-sm);
+}
+
+.departments-toggle__hint {
+  display: block;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.departments-access__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.departments-notice {
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm);
+}

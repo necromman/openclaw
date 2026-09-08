@@ -3,7 +3,10 @@
 // The browser never sees an identity-server token: it posts credentials here and the
 // Gateway returns only a session cookie. Everything below therefore uses
 // `credentials: "same-origin"` and carries no bearer token of its own.
-import { setIxAuthAdminAccess } from "./ix-auth-admin-access.ts";
+import {
+  setIxAuthAdminAccess,
+  setIxAuthSuperAdminAccess,
+} from "./ix-auth-admin-access.ts";
 
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
 const IX_AUTH_CSRF_HEADER = "x-openclaw-csrf";
@@ -169,6 +172,9 @@ function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState 
       session.authenticated &&
       session.adminConsoleUrl !== undefined,
   );
+  // The top rank is reported on the account itself, so the department screen never has to
+  // read a role code and decide what it outranks.
+  setIxAuthSuperAdminAccess(session.authenticated && session.user?.isSuperAdmin === true);
   if (session.authMode === "ix-auth") {
     void import("../../i18n/locales/en-ix-auth.ts")
       .then((module) => {
@@ -325,5 +331,6 @@ export async function signOutIxAuthSession(basePath: string): Promise<void> {
   await submitIxAuthLogout(basePath);
   lastIxAuthSession = undefined;
   setIxAuthAdminAccess(false);
+  setIxAuthSuperAdminAccess(false);
   globalThis.location.assign(basePath || "/");
 }

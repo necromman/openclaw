@@ -48,6 +48,7 @@ const APP_ROUTE_DEFINITIONS = {
   channels: { path: "/settings/channels", aliases: ["/channels"] },
   connection: { path: "/settings/connection" },
   users: { path: "/settings/users" },
+  departments: { path: "/settings/departments" },
   audit: { path: "/settings/audit" },
   config: { path: "/settings/general", aliases: ["/config"] },
   profile: { path: "/settings/profile", aliases: ["/profile"] },

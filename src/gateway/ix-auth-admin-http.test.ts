@@ -834,11 +834,29 @@ describe("department listing", () => {
       headers: { cookie: session.cookie },
     });
     expect(answer.status()).toBe(200);
+    // The listing carries the fork's own projection alongside each group. The two
+    // decorated fields are zero here because nothing has signed in or been bound.
     expect(JSON.parse(answer.body())).toEqual({
+      prefix: "dept-",
       departments: [
-        { code: "dept-rnd", name: "Research" },
-        { code: "dept-sales", name: "Sales" },
+        {
+          code: "dept-rnd",
+          slug: "rnd",
+          name: "Research",
+          identityName: "Research",
+          memberCount: 0,
+          agents: [],
+        },
+        {
+          code: "dept-sales",
+          slug: "sales",
+          name: "Sales",
+          identityName: "Sales",
+          memberCount: 0,
+          agents: [],
+        },
       ],
+      orphans: [],
     });
   });
 

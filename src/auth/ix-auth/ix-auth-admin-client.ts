@@ -116,6 +116,37 @@ export async function listIxAuthGroups(
   return { ok: true, groups };
 }
 
+/**
+ * Create one group, which is how a department comes into existence.
+ *
+ * No role is attached. Roles and departments are orthogonal (AUTH-DEPARTMENTS 3), and a
+ * department group that carried a role would quietly promote everyone placed into it.
+ */
+export async function createIxAuthGroup(
+  params: IxAuthAdminCall & { code: string; name: string },
+): Promise<{ ok: true; groupId: string } | IxAuthRelayFailure> {
+  const result = await callIxAuthEndpoint({
+    settings: params.settings,
+    path: "admin/groups",
+    accessToken: params.accessToken,
+    body: { code: params.code, name: params.name },
+    meta: params.meta,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  const groupId = readString(result.data, "id");
+  if (!groupId) {
+    return {
+      ok: false,
+      status: 502,
+      code: "IXAUTH_UNAVAILABLE",
+      message: "the identity server returned no group id",
+    };
+  }
+  return { ok: true, groupId };
+}
+
 /** Put one account into one group, which is how a department is granted. */
 export async function addIxAuthGroupMember(
   params: IxAuthAdminCall & { groupId: string; userId: string },

@@ -649,6 +649,13 @@ const CORE_GATEWAY_METHOD_SPECS = [
   ["update.runs.get", "update", "operator.admin", "2026.9"],
   ["update.runs.list", "update", "operator.admin", "2026.9"],
   ["gateway.suspend.handoff", "suspend", "operator.admin", "2026.9", CONTROL_PLANE_WRITE],
+  // Department administration. Appended rather than filed beside the other identity
+  // methods: this list's order is the advertised method order, and a client that
+  // remembers an index must not be moved by a new entry. The scope is the outer gate;
+  // the handler adds the super-administrator test, because a scope is not a rank.
+  ["departments.agents.list", "departments", "operator.admin", "2026.9"],
+  ["departments.agents.set", "departments", "operator.admin", "2026.9"],
+  ["departments.folders.list", "departments", "operator.admin", "2026.9"],
 ] as const satisfies readonly CoreGatewayMethodSpecRow[];
 
 export type CoreGatewayHandlerFamily = Exclude<(typeof CORE_GATEWAY_METHOD_SPECS)[number][1], null>;

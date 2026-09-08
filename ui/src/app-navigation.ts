@@ -5,7 +5,10 @@ import type { RouteId } from "./app-route-paths.ts";
 import type { NativeDeviceSettingsCapability } from "./app/native-device-settings.ts";
 import { BRAND_NAME } from "./brand.ts";
 import type { IconName } from "./components/icons.ts";
-import { canManageIxAuthUsers } from "./features/ix-auth/ix-auth-admin-access.ts";
+import {
+  canManageIxAuthDepartments,
+  canManageIxAuthUsers,
+} from "./features/ix-auth/ix-auth-admin-access.ts";
 import { i18n, t } from "./i18n/index.ts";
 
 export type NavigationRouteId = RouteId;
@@ -203,6 +206,7 @@ const SETTINGS_NAVIGATION_GROUPS = [
     routes: [
       "connection",
       "users",
+      "departments",
       "channels",
       "communications",
       "talk",
@@ -229,7 +233,7 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
   { labelKey: "nav.settingsGroupDevice", routes: ["device", "device-permissions"] },
   {
     labelKey: "nav.settingsGroupConnections",
-    routes: ["connection", "users", "channels", "talk", "devices"],
+    routes: ["connection", "users", "departments", "channels", "talk", "devices"],
   },
   {
     labelKey: "nav.settingsGroupAgents",
@@ -261,6 +265,11 @@ export function isSettingsNavigationRouteVisible(
   // the Gateway judged administrators. Gateway operator scopes are a different question.
   if (routeId === "users" || routeId === "audit") {
     return canManageIxAuthUsers();
+  }
+  // Departments decide which agents an account can reach at all, so the screen that moves
+  // them belongs to the one rank the department fence is not built for.
+  if (routeId === "departments") {
+    return canManageIxAuthDepartments();
   }
   return (
     canAdmin ||
@@ -322,6 +331,7 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   channels: ["link", "tabs.channels", "subtitles.channels"],
   connection: ["radio", "tabs.connection", "subtitles.connection"],
   users: ["users", "tabs.users", "subtitles.users"],
+  departments: ["shieldCog", "tabs.departments", "subtitles.departments"],
   audit: ["fileText", "tabs.audit", "subtitles.audit"],
   sessions: ["fileText", "tabs.sessions", "subtitles.sessions"],
   usage: ["coins", "tabs.usage", "subtitles.usage"],

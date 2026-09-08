@@ -3,6 +3,7 @@ import * as auditRun from "./audit-run.js";
 import * as auditUserActivity from "./audit-user-activity.js";
 import * as audit from "./audit.js";
 import * as config from "./config.js";
+import * as departments from "./departments.js";
 import * as humanMentions from "./human-mentions.js";
 import * as openclaw from "./openclaw.js";
 import * as taskSuggestions from "./task-suggestions.js";
@@ -34,6 +35,15 @@ export const OperationsProtocolSchemas = {
   AuditUserActivityEvent: auditUserActivity.AuditUserActivityEventSchema,
   AuditUserActivityListParams: auditUserActivity.AuditUserActivityListParamsSchema,
   AuditUserActivityListResult: auditUserActivity.AuditUserActivityListResultSchema,
+  DepartmentAgent: departments.DepartmentAgentSchema,
+  DepartmentSummary: departments.DepartmentSummarySchema,
+  DepartmentFolderEntry: departments.DepartmentFolderEntrySchema,
+  DepartmentsAgentsListParams: departments.DepartmentsAgentsListParamsSchema,
+  DepartmentsAgentsListResult: departments.DepartmentsAgentsListResultSchema,
+  DepartmentsAgentsSetParams: departments.DepartmentsAgentsSetParamsSchema,
+  DepartmentsAgentsSetResult: departments.DepartmentsAgentsSetResultSchema,
+  DepartmentsFoldersListParams: departments.DepartmentsFoldersListParamsSchema,
+  DepartmentsFoldersListResult: departments.DepartmentsFoldersListResultSchema,
   UserProfileAuthLink: users.UserProfileAuthLinkSchema,
   UserModelAccount: users.UserModelAccountSchema,
   UsersListModelAccountsParams: users.UsersListModelAccountsParamsSchema,

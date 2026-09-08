@@ -4,6 +4,9 @@ import type {
   AuditActivityListParams,
   AuditRunInspectParams,
   AuditUserActivityListParams,
+  DepartmentsAgentsListParams,
+  DepartmentsAgentsSetParams,
+  DepartmentsFoldersListParams,
   WebPushSubscribeParams,
   WebPushPreferencesGetParams,
   WebPushPreferencesSetParams,
@@ -107,6 +110,15 @@ export const validateDecisionReceiptV1 = compile(S.DecisionReceiptV1Schema);
 export const validateAuditListParams = compile(S.AuditListParamsSchema);
 export const validateAuditUserActivityListParams = compile<AuditUserActivityListParams>(
   S.AuditUserActivityListParamsSchema,
+);
+export const validateDepartmentsAgentsListParams = compile<DepartmentsAgentsListParams>(
+  S.DepartmentsAgentsListParamsSchema,
+);
+export const validateDepartmentsAgentsSetParams = compile<DepartmentsAgentsSetParams>(
+  S.DepartmentsAgentsSetParamsSchema,
+);
+export const validateDepartmentsFoldersListParams = compile<DepartmentsFoldersListParams>(
+  S.DepartmentsFoldersListParamsSchema,
 );
 export const validateUsersListParams = compile(S.UsersListParamsSchema);
 export const validateUsersMentionableParams = compile(S.UsersMentionableParamsSchema);

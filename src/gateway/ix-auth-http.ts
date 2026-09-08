@@ -518,7 +518,10 @@ const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> =
   ["mail-hook", new Set(["POST"])],
   ["admin-invites", new Set(["GET", "POST", "DELETE"])],
   ["admin-approvals", new Set(["GET", "POST"])],
-  ["admin-departments", new Set(["GET"])],
+  // POST creates a department group; PATCH renames the fork's own display name for one.
+  // Deletion is deliberately absent: removing a group orphans every membership and every
+  // agent binding that names it, and the identity console is the place to do that.
+  ["admin-departments", new Set(["GET", "POST", "PATCH"])],
   ["admin-users", new Set(["GET", "POST", "PATCH", "PUT", "DELETE"])],
   ["admin-audit-export", new Set(["GET"])],
 ]);
