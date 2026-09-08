@@ -212,8 +212,57 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 - **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
 - 관리 콘솔 링크는 `superadmin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다. `admin` 은 콘솔을 못 열지만 앱 안의 초대·가입 승인·사용자 관리·감사 조회는 그대로 쓴다 - 두 판정은 이름이 다른 별개의 술어다(`canOpenIxAuthAdminConsole` 과 `canUseIxAuthAdminApi`).
 
-  화면이 이 둘을 한동안 뒤섞고 있었다. `admin` 에게는 오지 않는 `adminConsoleUrl` 의 존재로 "사용자 관리를 해도 되는가" 를 판정해서, 서버가 200 을 내주는 `/settings/users`·`/settings/audit` 을 화면이 스스로 잠갔다. O 단계에서 세션 프로브가 **역할**(`user.gatewayRole`)을 `superadmin`·`admin` 과 맞추도록 고쳤다(`ui/src/features/ix-auth/ix-auth-admin-access.ts` 의 `isIxAuthAdminRole`). 부서 화면은 원래대로 superadmin 전용이고, 그 판정은 이제 `isSuperAdmin` 하나만 읽는다.
+  화면이 이 둘을 한동안 뒤섞고 있었다. `admin` 에게는 오지 않는 `adminConsoleUrl` 의 존재로 "사용자 관리를 해도 되는가" 를 판정해서, 서버가 200 을 내주는 `/settings/users`·`/settings/audit` 을 화면이 스스로 잠갔다. O 단계에서 세션 프로브가 **역할**(`user.gatewayRole`)을 `superadmin`·`admin` 과 맞추도록 고쳤다(`ui/src/features/ix-auth/ix-auth-admin-access.ts` 의 `isIxAuthAdminRole`). P 단계에서 부서 화면도 관리자에게 열렸다(5-1).
 - 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. A 단계는 매핑 데이터만 준비했고, **B 단계가 강제를 붙였다** - 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).
+
+## 5-1. 설정 메뉴 표시 규칙 (P 단계, 2026-09-08)
+
+ix-auth 모드의 `/settings` 왼쪽 메뉴는 역할 세 단계로 갈린다. 판정은 `ui/src/app-navigation.ts` 의 `isSettingsNavigationRouteVisible` 하나이고, 세 단계를 구분하는 술어는 `ui/src/features/ix-auth/ix-auth-admin-access.ts` 에 모여 있다(`isIxAuthRestrictedAccount`·`isIxAuthAdminOnlyAccount`·`canManageIxAuthUsers`·`canManageIxAuthDepartments`).
+
+| 메뉴 | 라우트 | 그 화면이 요구하는 것 | 직원·중재자·임원 | 관리자 | 시스템 관리자 | 근거 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 프로필 | `profile` | 읽기 전용 신원 표시 | 보임 | 보임 | 보임 | `ui/src/pages/profile/` (ix-auth 모드는 읽기 전용) |
+| 화면 설정 | `appearance` | 브라우저 로컬 테마·언어 | 보임 | 보임 | 보임 | `ui/src/pages/config/route.ts:65` |
+| 알림 | `notifications` | 브라우저 로컬 알림 | 보임 | 보임 | 보임 | `ui/src/pages/config/route.ts:66` |
+| 음성 대화 | `talk` | 채팅에서 쓰는 음성 조작 | 보임 | 보임 | 보임 | `ui/src/pages/config/route.ts:71` |
+| 정보 | `about` | 버전 표시 | 보임 | 보임 | 보임 | `ui/src/pages/about/` |
+| 사용자 | `users` | `/auth/admin/users` | 안 보임 | 보임 | 보임 | `src/auth/ix-auth/ix-auth-role-map.ts` 의 `canUseIxAuthAdminApi` |
+| 부서 | `departments` | `/auth/admin/departments` | 안 보임 | 보임 | 보임 | `src/gateway/ix-auth-admin-departments-http.ts` (P 단계에서 관리자에게 열림) |
+| 감사 기록 | `audit` | `/auth/admin/audit` | 안 보임 | 보임 | 보임 | `src/gateway/ix-auth-admin-audit-http.ts` |
+| 승인 | `approvals` | `operator.approvals` | 안 보임 | 보임 | 보임 | `chris-local/ixauth-gateway-config/openclaw.json` 의 역할 정의 |
+| Gateway | `connection` | `operator.admin` | 안 보임 | 안 보임 | 보임 | `ui/src/pages/connection/` |
+| 채널 | `channels` | `operator.admin` | 안 보임 | 안 보임 | 보임 | `ui/src/pages/channels/channels-page.ts:651` |
+| 기기 | `devices` | `operator.admin`(페어링 승인) | 안 보임 | 안 보임 | 보임 | `ui/src/pages/devices/` |
+| 에이전트 | `agents` | `operator.admin` | 안 보임 | 안 보임 | 보임 | `ui/src/pages/agents/agents-page.ts:718` 외 |
+| 모델 | `model-providers` | `operator.admin`(`config.set`) | 안 보임 | 안 보임 | 보임 | `ui/src/pages/model-providers/` |
+| 메모리 | `memory` | 게이트웨이 전역 설정(`plugins.slots.memory`) | 안 보임 | 안 보임 | 보임 | `ui/src/pages/config/memory-page.ts:60` |
+| 고급 | `advanced` | 게이트웨이 설정 편집 | 안 보임 | 안 보임 | 보임 | `ui/src/pages/config/route.ts:74` |
+| 디버그 | `debug` | 진단 | 안 보임 | 안 보임 | 보임 | `ui/src/pages/debug/` |
+| 로그 | `logs` | 게이트웨이 로그 | 안 보임 | 안 보임 | 보임 | `ui/src/pages/logs/` |
+| IX-Auth 콘솔 링크 | `/admin/identity/` | `canOpenIxAuthAdminConsole` | 안 보임 | 안 보임 | 보임 | 위 5절 마지막 항목 |
+
+- **감추는 것으로 끝내지 않는다.** 주소를 직접 입력해도 같은 판정이 라우트 아웃렛을 "권한 없음" 안내로 바꾼다(`ui/src/app/settings-route-access.ts`). 아웃렛을 아예 그리지 않으므로 그 화면의 로더가 게이트웨이에 아무것도 묻지 않는다. 하위 페이지(`ai-agents`·`model-setup`)는 자기 상위 항목의 판정을 따른다.
+- **토큰 모드는 그대로다.** 세 단계 판정은 `authMode: "ix-auth"` 이고 로그인한 세션에서만 켜지고, 그 전에는 전부 거짓이라 화면이 뜨는 도중에 항목이 사라지지 않는다.
+- **알려진 예외 한 가지**: 중재자는 역할 정의상 `operator.approvals` 를 가지지만 승인 화면은 관리자 전용으로 두었다. 채팅 사이드바의 승인 알림으로는 그대로 처리할 수 있다. 승인 화면까지 열지는 사용자 결정으로 남긴다.
+
+## 5-2. 시스템 관리자 계정 보호 (P 단계)
+
+`admin` 은 `superadmin` 행에 대해 다음을 할 수 없다. 판정은 `src/gateway/ix-auth-admin-users-guard.ts` 의 `rejectSuperAdminTarget` 하나이고 403 `forbidden` 을 낸다.
+
+| 동작 | 경로 | 관리자 | 시스템 관리자 |
+| --- | --- | --- | --- |
+| 역할 변경 | `PUT /auth/admin/users/<id>/roles` | 거부 | 가능 |
+| 부서 변경 | `PUT /auth/admin/users/<id>/departments` | 거부(P 단계에서 추가) | 가능 |
+| 비활성화 | `PATCH /auth/admin/users/<id>` (`status`) | 거부 | 가능 |
+| 삭제 | `DELETE /auth/admin/users/<id>` | 거부(원래 superadmin 전용) | 가능 |
+| 2단계 인증 초기화 | `POST /auth/admin/users/<id>/mfa-reset` | 거부(P 단계에서 추가) | 가능 |
+| 세션 강제 종료 | `DELETE /auth/admin/users/<id>/sessions` | 거부(P 단계에서 추가) | 가능 |
+| `SUPERADMIN` 역할 부여 | 역할·초대·CSV 가져오기 | 거부 | 가능 |
+
+- 자기 자신의 역할·부서·상태는 **누구도** 바꾸지 못한다(`rejectSelfTarget`). 이름 변경만 예외다.
+- 마지막 시스템 관리자를 강등·비활성화·삭제하는 것은 시스템 관리자에게도 409 `last_super_admin` 이다.
+- 비밀번호 재설정 메일·초대 재발송·잠금 해제는 관리자도 시스템 관리자 행에 쓸 수 있다. 셋 다 계정 소유자에게만 도달하므로 탈취 경로가 아니고, 헬프데스크 동작으로 남긴다.
+- 화면(`ui/src/pages/users/user-detail-panel.ts`)은 그 행의 조작을 흐리게 하고 이유를 한 줄로 적는다. 서버 판정이 정본이고 화면은 그것을 되풀이할 뿐이다.
 
 ## 6. 이번 단계에서 하지 않은 것
 
