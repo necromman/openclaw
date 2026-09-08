@@ -2,7 +2,14 @@
  * QuickJS worker for Code Mode guest execution and suspended VM snapshots.
  */
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
-import { EvalFlags, JSException, QuickJS, type JSValueHandle, type Snapshot } from "quickjs-wasi";
+import {
+  EvalFlags,
+  JSException,
+  MAX_STACK_SIZE,
+  QuickJS,
+  type JSValueHandle,
+  type Snapshot,
+} from "quickjs-wasi";
 import { serveWorkerTasks } from "../infra/worker-task-pool.js";
 import { CODE_MODE_CONTROLLER_SOURCE } from "./code-mode-controller-source.js";
 import {
@@ -176,6 +183,7 @@ async function createVm(input: CodeModeWorkerPayload, bridge: BridgeState): Prom
   const options = {
     wasm: input.wasmModule,
     memoryLimit: input.config.memoryLimitBytes,
+    maxStackSize: MAX_STACK_SIZE,
     timezoneOffset: 0,
     onUnhandledRejection: trackPromiseRejection,
     interruptHandler: () => {
