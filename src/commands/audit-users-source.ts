@@ -13,6 +13,7 @@
 // is empty or, worse, belongs to a different deployment. So the RPC is asked first, and
 // the local database answers only when the RPC left the question unanswered on a target
 // whose ledger is genuinely this one.
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import {
   ConnectErrorDetailCodes,
@@ -79,9 +80,7 @@ function isGatewayHandshakeRefusal(error: unknown): boolean {
   if (!(error instanceof Error) || error.name !== "GatewayClientRequestError") {
     return false;
   }
-  // SAFETY: the name check above proves this is a GatewayClientRequestError, which
-  // carries the error shape's optional `details` alongside the Error fields.
-  const details = (error as { details?: unknown }).details;
+  const details = isRecord(error) ? error.details : undefined;
   const code = readConnectErrorDetailCode(details);
   return code !== null && Object.hasOwn(ConnectErrorDetailCodes, code);
 }
