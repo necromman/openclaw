@@ -47,6 +47,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      # 첫 실측에서 pnpm check 가 oxlint core 3분째에 exit 143(SIGTERM)으로 죽었다.
+      # 셸이 남긴 로그에는 원인이 없고 러너가 스텝을 통째로 끊은 모양이다. 이 저장소는
+      # node_modules·tsgo 캐시·plugin-sdk dts 8725개까지 얹으면 스톡 러너의 여유
+      # 공간·메모리를 다 쓴다. chris-deliver-images.yml 이 이미 쓰는 방식대로 아무도
+      # 안 쓰는 SDK 를 지워 공간을 돌려주고, df·free 를 남겨 다음 실패의 근거로 삼는다.
+      - name: 러너 여유 공간 확보
+        run: |
+          set -euo pipefail
+          df -h /
+          free -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+
       # persist-credentials 를 기본값으로 두는 이유는 아래 origin/main fetch 다.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,8 +95,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # upstream ci.yml 의 check-lint-core 스트라이프는 호스티드 러너에서 oxlint 를
+      # --threads=1 로 돌린다. pnpm check 로는 그 인자를 넘길 수 없어서 oxlint 가 쓰는
+      # rayon 풀을 환경변수로 좁힌다.
       - name: Run pnpm check
         id: run_check
+        env:
+          RAYON_NUM_THREADS: "1"
         run: |
           set -o pipefail
           pnpm check 2>&1 | tee "$RUNNER_TEMP/chris-check.log"
@@ -95,7 +114,14 @@ jobs:
             echo "## chris-check 실패: pnpm check"
             echo
             echo "포맷·린트·타입·저장소 가드 중 하나가 실패했다. 배포는 막지 않는다."
-            echo "다음 커밋에서 고친다. 로그 끝 80줄:"
+            echo "다음 커밋에서 고친다. 남은 공간과 메모리:"
+            echo
+            echo '```'
+            df -h / 2>/dev/null || true
+            free -h 2>/dev/null || true
+            echo '```'
+            echo
+            echo "로그 끝 80줄:"
             echo
             echo '```'
             tail -n 80 "$RUNNER_TEMP/chris-check.log" 2>/dev/null || echo "(로그 없음: 설치 단계에서 끊겼다)"
