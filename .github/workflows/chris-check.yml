@@ -23,8 +23,13 @@ on:
   workflow_dispatch:
 
 # 최신 푸시만 의미가 있다. 앞선 실행은 이미 뒤처진 트리를 검사하는 중이다.
+# 손으로 돌린 실행은 자기 슬롯을 갖는다. 여러 에이전트가 같은 브랜치에 몇 분 간격으로
+# 푸시하는 동안에도 특정 커밋을 끝까지 보려면 그 실행이 취소되지 않아야 한다.
 concurrency:
-  group: chris-check-${{ github.ref }}
+  group: >-
+    ${{ github.event_name == 'workflow_dispatch'
+        && format('chris-check-manual-{0}', github.run_id)
+        || format('chris-check-{0}', github.ref) }}
   cancel-in-progress: true
 
 permissions:
