@@ -42,10 +42,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      # persist-credentials 를 기본값으로 두는 이유는 아래 origin/main fetch 다.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+
+      # env 이름 래칫(check:env-var-count)은 기준 ref 로 origin/main 을 찾는다.
+      # 얕은 체크아웃에는 그 ref 가 없어서 "Could not resolve env-var count base ref"
+      # 로 죽는다. 4 GB 짜리 히스토리를 다 받지 않고 팁 하나만 얕게 가져와 채운다.
+      - name: 기준 ref 확보 (origin/main)
+        run: git fetch --no-tags --depth=1 origin "+main:refs/remotes/origin/main"
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
