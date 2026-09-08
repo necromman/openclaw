@@ -6,6 +6,7 @@
 import {
   isIxAuthAdminRole,
   setIxAuthAdminAccess,
+  setIxAuthManagedSession,
   setIxAuthSuperAdminAccess,
 } from "./ix-auth-admin-access.ts";
 
@@ -181,6 +182,10 @@ function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState 
   // The top rank is reported on the account itself, so the department screen never has to
   // read a role code and decide what it outranks.
   setIxAuthSuperAdminAccess(session.authenticated && session.user?.isSuperAdmin === true);
+  // Recorded separately from the ranks above so the settings menu can tell "not an
+  // administrator" apart from "no accounts here at all": the shared-token modes must keep
+  // the menu they have always had.
+  setIxAuthManagedSession(session.authMode === "ix-auth" && session.authenticated);
   if (session.authMode === "ix-auth") {
     void import("../../i18n/locales/en-ix-auth.ts")
       .then((module) => {
@@ -338,5 +343,6 @@ export async function signOutIxAuthSession(basePath: string): Promise<void> {
   lastIxAuthSession = undefined;
   setIxAuthAdminAccess(false);
   setIxAuthSuperAdminAccess(false);
+  setIxAuthManagedSession(false);
   globalThis.location.assign(basePath || "/");
 }

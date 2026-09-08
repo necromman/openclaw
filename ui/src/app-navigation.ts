@@ -8,6 +8,7 @@ import type { IconName } from "./components/icons.ts";
 import {
   canManageIxAuthDepartments,
   canManageIxAuthUsers,
+  isIxAuthRestrictedAccount,
 } from "./features/ix-auth/ix-auth-admin-access.ts";
 import { i18n, t } from "./i18n/index.ts";
 
@@ -250,6 +251,19 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
   },
 ] as const satisfies readonly SettingsNavigationGroup[];
 
+// What an identity-managed account keeps when it is not an administrator: its own
+// account, its own look and feel, its own notifications, the voice controls it drives
+// from chat, and the version panel. Everything else in the settings menu writes Gateway
+// configuration that the whole company shares, or reads an administration API, so it is
+// hidden rather than shown as a screen whose every control would be refused.
+const IX_AUTH_MEMBER_SETTINGS_ROUTES: readonly NavigationRouteId[] = [
+  "profile",
+  "appearance",
+  "notifications",
+  "talk",
+  "about",
+];
+
 export function isSettingsNavigationRouteVisible(
   routeId: NavigationRouteId,
   canAdmin: boolean,
@@ -257,9 +271,6 @@ export function isSettingsNavigationRouteVisible(
 ): boolean {
   if (routeId === "device" || routeId === "device-permissions") {
     return nativeDeviceSettings !== null;
-  }
-  if (routeId === "updates") {
-    return canAdmin || nativeDeviceSettings !== null;
   }
   // User management exists only where identity is delegated, and only for the accounts
   // the Gateway judged administrators. Gateway operator scopes are a different question.
@@ -270,6 +281,15 @@ export function isSettingsNavigationRouteVisible(
   // them belongs to the one rank the department fence is not built for.
   if (routeId === "departments") {
     return canManageIxAuthDepartments();
+  }
+  // Ranked accounts below administrator keep only what is theirs. Placed after the three
+  // rules above so an administrator without operator.admin still reaches them, and before
+  // the operator-scope fallback so the shared-token modes are left exactly as they were.
+  if (isIxAuthRestrictedAccount()) {
+    return IX_AUTH_MEMBER_SETTINGS_ROUTES.includes(routeId);
+  }
+  if (routeId === "updates") {
+    return canAdmin || nativeDeviceSettings !== null;
   }
   return (
     canAdmin ||

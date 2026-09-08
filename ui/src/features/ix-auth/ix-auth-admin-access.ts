@@ -26,6 +26,7 @@ export function isIxAuthAdminRole(role: string | undefined): boolean {
 
 let ixAuthAdminAccess = false;
 let ixAuthSuperAdminAccess = false;
+let ixAuthManagedSession = false;
 
 /** Record what the last session probe reported. Called only by the session client. */
 export function setIxAuthAdminAccess(value: boolean): void {
@@ -41,6 +42,17 @@ export function setIxAuthAdminAccess(value: boolean): void {
  */
 export function setIxAuthSuperAdminAccess(value: boolean): void {
   ixAuthSuperAdminAccess = value;
+}
+
+/**
+ * Record whether this browser holds a signed-in account on a delegated-identity Gateway.
+ *
+ * The two flags above answer "how high does this account rank"; this one answers "is
+ * there a ranked account at all". A shared-token Gateway has no ranks, so nothing below
+ * may narrow its settings menu.
+ */
+export function setIxAuthManagedSession(value: boolean): void {
+  ixAuthManagedSession = value;
 }
 
 /**
@@ -63,4 +75,17 @@ export function canManageIxAuthUsers(): boolean {
  */
 export function canManageIxAuthDepartments(): boolean {
   return ixAuthSuperAdminAccess;
+}
+
+/**
+ * True when the settings menu must shrink to the entries that belong to the account.
+ *
+ * A staff member, a moderator and an executive all configure nothing on this deployment:
+ * every remaining settings screen writes Gateway configuration that everyone shares, and
+ * a screen whose every control answers 403 is worse than no screen. Administrators keep
+ * the full menu, and a shared-token Gateway keeps it too because it has no accounts to
+ * rank. False before the first probe answers, so nothing disappears mid-flight.
+ */
+export function isIxAuthRestrictedAccount(): boolean {
+  return ixAuthManagedSession && !ixAuthAdminAccess;
 }
