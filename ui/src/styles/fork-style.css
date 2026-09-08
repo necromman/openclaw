@@ -226,3 +226,28 @@ wa-select.settings-select::part(combobox) {
   align-items: center;
   gap: var(--space-1);
 }
+
+/* ── 8. Sidebar agent name ──
+ *
+ * Upstream fades the end of the agent name with a mask gradient instead of an
+ * ellipsis. A name that fits shows in full, but a name that does not simply
+ * stops: "Shared Assistant" reads as "Shared Assist" with no sign that anything
+ * was cut, and the fade runs right up to the switcher chevron so the two look
+ * like they overlap. A person cannot tell a long name from a truncated one.
+ *
+ * The mask has to go before the ellipsis can appear: it would fade out the very
+ * dots that carry the meaning. The RTL selector is repeated because it is more
+ * specific than a bare class, and leaving it alone would keep the fade in RTL.
+ * A small gap separates the name from the chevron so the last glyph and the
+ * arrow no longer touch. */
+.sidebar-agent-card__name {
+  gap: 4px;
+}
+
+.sidebar-agent-card__name-text,
+:root[dir="rtl"] .sidebar-agent-card__name-text {
+  padding-inline-end: 0;
+  -webkit-mask-image: none;
+  mask-image: none;
+  text-overflow: ellipsis;
+}

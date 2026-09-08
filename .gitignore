@@ -115,6 +115,10 @@ USER.md
 # though the bare names match the local-untracked rule above.
 !extensions/oc-path/src/oc-path/tests/fixtures/real/IDENTITY.md
 !extensions/oc-path/src/oc-path/tests/fixtures/real/USER.md
+# Exception: the delivery image seeds this identity into the agent workspace so the
+# first-run naming ceremony never happens on a customer install. It is a tracked
+# template, not somebody's local workspace file.
+!chris-local/ixauth-gateway-config/workspace-seed/IDENTITY.md
 *.tgz
 *.tar.gz
 *.zip

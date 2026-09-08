@@ -102,6 +102,7 @@ import {
 import { unregisterOpenClawAgentDatabase } from "../../state/openclaw-agent-db-registry.js";
 import { resolveUserPath } from "../../utils.js";
 import { prepareDepartmentGate } from "../department-access.js";
+import { resolveCallerMainKey } from "../home-session-key.js";
 import { listAgentsForGateway } from "../session-utils.js";
 import {
   AgentConfigPreconditionError,
@@ -825,17 +826,24 @@ export const agentsHandlers: GatewayRequestHandlers = {
           ),
       ),
     );
+    const projection = listAgentsForGateway(cfg, undefined, {
+      ...(allowedAgentIds ? { allowedAgentIds } : {}),
+      modelCatalogByAgentId,
+      includeSystem: hasGatewayClientCap(client?.connect.caps, GATEWAY_CLIENT_CAPS.AGENT_KIND),
+      httpAvatarBasePath:
+        client?.connect.client.id === GATEWAY_CLIENT_IDS.CONTROL_UI
+          ? (cfg.gateway?.controlUi?.basePath ?? "")
+          : undefined,
+    });
     respond(
       true,
-      listAgentsForGateway(cfg, undefined, {
-        ...(allowedAgentIds ? { allowedAgentIds } : {}),
-        modelCatalogByAgentId,
-        includeSystem: hasGatewayClientCap(client?.connect.caps, GATEWAY_CLIENT_CAPS.AGENT_KIND),
-        httpAvatarBasePath:
-          client?.connect.client.id === GATEWAY_CLIENT_IDS.CONTROL_UI
-            ? (cfg.gateway?.controlUi?.basePath ?? "")
-            : undefined,
-      }),
+      {
+        ...projection,
+        // The browser prefers this word over the handshake snapshot when it builds the
+        // home session key, so both surfaces must name the same session or the sidebar
+        // would point at one conversation and the route open another.
+        mainKey: resolveCallerMainKey({ cfg, client: client ?? null }),
+      },
       undefined,
     );
   },

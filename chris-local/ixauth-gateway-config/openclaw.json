@@ -58,7 +58,7 @@
         },
         "moderator": {
           "sessions": {
-            "others": "suggest"
+            "others": "none"
           },
           "agents": "*",
           "scopes": [
@@ -70,7 +70,7 @@
         },
         "member": {
           "sessions": {
-            "others": "view"
+            "others": "none"
           },
           "agents": "*",
           "scopes": [
@@ -84,7 +84,7 @@
   },
   "tools": {
     "sessions": {
-      "visibility": "department"
+      "visibility": "self"
     },
     "fs": {
       "workspaceOnly": true
@@ -130,8 +130,11 @@
     },
     "entries": {
       "main": {
-        "name": "Shared Assistant",
-        "description": "The one agent this delivery ships with"
+        "name": "공용",
+        "description": "회사 공용 AI 비서",
+        "identity": {
+          "name": "공용"
+        }
       }
     }
   },

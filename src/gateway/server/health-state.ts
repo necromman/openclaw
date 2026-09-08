@@ -4,11 +4,10 @@ import { resolveAgentEffectiveModelPrimary } from "../../agents/agent-scope.js";
 import { createConfigIO, getRuntimeConfig } from "../../config/io.js";
 import { STATE_DIR } from "../../config/paths.js";
 import { getRuntimeConfigAppliedHash } from "../../config/runtime-snapshot.js";
-import { resolveAgentMainSessionKey } from "../../config/sessions.js";
 import { listSystemPresence } from "../../infra/system-presence.js";
 import { getUpdateAvailable, getUpdateSchedule } from "../../infra/update-startup.js";
 import { getGatewaySuspendAdmissionPhase } from "../../process/gateway-work-admission.js";
-import { normalizeMainKey } from "../../routing/session-key.js";
+import { buildAgentMainSessionKey } from "../../routing/session-key.js";
 import { resolveGatewayAgentSelectionState } from "../agent-list.js";
 import { resolveGatewayAuth } from "../auth.js";
 import type { GatewayHotReloadStatus } from "../config-reload-status.types.js";
@@ -16,6 +15,7 @@ import type { GatewayConfigRevisionProjector } from "../config-revision-token.js
 import { projectUpdateAvailable } from "../events.js";
 import { collectGatewayHealthSnapshot } from "../health/collector.js";
 import type { HealthSummary } from "../health/types.js";
+import { resolveCallerMainKey } from "../home-session-key.js";
 import { createPresenceRecipientProjection } from "../presence-projection.js";
 import type { ChannelRuntimeSnapshot } from "../server-channel-runtime.types.js";
 import type { GatewayClient } from "../server-methods/types.js";
@@ -60,10 +60,12 @@ export function buildGatewaySnapshot(opts: {
   const cfg = getRuntimeConfig();
   const selection = resolveGatewayAgentSelectionState(cfg);
   const defaultAgentId = selection.defaultId;
-  const mainKey = normalizeMainKey(cfg.session?.mainKey);
+  // The word this caller's home session is named with. Identical to the configured one
+  // outside ix-auth mode, so no existing deployment sees a different key here.
+  const mainKey = resolveCallerMainKey({ cfg, client: opts.client });
   const scope = cfg.session?.scope ?? "per-sender";
   const mainSessionKey =
-    scope === "global" ? "global" : resolveAgentMainSessionKey({ cfg, agentId: defaultAgentId });
+    scope === "global" ? "global" : buildAgentMainSessionKey({ agentId: defaultAgentId, mainKey });
   const presence = createPresenceRecipientProjection({ cfg, presence: listSystemPresence() })(
     opts.client,
   );

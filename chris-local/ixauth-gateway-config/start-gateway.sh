@@ -75,4 +75,29 @@ sed -e "s|__OPENCLAW_PUBLIC_ORIGIN__|${origin}|g" \
     -e "s|\"__OPENCLAW_TRUSTED_PROXIES__\"|${trusted_proxies}|g" /config/openclaw.json \
   > /home/node/.openclaw/openclaw.json
 
+# Workspace identity, rendered the same way the config is: from the tracked template on
+# every start. A stock workspace ships a BOOTSTRAP.md whose first beat is "ask the user
+# what to call you", so the first question a person put to this delivery came back as a
+# naming ceremony instead of an answer. An appliance has no such conversation: the name,
+# the language and the role are decided here, once.
+#
+# Seeding IDENTITY.md is also what suppresses the ceremony. The Gateway seeds BOOTSTRAP.md
+# only into a workspace whose profile files still match the stock templates
+# (workspaceProfileLooksConfigured in src/agents/workspace.ts); a workspace that already
+# carries a real IDENTITY.md is recorded as set up and never gets one. Removing an
+# existing BOOTSTRAP.md closes the same door on volumes seeded before this change: the
+# Gateway reads "seeded once, gone now" as "the ceremony finished".
+#
+# Two directories, because either can be the agent workspace depending on how the roster
+# resolved when the volume was first written: "workspace" is the process default and
+# "workspace-<agent id>" is the per-agent form. Writing both costs two small files and
+# removes a class of "it worked on the other volume" faults.
+for workspace_dir in /home/node/.openclaw/workspace /home/node/.openclaw/workspace-main; do
+  mkdir -p "$workspace_dir"
+  cp /config/workspace-seed/IDENTITY.md "$workspace_dir/IDENTITY.md"
+  cp /config/workspace-seed/SOUL.md "$workspace_dir/SOUL.md"
+  chmod 644 "$workspace_dir/IDENTITY.md" "$workspace_dir/SOUL.md"
+  rm -f "$workspace_dir/BOOTSTRAP.md"
+done
+
 exec node dist/index.js gateway --bind lan --port 18789
