@@ -240,6 +240,12 @@ const IX_AUTH_ADMIN_CONSOLE_TOKEN_SENTINEL = "gateway-session";
 /** The console document carries exactly one script tag; the bootstrap goes before it. */
 const IX_AUTH_ADMIN_CONSOLE_SCRIPT_MARKER = "<script>";
 
+/** Where the console's exit control returns to, relative to the Gateway's own root. */
+const IX_AUTH_ADMIN_CONSOLE_RETURN_PATH = "/settings/users";
+
+/** What the console's sign-out control says once it can no longer sign anyone out. */
+const IX_AUTH_ADMIN_CONSOLE_EXIT_LABEL = "게이트웨이로 돌아가기";
+
 /**
  * JSON-encode one value for a place inside an inline script.
  *
@@ -279,7 +285,42 @@ export function injectIxAuthAdminConsoleBootstrap(params: {
     `sessionStorage.setItem('ixauth_token',${encodeForInlineScript(IX_AUTH_ADMIN_CONSOLE_TOKEN_SENTINEL)});` +
     `sessionStorage.setItem('ixauth_who',${encodeForInlineScript(who)});` +
     "}catch{}</script>";
-  return params.html.slice(0, markerIndex) + bootstrap + params.html.slice(markerIndex);
+  const seeded = params.html.slice(0, markerIndex) + bootstrap + params.html.slice(markerIndex);
+  return appendIxAuthAdminConsoleExit(seeded);
+}
+
+/**
+ * Turn the console's sign-out button into a way back out of the console.
+ *
+ * The console's own `logout()` clears its `sessionStorage` and shows its sign-in form.
+ * Under this proxy that form is a dead end: the sign-in routes are refused as not-found
+ * (rule 3 above), so pressing sign out produced a password box that answers 404 to
+ * anything typed into it. The visitor's session was never the console's to end anyway; it
+ * belongs to the Gateway.
+ *
+ * So the control leaves instead of signing out, and says so. Returning to the Gateway
+ * screen that offered the console keeps the session intact, which is what makes the
+ * console re-openable without signing in again. Signing out for real stays where it has
+ * always been, in the Gateway's own account menu.
+ *
+ * The override is appended after the console's script rather than before it: a function
+ * declaration in a classic script wins over an earlier assignment, so an override placed
+ * with the bootstrap above would be overwritten by the very function it replaces.
+ */
+function appendIxAuthAdminConsoleExit(html: string): string {
+  const script =
+    "<script>(function(){try{" +
+    // The Gateway may be mounted under a base path, so the way back is derived from the
+    // path this document was actually served at rather than assumed to be the root.
+    `var here=location.pathname;var cut=here.indexOf(${encodeForInlineScript(IX_AUTH_ADMIN_PROXY_BASE_PATH)});` +
+    `var exit=(cut>0?here.slice(0,cut):'')+${encodeForInlineScript(IX_AUTH_ADMIN_CONSOLE_RETURN_PATH)};` +
+    "window.logout=function(){location.assign(exit);};" +
+    "document.querySelectorAll('button[onclick]').forEach(function(button){" +
+    "if((button.getAttribute('onclick')||'').indexOf('logout')===0){" +
+    `button.textContent=${encodeForInlineScript(IX_AUTH_ADMIN_CONSOLE_EXIT_LABEL)};}});` +
+    "}catch{}})();</script>";
+  const closing = html.lastIndexOf("</body>");
+  return closing === -1 ? html + script : html.slice(0, closing) + script + html.slice(closing);
 }
 
 /**

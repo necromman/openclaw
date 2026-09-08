@@ -502,4 +502,22 @@ describe("injectIxAuthAdminConsoleBootstrap", () => {
       }),
     ).toBeUndefined();
   });
+
+  it("replaces the console sign-out with a way back to the Gateway", () => {
+    const injected =
+      injectIxAuthAdminConsoleBootstrap({
+        html:
+          '<!doctype html><body><header><button class="sm" onclick="logout()">out</button>' +
+          "</header><script>function logout(){}</script></body></html>",
+        principal: buildPrincipal("superadmin"),
+      }) ?? "";
+    // The override has to sit after the console's own declaration, or the function
+    // declaration would win and the dead sign-in form would come back.
+    expect(injected.indexOf("window.logout=")).toBeGreaterThan(
+      injected.indexOf("function logout(){}"),
+    );
+    expect(injected).toContain("/settings/users");
+    // Inserted inside the document, not appended after it closes.
+    expect(injected.indexOf("window.logout=")).toBeLessThan(injected.indexOf("</body>"));
+  });
 });
