@@ -527,6 +527,28 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | 신원 서버가 뜨지 않는다                        | `IXAUTH_SERVICE_KEY` 가 32자 미만이면 부팅을 거부한다                                                     |
 | 나머지                                         | [AUTH-IXAUTH.md](AUTH-IXAUTH.md) 7.4                                                                      |
 
+### 9.1 컨테이너 안 CLI 로 무엇이 되는가
+
+이 모드에는 공유 시크릿이 없다. 그래서 컨테이너 안의 `openclaw` 는 **자기 게이트웨이 RPC 에
+인증하지 못한다**(로그에 `reason=gateway_auth_required`). 호스트 셸을 여는 것은 이 납품의
+경계 밖이므로 "호스트에서 하라" 는 답이 되지 않는다. 명령마다 사정이 다르다.
+
+| 명령                        | 컨테이너 안에서                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| `openclaw audit users`      | **된다.** RPC 가 막히면 상태 SQLite 를 직접 읽고 첫 줄에 `Local read:` 를 찍는다        |
+| `openclaw knowledge sync`   | **된다.** 처음부터 게이트웨이를 타지 않는다 (12절)                                     |
+| `cron`, `devices`, `users`, `sessions`, `status`, `health`, `logs`, `secrets`, `nodes`, `gateway call` | **안 된다.** RPC 전용 |
+
+- 로컬 읽기는 부서로 좁히지 않는다. 컨테이너에 들어갈 수 있는 사람은 이미 상태 파일을 통째로
+  열 수 있으므로, 행을 걸러 봐야 시늉에 그친다. 화면과 CSV 의 부서 좁히기는 그대로다.
+- **안 되는 명령의 대안은 화면(Control UI)이다.** 브라우저의 핸드셰이크는 로그인 세션 쿠키로
+  인증되므로 공유 시크릿 없이 같은 RPC 가 통한다. 자동화(`cron add`)는 화면의 자동화 항목에서,
+  기기 목록은 설정 > 기기에서 한다.
+- 감사 원장은 화면 말고도 `GET /auth/admin/audit/export.csv`(로그인 쿠키 + 관리자 판정,
+  최대 10,000행)로 받는다.
+- 주기 실행이 필요하면 컨테이너 안의 `cron add` 가 아니라 **호스트 systemd 타이머**로 건다
+  (12절의 색인 갱신이 그 예다).
+
 ## 10. 확인된 제약
 
 | 제약                    | 내용                                                                                                                                                                                                                         |

@@ -336,6 +336,17 @@ enabled; otherwise a row carries only the question's length and a digest. Tool
 arguments are never stored, only the file paths an allowlisted read names.
 Retention is `logging.audit.userActivity.retentionDays` (default 90).
 
+The command asks the Gateway first. When the configured target is the local
+Gateway and the call never reaches a handler, because the socket closed, the
+request timed out, or this host has no credentials for it, the same page is read
+straight from the state database instead. That read is announced on its own first
+line and is not narrowed by department: whoever can run it can already read the
+database file, so the page is labelled rather than filtered. A request the
+Gateway did answer, including `FORBIDDEN`, stands as the answer and is never
+retried locally, and a `--url` override or a remote-mode target is never answered
+from the local database. With `--json` the page keeps one shape on both paths and
+the notice goes to stderr.
+
 ## Gateway RPC
 
 `audit.activity.list` requires `operator.read` and accepts the same filters. It

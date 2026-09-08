@@ -7,12 +7,11 @@ import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import type {
   AuditUserActivityEvent,
   AuditUserActivityListParams,
-  AuditUserActivityListResult,
 } from "../../packages/gateway-protocol/src/index.js";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import { parseAbsoluteTimeMs } from "../cron/parse.js";
-import { callGateway } from "../gateway/call.js";
 import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
+import { readAuditUsersPage } from "./audit-users-source.js";
 
 const DEFAULT_AUDIT_USERS_LIMIT = 100;
 const MAX_AUDIT_USERS_LIMIT = 500;
@@ -124,13 +123,18 @@ export async function auditUsersCommand(
     ...(to !== undefined ? { to } : {}),
     ...(options.cursor ? { cursor: options.cursor } : {}),
   };
-  const result = await callGateway<AuditUserActivityListResult>({
-    method: "audit.userActivity.list",
-    params,
-  });
+  const { result, localNotice } = await readAuditUsersPage(params);
   if (options.json) {
+    // The page itself keeps one shape whichever reader produced it, so a `--json` consumer
+    // never has to branch. The fallback is announced beside it, on the other stream.
+    if (localNotice) {
+      runtime.error(localNotice);
+    }
     writeRuntimeJson(runtime, result);
     return;
+  }
+  if (localNotice) {
+    runtime.log(localNotice);
   }
   for (const row of formatRows(result.events)) {
     runtime.log(row);

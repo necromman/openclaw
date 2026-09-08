@@ -130,6 +130,34 @@ openclaw audit users --json
 
 호스트 셸은 경계 밖이므로 전부 보인다.
 
+**읽는 곳이 둘이다.** 먼저 RPC 를 부르고, RPC 가 *답하지 못했을 때만* 이 호스트의 상태 SQLite 를 직접 읽는다
+(`src/commands/audit-users-source.ts`).
+
+|        | RPC 경로                                        | 로컬 직접 읽기                                                                        |
+| ------ | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 언제   | 기본. 게이트웨이가 살아 있고 인증이 되면 항상   | 전송 실패(연결 끊김·거절·타임아웃)·자격증명 없음 **그리고** 대상이 로컬 게이트웨이일 때 |
+| 인가   | 6.1 표 그대로. 계정이 실린 연결이면 부서로 좁힌다 | `queryUserActivityAudit` 의 **같은 `host` 리더**. 좁히지 않는다                        |
+| 알림   | 없음                                            | 첫 줄에 `Local read: ...` 한 줄. `--json` 이면 그 줄은 **stderr**, 페이지는 stdout      |
+
+폴백 조건이 저 둘 다인 이유:
+
+- **답한 거절은 폴백하지 않는다.** 핸들러가 `FORBIDDEN`·`INVALID_REQUEST` 로 답했다면 그것은 결정이다. 그 결정을
+  우회해 로컬을 읽으면 인가 판정이 인가 우회가 된다. 핸들러가 돌기 *전에* 끝난 실패(소켓 종료·타임아웃·자격증명
+  부재)만 질문을 미해결로 남기고, 그것만 로컬에 다시 묻는다.
+- **원격 대상은 폴백하지 않는다.** `gateway.mode=remote` 나 `--url` 은 다른 호스트를 가리키고 그 호스트의 원장은
+  이 파일시스템이 아니다. 거기서 로컬을 읽으면 폴백이 아니라 **틀린 답**이다. `isImplicitLocalGatewayTarget` 로
+  가른다.
+
+로컬 직접 읽기에 부서 필터를 걸지 않은 것도 의도다. RPC 가 관리자를 자기 부서로 좁히는 근거는 연결에 신원
+서버가 보증한 계정이 실려 있다는 사실이다. 로컬 읽기에는 그 계정이 없고, 그것을 실행할 수 있는 사람은 이미 DB
+파일을 열고 복사하고 고칠 수 있다. 그 위에 행 필터를 얹는 것은 통제가 아니라 시늉이다. 그래서 좁히는 대신
+**넓다는 사실을 매 출력의 첫 줄로 밝힌다**. `--json` 은 두 경로가 **같은 모양**을 낸다(`events`·`nextCursor`).
+알림만 stderr 로 빠진다 - 소비자가 어느 경로였는지 알아야 파싱할 수 있으면 그것은 계약이 둘인 것이다.
+
+이 폴백이 없으면 납품 스택(ix-auth)에서 이 명령은 아예 못 쓴다. ix-auth 모드에는 공유 시크릿이 없어서 컨테이너
+안의 CLI 가 자기 게이트웨이 RPC 에 인증할 수 없고(`client=cli ... reason=gateway_auth_required`), 호스트 셸은
+고객에게 열어 주지 않는 것이 이 납품의 전제다.
+
 ### 6.4 화면
 
 **설정 > 개인정보 보호 & 보안 > 감사 기록**(`/settings/audit`). superadmin·admin 에게만 보인다. 필터 바(사람·종류·기간), 표(시각·사람·역할·부서·종류·요약·세션), 행을 누르면 `detail` 원본, CSV 버튼. 라우트는 지연 로드라 시작 번들에 바이트를 더하지 않는다.
@@ -145,6 +173,7 @@ openclaw audit users --json
 | **부서 필터는 기록 시점 부서로 판정한다**         | 사람이 부서를 옮기면 과거 행은 옛 부서에 남는다. 그때 그 사람이 그 부서였다는 것이 사실이므로 의도한 동작이다       |
 | **채널 발신자는 계정과 이어지지 않는다**          | AUTH-DEPARTMENTS 14.3                                                                                               |
 | **에이전트가 셸로 읽은 파일은 안 잡힌다**         | 3.2 의 도구 목록 밖이다. 부서 에이전트는 셸을 끄는 것이 전제다(AUTH-DEPARTMENTS 13.4)                               |
+| **CLI 로컬 폴백은 부서로 좁히지 않는다** | 6.3. 컨테이너·호스트 셸에 들어올 수 있는 사람은 운영자라는 전제 위에 선다. 좁히는 대신 출력 첫 줄로 밝힌다 |
 
 ## 8. 계약 문구 초안
 
@@ -173,6 +202,8 @@ openclaw audit users --json
 | `src/gateway/ix-auth-admin-audit-http.ts`                     | CSV 내보내기 라우트            |
 | `src/gateway/server-methods/audit-user-activity.ts`           | RPC 핸들러                     |
 | `src/commands/audit-users.ts`                                 | `openclaw audit users`         |
+| `src/commands/audit-users-source.ts`                          | RPC 우선 + 로컬 폴백 판정      |
+| `src/gateway/user-activity-audit-wire.ts`                     | 원장 행 -> 프로토콜 이벤트     |
 | `packages/gateway-protocol/src/schema/audit-user-activity.ts` | 프로토콜 계약                  |
 | `ui/src/pages/audit/*`, `ui/src/styles/audit.css`             | 화면                           |
 

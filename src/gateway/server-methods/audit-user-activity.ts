@@ -7,16 +7,15 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import {
   ErrorCodes,
   errorShape,
-  type AuditUserActivityEvent,
   validateAuditUserActivityListParams,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { parsePositiveAuditCursor } from "../../audit/audit-cursor.js";
-import type { UserActivityAuditEntry } from "../../state/user-activity-audit-store.js";
 import { readClientAuditActor } from "../ix-auth-audit-actor.js";
 import {
   queryUserActivityAudit,
   type UserActivityAuditReader,
 } from "../user-activity-audit-query.js";
+import { toAuditUserActivityWireEvent } from "../user-activity-audit-wire.js";
 import type { GatewayClient } from "./client-types.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { assertValidParams } from "./validation.js";
@@ -31,26 +30,6 @@ import { assertValidParams } from "./validation.js";
 export function resolveUserActivityReader(client: GatewayClient | null): UserActivityAuditReader {
   const actor = readClientAuditActor(client);
   return actor ? { kind: "ix-auth", actor } : { kind: "host" };
-}
-
-function toWireEvent(entry: UserActivityAuditEntry): AuditUserActivityEvent {
-  return {
-    sequence: entry.sequence,
-    at: entry.at,
-    kind: entry.kind,
-    actorSource: entry.actorSource,
-    ...(entry.profileId ? { profileId: entry.profileId } : {}),
-    ...(entry.email ? { email: entry.email } : {}),
-    ...(entry.displayName ? { displayName: entry.displayName } : {}),
-    ...(entry.gatewayRole ? { gatewayRole: entry.gatewayRole } : {}),
-    departments: entry.departments,
-    ...(entry.sessionKey ? { sessionKey: entry.sessionKey } : {}),
-    ...(entry.agentId ? { agentId: entry.agentId } : {}),
-    detail: entry.detail,
-    ...(entry.remoteIp ? { remoteIp: entry.remoteIp } : {}),
-    ...(entry.userAgent ? { userAgent: entry.userAgent } : {}),
-    ...(entry.requestId ? { requestId: entry.requestId } : {}),
-  };
 }
 
 export const auditUserActivityHandlers: GatewayRequestHandlers = {
@@ -104,7 +83,7 @@ export const auditUserActivityHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, {
-      events: page.entries.map(toWireEvent),
+      events: page.entries.map(toAuditUserActivityWireEvent),
       ...(page.nextCursor !== undefined ? { nextCursor: String(page.nextCursor) } : {}),
     });
   },
