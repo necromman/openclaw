@@ -1,4 +1,9 @@
 {
+  "meta": {
+    "migrations": {
+      "modelPolicyAllowlist": true
+    }
+  },
   "gateway": {
     "mode": "local",
     "auth": {

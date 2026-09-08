@@ -69,6 +69,13 @@ if [ -n "${OPENCLAW_TRUSTED_PROXIES:-}" ]; then
   trusted_proxies="[${items}]"
 fi
 
+# The template carries a top-level "meta" block, and it has to. The Gateway compares each
+# config it reads against the last one it accepted, and a file that drops "meta" when the
+# previous one had it is read as damage: the loader restores the backup and logs
+# "Config auto-restored from backup ... (missing-meta-vs-last-good)". The Gateway writes
+# "meta" itself the first time it records a migration, so from that moment on a
+# meta-less render is silently thrown away and this deployment keeps running yesterday's
+# settings. Carrying the block makes the render an ordinary config again.
 mkdir -p /home/node/.openclaw
 sed -e "s|__OPENCLAW_PUBLIC_ORIGIN__|${origin}|g" \
     -e "s|\"__OPENCLAW_SELF_SIGNUP__\"|${self_signup}|g" \
