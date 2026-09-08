@@ -79,7 +79,11 @@ describe("chat send attachment ownership", () => {
 
   it("writes nothing when the turn carried no attachment", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
-      recordChatSendInboundMediaOwnership({ entries: [], client: null, sessionKey: "agent:main:x" });
+      recordChatSendInboundMediaOwnership({
+        entries: [],
+        client: null,
+        sessionKey: "agent:main:x",
+      });
       expect(getInboundMediaOwnership("img-1")).toBeUndefined();
     });
   });
