@@ -10,6 +10,7 @@ import {
   renderSettingsSection,
   renderSettingsValue,
 } from "../../components/settings-ui.ts";
+import { canManageIxAuthUsers } from "../../features/ix-auth/ix-auth-admin-access.ts";
 import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import type { IxAuthSessionState } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../../i18n/index.ts";
@@ -54,11 +55,12 @@ export function renderIxAuthAccountSection(
           title: t("ixAuth.impersonating", { admin: user.impersonatedBy }),
         })
       : nothing,
-    // The console link is only present in the payload for users the Gateway judged
-    // administrators, so it doubles as the signal that this row is worth drawing. The
-    // link itself now points at this app's own screen: the console is a second sign-in
-    // and stays an advanced escape hatch, offered there rather than here.
-    session.adminConsoleUrl
+    // Drawn for anyone the Gateway lets call the admin routes, which is the same test the
+    // screen behind this link makes. The console URL used to stand in for it and was
+    // wrong: it is withheld from everyone but a superadmin, so an ordinary administrator
+    // never saw the way in. The console itself is a second sign-in and stays an advanced
+    // escape hatch, offered on that screen rather than here.
+    canManageIxAuthUsers()
       ? renderSettingsRow({
           title: t("ixAuth.manageUsers"),
           control: html`

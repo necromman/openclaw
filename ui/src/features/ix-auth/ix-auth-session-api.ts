@@ -4,6 +4,7 @@
 // Gateway returns only a session cookie. Everything below therefore uses
 // `credentials: "same-origin"` and carries no bearer token of its own.
 import {
+  isIxAuthAdminRole,
   setIxAuthAdminAccess,
   setIxAuthSuperAdminAccess,
 } from "./ix-auth-admin-access.ts";
@@ -164,13 +165,18 @@ let lastIxAuthSession: IxAuthSessionState | undefined;
  */
 function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState {
   lastIxAuthSession = session;
-  // The Gateway withholds the console URL from anyone it does not judge an administrator,
-  // so its presence is the same signal the Gateway itself acts on. Recorded here so the
-  // sidebar, the identity menu, and the page never invent their own role test.
+  // The account's Gateway role is the signal, matched against the same list the Gateway
+  // enforces on `/auth/admin/*`. Recorded here so the sidebar, the identity menu, and the
+  // page never invent their own role test.
+  //
+  // It used to read the console URL instead. That URL is withheld from everyone but a
+  // superadmin, so an ordinary administrator was locked out of the user and audit screens
+  // the Gateway was already serving them (AUTH-IXAUTH 4-3: the two predicates are separate
+  // on purpose).
   setIxAuthAdminAccess(
     session.authMode === "ix-auth" &&
       session.authenticated &&
-      session.adminConsoleUrl !== undefined,
+      isIxAuthAdminRole(session.user?.gatewayRole),
   );
   // The top rank is reported on the account itself, so the department screen never has to
   // read a role code and decide what it outranks.

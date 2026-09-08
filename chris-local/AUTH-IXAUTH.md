@@ -211,6 +211,8 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 - **한국어 표기는 UI 카탈로그 한 곳**(`ui/src/features/ix-auth/ix-auth-role-labels.ts` + `ixAuth.roles.*`)에서 나온다. 역할 코드와 게이트웨이 역할 이름 둘 다 같은 라벨로 옮겨지므로 화면이 날것의 코드를 보이지 않는다. 매핑에 없는 이름은 설정한 그대로 보인다.
 - **`superadmin` 승격은 `roleMap` 만으로는 안 된다.** `superAdminRoles` 에도 있어야 한다. 매핑 오타 하나로 관리자가 생기지 않게 하는 이중 조건이다.
 - 관리 콘솔 링크는 `superadmin` 에게만 **응답 본문에 실린다.** 브라우저에서 감추는 것이 아니라 애초에 보내지 않는다. 주소를 직접 입력해도 게이트웨이의 `/admin/identity/*` 가 같은 판정으로 403 을 낸다. `admin` 은 콘솔을 못 열지만 앱 안의 초대·가입 승인·사용자 관리·감사 조회는 그대로 쓴다 - 두 판정은 이름이 다른 별개의 술어다(`canOpenIxAuthAdminConsole` 과 `canUseIxAuthAdminApi`).
+
+  화면이 이 둘을 한동안 뒤섞고 있었다. `admin` 에게는 오지 않는 `adminConsoleUrl` 의 존재로 "사용자 관리를 해도 되는가" 를 판정해서, 서버가 200 을 내주는 `/settings/users`·`/settings/audit` 을 화면이 스스로 잠갔다. O 단계에서 세션 프로브가 **역할**(`user.gatewayRole`)을 `superadmin`·`admin` 과 맞추도록 고쳤다(`ui/src/features/ix-auth/ix-auth-admin-access.ts` 의 `isIxAuthAdminRole`). 부서 화면은 원래대로 superadmin 전용이고, 그 판정은 이제 `isSuperAdmin` 하나만 읽는다.
 - 부서는 `ixauth_groups` 의 `dept-` 접두 코드에서 뽑아 `IxAuthPrincipal.departments` 에 담는다. A 단계는 매핑 데이터만 준비했고, **B 단계가 강제를 붙였다** - 정본 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md).
 
 ## 6. 이번 단계에서 하지 않은 것

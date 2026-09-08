@@ -20,6 +20,7 @@ import {
   renderSettingsSection,
 } from "../../components/settings-ui.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
+import { canManageIxAuthUsers } from "../../features/ix-auth/ix-auth-admin-access.ts";
 import {
   fetchIxAuthDepartments,
   type IxAuthDepartmentOption,
@@ -113,7 +114,10 @@ export class UsersPage extends OpenClawLightDomElement {
   }
 
   private canManage(): boolean {
-    return this.session?.adminConsoleUrl !== undefined;
+    // The shared predicate, so this page and the navigation that leads to it never
+    // disagree. It is a role test, not a console-URL test: the console is superadmin only
+    // while these routes serve admins too.
+    return canManageIxAuthUsers();
   }
 
   private async load(): Promise<void> {

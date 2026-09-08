@@ -5,8 +5,24 @@
 // would pull that whole module (and its fetch plumbing) into the boot bundle, which is
 // several kilobytes for one flag.
 //
-// The session probe is the only writer: it learns the answer from `/auth/me`, where the
-// Gateway withholds the console URL from anyone it does not judge an administrator.
+// The session probe is the only writer: it learns the answer from `/auth/me`, which
+// reports the account's Gateway role.
+
+/**
+ * The Gateway roles that may call the `/auth/admin/*` routes.
+ *
+ * It mirrors `IX_AUTH_ADMIN_API_ROLES` in `src/auth/ix-auth/ix-auth-role-map.ts`, which is
+ * the predicate `ix-auth-admin-context.ts` actually enforces. It is deliberately NOT the
+ * console predicate: the console is superadmin only, and using the console URL as the
+ * stand-in shut ordinary administrators out of screens the Gateway serves them (AUTH-IXAUTH
+ * 4-3). The list is inlined rather than imported so this module keeps its zero imports.
+ */
+const IX_AUTH_ADMIN_API_ROLES = ["superadmin", "admin"];
+
+/** True when this Gateway role may call the admin routes. Shared by every caller. */
+export function isIxAuthAdminRole(role: string | undefined): boolean {
+  return role !== undefined && IX_AUTH_ADMIN_API_ROLES.includes(role);
+}
 
 let ixAuthAdminAccess = false;
 let ixAuthSuperAdminAccess = false;
@@ -40,10 +56,11 @@ export function canManageIxAuthUsers(): boolean {
 /**
  * True when the signed-in account may open the department screen.
  *
- * False before the first probe answers, and false for an ordinary administrator. The
- * Gateway refuses the routes behind that screen either way; this only decides whether an
- * item that would answer 403 is worth drawing.
+ * False before the first probe answers, and false for an ordinary administrator: the
+ * department writes are superadmin only (`rejectNonSuperAdmin` in
+ * `src/gateway/ix-auth-admin-departments-http.ts`). The top rank alone decides it, because
+ * every superadmin is also an admin; asking both would only restate that.
  */
 export function canManageIxAuthDepartments(): boolean {
-  return ixAuthAdminAccess && ixAuthSuperAdminAccess;
+  return ixAuthSuperAdminAccess;
 }
