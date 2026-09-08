@@ -9,7 +9,7 @@
 
 ## 0. 이 문서의 가정 (사용자 미확정)
 
-아래 6가지는 감독 판단으로 정한 기본값이다. 고객 요건이 다르면 바꾸고, 바꾼 값을 이 문서에 적는다.
+아래 7가지 가운데 7번은 사용자가 확정한 값이고, 나머지는 감독 판단으로 정한 기본값이다. 고객 요건이 다르면 바꾸고, 바꾼 값을 이 문서에 적는다.
 
 | #   | 가정                                                                                                              | 바꾸려면                                                                                                                                      |
 | --- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,6 +19,7 @@
 | 4   | 한국어 로케일은 `pnpm ui:i18n:sync` 로 채운다                                                                     | 다른 언어를 쓰면 브라우저 언어 설정을 따른다. ko 외 로케일은 아직 영어 폴백이다 (7절)                                                         |
 | 5   | 호스트 포트는 **18800**                                                                                           | `.env` 의 `OPENCLAW_GATEWAY_PORT` 와 `OPENCLAW_PUBLIC_ORIGIN` 을 함께 바꾼다                                                                  |
 | 6   | 부서 강제를 **켠 채로** 납품한다 (`tools.sessions.visibility: "department"`, 부서 코드 `dept-<slug>`)             | 부서를 안 쓰는 고객이면 그 값을 `"self"` 로 되돌린다. 접두사는 `gateway.auth.ixAuth.departmentGroupPrefix` (AUTH-DEPARTMENTS.md 4·5절)        |
+| 7   | **사용자 확정(2026-09-07).** 주소는 `https://jinbio.botops.cloud`, TLS 는 Cloudflare Tunnel 로 붙인다. PoC·데모·초기 운영 한정이고 정식 납품 시 진바이오테크 자체 도메인으로 옮긴다 | 절차·되돌리기는 11.7. 도메인 없이 사내 IP 로만 쓰려면 11.1 로 간다 |
 
 ## 1. 요구사항
 
@@ -62,7 +63,9 @@
 | `IXAUTH_MAIL_SMTP_STARTTLS`             |        | `true`                                | STARTTLS 사용 여부                                                                                                              |
 | `MAILPIT_UI_PORT`                       |        | `18025`                               | 개발용 수신함(`--profile mail`)의 호스트 포트                                                                                   |
 | `OPENCLAW_GATEWAY_PORT`                 |        | `18800`                               | 호스트에 여는 포트                                                                                                              |
-| `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다                |
+| `OPENCLAW_PUBLIC_ORIGIN`                |        | `http://127.0.0.1:18800`              | **브라우저가 실제로 쓰는 오리진.** 스킴·포트 포함, 끝에 `/` 없이. `gateway.controlUi.allowedOrigins` 로 들어간다. 터널을 쓰면 `https://jinbio.botops.cloud` (11.7) |
+| `OPENCLAW_TRUSTED_PROXIES`              |        | (없음)                                | `x-forwarded-proto` 를 믿어도 되는 앞단 주소 목록, 쉼표 구분. 비우면 게이트웨이가 모든 접속을 평문으로 보고 `__Host-` 없는 쿠키를 내린다. TLS 종단이 앞에 실제로 있을 때만 채운다 (11.3·11.7) |
+| `CLOUDFLARE_TUNNEL_TOKEN`               |        | (없음)                                | Cloudflare Tunnel 토큰. `--profile tunnel` 일 때만 읽는다. 시크릿이므로 `.env` 에만 두고 어디에도 커밋하지 않는다 (11.7) |
 | `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                 |
 | `OPENCLAW_NAS_ROOT`                     |        | (없음)                                | 부서 공유의 부모 경로. 비우면 샘플 트리를 마운트하고 부서 에이전트는 자기 워크스페이스를 쓴다 (11.4)                            |
 | `OPENCLAW_KNOWLEDGE_ROOT`               |        | (없음)                                | 마크다운 사이드카 색인의 부모 경로. 비우면 부서 에이전트의 `extraPaths` 가 빈 목록이 된다 (12절, KNOWLEDGE.md)                  |
@@ -84,7 +87,7 @@
 
 상세는 [AUTH-SIGNUP.md](AUTH-SIGNUP.md).
 
-`issuer` 와 `audience` 는 **환경변수가 아니다.** compose 와 게이트웨이 설정 파일에 같은 리터럴(`openclaw-ix-auth` / `openclaw-gateway`)로 박아 두었다. 이 두 값을 양쪽에서 따로 맞추다 틀리는 것이 이 모드의 1번 함정이라 손댈 수 없게 한 것이다.
+`issuer` 와 `audience` 는 **환경변수가 아니다.** compose 와 게이트웨이[<sup>1</sup>](#g1) 설정 파일에 같은 리터럴(`openclaw-ix-auth` / `openclaw-gateway`)로 박아 두었다. 이 두 값을 양쪽에서 따로 맞추다 틀리는 것이 이 모드의 1번 함정이라 손댈 수 없게 한 것이다.
 
 ## 3. 기동 절차
 
@@ -108,13 +111,13 @@ docker compose --env-file chris-local/ixauth.env \
 4. 서명 키 생성 + **최초 관리자 1명 시드**(`SUPERADMIN` 부여)
 5. 게이트웨이가 `ixauth-gateway-config/openclaw.json` 을 상태 볼륨에 렌더링하고 `--bind lan` 으로 기동
 
-`http://<OPENCLAW_PUBLIC_ORIGIN>` 을 열면 로그인 화면이 뜬다. 토큰도 기기 페어링도 없다.
+`http://<OPENCLAW_PUBLIC_ORIGIN>` 을 열면 로그인 화면이 뜬다. 토큰[<sup>2</sup>](#g2)도 기기 페어링도 없다.
 
 > **`__Host-` 쿠키 주의.** 기본 쿠키 이름은 `__Host-` 접두라 `Secure` 를 요구하지만, 게이트웨이는 비보안 컨텍스트에서 접두사와 `Secure` 를 스스로 떼고 내리므로 평문 HTTP 사내망 IP 에서도 세션이 유지된다(근거와 대가는 11.2). 로컬 검증은 `http://127.0.0.1:18800` 으로 하고(`localhost` 는 다른 이름이라 오리진이 어긋난다), 실배포는 TLS 뒤에 두는 것을 권한다.
 
 ### 3.1 첫 로그인 직후 할 일 (운영 지시)
 
-IX-Auth 에는 "첫 로그인 시 비밀번호 변경 강제" 기능이 **없다.** 통제 장치가 아니라 절차로 지킨다.
+IX-Auth 에는 "첫 로그인 시 비밀번호 변경 강제" 기능이 **없다.** 통제 장치 없이 절차로 지킨다.
 
 1. `IXAUTH_ADMIN_EMAIL` / `IXAUTH_ADMIN_PASSWORD` 로 로그인한다.
 2. 신원 메뉴의 **사용자 관리**(`/settings/users`)로 들어간다. 앱 안에서 처리되므로 두 번째 로그인이 없다.
@@ -140,7 +143,7 @@ IX-Auth 콘솔(`/admin/identity/`)은 **superadmin 에게만** "고급" 링크�
 초대 화면에서 역할을 임원으로 고르면 부서가 전체 체크된 채로 뜬다(해제 가능). 부서를 하나도
 남기지 않으면 게이트웨이가 전 부서를 채운다. 자세한 규칙은 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 3절.
 
-링크는 감추는 것이 아니라 **응답 본문에 싣지 않는다.** 주소를 직접 입력해도 403 이다.
+링크를 **응답 본문에 싣지 않는다.** 주소를 직접 입력해도 403 이다.
 
 ### 3.3 부서 운영
 
@@ -206,7 +209,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 #### (나) 사내 ollama 방식
 
-모델과 임베딩을 전부 사내에서 끝낸다. compose 에 서비스를 하나 더 붙인다.
+모델과 임베딩[<sup>3</sup>](#g3)을 전부 사내에서 끝낸다. compose 에 서비스를 하나 더 붙인다.
 
 ```yaml
 # docker-compose.ixauth.yml 의 services: 아래
@@ -249,7 +252,7 @@ ollama-models:
 }
 ```
 
-- `baseUrl` 에 **`/v1` 을 붙이지 마라.** OpenAI 호환 경로는 도구 호출을 깨뜨려서 모델이 도구 호출 JSON 을 본문에 그대로 뱉는다.
+- `baseUrl` 에 **`/v1` 을 붙이지 마라.** OpenAI 호환 경로는 도구 호출[<sup>4</sup>](#g4)을 깨뜨려서 모델이 도구 호출 JSON 을 본문에 그대로 뱉는다.
 - 루프백·사설망·컨테이너 이름 주소는 토큰이 필요 없다. 게이트웨이가 `ollama-local` 표식을 쓴다.
 - 모델은 미리 받아 둔다: `docker compose ... exec ollama ollama pull qwen4:32b`, 임베딩은 `ollama pull bge-m3`.
 - 임베딩 모델을 바꾸면 색인 정체성이 달라진다. 반드시 3.5 의 재색인을 돌린다.
@@ -257,7 +260,7 @@ ollama-models:
 
 #### (다) ChatGPT 구독(Codex OAuth) 방식
 
-API 키를 따로 사지 않고, 이미 있는 ChatGPT 유료 구독 계정으로 붙인다. 자격증명은 API 키가 아니라 OAuth 프로필이라 `.env` 에도 설정 파일에도 쓰지 않는다. 상태 볼륨의 인증 저장소(`/home/node/.openclaw/state/openclaw.sqlite`)에 들어가고, 컨테이너를 다시 만들어도 볼륨이 살아 있는 한 유지된다.
+API 키를 따로 사지 않고, 이미 있는 ChatGPT 유료 구독 계정으로 붙인다. 자격증명이 OAuth 프로필이라 `.env` 에도 설정 파일에도 쓰지 않는다. 상태 볼륨의 인증 저장소(`/home/node/.openclaw/state/openclaw.sqlite`)에 들어가고, 컨테이너를 다시 만들어도 볼륨이 살아 있는 한 유지된다.
 
 정본 템플릿에는 이 방식에 필요한 두 키가 이미 들어 있다. 그래서 로그인만 하면 되고, 설정을 고칠 일이 없다.
 
@@ -305,6 +308,56 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 > **부서 에이전트는 이 방식으로 쓰지 마라.** 이 경로의 모델은 codex 하네스에서 돌고, 그 하네스는 파일을 자기 셸로 읽는다. 셸의 읽기 전용 샌드박스는 "쓰기 금지"일 뿐 파일시스템 전체가 읽히므로, `tools.fs.workspaceOnly` 로 선언한 폴더 경계가 서지 않는다(다른 부서 마운트도 읽힌다). 근거와 실측은 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.9 다. 부서 에이전트에는 (가) 외부 API 방식의 자격증명을 준다. 설정에 그 조합이 남아 있으면 `openclaw doctor --lint --only codex/agent-workspace-boundary` 가 경고한다.
 
+#### (라) 배포 후 부서 에이전트 키 세팅 순서
+
+사용자 결정(2026-09-08): **API 키는 배포 시점에 넣는다.** 그때까지 `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 는 둘 다 비어 있고, `main` 은 (다) 의 구독 프로필로 답하고 `rnd-bot`·`qa-bot` 은 모델이 없어 답하지 못한다. 다른 기능은 이 상태에서도 전부 동작한다.
+
+키가 생기면 아래 순서로 한다. 둘 중 **한 쪽만** 채우면 된다.
+
+1. **키를 `.env` 에 넣는다.** `chris-local/ixauth.env` 의 `ANTHROPIC_API_KEY` 또는 `OPENAI_API_KEY`. compose 가 같은 이름으로 게이트웨이 컨테이너에 넘긴다.
+
+2. **정본 템플릿에 프로바이더와 부서 에이전트 모델을 적는다.** 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 값이 아니라 이름만 적는다((가) 의 SecretRef).
+
+   ```json
+   {
+     "models": {
+       "providers": {
+         "anthropic": { "baseUrl": "https://api.anthropic.com", "apiKey": "${ANTHROPIC_API_KEY}" }
+       }
+     },
+     "agents": {
+       "entries": {
+         "rnd-bot": { "model": "anthropic/claude-sonnet-5" },
+         "qa-bot": { "model": "anthropic/claude-sonnet-5" }
+       }
+     }
+   }
+   ```
+
+   `main` 은 손대지 않는다. 그러면 `agents.defaults.model.primary` 를 그대로 써서 구독 경로로 계속 답한다.
+
+   **화면에서는 모델을 바꿀 수 없다.** 설정 > 부서 관리(`/settings/departments`)가 쓰는 `config.patch` 는 워크스페이스·읽기 전용 여부·색인 폴더만 건드린다(`ui/src/pages/departments/departments-gateway.ts`). 그리고 `start-gateway.sh` 가 매 기동마다 템플릿으로 상태 설정을 덮으므로, 화면이나 CLI 로 넣은 설정은 다음 재기동에 사라진다. 모델은 템플릿에 적어야 남는다.
+
+3. **재기동한다.** 템플릿만 바뀌었으면 이미지를 다시 빌드할 필요가 없다. 설정 디렉터리는 읽기 전용 바인드 마운트라 파일이 그대로 보인다.
+
+   ```bash
+   docker compose --env-file chris-local/ixauth.env \
+     -f chris-local/docker-compose.ixauth.yml up -d gateway
+   ```
+
+4. **확인한다.** 위에서 아래로 하나씩 본다. 앞 단계가 안 되면 뒤는 볼 필요가 없다.
+
+   | 순서 | 확인                                                | 어디서                                                                       |
+   | ---- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
+   | 1    | 모델 목록에 새 모델이 보인다                        | 위 "확인" 의 `models list`                                                   |
+   | 2    | 부서 색인이 최신이다                                | `knowledge sync`(12절) 후 `memory index --force --agent rnd-bot`(3.5)        |
+   | 3    | rnd-bot 이 폴더 문서를 요약하고 **원본 경로**를 낸다 | 로그인 후 rnd-bot 세션에서 질문. 인용 규칙은 [KNOWLEDGE.md](KNOWLEDGE.md)    |
+   | 4    | qa-bot 에게 R&D 자료를 물으면 못 찾는다             | 같은 질문을 qa-bot 에게. 부서 경계는 마운트와 워크스페이스가 만든다          |
+   | 5    | 쓰기 요청이 거부된다                                | rnd-bot 에게 파일 수정을 시킨다. 공유는 `:ro` 이고 도구 프로필은 `readonly`  |
+   | 6    | 경계 경고가 없다                                    | `openclaw doctor --lint --only codex/agent-workspace-boundary`               |
+
+   근거와 배경은 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 3-1절과 [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.9.
+
 #### 확인
 
 ```bash
@@ -344,6 +397,8 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 사람 단위 활동 기록은 **기본으로 켜져 있다**. 정본은 [AUTH-AUDIT.md](AUTH-AUDIT.md). 배포가 정해야 하는 값은 셋뿐이다.
 
+> **납품 기본값은 사용자 확정값이다(2026-09-08): 보존기간 90일, 질문 본문 미기록(`promptText: false`).** 아래 표의 기본값과 같으므로 설정을 바꿀 것은 없다. 계약 문구에도 같은 90일을 적는다.
+
 ```jsonc
 {
   "logging": {
@@ -373,6 +428,40 @@ docker exec -it openclaw-gateway openclaw audit users --limit 5
 ```
 
 관리자 화면은 **설정 > 개인정보 보호 & 보안 > 감사 기록**, CSV 는 그 화면의 내려받기 버튼이다. 원장은 보존기간 내 조회용이고 변조 방지가 없다 - 장기 보존이 요건이면 고객사 SIEM 내보내기를 정본으로 계약에 적는다.
+
+### 3.8 배포 후 메일(SMTP) 세팅
+
+사용자 결정(2026-09-08): **메일 서버도 배포 시점에 붙인다.** 그때까지는 `IXAUTH_MAIL_TRANSPORT=WEBHOOK` 으로 두고, 초대 링크는 화면에 뜨는 것을 관리자가 직접 전달한다(2.1). 이 상태에서 못 하는 것은 비밀번호 재설정 메일과 자체 가입 두 가지뿐이다.
+
+고객 메일 서버 정보가 오면 아래 순서로 한다.
+
+1. `chris-local/ixauth.env` 를 채운다.
+
+   ```bash
+   IXAUTH_MAIL_TRANSPORT=SMTP
+   IXAUTH_MAIL_SMTP_HOST=<메일 서버>
+   IXAUTH_MAIL_SMTP_PORT=587
+   IXAUTH_MAIL_SMTP_USERNAME=<계정>      # 인증이 없으면 비운다
+   IXAUTH_MAIL_SMTP_PASSWORD=<비밀번호>
+   IXAUTH_MAIL_SMTP_STARTTLS=true
+   IXAUTH_MAIL_FROM=<발신 주소>          # 그 서버가 발신을 허용하는 주소여야 한다
+   IXAUTH_MAIL_PRODUCT_NAME=<제품명>     # 메일 제목·본문에 쓰인다
+   ```
+
+2. 신원 서버를 다시 띄운다. 메일 설정은 기동 시점에 읽는다.
+
+   ```bash
+   docker compose --env-file chris-local/ixauth.env \
+     -f chris-local/docker-compose.ixauth.yml up -d ix-auth
+   ```
+
+3. 초대를 한 통 발급해 실제로 도착하는지 본다(설정 > 연결 > 초대). 도착하면 화면에는 링크가 더 이상 보관되지 않는다.
+
+4. 개발용 수신함을 쓰고 있었으면 내린다. `--profile mail` 을 빼고 `up -d` 하면 mailpit 컨테이너가 사라진다. 18025 포트도 함께 닫힌다.
+
+5. 메일이 살아난 뒤에야 자체 가입을 열 수 있다. `IXAUTH_ACCOUNT_SIGNUP_MODE=APPROVAL` 로 바꾸고 다시 기동하면 게이트웨이의 가입 화면도 함께 열린다(두 값은 한 변수에서 유도된다, 2절).
+
+메일이 안 나갈 때 보는 곳은 `docker compose ... logs ix-auth` 다. 인증 실패·STARTTLS 거부·발신 주소 거부가 그대로 찍힌다.
 
 ## 4. 백업 · 복구
 
@@ -410,8 +499,10 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 ### 4.1 납품 전 초기화
 
-시연과 예행연습이 남긴 것을 걷어내는 절차다. 두 갈래가 있고, 고르는 기준은 하나다.
+시연과 예행연습이 남긴 것을 걷어내는 절차다. 두 갈래가 있고, 고르는 기준은 하나다.\
 **계정을 다시 만들 수 있으면 볼륨을 새로 만들고, 그럴 수 없으면 골라서 지운다.**
+
+> **사용자 결정(2026-09-08): 시험 계정 8개는 이 PC 의 로컬 스택에는 그대로 두고, 납품용 스택을 세울 때 이 절차로 정리해 관리자 계정만 남긴다.** 로컬 검증 스택에는 아무 조작도 하지 않는다.
 
 #### (가) 볼륨 재생성 - 가장 확실하다
 
@@ -425,7 +516,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 ```
 
 - `down -v` 는 두 볼륨을 **모두** 지운다. 남길 것이 하나라도 있으면 4절 백업을 먼저 뜬다.
-- NAS 마운트와 색인 폴더는 볼륨이 아니라 호스트 경로라 그대로 남는다. 색인은 12절 절차로
+- NAS 마운트와 색인 폴더는 호스트 경로에 있어 그대로 남는다. 색인은 12절 절차로
   다시 만든다.
 - 서명 키가 새로 생기므로 열려 있던 탭은 전부 로그인 화면으로 떨어진다. 정상이다.
 
@@ -463,6 +554,45 @@ chris-local/reset-seed.sh --accounts disable --invites --audit --yes
   하려고, 관리자 로그인 쿠키를 그대로 한 번의 핸드셰이크에 실어 보낸다. 근거와 코드는
   `chris-local/reset-seed-rpc.mjs` 주석에 있다.
 
+#### (다) 관리자 계정만 남기기
+
+납품 스택에서 하는 것은 이것이다. 지우는 대상은 스크립트의 `TEST_ACCOUNTS` 목록에 이름으로
+적혀 있고, 그 목록에 없는 계정은 손대지 않는다.
+
+```bash
+# 먼저 무엇이 지워질지 본다
+chris-local/reset-seed.sh --accounts delete --invites --audit
+
+# 확인했으면 실행한다
+chris-local/reset-seed.sh --accounts delete --invites --audit --yes
+```
+
+| 구분          | 계정                                                                              | 결과                          |
+| ------------- | --------------------------------------------------------------------------------- | ----------------------------- |
+| 지운다        | `solo` `nobody` `nobody-1` `nobody-2` `newjoiner` `invitee` `qamem` `mod` `member` `admin2` `exec1` | 목록에서 사라진다             |
+| 남긴다        | `.env` 의 `IXAUTH_ADMIN_EMAIL` (SUPERADMIN 시드 계정)                             | 이 계정으로 인수인계한다      |
+| 남긴다        | 고객이 직접 만든 계정                                                             | 이름이 목록에 없으므로 안전   |
+
+실행 뒤 `/settings/users` 를 열어 남은 계정이 관리자 하나뿐인지 눈으로 본다. 목록에 없던 시험
+계정을 더 만들었으면 `--account <이름>` 으로 한 건씩 지운다.
+
+관리자 비밀번호는 인수인계 전에 바꾼다(3.1). `.env` 에 적힌 초기 비밀번호는 그 파일을 본 사람이
+모두 아는 값이다.
+
+### 4.2 납품 배포 체크리스트
+
+기능 결정은 2026-09-08 에 전부 끝났다. 배포 시점에 값만 넣으면 되는 것이 아래 네 가지이고,
+각 항목의 절차는 옆 칸의 절이 정본이다.
+
+| # | 넣을 것            | 절차       | 안 넣으면                                                             |
+| - | ------------------ | ---------- | --------------------------------------------------------------------- |
+| 1 | 모델 API 키 한 개  | 3.4 (라)   | `main` 은 구독으로 답하고 부서 에이전트는 답하지 못한다               |
+| 2 | 고객 SMTP 자격증명 | 3.8        | 초대 링크를 관리자가 손으로 전달한다. 비밀번호 재설정 메일이 안 나간다 |
+| 3 | 제품명             | FORK.md 5-1 (`src/brand.ts` 의 `BRAND_NAME`) | 임시값 "Chris Agent" 가 화면과 메일에 그대로 나온다 |
+| 4 | 약관 문안          | 고객 제공  | 가입·초대 화면에 약관 링크가 없다                                      |
+
+같이 하는 것: 시험 계정 정리(4.1 (다)), 도메인·터널 확인(11.7), 백업 1회(4절).
+
 ## 5. 업그레이드
 
 ```bash
@@ -472,7 +602,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 ```
 
 - 볼륨은 유지된다. Flyway 가 새 마이그레이션만 적용한다.
-- 게이트웨이 설정은 `ixauth-gateway-config/openclaw.json` 이 정본이고 **매 기동마다 상태 볼륨에 덮어쓴다.** 설정을 바꾸려면 컨테이너 안이 아니라 이 파일을 고친다.
+- 게이트웨이 설정은 `ixauth-gateway-config/openclaw.json` 이 정본이고 **매 기동마다 상태 볼륨에 덮어쓴다.** 설정을 바꾸려면 이 파일을 고친다. 컨테이너 안에서 고친 것은 다음 기동에 사라진다.
 - 업그레이드 전에 4절 백업을 먼저 뜬다.
 
 ## 6. 되돌리기
@@ -494,24 +624,22 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 - 운영에서는 18800 을 리버스 프록시(TLS 종단) 뒤에 두고, 호스트 방화벽에서 18800 을 프록시 주소로만 연다.
 - Docker 는 `iptables` 를 직접 만지므로 `ufw` 규칙이 컨테이너 포트에 먹지 않는다. `DOCKER-USER` 체인에 넣거나 `ports` 를 `127.0.0.1:18800:18789` 로 바꿔 프록시가 같은 호스트에서만 붙게 한다.
 - 게이트웨이는 컨테이너 안에서 `0.0.0.0` 에 바인드한다. 루프백 바인드로는 브리지 네트워크의 `-p` 가 닿지 않기 때문이고, 그래도 안전한 이유는 `gateway.auth.mode` 가 `ix-auth` 라 인증 없는 표면이 없어서다.
+- **Cloudflare Tunnel 프로파일(11.7)을 쓰면 인바운드로 여는 포트가 하나도 없다.** cloudflared 가 Cloudflare 로 나가는 연결을 자기가 열고 그 위로 요청을 받으므로, 공유기 포트포워딩도 공인 IP 도 필요 없다. 방화벽에는 아웃바운드 443/tcp(및 QUIC 을 쓰면 7844/udp) 만 있으면 된다. 호스트 18800 은 그때 로컬 점검용으로만 남으므로 `ports` 를 `127.0.0.1:18800:18789` 로 좁히는 편이 낫다.
 
 ## 8. 라이선스 확인 항목 (납품 전 법무 확인 필요)
 
 | 대상                                    | 라이선스                       | 상태                    |
 | --------------------------------------- | ------------------------------ | ----------------------- |
-| **IX-Auth** (`ix-auth/`)                | `package.json` 이 `UNLICENSED` | **미해결.** 아래        |
+| **IX-Auth** (`ix-auth/`)                | `package.json` 이 `UNLICENSED` | **해결.** 자사 제품이라 동봉·재배포에 제약이 없음을 사용자가 확인했다 (2026-09-08) |
 | 게이트웨이                              | MIT                            | 문제 없음               |
 | `postgres:16-alpine`                    | PostgreSQL License (BSD 계열)  | 문제 없음               |
 | Chromium (`OPENCLAW_INSTALL_BROWSER=1`) | BSD 계열 + 다수                | 고지 의무 확인          |
 | Noto CJK 폰트                           | SIL OFL 1.1                    | 재배포 시 라이선스 동봉 |
 
-**IX-Auth 는 사내 제품이고 `UNLICENSED` 로 표기돼 있다.** 이 상태로 외부 고객에게 이미지를 넘기면 배포 권원이 문서로 남지 않는다. 납품 전에 확정해야 할 것:
+**IX-Auth 는 자사 제품이다.** `package.json` 의 `UNLICENSED` 표기는 공개 npm 배포를 막는 표시일 뿐이고, 자사 제품을 자사 납품물에 동봉하는 데는 제약이 없다는 것을 사용자가 2026-09-08 에 확인했다. 남은 것은 문서 정리뿐이다.
 
-1. 이 포크에 IX-Auth 를 동봉해 배포할 권한이 있는가 (사내 제품이라도 명시적 허가가 문서에 남아야 한다).
-2. 고객이 받는 것이 사용권인가 소스 포함인가.
-3. 상용 라이선스가 필요한 배포 형태인가 (`ix-auth/VENDOR.md` 의 원본 저장소 정책과 대조).
-
-이 항목은 **기술로 해결되지 않는다.** 사용자 결정 사항으로 남긴다.
+- 고객이 받는 범위(사용권인지 소스 포함인지)는 납품 계약서에 적는다.
+- 벤더 복사본의 출처와 재동기화 절차는 [ix-auth/VENDOR.md](../ix-auth/VENDOR.md) 에 있다.
 
 ## 9. 진단
 
@@ -546,7 +674,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
   기기 목록은 설정 > 기기에서 한다.
 - 감사 원장은 화면 말고도 `GET /auth/admin/audit/export.csv`(로그인 쿠키 + 관리자 판정,
   최대 10,000행)로 받는다.
-- 주기 실행이 필요하면 컨테이너 안의 `cron add` 가 아니라 **호스트 systemd 타이머**로 건다
+- 주기 실행이 필요하면 **호스트 systemd 타이머**로 건다. 컨테이너 안의 `cron add` 는 쓰지 않는다
   (12절의 색인 갱신이 그 예다).
 
 ## 10. 확인된 제약
@@ -604,7 +732,7 @@ URL 키가 `publicOrigin` 이다. 오리진 검증은 문자열 완전 일치라
 (`ix-auth-principal.ts:26-33`). 그래서 설정 값 하나로 TLS 배포와 평문 배포가 모두 성립한다.\
 동반 CSRF 쿠키도 세션 쿠키 이름에서 파생되므로 같이 접두사를 잃는다.
 
-보안 컨텍스트로 인정되는 것은 **TLS 종단**, **루프백 주소**, 그리고 **신뢰하는 프록시가 보낸\
+보안 컨텍스트[<sup>5</sup>](#g5)로 인정되는 것은 **TLS 종단**, **루프백 주소**, 그리고 **신뢰하는 프록시가 보낸\
 `x-forwarded-proto: https`** 셋뿐이다(`cookie-header.ts:141-150`).\
 `x-forwarded-proto` 는 `gateway.trustedProxies` 에 등록된 주소에서 온 요청에서만 읽는다.\
 등록하지 않으면 아무나 HTTPS 를 자칭해 브라우저가 버릴 `Secure` 쿠키를 유도할 수 있기 때문이다.
@@ -865,6 +993,98 @@ CPU 가 포화되고, 그동안 NAS 본래의 파일 서비스가 같이 느려�
 NAS 는 **파일 공유 자리로 두고**, 게이트웨이 호스트가 그 공유를 읽기 전용으로 마운트하는 배치가\
 11.4 의 그림이다. 그러면 NAS 부하는 파일 읽기뿐이고, 모델·변환·브라우저는 전부 별도 호스트에 남는다.
 
+### 11.7 Cloudflare Tunnel 프로파일 (jinbio.botops.cloud)
+
+사용자 결정(2026-09-07): 개인 도메인 `botops.cloud` 의 서브도메인 **`jinbio.botops.cloud`** 로 서비스하고,TLS 는 Cloudflare 가 맡는다. cloudflared 컨테이너를 이 스택에 함께 띄워 홈랩 Cloudflare 계정의터널로 게이트웨이를 노출한다.
+
+| 항목             | 값                                                            |
+| ---------------- | ------------------------------------------------------------- |
+| 주소             | `https://jinbio.botops.cloud`                                 |
+| TLS              | Cloudflare 자동 (인증서 발급·갱신 없음)                       |
+| 공유기 포트포워딩 | 필요 없다 (cloudflared 가 나가는 연결만 쓴다)                 |
+| 공인 IP · NS 이전 | 필요 없다                                                     |
+| WebSocket        | 그대로 통과한다 (Control UI 가 이것으로 붙는다)               |
+| 적용 범위        | **PoC·데모·초기 운영.** 정식 납품 시 진바이오테크 자체 도메인으로 옮긴다 |
+
+경계를 분명히 해 둔다. 이 주소는 감독 개인 계정의 도메인이고 터널도 그 계정의 것이다.고객이 상시 운영에 들어가면 고객 도메인과 고객 계정으로 옮겨야 한다. 옮길 때 바뀌는 것은`OPENCLAW_PUBLIC_ORIGIN` 과 터널 토큰 두 개뿐이다.
+
+#### (가) 터널을 만든다
+
+Cloudflare 대시보드에서 한 번만 한다. 저장소에서 할 일은 없다.
+
+1. Zero Trust > Networks > Tunnels > **Create a tunnel** > Cloudflared.
+2. 이름을 정하고 만들면 **토큰**이 나온다. 이 값이 자격증명이다.
+3. 만든 터널의 **Public Hostname** 에 한 줄 추가한다.
+
+   | 칸        | 값                       |
+   | --------- | ------------------------ |
+   | Subdomain | `jinbio`                 |
+   | Domain    | `botops.cloud`           |
+   | Type      | `HTTP`                   |
+   | URL       | `gateway:18789`          |
+
+   **호스트의 `127.0.0.1:18800` 이 아니다.** cloudflared 는 이 스택의 compose 네트워크 안에서 돌고,   거기서 게이트웨이는 서비스 이름 `gateway` 의 컨테이너 포트 `18789` 로 보인다. 호스트 포트는   같은 곳으로 가는 두 번째 문일 뿐이고, 그쪽으로 돌리면 터널이 호스트의 포트 게시에 의존하게 된다.
+
+#### (나) 값을 넣고 띄운다
+
+```bash
+# chris-local/ixauth.env
+OPENCLAW_PUBLIC_ORIGIN=https://jinbio.botops.cloud
+OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12
+CLOUDFLARE_TUNNEL_TOKEN=<대시보드에서 받은 토큰>
+```
+
+```bash
+docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose.ixauth.yml --profile tunnel up -d
+```
+
+`--profile tunnel` 을 주지 않으면 cloudflared 서비스 자체가 만들어지지 않는다. 프로파일 없이 쓰던스택은 이 변경 뒤에도 그대로다.
+
+세 값이 한 벌이다.
+
+| 값                         | 없으면                                                                     |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `OPENCLAW_PUBLIC_ORIGIN`   | 로그인 폼이 403 `origin_not_allowed`, 또는 화면이 계속 연결 중             |
+| `OPENCLAW_TRUSTED_PROXIES` | 로그인은 되지만 쿠키가 평문 배포 모양 그대로다 (아래 (다))                 |
+| `CLOUDFLARE_TUNNEL_TOKEN`  | `docker compose` 가 변수 없음으로 거부한다                                 |
+
+#### (다) 평문 HTTP 의 손실이 사라진다
+
+11.2 가 적어 둔 손실 세 가지(세션 쿠키 평문, 자격증명 평문, 무결성 없음)는 브라우저와Cloudflare 사이가 TLS 가 되면서 사라진다. 남는 평문 구간은 cloudflared 컨테이너와 게이트웨이컨테이너 사이, 즉 이 스택의 내부 네트워크뿐이다.
+
+쿠키 모양도 되돌아온다. 게이트웨이는 `x-forwarded-proto: https` 를 **`gateway.trustedProxies` 에등록된 주소에서 온 요청에서만** 읽고(`src/gateway/cookie-header.ts` 의 `isSecureGatewayBrowserContext`),cloudflared 는 compose 네트워크의 컨테이너라 그 주소가 172.x 대역이다. 그래서`OPENCLAW_TRUSTED_PROXIES=172.16.0.0/12` 을 넣어야 `__Host-` 접두와 `Secure` 가 다시 붙는다.`start-gateway.sh` 가 이 값을 `gateway.trustedProxies` 로 렌더링한다.
+
+172.16.0.0/12 은 Docker 기본 주소 풀을 덮는 범위다. 실제 주소를 확인하려면 아래를 본다.
+
+```bash
+docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose.ixauth.yml exec gateway sh -c 'ip route | head -3'
+```
+
+이 목록은 **터널이나 리버스 프록시가 앞에 있을 때만** 채운다. 평문 HTTP 로 직접 여는 배치(11.1)에서같은 값을 넣으면, 그 대역에서 오는 아무 요청이나 HTTPS 를 자칭해 브라우저가 버릴 `Secure` 쿠키를받아 갈 수 있다. 증상은 이유 없이 실패하는 로그인이다.
+
+게이트웨이 쪽에 이것 말고 더 할 설정은 없다. `issuer`·`audience` 는 고정 리터럴이라 주소와 무관하고,`gateway.bind` 는 컨테이너 안에서 계속 `lan` 이면 된다. cloudflared 가 같은 네트워크에서 붙기 때문이다.
+
+#### (라) 확인
+
+```bash
+# 터널이 붙었나 (Registered tunnel connection 줄이 4개쯤 뜬다)
+docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose.ixauth.yml --profile tunnel logs cloudflared | tail -20
+
+# 밖에서 열리나
+curl -s -o /dev/null -w '%{http_code}
+' https://jinbio.botops.cloud/
+```
+
+브라우저에서는 로그인한 뒤 개발자 도구 > Application > Cookies 에서 이름이`__Host-openclaw-session` 이고 `Secure` 가 켜져 있는지 본다. 접두가 없으면 (나) 의`OPENCLAW_TRUSTED_PROXIES` 가 렌더된 설정에 들어가지 않은 것이다.
+
+#### (마) 되돌리기
+
+```bash
+docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose.ixauth.yml --profile tunnel down cloudflared
+```
+
+그다음 `.env` 의 `OPENCLAW_PUBLIC_ORIGIN` 을 원래 주소로, `OPENCLAW_TRUSTED_PROXIES` 를 빈 값으로되돌리고 게이트웨이를 다시 띄운다. 이 둘을 되돌리지 않으면 화면이 오리진 불일치로 열리지 않는다.Cloudflare 쪽 터널은 대시보드에서 지운다.
+
 ## 12. NAS 문서를 검색 가능하게 만들기 (마크다운 사이드카 색인)
 
 > 정본은 [KNOWLEDGE.md](KNOWLEDGE.md). 여기에는 설치·운영에 필요한 최소 절차만 둔다.
@@ -941,3 +1161,11 @@ ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth
 | hwp 가 통째로 빠진다                   | 지원 대상이 아니다(사용자 확정). `ignored/extension` 으로 집계된다                                              |
 | 쓰기 권한 오류                         | 색인 폴더 소유자가 컨테이너의 `node`(uid 1000)가 아니다                                                         |
 | 원본을 지웠는데 답변에 계속 나온다     | 동기를 한 번 더 돌려 사이드카를 지우고 재색인한다                                                               |
+
+## 용어 설명
+
+1. <a id="g1"></a>**게이트웨이** - 모든 요청이 먼저 닿는 앞단 서버. 이 제품에서는 화면·인증·에이전트 실행을 한꺼번에 맡는 본체다.
+2. <a id="g2"></a>**토큰** - 여기서는 신원을 증명하는 문자열. 가진 쪽은 그 신원으로 접속할 수 있으므로 비밀번호처럼 다룬다.
+3. <a id="g3"></a>**임베딩** - 문장을 숫자 배열로 바꿔 뜻이 가까운 것끼리 가깝게 놓는 변환. 단어가 겹치지 않아도 뜻이 비슷하면 검색에 걸린다.
+4. <a id="g4"></a>**도구 호출** - 모델이 정해진 함수를 골라 인자를 채워 부르는 동작. 파일 읽기나 검색이 이 방식으로 일어난다.
+5. <a id="g5"></a>**컨텍스트** - 여기서는 브라우저가 판단하는 접속의 안전 여부(보안 컨텍스트). TLS 접속과 루프백 주소가 여기에 든다.
