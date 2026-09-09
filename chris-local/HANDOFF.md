@@ -30,6 +30,8 @@
   - **컨테이너에 `group_add: 65540` 을 주고 공유 9개를 `/mnt/nas/<공유 이름>` 으로 `:ro` 마운트했다.** `OPENCLAW_NAS_SHARES_ROOT=/volume1`·`OPENCLAW_NAS_GROUP_GID=65540` 이 NAS 의 `ixauth.env` 에 있다. compose 백업은 `docker-compose.nas.yml.bak-20260909-acl`.
   - **`보안폴더` 7개는 상속이 끊겨 있어 컨테이너에서도 계속 막힌다.** 앱 규칙과 무관하다. NAS ACL 이 앱 권한의 상한이라는 것이 이 배치의 성질이다.
   - **규칙이 없는 폴더는 아무에게도 보이지 않는다.** 화면(`/settings/folders`, 관리자 이상)에서 규칙을 만들어야 열린다. 판정은 깊은 경로 우선, 같은 경로에서는 개인 > 부서 > 역할, 같은 종류가 여럿이면 더 강한 제한이 이긴다.
+  - **함정: 관리자는 `operator.admin` 스코프를 받지 않는다.** 그 스코프는 시스템 관리자의 것이라, 관리자가 쓸 RPC 를 그 스코프로 걸면 화면 전체가 `missing scope` 로 막힌다. 폴더 메서드 다섯을 `operator.read` 로 내리고 등급 판정은 핸들러에서 한다(`6b03c6a7d64`). 새 관리자용 메서드를 만들 때 같은 함정을 밟지 않는다.
+  - **운영 실측 통과(2026-09-09)**: 관리자 트리 11개, 규칙 저장·상속·깊은 경로 우선, 미리보기에서 숨김 확인, 직원 메뉴 없음, 감사 원장 2건. 스크린샷은 chris-server `analysis/2026-09-07-openclaw-auth/delivery-r-0*.png` 6장.
   - **아직 아닌 것**: 세션 파일 목록·미리보기·지식 색인에는 규칙이 걸리지 않는다(2단계). 에이전트가 도구로 읽는 파일과 쓰기는 3단계다.
 
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
