@@ -460,7 +460,53 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 **한계 두 가지.**
 
 - **부서 봇에는 못 쓴다.** 구독 런타임에서는 폴더 경계가 지켜지지 않는다(AUTH-DEPARTMENTS 13.9). `rnd-bot`·`qa-bot` 은 (라) 의 API 키가 필요하다. 이 방식은 부서에 묶이지 않은 `main` 전용이다.
-- **같은 로그인을 두 곳에서 쓰지 않는다.** 같은 파일을 원래 PC 와 서버가 동시에 쓰면 한쪽의 갱신이 다른 쪽의 refresh 토큰을 무효화할 수 있다. 서버로 옮겼으면 그 로그인은 서버 것으로 본다.
+- **같은 로그인을 두 곳에서 쓰지 않는다.** 같은 파일을 원래 PC 와 서버가 동시에 쓰면 한쪽의 갱신이 다른 쪽의 refresh 토큰을 무효화한다. 서버로 옮겼으면 그 로그인은 서버 것으로 본다. 2026-09-09 에 이 함정을 운영에서 그대로 밟았다. 아래 (바) 가 그 기록이다.
+
+#### (바) 함정: 같은 구독 로그인을 PC 와 서버가 나눠 쓰면 서버가 30초씩 문다 (2026-09-09 실측)
+
+**증상.** 사용자 화면에 `auth refresh request failed: code=-32603` 이 반복되고, 답은 오지만 매 질문이 30초 이상 늦었다. 게이트웨이 로그는 이렇게 남는다.
+
+```
+[diagnostic] lane task error: lane=main durationMs=31140 error="auth refresh request failed: code=-32603"
+[model-fallback/decision] decision=candidate_failed requested=openai/gpt-5.6-luna candidate=openai/gpt-5.6-luna
+  reason=unknown next=anthropic/claude-sonnet-5 detail=auth refresh request failed: code=-32603
+```
+
+**원인.** ChatGPT 구독 OAuth 는 갱신할 때 refresh 토큰을 회전시킨다. (마) 의 `auth.json` 을 PC 에서 복사해 NAS 에 넣은 뒤에도 PC 의 Codex CLI 가 계속 그 로그인을 쓰면, PC 가 갱신할 때마다 NAS 사본의 refresh 토큰이 무효가 된다. 실측에서 NAS 사본의 `last_refresh` 는 2026-09-04 였고 PC 쪽은 2026-09-09 였다. 그 사이 PC 가 여러 번 회전시킨 것이다.
+
+게이트웨이가 이 파일을 `bootstrapOnly` 로 읽어 **runtime-only** 프로필을 만드는 것이 두 번째 조건이다(`src/agents/auth-profiles/external-cli-sync.ts`). 갱신이 한 번이라도 성공해야 상태 저장소에 영구 저장되는데, 처음부터 실패하므로 영구 저장본이 생기지 않는다. `models auth list` 의 `Profiles:` 에 `anthropic:manual` 만 있고 `openai:default` 이 없으면 그 상태다(`models status` 는 런타임 오버레이까지 보여 주므로 둘 다 보인다).
+
+**왜 30초인가.** 재시도가 아니라 **취소되지 않는 fetch 타임아웃 하나**다.
+
+| 층 | 값 | 위치 |
+| --- | --- | --- |
+| OpenAI 토큰 엔드포인트 fetch | **30초** | `extensions/openai/openai-chatgpt-oauth-token.runtime.ts` 의 `TOKEN_REQUEST_TIMEOUT_MS` |
+| Codex 인밴드 갱신 RPC 상한 | 9초 | `extensions/codex/src/app-server/client-runtime.ts` 의 `CODEX_EXTERNAL_AUTH_REFRESH_TIMEOUT_MS` |
+
+9초 래퍼는 경주(race)일 뿐 아래 fetch 를 끊지 않는다. 그래서 `-32603` 은 9초에 나가지만 30초짜리 POST 는 계속 돌고, 뒤따르는 호출은 `auth-bridge.ts` 의 in-flight 큐에 합류해 남은 시간을 그대로 물려받는다. `-32603` 자체는 Codex Rust app-server 가 찍는 줄이고(OpenClaw 소스에는 이 문자열이 없다), OpenClaw 는 그 프로세스의 stderr 를 게이트웨이 로그로 흘려보낼 뿐이다.
+
+**왜 매번 다시 무는가.** runtime-only 프로필의 갱신 실패는 평범한 `Error` 로 던져져서, 실패 쿨다운을 기록하는 `markAuthProfileFailure` 경로(`OAuthRefreshFailureError` 일 때만 돈다)를 타지 않는다. 그래서 실패한 프로필을 일정 시간 건너뛰는 처리가 걸리지 않고 질문마다 같은 값을 다시 낸다. 업스트림 동작이라 이 포크에서는 고치지 않았다.
+
+**대처.** 셋 중 하나를 고른다.
+
+| 방법 | 내용 | 성질 |
+| --- | --- | --- |
+| 기본 모델을 Claude 로 | 설정 > 모델(채팅) 에서 기본 모델을 `anthropic/claude-sonnet-5` 로 둔다. Anthropic 은 setup-token 장기 토큰이라 갱신 자체가 없다 | **채택(2026-09-09).** OpenAI 없이도 즉시 정상화된다 |
+| 파일 갈아끼우기 | PC 에서 `codex login` 을 다시 하고 (마) 의 명령으로 NAS 사본을 덮는다 | 임시방편. PC 가 다시 갱신하는 순간 같은 증상이 돌아온다 |
+| NAS 전용 OpenAI 자격증명 | NAS 에서 (다) 의 device-code 로그인을 따로 하거나 (라) 의 `OPENAI_API_KEY` 를 넣는다 | 항구적. 로그인 하나를 두 곳이 나눠 쓰지 않게 된다 |
+
+**남은 것.** 기본 모델을 Claude 로 옮겨도 `openai/gpt-5.6-luna` 는 채팅 목록에 남아 있다(사용자 결정). 그 모델을 고른 사람은 위 30초를 그대로 만난다. OpenAI 를 실제로 쓰려면 세 번째 줄을 해야 한다.
+
+**확인 명령.**
+
+```bash
+# 프로필이 영구 저장됐는지 (runtime-only 면 openai:default 이 안 보인다)
+docker exec -u node <게이트웨이> node openclaw.mjs models auth list
+
+# 파일 쪽 갱신 시각 (토큰 값은 보지 않는다)
+tr ',' '
+' < /volume1/@docker/volumes/openclaw-ixauth_gateway-state/_data/codex-cli/auth.json | grep last_refresh
+```
 
 #### 확인
 
@@ -1315,6 +1361,27 @@ curl -s -o /dev/null -w '%{http_code}
 ```
 
 브라우저에서는 로그인한 뒤 개발자 도구 > Application > Cookies 에서 이름이`__Host-openclaw-session` 이고 `Secure` 가 켜져 있는지 본다. 접두가 없으면 (나) 의`OPENCLAW_TRUSTED_PROXIES` 가 렌더된 설정에 들어가지 않은 것이다.
+
+#### (바) "WebSocket 폴백" 메시지는 터널 문제가 아니다 (2026-09-09 실측)
+
+사용자 화면에 `Falling back from WebSockets to HTTPS transport` 가 반복된다는 신고가 있었다. **이 문장은 게이트웨이도 Cloudflare 도 만들지 않는다.** ChatGPT 구독 경로가 쓰는 Codex 런타임 바이너리(상태 볼륨의 `@openai/codex`)가 OpenAI 로 가는 자기 스트림을 열지 못했을 때 찍는 상태 줄이고, 같은 문자열 테이블에 `stream connection failed; waiting to retry`·`Reconnecting... waiting for network` 가 나란히 있다. 브라우저와 게이트웨이 사이의 WebSocket 과는 무관하다. 3.4 (바) 의 인증 장애와 한 몸이고, 기본 모델을 Claude 로 옮기면 codex 런타임 자체가 돌지 않아 함께 사라진다.
+
+확인 방법(문자열이 어디서 오는지 직접 본다):
+
+```bash
+docker exec -u node <게이트웨이> sh -c   'grep -rl "Falling back from WebSockets" /home/node/.openclaw/npm'
+```
+
+**터널 쪽에도 WebSocket 오류가 있기는 하다. 성질이 다르다.** cloudflared 로그의
+
+```
+ERR Request failed error="Unable to reach the origin service ... dial tcp 172.16.240.4:18789: connect: connection refused" type=ws
+ERR Request failed error="... dial tcp: lookup gateway on 127.0.0.11:53: no such host" type=ws
+```
+
+는 **게이트웨이 컨테이너가 다시 만들어지는 동안에만** 나온다. cron 이 새 이미지를 받아 `up -d` 를 부르면 컨테이너 이름이 잠깐 Docker 내부 DNS 에서 사라지고(`no such host`), 그 뒤 게이트웨이가 포트를 열 때까지 1분 남짓 거절된다(`connection refused`). 그 구간에 열려 있던 브라우저는 WebSocket 을 잃고 HTTPS 로 내려갔다가 돌아온다. 실측에서 오류는 전부 배포 시각 앞뒤 1~2분에 몰려 있었고, 그 밖의 시간에는 한 줄도 없었다.
+
+그래서 **터널 설정(`originRequest`)에 손대지 않았다.** 아이들 타임아웃 가설도 배제된다: 게이트웨이가 30초마다 `tick` 을 모든 WebSocket 에 보내므로(`src/gateway/server-constants.ts` 의 `TICK_INTERVAL_MS`) Cloudflare 의 100초 유휴 한도에 걸릴 일이 없다. 배포 중 끊김을 없애려면 게이트웨이를 두 벌로 띄우는 무중단 구성이 필요하고, 그것은 이 PoC 배치의 범위 밖이다.
 
 #### (마) 되돌리기
 
