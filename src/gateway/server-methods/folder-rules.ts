@@ -174,6 +174,8 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
       respondRefused(respond);
       return;
     }
+    const previewing =
+      manage && params.previewSubjectKind !== undefined && params.previewSubjectId !== undefined;
     const identity = viewingIdentity({
       client,
       manage,
@@ -184,17 +186,26 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
         ? {}
         : { previewSubjectId: params.previewSubjectId }),
     });
+    // Hidden folders appear only in a manager's own view, where they have to appear or a
+    // hidden folder could never be un-hidden. A preview is a claim about what somebody
+    // else sees, so it hides exactly what they would not see; a preview that still showed
+    // the folder would be no evidence at all.
+    const showHidden = manage && !previewing;
     const rules = readRulesForSubtree(root);
-    // A non-manager may not open a folder they cannot see, and the refusal is the same
-    // one an absent folder gets.
-    if (!manage && folderPath.length > 0) {
+    // Nobody opens a folder their view cannot see, and the refusal is the same one an
+    // absent folder gets.
+    if (!showHidden && folderPath.length > 0) {
       const verdict = resolveFolderAccess({ folderPath, identity, rules });
       if (verdict.permission === "hidden") {
-        recordAccessDeniedActivity({
-          client,
-          reason: "folder_rule",
-          surface: "folder-tree",
-        });
+        if (!manage) {
+          // A manager stepping through a preview is not being refused anything, so it is
+          // not an access denial and does not belong in the ledger.
+          recordAccessDeniedActivity({
+            client,
+            reason: "folder_rule",
+            surface: "folder-tree",
+          });
+        }
         respondRefused(respond);
         return;
       }
@@ -218,7 +229,7 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
         continue;
       }
       const verdict = resolveFolderAccess({ folderPath: childPath, identity, rules });
-      if (!manage && verdict.permission === "hidden") {
+      if (!showHidden && verdict.permission === "hidden") {
         continue;
       }
       entries.push({
