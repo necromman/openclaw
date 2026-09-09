@@ -69,8 +69,7 @@
 | `OPENCLAW_TZ`                           |        | `Asia/Seoul`                          | 컨테이너 시간대                                                                                                                                                                               |
 | `OPENCLAW_NAS_ROOT`                     |        | (없음)                                | 부서 공유의 부모 경로. 비우면 샘플 트리를 마운트하고 부서 에이전트는 자기 워크스페이스를 쓴다 (11.4)                                                                                          |
 | `OPENCLAW_KNOWLEDGE_ROOT`               |        | (없음)                                | 마크다운 사이드카 색인의 부모 경로. 비우면 부서 에이전트의 `extraPaths` 가 빈 목록이 된다 (12절, KNOWLEDGE.md)                                                                                |
-| `ANTHROPIC_API_KEY`                     |        | (없음)                                | 외부 모델 API 키. 사내 ollama 만 쓰면 비워 둔다. 설정 파일에는 `"${ANTHROPIC_API_KEY}"` 이름만 적는다 (3.4)                                                                                   |
-| `OPENAI_API_KEY`                        |        | (없음)                                | 위와 같다. 두 키 모두 비면 모델 목록이 비고 화면에 "사용 가능한 모델 없음" 이 뜬다                                                                                                            |
+| `ANTHROPIC_API_KEY`                     |        | (없음)                                | Anthropic API 키. 비워 두면 인증 저장소의 Claude setup-token 프로필이 답한다. 둘 다 없으면 화면에 "사용 가능한 모델 없음" 이 뜬다. 설정 파일에는 `"${ANTHROPIC_API_KEY}"` 이름만 적는다 (3.4) |
 
 `gateway.auth.ixAuth.selfSignup` 도 **환경변수가 아니다.** `start-gateway.sh` 가 `IXAUTH_ACCOUNT_SIGNUP_MODE` 에서 유도한다(`OPEN`·`APPROVAL` 이면 가입 화면이 열린다). 두 곳을 손으로 맞추면 "가입 화면은 있는데 누르면 거부" 가 생긴다.
 
@@ -218,19 +217,32 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 ### 3.4 모델 프로바이더
 
-기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 모델 이름만 담고 키도 계정도 담지 않는다. 아래 셋 중 하나를 고른다.
+기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 모델 이름만 담고 키도 계정도 담지 않는다.
 
-**이 납품이 쓰는 두 모델** (사용자 결정 2026-09-08, 4절 11번). 화면의 모델 선택 목록에는 이 둘만 나온다.
+**이 납품은 Claude 단독이다**(사용자 지시 2026-09-09, Y 단계). OpenAI 는 키도 로그인도 두지 않고, codex 플러그인도 꺼져 있다. 화면의 모델 선택 목록에는 아래 세 모델만 나온다.
 
-| 자리                | 모델                       | 설정 키                                              | 어떻게 인증하나                                  |
-| ------------------- | -------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
-| 기본                | `openai/gpt-5.6-luna`      | `agents.defaults.model.primary`                      | ChatGPT 구독 로그인 (다)·(마), 또는 `OPENAI_API_KEY` |
-| 예비                | `anthropic/claude-sonnet-5` | `agents.defaults.model.fallbacks`                    | Claude setup-token, 또는 `ANTHROPIC_API_KEY`     |
+| 자리 | 모델 | 설정 키 | 어떻게 인증하나 |
+| --- | --- | --- | --- |
+| 기본 | `anthropic/claude-sonnet-5` | `agents.defaults.model.primary` | Claude setup-token (사), 또는 `ANTHROPIC_API_KEY` |
+| 선택(상위) | `anthropic/claude-opus-5` | `agents.defaults.modelPolicy.allow` | 위와 같은 자격증명 |
+| 선택(경량) | `anthropic/claude-haiku-4-5` | `agents.defaults.modelPolicy.allow` | 위와 같은 자격증명 |
 
-- 키 이름은 **복수형 `fallbacks` 이고 배열**이다. 단수 `fallback` 을 적으면 설정 스키마가 거부해 게이트웨이가 뜨지 않는다(`AgentModelSchema` 는 `.strict()`).
-- `agents.defaults.modelPolicy.allow` 에 **두 모델을 모두** 적는다. 예비 모델은 목록에 남기는 것만으로는 사용자가 고를 수 없고, `allow` 에 있어야 직접 고를 수 있다(`src/agents/model-selection-shared.ts` 의 `addConfiguredRef` 주석).
+- **대체 모델(`fallbacks`)은 비어 있다.** 하나뿐인 자격증명으로 도는 배포에서 대체 모델은 같은 실패를 한 번 더 무는 일이다. 키 이름은 복수형 `fallbacks` 이고 배열이며, 단수 `fallback` 을 적으면 설정 스키마가 거부해 게이트웨이가 뜨지 않는다(`AgentModelSchema` 는 `.strict()`).
+- `agents.defaults.modelPolicy.allow` 에 **고르게 할 모델을 전부** 적는다. 기본 모델이 아닌 모델은 목록에 남기는 것만으로는 사용자가 고를 수 없고, `allow` 에 있어야 직접 고를 수 있다(`src/agents/model-selection-shared.ts` 의 `addConfiguredRef` 주석).
 - `allow` 를 비우거나 빈 배열로 두면 **전부 허용**이다. 차단이 아니다.
-- 세 형제 모델(`gpt-5.6-sol`·`terra`·`luna`)은 같은 라우트를 쓰고 값만 다르다. Luna 가 가장 저렴하고, codex 하네스에서 `thinking=ultra` 만 지원하지 않는다.
+- **왜 이 세 개인가.** 카탈로그의 Anthropic 모델 7개를 운영 setup-token 으로 하나씩 실제 호출해 본 결과다(2026-09-09, `agent exec --model` 로 한 번씩).
+
+  | 모델 | 결과 | 켰나 |
+  | --- | --- | --- |
+  | `claude-sonnet-5` | HTTP 200 | 켬 (기본) |
+  | `claude-opus-5` | HTTP 200 | 켬 (상위) |
+  | `claude-haiku-4-5` | HTTP 200 | 켬 (경량) |
+  | `claude-opus-4-8` | HTTP 200 | 끔. 지난 세대 Opus 라 선택기만 길어진다 |
+  | `claude-fable-5` | HTTP 200 | 끔. 위 셋과 쓰임이 겹친다 |
+  | `claude-fable-5-1` | HTTP 400 `claude_code_version_too_old` | **끔.** 이 게이트웨이가 보내는 클라이언트 판이 낮아 호출 자체가 거절된다 |
+  | `claude-mythos-5` | HTTP 404 `not_found_error` | **끔.** 이 자격증명으로는 없는 모델이다 |
+
+  뒤 둘은 켜면 **고르는 즉시 실패한다.** 카탈로그에 이름이 있다는 것과 이 자격증명으로 부를 수 있다는 것은 다른 말이고, 그 차이는 실제로 한 번 불러 봐야만 안다.
 
 세션 사이드바에서 "새 세션 - Claude Code"·"새 세션 - Codex" 항목을 없애는 것은 별개 키다.
 
@@ -238,14 +250,16 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 {
   "plugins": {
     "entries": {
-      "codex": { "enabled": true, "config": { "sessionCatalog": { "enabled": false } } },
+      "codex": { "enabled": false },
       "anthropic": { "config": { "sessionCatalog": { "enabled": false } } }
     }
   }
 }
 ```
 
-`plugins.entries.codex.enabled` 를 `false` 로 하는 것과 **다르다.** `config.sessionCatalog.enabled` 는 세션 카탈로그 provider 등록과 노드 호스트 명령만 건너뛰고, `registerAgentHarness` 는 그 조건문 바깥에 있어 그대로 등록된다(`extensions/codex/index.ts`). 그래서 구독 로그인이 타는 codex 런타임은 살아 있다. 플러그인 자체를 끄면 구독 로그인이 죽는다.
+- `codex` 는 **플러그인째 껐다**(Y 단계). 이 납품은 CLI 세션을 쓰지 않고, codex 하네스를 타던 OpenAI 구독 경로도 없앴기 때문이다. Claude 응답 경로는 이것과 무관하다: `anthropic/claude-*` 는 내장 러너가 `POST https://api.anthropic.com/v1/messages`(`api=anthropic-messages`)로 직접 부르고, 하네스를 등록하는 플러그인은 저장소 전체에서 `codex` 와 `copilot` 둘뿐이다(`registerAgentHarness` 호출 지점). 실측으로도 codex 를 끈 뒤 Sonnet 응답이 그대로였다.
+- `anthropic` 은 **끄면 안 된다.** 그 플러그인이 Anthropic 프로바이더와 모델 카탈로그를 준다. 꺼야 하는 것은 그 안의 `config.sessionCatalog.enabled` 하나이고, 그것은 "새 세션 - Claude Code" 항목만 없앤다.
+- 참고: `config.sessionCatalog.enabled` 는 세션 카탈로그 provider 등록과 노드 호스트 명령만 건너뛰고 `registerAgentHarness` 는 그 조건문 바깥에 있다(`extensions/codex/index.ts`). O 단계가 codex 를 켜 둔 채 카탈로그만 껐던 것이 그 성질을 쓴 것이다. Y 단계에서 구독 로그인이 사라지면서 켜 둘 이유도 사라졌다.
 
 정본 설정 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 매 기동마다 상태 볼륨에 덮어쓴다(5절). 모델 설정도 이 파일에 넣는다.
 
@@ -290,7 +304,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 }
 ```
 
-`ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 는 게이트웨이가 **환경변수 이름 그대로도 읽는다**(프로바이더 기본 자격증명 조회). 그래서 `.env` 에 값만 채워도 동작하고, 위처럼 SecretRef 로 적는 것은 "이 배포가 어떤 키를 쓰는지" 를 설정 파일에 남기기 위해서다. 어느 쪽이든 값은 `.env` 에만 있다.
+`ANTHROPIC_API_KEY` 는 게이트웨이가 **환경변수 이름 그대로도 읽는다**(프로바이더 기본 자격증명 조회). 그래서 `.env` 에 값만 채워도 동작하고, 위처럼 SecretRef 로 적는 것은 "이 배포가 어떤 키를 쓰는지" 를 설정 파일에 남기기 위해서다. 어느 쪽이든 값은 `.env` 에만 있다. `OPENAI_API_KEY` 는 Y 단계에서 compose 와 `.env` 양쪽에서 **없앴다**. 되살리는 절차는 (아).
 
 > 외부 API 는 사내 자료가 회사 밖으로 나간다. 부서 기밀 요건이 있으면 (나) 를 쓴다.
 
@@ -345,7 +359,9 @@ ollama-models:
 - 임베딩 모델을 바꾸면 색인 정체성이 달라진다. 반드시 3.5 의 재색인을 돌린다.
 - GPU 가 있으면 compose 서비스에 `deploy.resources.reservations.devices` 로 넘긴다. 없으면 CPU 로도 뜨지만 응답이 느리다.
 
-#### (다) ChatGPT 구독(Codex OAuth) 방식
+#### (다) ChatGPT 구독(Codex OAuth) 방식 [지금은 쓰지 않는다]
+
+> **이 납품은 이 절을 쓰지 않는다**(Y 단계, 2026-09-09). codex 플러그인이 꺼져 있고 로그인 파일도 지웠다. 아래는 되살릴 때를 위한 기록이고, 되살리는 순서는 (아) 다. 왜 그만두었는지는 (바).
 
 API 키를 따로 사지 않고, 이미 있는 ChatGPT 유료 구독 계정으로 붙인다. 자격증명이 OAuth 프로필이라 `.env` 에도 설정 파일에도 쓰지 않는다. 상태 볼륨의 인증 저장소(`/home/node/.openclaw/state/openclaw.sqlite`)에 들어가고, 컨테이너를 다시 만들어도 볼륨이 살아 있는 한 유지된다.
 
@@ -399,11 +415,11 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 #### (라) 배포 후 API 키 세팅 순서
 
-사용자 결정(2026-09-08): **API 키는 배포 시점에 넣는다.** 그때까지 `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 는 둘 다 비어 있고, `main` 은 (다)·(마) 의 구독 프로필로 기본 모델을 답한다. 예비 모델(`anthropic/claude-sonnet-5`)은 Claude setup-token 을 붙였으면 그것으로 답하고, 아무것도 없으면 예비로 넘어갈 때 못 쓴다고 답한다.
+사용자 결정(2026-09-08): **API 키는 배포 시점에 넣는다.** 지금 `ANTHROPIC_API_KEY` 는 비어 있고, `main` 은 (사) 의 Claude setup-token 프로필로 답한다. 키를 넣으면 같은 모델 이름이 구독 토큰 대신 API 키로 인증될 뿐, 모델 구성은 바뀌지 않는다.
 
 키가 생기면 아래 순서로 한다.
 
-1. **키를 `.env` 에 넣는다.** `chris-local/ixauth.env` 의 `ANTHROPIC_API_KEY` 또는 `OPENAI_API_KEY`. compose 가 같은 이름으로 게이트웨이 컨테이너에 넘긴다.
+1. **키를 `.env` 에 넣는다.** `chris-local/ixauth.env` 의 `ANTHROPIC_API_KEY`. compose 가 같은 이름으로 게이트웨이 컨테이너에 넘긴다.
 
 2. **정본 템플릿에 프로바이더를 적는다.** 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 값이 아니라 이름만 적는다((가) 의 SecretRef).
 
@@ -432,7 +448,10 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 부서 에이전트에 키를 주는 것은 다른 일이다. 그 에이전트가 지금 없으므로 절차는 3.3-1 에 있다.
 
 
-#### (마) 구독 로그인 파일로 main 인증을 넣는다 (키 없이 바로 답하게 하기)
+#### (마) 구독 로그인 파일로 main 인증을 넣는다 [지금은 쓰지 않는다]
+
+> **이 절도 쓰지 않는다**(Y 단계). 이 방식이 만들어 낸 장애가 (바) 이고, 그 결과 파일을 지우고 `CODEX_HOME` 도 compose 에서 없앴다. 되살리려면 (아).
+
 
 (다) 를 컨테이너 안에서 대화형으로 돌리기 어려운 배포(NAS 등)에서는, **이미 로그인한 PC 의 Codex CLI 로그인 파일 하나**를 옮기는 것으로 같은 결과를 얻는다. 게이트웨이는 그 파일을 읽어 ChatGPT 구독 OAuth 프로필 `openai:default` 을 만든다.
 
@@ -495,7 +514,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | 파일 갈아끼우기 | PC 에서 `codex login` 을 다시 하고 (마) 의 명령으로 NAS 사본을 덮는다 | 임시방편. PC 가 다시 갱신하는 순간 같은 증상이 돌아온다 |
 | NAS 전용 OpenAI 자격증명 | NAS 에서 (다) 의 device-code 로그인을 따로 하거나 (라) 의 `OPENAI_API_KEY` 를 넣는다 | 항구적. 로그인 하나를 두 곳이 나눠 쓰지 않게 된다 |
 
-**남은 것.** 기본 모델을 Claude 로 옮겨도 `openai/gpt-5.6-luna` 는 채팅 목록에 남아 있다(사용자 결정). 그 모델을 고른 사람은 위 30초를 그대로 만난다. OpenAI 를 실제로 쓰려면 세 번째 줄을 해야 한다.
+**남은 것은 Y 단계(2026-09-09)에서 없앴다.** W 단계는 기본 모델만 옮기고 `openai/gpt-5.6-luna` 를 채팅 목록에 남겨 두었으므로, 그 모델을 고른 사람은 위 30초를 그대로 만났다. 사용자 지시로 OpenAI 를 통째로 걷어냈고((아) 의 표), 지금은 고를 수 있는 모델이 Claude 뿐이라 이 함정을 만날 경로가 없다.
 
 **확인 명령.**
 
@@ -507,6 +526,50 @@ docker exec -u node <게이트웨이> node openclaw.mjs models auth list
 tr ',' '
 ' < /volume1/@docker/volumes/openclaw-ixauth_gateway-state/_data/codex-cli/auth.json | grep last_refresh
 ```
+
+#### (사) Claude setup-token 방식 (이 납품이 실제로 쓰는 것)
+
+**이것이 지금 답하고 있는 경로다**(Y 단계 확정, 2026-09-09). Claude 구독의 장기 토큰(`sk-ant-oat01-...`)을 인증 저장소에 한 번 붙여 두면 끝이고, **갱신이 없다.** (다)·(마) 의 구독 OAuth 가 갱신 때마다 refresh 토큰을 회전시켜 (바) 의 장애를 만든 것과 정반대의 성질이다.
+
+| 항목 | 값 |
+| --- | --- |
+| 프로필 | `anthropic:manual` (`models auth list` 의 `[anthropic/token]`) |
+| 저장 위치 | 상태 볼륨의 인증 저장소 `/home/node/.openclaw/state/openclaw.sqlite` |
+| 넣는 명령 | `models auth paste-token --provider anthropic --agent main` |
+| 실제 호출 | 내장 러너가 `POST https://api.anthropic.com/v1/messages` (`provider=anthropic api=anthropic-messages`) |
+| 토큰 값 | 이 저장소에 두지 않는다. 진바이오 배포의 값은 `chris-local/infra/local/jinbio-deploy.md`(git 제외) |
+
+```bash
+# 토큰을 넣는다 (값이 프로세스 목록에 남지 않도록 대화형 입력으로 받는다)
+docker exec -it -u node openclaw-ixauth_gateway_1 node openclaw.mjs models auth paste-token --provider anthropic --agent main
+
+# 확인: Profiles 줄에 anthropic:manual 이 보이면 끝이다
+docker exec -u node openclaw-ixauth_gateway_1 node openclaw.mjs models auth list --agent main
+```
+
+- **모델 하나를 실제로 불러 보는 것이 유일한 확인**이다. 카탈로그에 이름이 있다고 부를 수 있는 것이 아니다(3.4 머리의 표).
+
+  ```bash
+  docker exec -u node openclaw-ixauth_gateway_1 sh -lc 'node openclaw.mjs agent exec --state-dir /home/node/.openclaw/state --model anthropic/claude-opus-5 --timeout 60 "Reply with the single word OK."'
+  ```
+
+  "허용 목록에 없다" 고 거절되면 `modelPolicy.allow` 밖의 모델이다. 켜기 전에 시험하려면 `--config` 로 `modelPolicy` 를 뺀 사본을 하나 만들어 그것으로 부른다.
+- 이 토큰은 **한 계정의 구독 한도**를 나눠 쓰는 것이다. 사용량이 계정 단위로 걸리는 것은 (다) 와 같다.
+- 부서 에이전트에 이 방식을 써도 되는가: 된다. (다) 가 부서 에이전트에 금지였던 이유는 codex 하네스가 파일을 자기 셸로 읽어 폴더 경계가 서지 않기 때문인데(AUTH-DEPARTMENTS.md 13.9), 이 경로는 하네스를 쓰지 않고 내장 러너가 도구 정책 안에서 돈다.
+
+#### (아) OpenAI 를 다시 켜려면 (Y 단계에서 걷어낸 것 목록)
+
+지금은 **어느 경로로도 OpenAI 에 닿지 않는다.** 되살리려면 아래를 되돌린다. 되돌리기 전에 (바) 를 다시 읽는다: 작업 PC 의 로그인을 서버가 나눠 쓰는 구성으로 돌아가면 같은 장애가 그대로 재발한다.
+
+| 걷어낸 것 | 어디 | 되살리려면 |
+| --- | --- | --- |
+| codex 플러그인 | 템플릿 `plugins.entries.codex.enabled: false` | `true` 로. 그래야 `openai/gpt-5.6-*` 가 런타임을 얻는다 |
+| 기본·허용 모델 | 템플릿 `agents.defaults.model`·`modelPolicy.allow` | OpenAI 모델 이름을 `allow` 에 더한다. 관리자 화면(설정 > 모델)으로도 된다 |
+| `OPENAI_API_KEY` 전달 | compose 두 파일의 게이트웨이 `environment` | 줄을 되살리고 `.env` 에 값을 넣는다 |
+| `CODEX_HOME` | compose 두 파일 | 줄을 되살린다. (마) 의 로그인 파일 자리를 상태 볼륨 안에 고정하는 값이다 |
+| 로그인 파일 | 상태 볼륨 `codex-cli/auth.json`, NAS 호스트 `codex-auth.json` | **서버 전용 로그인을 새로 만든다.** 지운 사본은 NAS `/volume1/docker/openclaw/openai-removed-y-20260909/` 에 있지만 낡은 refresh 토큰이라 그대로는 살아나지 않는다 |
+
+인증 저장소에는 지울 OpenAI 프로필이 애초에 없었다. (바) 대로 갱신이 한 번도 성공하지 못해 `openai:default` 이 영구 저장된 적이 없기 때문이고, `models auth list` 가 `anthropic:manual` 하나만 보이는 것이 그 증거다.
 
 #### 확인
 
@@ -1364,7 +1427,7 @@ curl -s -o /dev/null -w '%{http_code}
 
 #### (바) "WebSocket 폴백" 메시지는 터널 문제가 아니다 (2026-09-09 실측)
 
-사용자 화면에 `Falling back from WebSockets to HTTPS transport` 가 반복된다는 신고가 있었다. **이 문장은 게이트웨이도 Cloudflare 도 만들지 않는다.** ChatGPT 구독 경로가 쓰는 Codex 런타임 바이너리(상태 볼륨의 `@openai/codex`)가 OpenAI 로 가는 자기 스트림을 열지 못했을 때 찍는 상태 줄이고, 같은 문자열 테이블에 `stream connection failed; waiting to retry`·`Reconnecting... waiting for network` 가 나란히 있다. 브라우저와 게이트웨이 사이의 WebSocket 과는 무관하다. 3.4 (바) 의 인증 장애와 한 몸이고, 기본 모델을 Claude 로 옮기면 codex 런타임 자체가 돌지 않아 함께 사라진다.
+사용자 화면에 `Falling back from WebSockets to HTTPS transport` 가 반복된다는 신고가 있었다. **이 문장은 게이트웨이도 Cloudflare 도 만들지 않는다.** ChatGPT 구독 경로가 쓰는 Codex 런타임 바이너리(상태 볼륨의 `@openai/codex`)가 OpenAI 로 가는 자기 스트림을 열지 못했을 때 찍는 상태 줄이고, 같은 문자열 테이블에 `stream connection failed; waiting to retry`·`Reconnecting... waiting for network` 가 나란히 있다. 브라우저와 게이트웨이 사이의 WebSocket 과는 무관하다. 3.4 (바) 의 인증 장애와 한 몸이고, 기본 모델을 Claude 로 옮기면 codex 런타임 자체가 돌지 않아 함께 사라진다. Y 단계에서 codex 플러그인을 껐으므로 이제 그 바이너리가 실행될 경로 자체가 없다.
 
 확인 방법(문자열이 어디서 오는지 직접 본다):
 
@@ -1640,7 +1703,7 @@ sudo chown -R root:root /volume1/docker/openclaw
 | `IXAUTH_MAIL_TRANSPORT`                | `WEBHOOK`                                  | SMTP 는 배포 후 (3.8)                                        |
 | `OPENCLAW_NAS_ROOT`                    | `/volume1/docker/openclaw/nas-sample`      | 실제 공유 매핑은 다음 단계 (11.4)                            |
 | `OPENCLAW_KNOWLEDGE_ROOT`              | `/volume1/docker/openclaw/knowledge-index` |                                                              |
-| `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | 빈 값                                      | 배포 후 세팅 (3.4 (라))                                      |
+| `ANTHROPIC_API_KEY`                    | 빈 값                                      | Claude setup-token 으로 답한다. 키는 배포 후 세팅 (3.4 (라)) |
 
 만든 값은 `chris-local/infra/local/jinbio-deploy.md`(git 제외)에 적어 둔다.
 

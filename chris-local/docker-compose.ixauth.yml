@@ -166,7 +166,7 @@ services:
       # OPENAI_API_KEY is deliberately absent. Nothing in this stack routes to OpenAI any
       # more: the Codex plugin is off, the model allowlist is Claude only, and passing a
       # name whose provider cannot be selected only invites the belief that it does
-      # something. Bringing OpenAI back is DEPLOY.md 3.4 (사).
+      # something. Bringing OpenAI back is DEPLOY.md 3.4 (아).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
