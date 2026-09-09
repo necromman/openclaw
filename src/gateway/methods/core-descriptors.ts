@@ -656,6 +656,15 @@ const CORE_GATEWAY_METHOD_SPECS = [
   ["departments.agents.list", "departments", "operator.admin", "2026.9"],
   ["departments.agents.set", "departments", "operator.admin", "2026.9"],
   ["departments.folders.list", "departments", "operator.admin", "2026.9"],
+  // Per-folder access rules (R). Appended at the end for the same reason the department
+  // rows were: this list's order is the advertised method order. The tree read is
+  // `operator.read` because it is the surface a non-manager would use once folder-scoped
+  // reading arrives; the rank check inside the handler is what decides who sees what.
+  ["folders.tree.list", "folder-rules", "operator.read", "2026.9"],
+  ["folders.rules.list", "folder-rules", "operator.admin", "2026.9"],
+  ["folders.rules.set", "folder-rules", "operator.admin", "2026.9", CONTROL_PLANE_WRITE],
+  ["folders.rules.clear", "folder-rules", "operator.admin", "2026.9", CONTROL_PLANE_WRITE],
+  ["folders.subjects.list", "folder-rules", "operator.admin", "2026.9"],
 ] as const satisfies readonly CoreGatewayMethodSpecRow[];
 
 export type CoreGatewayHandlerFamily = Exclude<(typeof CORE_GATEWAY_METHOD_SPECS)[number][1], null>;

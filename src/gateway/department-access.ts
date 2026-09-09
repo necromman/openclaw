@@ -58,8 +58,20 @@ export function isDepartmentScopeEnabled(cfg: OpenClawConfig | undefined): boole
   return cfg.gateway?.auth?.mode === "ix-auth" && cfg.tools?.sessions?.visibility === "department";
 }
 
-/** Department facts proven by one verified IX-Auth login. */
-export type DepartmentIdentity = { departments: readonly string[]; isSuperAdmin: boolean };
+/**
+ * Department facts proven by one verified IX-Auth login.
+ *
+ * `profileId` and `gatewayRole` ride along because the folder rules (R) name people and
+ * ranks as rule subjects, and a rule subject is an authorization input. They are read
+ * from this bag rather than from the audit bag next door, which stays attribution-only:
+ * a name in the ledger is still not a permission.
+ */
+export type DepartmentIdentity = {
+  departments: readonly string[];
+  isSuperAdmin: boolean;
+  profileId?: string | undefined;
+  gatewayRole?: string | undefined;
+};
 
 /**
  * Handshake fields carrying the department boundary onto the connection.
@@ -76,9 +88,24 @@ export function departmentHandshakeFacts(principal: DepartmentIdentity | undefin
         ixAuthDepartments: {
           departments: principal.departments,
           isSuperAdmin: principal.isSuperAdmin,
+          ...(principal.profileId ? { profileId: principal.profileId } : {}),
+          ...(principal.gatewayRole ? { gatewayRole: principal.gatewayRole } : {}),
         },
       }
     : {};
+}
+
+/**
+ * The verified identity facts on one connection, or undefined for a host caller.
+ *
+ * Exported for the folder rule surface, which needs the same three facts (person,
+ * departments, rank) and must read them from the authorization bag rather than from the
+ * ledger bag.
+ */
+export function readClientDepartmentIdentity(
+  client: Pick<GatewayClient, "internal"> | null,
+): DepartmentIdentity | undefined {
+  return readClientDepartments(client);
 }
 
 /** Departments proven by the caller's login, or undefined when it carried no principal. */

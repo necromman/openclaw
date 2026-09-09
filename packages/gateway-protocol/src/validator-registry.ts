@@ -7,6 +7,11 @@ import type {
   DepartmentsAgentsListParams,
   DepartmentsAgentsSetParams,
   DepartmentsFoldersListParams,
+  FoldersRulesClearParams,
+  FoldersRulesListParams,
+  FoldersRulesSetParams,
+  FoldersSubjectsListParams,
+  FoldersTreeListParams,
   WebPushSubscribeParams,
   WebPushPreferencesGetParams,
   WebPushPreferencesSetParams,
@@ -119,6 +124,21 @@ export const validateDepartmentsAgentsSetParams = compile<DepartmentsAgentsSetPa
 );
 export const validateDepartmentsFoldersListParams = compile<DepartmentsFoldersListParams>(
   S.DepartmentsFoldersListParamsSchema,
+);
+export const validateFoldersTreeListParams = compile<FoldersTreeListParams>(
+  S.FoldersTreeListParamsSchema,
+);
+export const validateFoldersRulesListParams = compile<FoldersRulesListParams>(
+  S.FoldersRulesListParamsSchema,
+);
+export const validateFoldersRulesSetParams = compile<FoldersRulesSetParams>(
+  S.FoldersRulesSetParamsSchema,
+);
+export const validateFoldersRulesClearParams = compile<FoldersRulesClearParams>(
+  S.FoldersRulesClearParamsSchema,
+);
+export const validateFoldersSubjectsListParams = compile<FoldersSubjectsListParams>(
+  S.FoldersSubjectsListParamsSchema,
 );
 export const validateUsersListParams = compile(S.UsersListParamsSchema);
 export const validateUsersMentionableParams = compile(S.UsersMentionableParamsSchema);

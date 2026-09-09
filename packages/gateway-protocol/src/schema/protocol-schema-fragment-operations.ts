@@ -4,6 +4,7 @@ import * as auditUserActivity from "./audit-user-activity.js";
 import * as audit from "./audit.js";
 import * as config from "./config.js";
 import * as departments from "./departments.js";
+import * as folderRules from "./folder-rules.js";
 import * as humanMentions from "./human-mentions.js";
 import * as openclaw from "./openclaw.js";
 import * as taskSuggestions from "./task-suggestions.js";
@@ -44,6 +45,21 @@ export const OperationsProtocolSchemas = {
   DepartmentsAgentsSetResult: departments.DepartmentsAgentsSetResultSchema,
   DepartmentsFoldersListParams: departments.DepartmentsFoldersListParamsSchema,
   DepartmentsFoldersListResult: departments.DepartmentsFoldersListResultSchema,
+  FolderAccessRule: folderRules.FolderAccessRuleSchema,
+  FolderTreeEntry: folderRules.FolderTreeEntrySchema,
+  FolderEffectiveRule: folderRules.FolderEffectiveRuleSchema,
+  FolderSubjectDepartment: folderRules.FolderSubjectDepartmentSchema,
+  FolderSubjectUser: folderRules.FolderSubjectUserSchema,
+  FoldersTreeListParams: folderRules.FoldersTreeListParamsSchema,
+  FoldersTreeListResult: folderRules.FoldersTreeListResultSchema,
+  FoldersRulesListParams: folderRules.FoldersRulesListParamsSchema,
+  FoldersRulesListResult: folderRules.FoldersRulesListResultSchema,
+  FoldersRulesSetParams: folderRules.FoldersRulesSetParamsSchema,
+  FoldersRulesSetResult: folderRules.FoldersRulesSetResultSchema,
+  FoldersRulesClearParams: folderRules.FoldersRulesClearParamsSchema,
+  FoldersRulesClearResult: folderRules.FoldersRulesClearResultSchema,
+  FoldersSubjectsListParams: folderRules.FoldersSubjectsListParamsSchema,
+  FoldersSubjectsListResult: folderRules.FoldersSubjectsListResultSchema,
   UserProfileAuthLink: users.UserProfileAuthLinkSchema,
   UserModelAccount: users.UserModelAccountSchema,
   UsersListModelAccountsParams: users.UsersListModelAccountsParamsSchema,
