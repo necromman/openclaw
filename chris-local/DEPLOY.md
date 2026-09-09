@@ -563,7 +563,7 @@ docker exec -u node openclaw-ixauth_gateway_1 node openclaw.mjs models auth list
 
 | 걷어낸 것 | 어디 | 되살리려면 |
 | --- | --- | --- |
-| codex 플러그인 | 템플릿 `plugins.entries.codex.enabled: false` | `true` 로. 그래야 `openai/gpt-5.6-*` 가 런타임을 얻는다 |
+| codex 플러그인 | 템플릿 `plugins.entries.codex.enabled: false` | `true` 로. **이것 하나로 OpenAI 프로바이더가 모델 카탈로그에 돌아온다.** 끄자 `models list --all` 의 `openai/` 가 0건이 되고 관리자 모델 화면의 프로바이더가 8개에서 7개로 줄었다(2026-09-09 실측). `openai` 플러그인 자체는 그대로 실려 있으므로(기동 로그의 플러그인 12개) 기전까지 파지는 않았고, 확인한 것은 끄면 사라지고 켜면 돌아온다는 사실이다 |
 | 기본·허용 모델 | 템플릿 `agents.defaults.model`·`modelPolicy.allow` | OpenAI 모델 이름을 `allow` 에 더한다. 관리자 화면(설정 > 모델)으로도 된다 |
 | `OPENAI_API_KEY` 전달 | compose 두 파일의 게이트웨이 `environment` | 줄을 되살리고 `.env` 에 값을 넣는다 |
 | `CODEX_HOME` | compose 두 파일 | 줄을 되살린다. (마) 의 로그인 파일 자리를 상태 볼륨 안에 고정하는 값이다 |
