@@ -1049,6 +1049,113 @@ $CO exec gateway sh -c "grep -A2 workspace /home/node/.openclaw/openclaw.json"
 호스트에서 다시 마운트해도 컨테이너 안 바인드 마운트는 **끊긴 예전 것을 계속 본다.**\
 `mount -a` 뒤에는 게이트웨이 컨테이너를 재시작한다.
 
+### 11.4-1 NAS 안에서 도는 배치: 전용 그룹 + 바인드 마운트 (2026-09-09 실측)
+
+> 진바이오 배치는 게이트웨이가 **NAS 안에서** 돈다. SMB 를 거치지 않으므로 11.4 의 `cifs` 절차 대신
+> 공유를 바인드 마운트로 붙이고, 컨테이너에 NAS 신원을 보조 그룹으로 준다. 설계 근거는
+> [NAS-FOLDER-ACL.md](NAS-FOLDER-ACL.md) 4.2, 사용자 결정은 같은 문서 10절 1번 (가) 안이다.
+
+#### (가) 왜 그룹이 필요한가
+
+공유 폴더의 POSIX 모드는 `d---------`(000) 이고 접근권은 전부 Synology ACL 이 준다.
+게이트웨이 컨테이너의 사용자는 `uid=1000(node)` 이며 그 uid 는 NAS 에 존재하지 않는다.
+그래서 **그룹을 주지 않으면 마운트를 붙여도 한 글자도 못 읽는다.**
+
+기존 `진바이오테크 직원` 그룹을 재사용하지 않는다. 그 그룹에는 쓰기 권한이 붙어 있어,
+언젠가 마운트에서 `:ro` 를 떼는 날 OS 방어선이 통째로 사라진다.
+
+#### (나) NAS 에 전용 그룹 2개를 만든다
+
+```bash
+# NAS 에 관리자 SSH 로 (절차는 infra/local/jinbio-nas.md 5절)
+sudo /usr/syno/sbin/synogroup --add openclaw-ro
+sudo /usr/syno/sbin/synogroup --add openclaw-rw
+grep openclaw /etc/group      # gid 를 적어 둔다
+```
+
+2026-09-09 배치에서 받은 gid 는 `openclaw-ro=65540`, `openclaw-rw=65541` 이다.
+**둘 다 구성원이 없다.** 사람을 넣는 그룹이 아니라 컨테이너 프로세스에만 주는 그룹이다.
+
+#### (다) 공유 ACL 에 그 그룹을 더한다 (추가만, 기존 항목은 건드리지 않는다)
+
+먼저 되돌릴 수 있게 지금 ACL 을 저장한다.
+
+```bash
+sudo mkdir -p /volume1/docker/openclaw/nas-acl-backup
+for s in 00_공용폴더 01_이화정 02_최병만 03_장혜린 04_김서희 05_이대훈 06_박정현 디자인PC 이영준한의원; do
+  sudo sh -c "/usr/syno/bin/synoacltool -get \"/volume1/$s\" > \"/volume1/docker/openclaw/nas-acl-backup/$s.acl.$(date +%Y%m%d)\""
+done
+```
+
+```bash
+for s in 00_공용폴더 01_이화정 02_최병만 03_장혜린 04_김서희 05_이대훈 06_박정현 디자인PC 이영준한의원; do
+  sudo /usr/syno/bin/synoacltool -add "/volume1/$s" "group:openclaw-ro:allow:r-x---a-R-c--:fd--"
+  sudo /usr/syno/bin/synoacltool -add "/volume1/$s" "group:openclaw-rw:allow:rwxpdDaARWc--:fd--"
+done
+```
+
+`fd--` 는 파일·폴더 상속 표시다. 하위 폴더 대부분은 아카이브 비트가 `is_inherit` 이라
+**공유 루트에 한 번 넣으면 그 아래로 자동으로 따라간다.** 다시 훑을 필요가 없다.
+반대로 상속이 끊긴(`has_ACL`) 하위 폴더는 그룹 항목을 받지 않으므로 **컨테이너에서도 계속 막힌다.**
+그것이 이 배치가 원하는 상한이다((마)의 표).
+
+되돌리기: `synoacltool -get` 으로 지금 인덱스를 확인하고 `synoacltool -del <경로> <인덱스>` 로
+그 두 항목만 지운다. 그룹 자체는 `synogroup --del openclaw-ro` 로 지운다.
+백업 파일은 사람이 읽는 사본이며 그대로 복원하는 명령은 없다.
+
+#### (라) compose 에 마운트와 그룹을 넣는다
+
+정본은 `chris-local/nas/docker-compose.nas.yml` 이고 NAS 위의 실물은
+`/volume1/docker/openclaw/docker-compose.nas.yml` 이다. **둘 다 고친다**(13.4-1).
+
+```bash
+# NAS 의 ixauth.env
+OPENCLAW_NAS_SHARES_ROOT=/volume1
+OPENCLAW_NAS_GROUP_GID=65540
+```
+
+compose 의 게이트웨이 서비스에는 공유 9개가 `${OPENCLAW_NAS_SHARES_ROOT}/<공유>:/mnt/nas/<공유>:ro`
+로 들어가고, `group_add: ["${OPENCLAW_NAS_GROUP_GID:-65540}"]` 한 줄이 신원을 준다.
+`OPENCLAW_NAS_ROOT` 는 그대로 두어 `rnd`·`qa` 샘플 마운트가 살아 있게 한다.
+
+```bash
+cd /volume1/docker/openclaw
+sudo cp -a docker-compose.nas.yml docker-compose.nas.yml.bak-$(date +%Y%m%d)
+cat <새 정본> | ssh <NAS> 'cat > /tmp/docker-compose.nas.yml'
+sudo cp /tmp/docker-compose.nas.yml docker-compose.nas.yml
+sudo /volume1/docker/openclaw/deploy.sh --force
+```
+
+#### (마) 확인
+
+```bash
+D=/var/packages/Docker/target/usr/bin/docker
+sudo $D exec openclaw-ixauth_gateway_1 id          # groups 에 65540 이 있어야 한다
+sudo $D exec openclaw-ixauth_gateway_1 ls /mnt/nas
+sudo $D exec openclaw-ixauth_gateway_1 sh -c 'touch "/mnt/nas/00_공용폴더/.probe"'   # Read-only file system
+```
+
+2026-09-09 실측. 공유 9개 전부 읽혔고 전부 쓰기가 막혔다.
+
+| 공유 | 컨테이너에서 보이는 1단계 하위 수 | 쓰기 |
+| --- | --- | --- |
+| `00_공용폴더` | 18 | 거부(read-only) |
+| `01_이화정` | 12 | 거부 |
+| `02_최병만` | 4 | 거부 |
+| `03_장혜린` | 6 | 거부 |
+| `04_김서희` | 19 | 거부 |
+| `05_이대훈` | 11 | 거부 |
+| `06_박정현` | 31 | 거부 |
+| `디자인PC` | 8 | 거부 |
+| `이영준한의원` | 3 | 거부 |
+
+**그룹 항목을 받지 못해 컨테이너에서도 막히는 하위 폴더**(상속이 끊겨 있다. 손대지 않았다):
+`00_공용폴더/##직원전용`, `01_이화정/보안폴더`, `02_최병만/보안폴더`, `03_장혜린/00_보안폴더`,
+`04_김서희/보안폴더`, `05_이대훈/보안폴더`, `06_박정현/12. 보안폴더`.
+
+이 일곱은 NAS ACL 이 이미 막고 있으므로 앱 규칙과 무관하게 절대 열리지 않는다.
+**NAS ACL 이 앱 권한의 상한**이라는 것이 이 배치의 성질이다.
+
 ### 11.5 사용자 20명을 CSV 로 한 번에 넣기
 
 NAS 로컬 사용자 목록을 계정으로 옮기는 절차다. 화면은 F 단계에서 만든 **설정 > 사용자 관리**\
