@@ -64,6 +64,35 @@ export const FolderTreeEntrySchema = closedObject({
   sourcePath: Type.Optional(Type.String()),
   /** Rules attached to exactly this folder, so the tree can mark explicit settings. */
   ownRuleCount: Type.Integer({ minimum: 0 }),
+  /**
+   * False when the snapshot knows this folder holds no subfolders.
+   *
+   * Absent from a live listing, which cannot say without a second read. The screen draws
+   * an expander whenever this is absent or true, so an unknown answer costs one wasted
+   * click and never a missing branch.
+   */
+  hasChildren: Type.Optional(Type.Boolean()),
+});
+
+/**
+ * The last walk of the mount.
+ *
+ * Shown on the screen so an operator reading a tree knows how old it is, and so the
+ * refresh button has something to report. `running` is a claim held in the state
+ * database rather than in one process, because the nightly cron walks from a second
+ * process inside the same container.
+ */
+export const FolderTreeScanStatusSchema = closedObject({
+  running: Type.Boolean(),
+  branchPath: Type.String(),
+  startedAt: Type.Integer(),
+  /** Absent while a walk is in flight. */
+  finishedAt: Type.Optional(Type.Integer()),
+  durationMs: Type.Optional(Type.Integer()),
+  folderCount: Type.Optional(Type.Integer({ minimum: 0 })),
+  /** Folders the NAS refused the container, which the walk stepped over. */
+  unreadableCount: Type.Optional(Type.Integer({ minimum: 0 })),
+  truncated: Type.Optional(Type.Boolean()),
 });
 
 /**
@@ -90,6 +119,31 @@ export const FoldersTreeListResultSchema = closedObject({
   /** True when this caller may edit rules, which is also when hidden folders appear. */
   manage: Type.Boolean(),
   entries: Type.Array(FolderTreeEntrySchema),
+  /** Whether this level came from the snapshot or from reading the NAS. */
+  source: Type.Union([Type.Literal("index"), Type.Literal("live")]),
+  /** When the walk last read this level. Absent for a live read. */
+  indexedAt: Type.Optional(Type.Integer()),
+  /** The last walk of the whole mount, for the "last updated" line. */
+  scan: Type.Optional(FolderTreeScanStatusSchema),
+});
+
+/**
+ * Walk one branch again now.
+ *
+ * The walk runs behind the response rather than inside it. A full walk of the delivery
+ * share is tens of seconds of NAS reads, which is longer than a request should hold a
+ * connection open, so this answers with whether a walk is now in flight and the screen
+ * watches `folders.tree.list` for it to end.
+ */
+export const FoldersTreeRefreshParamsSchema = closedObject({
+  /** Root-relative branch. `""` or absent walks the whole mount. */
+  path: Type.Optional(Type.String()),
+});
+
+export const FoldersTreeRefreshResultSchema = closedObject({
+  /** False when a walk was already in flight; the existing one keeps going. */
+  started: Type.Boolean(),
+  scan: Type.Optional(FolderTreeScanStatusSchema),
 });
 
 /** The verdict for one subject on one folder, with the rule that produced it. */
@@ -248,6 +302,27 @@ export type FolderTreeEntry = {
   inherited: boolean;
   sourcePath?: string;
   ownRuleCount: number;
+  hasChildren?: boolean;
+};
+
+export type FolderTreeScanStatus = {
+  running: boolean;
+  branchPath: string;
+  startedAt: number;
+  finishedAt?: number;
+  durationMs?: number;
+  folderCount?: number;
+  unreadableCount?: number;
+  truncated?: boolean;
+};
+
+export type FoldersTreeRefreshParams = {
+  path?: string;
+};
+
+export type FoldersTreeRefreshResult = {
+  started: boolean;
+  scan?: FolderTreeScanStatus;
 };
 
 export type FoldersTreeListParams = {
@@ -263,6 +338,9 @@ export type FoldersTreeListResult = {
   parent?: string;
   manage: boolean;
   entries: FolderTreeEntry[];
+  source: "index" | "live";
+  indexedAt?: number;
+  scan?: FolderTreeScanStatus;
 };
 
 export type FolderEffectiveRule = {

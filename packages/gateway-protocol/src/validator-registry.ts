@@ -14,6 +14,7 @@ import type {
   FoldersRulesSetParams,
   FoldersSubjectsListParams,
   FoldersTreeListParams,
+  FoldersTreeRefreshParams,
   WebPushSubscribeParams,
   WebPushPreferencesGetParams,
   WebPushPreferencesSetParams,
@@ -129,6 +130,9 @@ export const validateDepartmentsFoldersListParams = compile<DepartmentsFoldersLi
 );
 export const validateFoldersTreeListParams = compile<FoldersTreeListParams>(
   S.FoldersTreeListParamsSchema,
+);
+export const validateFoldersTreeRefreshParams = compile<FoldersTreeRefreshParams>(
+  S.FoldersTreeRefreshParamsSchema,
 );
 export const validateFoldersRulesListParams = compile<FoldersRulesListParams>(
   S.FoldersRulesListParamsSchema,

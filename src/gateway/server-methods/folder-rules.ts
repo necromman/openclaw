@@ -28,12 +28,9 @@ import {
   validateFoldersRulesOrphansParams,
   validateFoldersRulesSetParams,
   validateFoldersSubjectsListParams,
-  validateFoldersTreeListParams,
-  type FolderAccessRule,
   type FolderOrphanRule,
   type FolderSubjectDepartment,
   type FolderSubjectUser,
-  type FolderTreeEntry,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { recordUserActivity } from "../../audit/user-activity-audit-recorder.js";
 import { IX_AUTH_DEFAULT_ROLE_MAP } from "../../auth/ix-auth/ix-auth-role-map.js";
@@ -55,18 +52,15 @@ import {
 import {
   folderRuleAbsolutePath,
   folderRuleAncestry,
-  isExcludedFolderName,
   normalizeFolderRulePath,
 } from "../folder-access-path.js";
 import {
-  resolveFolderAccess,
   resolveFolderEffectiveRules,
   subjectIdentity,
   type FolderAccessIdentity,
 } from "../folder-access-policy.js";
 import { clientActivityActor } from "../ix-auth-audit-actor.js";
 import { ADMIN_SCOPE } from "../operator-scopes.js";
-import { recordAccessDeniedActivity } from "../session-view-activity-audit.js";
 import type { GatewayClient } from "./client-types.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 import { assertValidParams } from "./validation.js";
@@ -82,7 +76,7 @@ const FOLDER_RULE_MANAGER_ROLES = new Set(["superadmin", "admin"]);
  */
 const FOLDER_REFUSAL = "path is outside the shared folder root";
 
-function respondRefused(respond: RespondFn): void {
+export function respondRefused(respond: RespondFn): void {
   respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, FOLDER_REFUSAL));
 }
 
@@ -95,7 +89,7 @@ function respondForbidden(respond: RespondFn): void {
 }
 
 /** The caller's authorization facts, or undefined for a host connection. */
-function callerIdentity(client: GatewayClient | null): FolderAccessIdentity | undefined {
+export function callerIdentity(client: GatewayClient | null): FolderAccessIdentity | undefined {
   const identity = readClientDepartmentIdentity(client);
   if (!identity) {
     return undefined;
@@ -133,7 +127,7 @@ export function mayManageFolderRules(client: GatewayClient | null): boolean {
  * rules always gets their own verdicts: preview is a manager's tool, not a way to borrow
  * someone else's reach.
  */
-function viewingIdentity(params: {
+export function viewingIdentity(params: {
   client: GatewayClient | null;
   manage: boolean;
   previewSubjectKind?: "role" | "department" | "user";
@@ -154,108 +148,7 @@ function viewingIdentity(params: {
   return { departments: [], isSuperAdmin: true };
 }
 
-/**
- * Every rule under the root, read once per listing.
- *
- * A listing needs the ancestry of the folder asked about and the ancestry of each child,
- * and the child paths are only known after the directory read. The table holds one row
- * per deliberate operator act, so reading all of it is cheaper and simpler than a query
- * per child, and it keeps the verdicts in one listing consistent with each other.
- */
-function readRulesForSubtree(scopeRoot: string): FolderAccessRule[] {
-  return listAllFolderRules(scopeRoot);
-}
-
 export const folderRulesHandlers: GatewayRequestHandlers = {
-  "folders.tree.list": async ({ params, respond, client }) => {
-    if (!assertValidParams(params, validateFoldersTreeListParams, "folders.tree.list", respond)) {
-      return;
-    }
-    const manage = mayManageFolderRules(client);
-    const { root, available } = await resolveDepartmentFolderRoot();
-    const folderPath = normalizeFolderRulePath(params.path, root);
-    if (folderPath === undefined) {
-      respondRefused(respond);
-      return;
-    }
-    const previewing =
-      manage && params.previewSubjectKind !== undefined && params.previewSubjectId !== undefined;
-    const identity = viewingIdentity({
-      client,
-      manage,
-      ...(params.previewSubjectKind === undefined
-        ? {}
-        : { previewSubjectKind: params.previewSubjectKind }),
-      ...(params.previewSubjectId === undefined
-        ? {}
-        : { previewSubjectId: params.previewSubjectId }),
-    });
-    // Hidden folders appear only in a manager's own view, where they have to appear or a
-    // hidden folder could never be un-hidden. A preview is a claim about what somebody
-    // else sees, so it hides exactly what they would not see; a preview that still showed
-    // the folder would be no evidence at all.
-    const showHidden = manage && !previewing;
-    const rules = readRulesForSubtree(root);
-    // Nobody opens a folder their view cannot see, and the refusal is the same one an
-    // absent folder gets.
-    if (!showHidden && folderPath.length > 0) {
-      const verdict = resolveFolderAccess({ folderPath, identity, rules });
-      if (verdict.permission === "hidden") {
-        if (!manage) {
-          // A manager stepping through a preview is not being refused anything, so it is
-          // not an access denial and does not belong in the ledger.
-          recordAccessDeniedActivity({
-            client,
-            reason: "folder_rule",
-            surface: "folder-tree",
-          });
-        }
-        respondRefused(respond);
-        return;
-      }
-    }
-    const listing = await listDepartmentFolders({
-      root,
-      available,
-      path: folderPath,
-    });
-    if (isDepartmentFolderRejection(listing)) {
-      respondRefused(respond);
-      return;
-    }
-    const entries: FolderTreeEntry[] = [];
-    for (const entry of listing.entries) {
-      if (isExcludedFolderName(entry.name)) {
-        continue;
-      }
-      const childPath = normalizeFolderRulePath(entry.path, root);
-      if (childPath === undefined) {
-        continue;
-      }
-      const verdict = resolveFolderAccess({ folderPath: childPath, identity, rules });
-      if (!showHidden && verdict.permission === "hidden") {
-        continue;
-      }
-      entries.push({
-        name: entry.name,
-        path: entry.path,
-        absolutePath: entry.absolutePath,
-        permission: verdict.permission,
-        inherited: verdict.inherited,
-        ...(verdict.sourcePath === undefined ? {} : { sourcePath: verdict.sourcePath }),
-        ownRuleCount: rules.filter((rule) => rule.folderPath === childPath).length,
-      });
-    }
-    respond(true, {
-      root: listing.root,
-      available: listing.available,
-      path: listing.path,
-      ...(listing.parent === undefined ? {} : { parent: listing.parent }),
-      manage,
-      entries,
-    });
-  },
-
   "folders.rules.list": async ({ params, respond, client }) => {
     if (!assertValidParams(params, validateFoldersRulesListParams, "folders.rules.list", respond)) {
       return;

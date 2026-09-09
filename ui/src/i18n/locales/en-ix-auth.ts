@@ -381,6 +381,16 @@ const enIxAuth = {
         "A folder is hidden until a rule grants read or write to a role, a department, or a person. A rule set here reaches every folder below it unless a closer rule says otherwise.",
       treeTitle: "Folders",
       rulesTitle: "Rules for this folder",
+      // The stored folder list. The share is read on a schedule rather than on every
+      // click, so the screen has to say how old what it is showing is.
+      indexNever: "No stored folder list yet, so the share is being read as you open it.",
+      indexAt: "Folder list stored {time}, {count} folders.",
+      indexRunning: "Reading the share again. This screen updates when it finishes.",
+      refresh: "Refresh",
+      refreshTitleRoot: "Read the whole share again",
+      refreshTitleBranch: "Read {path} again",
+      refreshStarted: "Reading the share again.",
+      refreshRunning: "A read is already running.",
       loading: "Loading",
       treeEmpty: "Nothing has been read from the share yet.",
       folderEmpty: "This folder has no subfolders.",

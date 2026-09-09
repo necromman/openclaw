@@ -47,6 +47,34 @@
   letter-spacing: 0.04em;
 }
 
+/* When the stored folder list was written, and the button that rewrites it. */
+.folders-index {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.folders-index__status {
+  font-size: var(--control-ui-text-xs);
+}
+
+.folders-index__refresh {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: inherit;
+  font-size: var(--control-ui-text-xs);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.folders-index__refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ── The tree ── */
 
 .folders-tree {

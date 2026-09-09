@@ -134,6 +134,11 @@ const coreCliCommandCatalog = defineCommandDescriptorCatalog([
     hasSubcommands: true,
   },
   {
+    name: "folders",
+    description: "Index the shared folder tree so the folder screen does not read the NAS",
+    hasSubcommands: true,
+  },
+  {
     name: "sessions",
     description: "List stored conversation sessions",
     hasSubcommands: true,

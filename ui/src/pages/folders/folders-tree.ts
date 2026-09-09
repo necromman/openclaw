@@ -148,12 +148,16 @@ export function renderFoldersTree(params: {
         ${level.entries.map((entry) => {
           const expanded = params.expanded.has(entry.path);
           const alreadyOpen = visited.has(entry.path);
+          // The snapshot knows whether a folder holds subfolders; a live listing does
+          // not, and an absent answer has to draw the expander or a branch would be
+          // unreachable.
+          const expandable = !alreadyOpen && entry.hasChildren !== false;
           return html`<li class="folders-tree__node">
             ${renderRow({
               path: entry.path,
               name: entry.name,
               selected: entry.path === params.selectedPath,
-              expandable: !alreadyOpen,
+              expandable,
               expanded,
               chip: renderChip(entry),
               ownRuleCount: entry.ownRuleCount,
@@ -162,7 +166,7 @@ export function renderFoldersTree(params: {
               onToggle: params.onToggle,
             })}
             ${
-              expanded && !alreadyOpen
+              expanded && expandable
                 ? renderLevel(entry.path, depth + 1, new Set([...visited, entry.path]))
                 : nothing
             }

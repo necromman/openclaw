@@ -56,6 +56,7 @@ import {
   fetchFolderRules,
   fetchFolderSubjects,
   fetchFolderTree,
+  refreshFolderTree,
   setFolderRule,
 } from "./folders-gateway.ts";
 import { renderFoldersTree } from "./folders-tree.ts";
@@ -63,6 +64,18 @@ import { renderFoldersTree } from "./folders-tree.ts";
 registerIxAuthEnglish();
 
 type FolderPreview = { kind: FolderRuleSubjectKind; id: string };
+
+/** How often the screen asks whether the walk it started has finished. */
+const SCAN_POLL_MS = 3000;
+
+/**
+ * How many times it asks before it stops asking.
+ *
+ * Five minutes at the interval above. A walk of the delivered share was measured in
+ * seconds, so a poll that runs out means something is wrong and the operator should press
+ * refresh again rather than watch a spinner forever.
+ */
+const SCAN_POLL_LIMIT = 100;
 
 /** The parent of one share-relative path. The root's parent is the root itself. */
 function parentFolderPath(path: string): string {
@@ -90,6 +103,7 @@ export class FoldersPage extends OpenClawLightDomElement {
   @state() private orphansConfirming = false;
   @state() private loading = false;
   @state() private busy = false;
+  @state() private scanning = false;
   @state() private errorKey: string | undefined;
   @state() private notice: string | undefined;
 
@@ -97,6 +111,8 @@ export class FoldersPage extends OpenClawLightDomElement {
   private stopGateway: (() => void) | undefined;
   private connected = false;
   private started = false;
+  private pollTimer: ReturnType<typeof setTimeout> | undefined;
+  private pollsLeft = 0;
 
   override connectedCallback() {
     // The host supplies a shellless loading fallback. Remove that unowned light-DOM
@@ -110,6 +126,10 @@ export class FoldersPage extends OpenClawLightDomElement {
   }
 
   override disconnectedCallback() {
+    if (this.pollTimer !== undefined) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = undefined;
+    }
     this.stopGateway?.();
     this.stopGateway = undefined;
     this.client = null;
@@ -206,6 +226,76 @@ export class FoldersPage extends OpenClawLightDomElement {
       this.tree = new Map([...this.tree, [path, level]]);
     } catch {
       this.errorKey = "loadFailed";
+    }
+  }
+
+  /**
+   * Ask the Gateway to walk this branch again, then watch for it to finish.
+   *
+   * The branch is whatever folder is selected, so an operator who just moved files into
+   * one folder pays for that folder rather than for the whole share. With nothing
+   * selected the branch is the root, which is the full walk.
+   */
+  private async startRefresh(): Promise<void> {
+    const client = this.client;
+    if (!client || this.scanning) {
+      return;
+    }
+    this.notice = undefined;
+    try {
+      const result = await refreshFolderTree({ client, path: this.selectedPath });
+      this.scanning = true;
+      this.notice = result.started
+        ? t("ixAuth.folders.refreshStarted")
+        : t("ixAuth.folders.refreshRunning");
+      this.pollsLeft = SCAN_POLL_LIMIT;
+      this.schedulePoll();
+    } catch {
+      this.errorKey = "rejected";
+    }
+  }
+
+  private schedulePoll(): void {
+    if (this.pollTimer !== undefined) {
+      clearTimeout(this.pollTimer);
+    }
+    this.pollTimer = setTimeout(() => {
+      this.pollTimer = undefined;
+      void this.pollScan();
+    }, SCAN_POLL_MS);
+  }
+
+  /** Read the root level again; while the walk runs that is the only thing that moves. */
+  private async pollScan(): Promise<void> {
+    const client = this.client;
+    if (!client || !this.connected || this.pollsLeft <= 0) {
+      this.scanning = false;
+      return;
+    }
+    this.pollsLeft -= 1;
+    try {
+      const root = await fetchFolderTree({
+        client,
+        path: "",
+        ...(this.preview ? { previewSubjectKind: this.preview.kind } : {}),
+        ...(this.preview ? { previewSubjectId: this.preview.id } : {}),
+      });
+      this.tree = new Map([...this.tree, ["", root]]);
+      if (root.scan?.running) {
+        this.schedulePoll();
+        return;
+      }
+    } catch {
+      this.errorKey = "loadFailed";
+    }
+    this.scanning = false;
+    await this.reloadOpenLevels();
+  }
+
+  /** Redraw every level the operator has open, now that the snapshot moved under them. */
+  private async reloadOpenLevels(): Promise<void> {
+    for (const path of [...this.tree.keys()]) {
+      await this.loadLevel(path);
     }
   }
 
@@ -381,10 +471,44 @@ export class FoldersPage extends OpenClawLightDomElement {
     });
   }
 
+  /** When the stored folder list was written, and the button that rewrites it. */
+  private renderIndexLine(): TemplateResult {
+    const root = this.tree.get("");
+    const scan = root?.scan;
+    const status =
+      this.scanning || scan?.running
+        ? t("ixAuth.folders.indexRunning")
+        : scan?.finishedAt
+          ? t("ixAuth.folders.indexAt", {
+              time: new Date(scan.finishedAt).toLocaleString(),
+              count: String(scan.folderCount ?? 0),
+            })
+          : t("ixAuth.folders.indexNever");
+    return html`
+      <div class="folders-index">
+        <span class="folders-index__status muted">${status}</span>
+        <button
+          type="button"
+          class="folders-index__refresh"
+          ?disabled=${this.busy || this.scanning || !(root?.manage ?? false)}
+          title=${
+            this.selectedPath.length === 0
+              ? t("ixAuth.folders.refreshTitleRoot")
+              : t("ixAuth.folders.refreshTitleBranch", { path: this.selectedPath })
+          }
+          @click=${() => void this.startRefresh()}
+        >
+          ${t("ixAuth.folders.refresh")}
+        </button>
+      </div>
+    `;
+  }
+
   private renderTreeColumn(): TemplateResult {
     return html`
       <div class="folders-layout__tree">
         <h3 class="folders-layout__heading">${t("ixAuth.folders.treeTitle")}</h3>
+        ${this.renderIndexLine()}
         ${renderFoldersTree({
           levels: this.tree,
           expanded: this.expanded,

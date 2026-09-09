@@ -1,6 +1,6 @@
 // Gateway calls the folder-access screen makes, in one place.
 //
-// Seven methods, one job: read the share one level at a time, read and write the rules
+// Eight methods, one job: read the share one level at a time, read and write the rules
 // pinned to one folder, read the subjects a rule may name, and list or clear the rules
 // that no longer point at anything. Nothing here decides who may call them; the Gateway
 // refuses every one of them for an account that is not an administrator, and this module
@@ -19,6 +19,7 @@ import type {
   FoldersRulesSetResult,
   FoldersSubjectsListResult,
   FoldersTreeListResult,
+  FoldersTreeRefreshResult,
 } from "../../../../packages/gateway-protocol/src/schema/folder-rules.js";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
 
@@ -35,6 +36,21 @@ export async function fetchFolderTree(params: {
       ? {}
       : { previewSubjectKind: params.previewSubjectKind }),
     ...(params.previewSubjectId === undefined ? {} : { previewSubjectId: params.previewSubjectId }),
+  });
+}
+
+/**
+ * Ask the Gateway to walk one branch of the share again.
+ *
+ * The walk runs behind the response. What comes back says whether one is now in flight,
+ * and the screen watches the stamp on `folders.tree.list` for it to end.
+ */
+export async function refreshFolderTree(params: {
+  client: GatewayBrowserClient;
+  path?: string;
+}): Promise<FoldersTreeRefreshResult> {
+  return params.client.request<FoldersTreeRefreshResult>("folders.tree.refresh", {
+    ...(params.path === undefined ? {} : { path: params.path }),
   });
 }
 

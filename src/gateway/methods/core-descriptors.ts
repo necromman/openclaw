@@ -665,7 +665,10 @@ const CORE_GATEWAY_METHOD_SPECS = [
   // `ui/src/features/ix-auth/ix-auth-admin-access.ts`) - so requiring it here would refuse
   // the exact people whose job this screen is. Measured 2026-09-09: with `operator.admin`
   // on these rows, `admin.test` got `missing scope: operator.admin` on every write.
-  ["folders.tree.list", "folder-rules", "operator.read", "2026.9"],
+  ["folders.tree.list", "folder-tree", "operator.read", "2026.9"],
+  // A refresh reads the NAS rather than the snapshot, so it is a write in the sense the
+  // policy flag means: it costs the machine something and only a manager may ask for it.
+  ["folders.tree.refresh", "folder-tree", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
   ["folders.rules.list", "folder-rules", "operator.read", "2026.9"],
   ["folders.rules.set", "folder-rules", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
   ["folders.rules.clear", "folder-rules", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
