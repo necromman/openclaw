@@ -209,6 +209,7 @@ const SETTINGS_NAVIGATION_GROUPS = [
       "connection",
       "users",
       "departments",
+      "folders",
       "channels",
       "communications",
       "talk",
@@ -235,7 +236,7 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
   { labelKey: "nav.settingsGroupDevice", routes: ["device", "device-permissions"] },
   {
     labelKey: "nav.settingsGroupConnections",
-    routes: ["connection", "users", "departments", "channels", "talk", "devices"],
+    routes: ["connection", "users", "departments", "folders", "channels", "talk", "devices"],
   },
   {
     labelKey: "nav.settingsGroupAgents",
@@ -272,6 +273,7 @@ const IX_AUTH_ADMIN_SETTINGS_ROUTES: ReadonlySet<NavigationRouteId> = new Set([
   ...IX_AUTH_MEMBER_SETTINGS_ROUTES,
   "users",
   "departments",
+  "folders",
   "audit",
   "approvals",
 ]);
@@ -292,6 +294,11 @@ export function isSettingsNavigationRouteVisible(
   // Departments are part of that same job, so the same rank decides them.
   if (routeId === "departments") {
     return canManageIxAuthDepartments();
+  }
+  // Folder access grants and withdraws what people may read on the share, which is the
+  // same job again: whoever runs the accounts runs the folders those accounts reach.
+  if (routeId === "folders") {
+    return canManageIxAuthUsers();
   }
   // The two narrower tiers. Placed after the rules above so an administrator holding no
   // operator scope still reaches them, and before the operator-scope fallback so the
@@ -366,6 +373,7 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   connection: ["radio", "tabs.connection", "subtitles.connection"],
   users: ["users", "tabs.users", "subtitles.users"],
   departments: ["shieldCog", "tabs.departments", "subtitles.departments"],
+  folders: ["folder", "tabs.folders", "subtitles.folders"],
   audit: ["fileText", "tabs.audit", "subtitles.audit"],
   sessions: ["fileText", "tabs.sessions", "subtitles.sessions"],
   usage: ["coins", "tabs.usage", "subtitles.usage"],

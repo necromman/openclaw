@@ -27,11 +27,13 @@ import {
   validateFoldersSubjectsListParams,
   validateFoldersTreeListParams,
   type FolderAccessRule,
+  type FolderSubjectDepartment,
   type FolderSubjectUser,
   type FolderTreeEntry,
 } from "../../../packages/gateway-protocol/src/index.js";
-import { IX_AUTH_DEFAULT_ROLE_MAP } from "../../auth/ix-auth/ix-auth-role-map.js";
 import { recordUserActivity } from "../../audit/user-activity-audit-recorder.js";
+import { IX_AUTH_DEFAULT_ROLE_MAP } from "../../auth/ix-auth/ix-auth-role-map.js";
+import { listDepartments } from "../../state/departments-store.js";
 import {
   clearFolderRule,
   clearFolderRuleDescendants,
@@ -39,7 +41,6 @@ import {
   listFolderRulesForPaths,
   setFolderRule,
 } from "../../state/folder-access-store.js";
-import { listDepartments } from "../../state/departments-store.js";
 import { listProfiles } from "../../state/user-profile-list.js";
 import { readClientDepartmentIdentity } from "../department-access.js";
 import {
@@ -362,7 +363,7 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
     }
     const configuredRoleMap = context.getRuntimeConfig()?.gateway?.auth?.ixAuth?.roleMap;
     const roleMap = configuredRoleMap ?? IX_AUTH_DEFAULT_ROLE_MAP;
-    const roles = [...new Set(Object.values(roleMap))].sort();
+    const roles = [...new Set(Object.values(roleMap))].toSorted();
     const users: FolderSubjectUser[] = [];
     for (const profile of listProfiles()) {
       if (profile.mergedInto) {
@@ -375,14 +376,15 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
         ...(profile.displayName ? { displayName: profile.displayName } : {}),
       });
     }
-    respond(true, {
-      roles,
-      departments: listDepartments().map((department) => ({
-        slug: department.slug,
-        ...(department.display_name ? { displayName: department.display_name } : {}),
-      })),
-      users,
-    });
+    const departments: FolderSubjectDepartment[] = [];
+    for (const department of listDepartments()) {
+      const entry: FolderSubjectDepartment = { slug: department.slug };
+      if (department.display_name) {
+        entry.displayName = department.display_name;
+      }
+      departments.push(entry);
+    }
+    respond(true, { roles, departments, users });
   },
 };
 

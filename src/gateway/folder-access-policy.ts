@@ -216,10 +216,7 @@ export function resolveFolderEffectiveRules(params: {
  * Used for the editor's preview and for the effective list. It carries no super-admin
  * flag on purpose: previewing a role must not answer with the rank of the person asking.
  */
-export function subjectIdentity(
-  kind: FolderRuleSubjectKind,
-  id: string,
-): FolderAccessIdentity {
+export function subjectIdentity(kind: FolderRuleSubjectKind, id: string): FolderAccessIdentity {
   if (kind === "user") {
     return { profileId: id, departments: [], isSuperAdmin: false };
   }

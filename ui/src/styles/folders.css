@@ -1,0 +1,344 @@
+/* Folder access: a lazy tree on the left, the rules for one folder on the right.
+ *
+ * Loaded with the page rather than from the shared sheet, so a deployment without an
+ * identity server never downloads it. Everything uses the shared tokens; the radius cap
+ * in fork-style.css applies here exactly as it does everywhere else. */
+
+/* Section 1b of fork-style.css widens a stacked settings row's control for the wide
+ * blocks on the users and audit screens. The two-column layout below needs the same
+ * treatment for the same reason: .settings-row__control is a flex container, so a child
+ * that only says `width: 100%` collapses to its max-content width and the row ends up
+ * roughly half the page. Same shape, same reason, no !important. */
+.settings-row--stacked > .settings-row__control:has(> .folders-layout) {
+  width: 100%;
+}
+
+.folders-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) minmax(320px, 3fr);
+  gap: var(--space-4);
+  align-items: start;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/* One column below the layout breakpoint: a tree squeezed next to an editor is two
+ * unusable halves rather than one usable screen. */
+@media (max-width: 900px) {
+  .folders-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.folders-layout__tree,
+.folders-layout__panel {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.folders-layout__heading {
+  margin: 0;
+  font-size: var(--control-ui-text-xs);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── The tree ── */
+
+.folders-tree {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  /* The delivered share is tens of thousands of folders deep; the tree scrolls inside
+   * its own box rather than making the page do it. */
+  max-height: 60vh;
+  overflow: auto;
+  min-width: 0;
+}
+
+.folders-tree__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  /* One indent step per level, drawn by the nesting itself. */
+  padding-inline-start: var(--space-4);
+  list-style: none;
+}
+
+.folders-tree__node {
+  min-width: 0;
+}
+
+.folders-tree__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.folders-tree__row--selected {
+  background: var(--surface-2, var(--surface));
+}
+
+.folders-tree__toggle {
+  flex: 0 0 auto;
+  width: 1.25em;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.folders-tree__toggle--leaf {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.folders-tree__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--control-ui-text-sm);
+  color: inherit;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.folders-tree__count {
+  flex: 0 0 auto;
+  min-width: 1.4em;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--control-ui-text-xs);
+  text-align: center;
+  color: var(--muted);
+}
+
+.folders-tree__chip {
+  flex: 0 0 auto;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--control-ui-text-xs);
+  white-space: nowrap;
+}
+
+/* An inherited verdict is drawn faintly so a rule and its consequence are told apart
+ * without reading either label. */
+.folders-tree__chip--inherited {
+  opacity: 0.6;
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.folders-tree__empty {
+  margin: 0 0 0 var(--space-4);
+  font-size: var(--control-ui-text-xs);
+}
+
+/* ── The rule panel ── */
+
+.folders-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.folders-panel__head {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.folders-panel__path {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--control-ui-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.folders-panel__warning {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.folders-notice {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm);
+}
+
+.folders-preview {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.folders-preview__field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.folders-preview__label,
+.folders-search__label {
+  font-size: var(--control-ui-text-xs);
+  color: var(--muted);
+}
+
+.folders-preview__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.folders-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.folders-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--control-ui-text-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.folders-tab--active {
+  color: inherit;
+  border-bottom-color: currentColor;
+}
+
+.folders-search {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.folders-subjects {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folders-subject {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.folders-subject__identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.folders-subject__name {
+  font-size: var(--control-ui-text-sm);
+}
+
+.folders-subject__hint {
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.folders-subject__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.folders-subject__inherit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--control-ui-text-xs);
+  color: var(--muted);
+}
+
+.folders-subject__effective {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}
+
+.folders-perm {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.folders-perm__button {
+  background: none;
+  border: none;
+  border-inline-end: 1px solid var(--border);
+  padding: 2px var(--space-3);
+  font: inherit;
+  font-size: var(--control-ui-text-xs);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.folders-perm__button:last-child {
+  border-inline-end: none;
+}
+
+.folders-perm__button--active {
+  background: var(--surface-2, var(--surface));
+  color: inherit;
+  font-weight: 600;
+}
+
+.folders-panel__descendants {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.folders-panel__descendants-label {
+  display: block;
+  font-size: var(--control-ui-text-sm);
+}
+
+.folders-panel__descendants-hint {
+  display: block;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+}

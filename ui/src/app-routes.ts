@@ -47,6 +47,7 @@ import {
   permissionsPage as devicePermissionsPage,
 } from "./pages/device/route.ts";
 import { page as devicesPage } from "./pages/devices/route.ts";
+import { page as foldersPage } from "./pages/folders/route.ts";
 import { page as labsPage } from "./pages/labs/route.ts";
 import { page as lobsterdexPage } from "./pages/lobsterdex/route.ts";
 import { page as logsPage } from "./pages/logs/route.ts";
@@ -102,6 +103,7 @@ const APP_ROUTE_TREE = [
   connectionPage,
   usersPage,
   departmentsPage,
+  foldersPage,
   auditPage,
   labsPage,
   aboutPage,
