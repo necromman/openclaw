@@ -38,16 +38,16 @@ NAS 공유 (읽기 전용)                호스트 로컬 색인            에
 openclaw knowledge sync --source <문서 폴더> --out <색인 폴더> [옵션]
 ```
 
-| 옵션                | 기본값                      | 뜻                                                            |
-| ------------------- | --------------------------- | ------------------------------------------------------------- |
-| `--source <dir>`    | (필수)                      | 읽을 문서 폴더. 절대 쓰지 않는다                              |
-| `--out <dir>`       | (필수)                      | 사이드카를 쓸 색인 폴더. `--source` 안이면 거부               |
-| `--include <목록>`  | `pdf,docx,xlsx,pptx,hwp,hwpx,md,txt` | 쉼표로 구분한 확장자. 목록 밖은 건너뛴다             |
-| `--max-bytes <n>`   | `20971520` (20 MiB)         | 이보다 큰 원본은 건너뛴다. 상한 40 MiB                        |
-| `--concurrency <n>` | `2`                         | 동시 변환 수. 상한 8. LibreOffice 가 변환마다 프로세스를 뜬다 |
-| `--dry-run`         | 꺼짐                        | 변환·쓰기·삭제를 하지 않고 계획만 낸다                        |
-| `--verbose`         | 꺼짐                        | 건너뛴 파일까지 표에 넣는다                                   |
-| `--json`            | 꺼짐                        | 요약 객체를 그대로 출력한다                                   |
+| 옵션                | 기본값                               | 뜻                                                            |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------- |
+| `--source <dir>`    | (필수)                               | 읽을 문서 폴더. 절대 쓰지 않는다                              |
+| `--out <dir>`       | (필수)                               | 사이드카를 쓸 색인 폴더. `--source` 안이면 거부               |
+| `--include <목록>`  | `pdf,docx,xlsx,pptx,hwp,hwpx,md,txt` | 쉼표로 구분한 확장자. 목록 밖은 건너뛴다                      |
+| `--max-bytes <n>`   | `20971520` (20 MiB)                  | 이보다 큰 원본은 건너뛴다. 상한 40 MiB                        |
+| `--concurrency <n>` | `2`                                  | 동시 변환 수. 상한 8. LibreOffice 가 변환마다 프로세스를 뜬다 |
+| `--dry-run`         | 꺼짐                                 | 변환·쓰기·삭제를 하지 않고 계획만 낸다                        |
+| `--verbose`         | 꺼짐                                 | 건너뛴 파일까지 표에 넣는다                                   |
+| `--json`            | 꺼짐                                 | 요약 객체를 그대로 출력한다                                   |
 
 기본 출력은 표 한 장과 집계 한 줄이다. 표에는 **신규·갱신·삭제·실패**만 나오고, 건너뛴 파일은 집계에만 잡힌다(`--verbose` 로 펼친다).
 
@@ -308,18 +308,18 @@ docker compose ... exec gateway openclaw memory index --force --agent rnd-bot
 
 ## 10. 코드 위치
 
-| 파일                                    | 역할                                                 |
-| --------------------------------------- | ---------------------------------------------------- |
-| `src/knowledge/types.ts`                | 요약·frontmatter·기본값 계약                         |
-| `src/knowledge/sidecar.ts`              | 사이드카 이름, frontmatter 쓰기·읽기, 경로 안전 검사 |
-| `src/knowledge/plan.ts`                 | 공유 훑기, 자격 판정, 고아 사이드카 찾기             |
-| `src/knowledge/convert.ts`              | 확장자별 변환기 선택                                 |
-| `src/gateway/document-cfb.ts`           | OLE2 복합 파일 리더 (hwp 컨테이너)                   |
-| `src/gateway/document-extract-hangul.ts` | hwp 5.0 · hwpx 본문 추출                            |
-| `src/knowledge/convert-pdf.ts`          | 페이지별 pdf 텍스트 (`## p.N`)                       |
-| `src/knowledge/html-markdown.ts`        | 미리보기 HTML -> 마크다운                            |
-| `src/knowledge/sync.ts`                 | 증분 판정과 실행                                     |
-| `src/commands/knowledge.ts`             | 표·집계·JSON 출력                                    |
-| `src/cli/program/register.knowledge.ts` | `openclaw knowledge sync` 등록                       |
+| 파일                                     | 역할                                                 |
+| ---------------------------------------- | ---------------------------------------------------- |
+| `src/knowledge/types.ts`                 | 요약·frontmatter·기본값 계약                         |
+| `src/knowledge/sidecar.ts`               | 사이드카 이름, frontmatter 쓰기·읽기, 경로 안전 검사 |
+| `src/knowledge/plan.ts`                  | 공유 훑기, 자격 판정, 고아 사이드카 찾기             |
+| `src/knowledge/convert.ts`               | 확장자별 변환기 선택                                 |
+| `src/gateway/document-cfb.ts`            | OLE2 복합 파일 리더 (hwp 컨테이너)                   |
+| `src/gateway/document-extract-hangul.ts` | hwp 5.0 · hwpx 본문 추출                             |
+| `src/knowledge/convert-pdf.ts`           | 페이지별 pdf 텍스트 (`## p.N`)                       |
+| `src/knowledge/html-markdown.ts`         | 미리보기 HTML -> 마크다운                            |
+| `src/knowledge/sync.ts`                  | 증분 판정과 실행                                     |
+| `src/commands/knowledge.ts`              | 표·집계·JSON 출력                                    |
+| `src/cli/program/register.knowledge.ts`  | `openclaw knowledge sync` 등록                       |
 
 재사용한 자산은 `src/gateway/document-convert.ts`(soffice), `src/gateway/document-extract-html.ts`(OOXML), 루트 의존성 `clawpdf`·`jszip`·`iconv-lite` 뿐이고 **새 npm 의존성은 0개**다.
