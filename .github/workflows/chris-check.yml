@@ -75,7 +75,7 @@ jobs:
         with:
           fetch-depth: 20
 
-      # 두 가지를 한다.
+      # 세 가지를 한다.
       #  1. origin/main 확보. 저장소 가드 몇 개(env 이름 래칫 등)가 기준 ref 로 그것을
       #     찾고, 얕은 체크아웃에는 없어서 "Could not resolve ... base ref" 로 죽는다.
       #     4 GB 짜리 히스토리를 다 받지 않고 팁 하나만 얕게 가져와 채운다.
@@ -83,7 +83,14 @@ jobs:
       #     로컬에 있으면 그것, 없으면 HEAD~1. 둘 다 없으면(첫 푸시·강제 푸시·얕은
       #     경계) 레인을 건너뛴다. origin/main 으로 떨어뜨리면 포크 델타 전량이 잡혀
       #     lanes=all 이 되고, 그것이 바로 이 레인을 죽이던 전량 검사다.
-      - name: 기준 ref 확보
+      #  3. 검사 대상 경로 추리기. scripts/changed-lanes.mts 는 업스트림이 아는 표면만
+      #     분류하고, 모르는 경로가 하나라도 있으면 "unknown surface; fail-safe all
+      #     lanes" 로 전량 검사를 켠다. 이 포크가 통째로 더한 트리(ix-auth·chris-local
+      #     ·.claude)가 전부 거기 걸린다. 그 트리에는 업스트림 레인이 볼 것이 없으므로
+      #     (Java·Gradle·마크다운·compose·에이전트 설정) 목록에서 뺀다. 이 워크플로
+      #     자신도 뺀다. 도구 표면으로 분류돼 린트 대상을 좁히지 못하고 lint:core 전량
+      #     으로 되돌아가는데, 그 린트는 YAML 을 보지도 않는다.
+      - name: 기준 ref 와 검사 대상 확보
         id: base
         env:
           BEFORE_SHA: ${{ github.event.before }}
@@ -99,13 +106,31 @@ jobs:
             ref="$(git rev-parse HEAD~1)"
           fi
           if [[ -z "$ref" ]]; then
-            echo "ready=0" >> "$GITHUB_OUTPUT"
+            {
+              echo "ready=0"
+              echo "reason=푸시 직전 커밋을 못 찾았다(첫 푸시·강제 푸시·얕은 경계)."
+            } >> "$GITHUB_OUTPUT"
             echo "기준 ref 를 못 찾았다. 이 레인은 건너뛴다."
+            exit 0
+          fi
+          echo "기준 ref: $ref"
+          list="$RUNNER_TEMP/chris-check-paths.txt"
+          git diff --name-only --diff-filter=d "$ref" HEAD |
+            grep -Ev '^(ix-auth/|chris-local/|\.claude/|\.github/workflows/chris-)' \
+            > "$list" || true
+          count="$(grep -c . "$list" || true)"
+          echo "검사 대상 $count 개"
+          cat "$list"
+          if [[ "$count" == "0" ]]; then
+            {
+              echo "ready=0"
+              echo "reason=이번 푸시가 바꾼 것이 이 포크 전용 트리뿐이라 볼 레인이 없다."
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "ready=1" >> "$GITHUB_OUTPUT"
-            echo "ref=$ref" >> "$GITHUB_OUTPUT"
-            echo "기준 ref: $ref"
-            git diff --name-only "$ref" HEAD
+            {
+              echo "ready=1"
+              echo "ref=$ref"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup Node
@@ -143,16 +168,19 @@ jobs:
           BASE_REF: ${{ steps.base.outputs.ref }}
         run: |
           set -o pipefail
-          pnpm check:changed --base "$BASE_REF" --head HEAD 2>&1 |
+          mapfile -t paths < "$RUNNER_TEMP/chris-check-paths.txt"
+          pnpm check:changed --base "$BASE_REF" --head HEAD -- "${paths[@]}" 2>&1 |
             tee "$RUNNER_TEMP/chris-check.log"
 
-      - name: 기준 ref 없음
+      - name: 검사 대상 없음
         if: steps.base.outputs.ready != '1'
+        env:
+          REASON: ${{ steps.base.outputs.reason }}
         run: |
           {
             echo "## chris-check 건너뜀: pnpm check:changed"
             echo
-            echo "푸시 직전 커밋을 못 찾아 변경분을 고를 수 없었다(첫 푸시·강제 푸시·얕은 경계)."
+            echo "$REASON"
             echo "다음 푸시에서 다시 돈다."
           } >> "$GITHUB_STEP_SUMMARY"
 
