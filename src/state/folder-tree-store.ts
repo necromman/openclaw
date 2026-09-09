@@ -209,6 +209,12 @@ export function recordFolderTreeNodesScanned(
 /**
  * Drop rows under one branch that this walk did not touch.
  *
+ * The reading half runs outside a write transaction and the deleting half runs in short
+ * batches, because the Gateway is using the same database the whole time. Reading 19,000
+ * rows inside one write transaction holds the write lock for as long as the read takes,
+ * and on a busy two-core NAS that was enough to blow the busy timeout and fail the walk
+ * at its last step (measured 2026-09-09).
+ *
  * The prefix match is done in TypeScript rather than with a SQL `LIKE`, because these
  * folder names are full of `_` and `%` and a pattern would quietly match the wrong
  * siblings. `00_공용폴더` alone would match `000공용폴더` under `LIKE`.
@@ -219,41 +225,43 @@ export function pruneFolderTreeBranch(
 ): number {
   ensureFolderTreeSchema(options);
   const prefix = params.branchPath.length === 0 ? "" : `${params.branchPath}/`;
-  return runOpenClawStateWriteTransaction(
-    ({ db }) => {
-      const rows = executeSqliteQuerySync(
-        db,
-        folderTreeDb(db)
-          .selectFrom("folder_tree_nodes")
-          .select(["folder_path", "scanned_at"])
-          .where("scope_root", "=", params.scopeRoot),
-      ).rows;
-      const doomed = rows
-        .filter(
-          (row) =>
-            row.scanned_at < params.seenBefore &&
-            (prefix.length === 0 ||
-              row.folder_path === params.branchPath ||
-              row.folder_path.startsWith(prefix)),
-        )
-        .map((row) => row.folder_path);
-      if (doomed.length === 0) {
-        return 0;
-      }
-      for (let start = 0; start < doomed.length; start += WRITE_BATCH_SIZE) {
+  const database = openOpenClawStateDatabase(options);
+  const rows = executeSqliteQuerySync(
+    database.db,
+    folderTreeDb(database.db)
+      .selectFrom("folder_tree_nodes")
+      .select(["folder_path", "scanned_at"])
+      .where("scope_root", "=", params.scopeRoot),
+  ).rows;
+  const doomed = rows
+    .filter(
+      (row) =>
+        row.scanned_at < params.seenBefore &&
+        (prefix.length === 0 ||
+          row.folder_path === params.branchPath ||
+          row.folder_path.startsWith(prefix)),
+    )
+    .map((row) => row.folder_path);
+  if (doomed.length === 0) {
+    return 0;
+  }
+  for (let start = 0; start < doomed.length; start += WRITE_BATCH_SIZE) {
+    const batch = doomed.slice(start, start + WRITE_BATCH_SIZE);
+    runOpenClawStateWriteTransaction(
+      ({ db }) => {
         executeSqliteQuerySync(
           db,
           folderTreeDb(db)
             .deleteFrom("folder_tree_nodes")
             .where("scope_root", "=", params.scopeRoot)
-            .where("folder_path", "in", doomed.slice(start, start + WRITE_BATCH_SIZE)),
+            .where("folder_path", "in", batch),
         );
-      }
-      return doomed.length;
-    },
-    options,
-    { operationLabel: "folderTree.nodes.prune" },
-  );
+      },
+      options,
+      { operationLabel: "folderTree.nodes.prune" },
+    );
+  }
+  return doomed.length;
 }
 
 /** The last walk recorded for one mount, running or finished. */

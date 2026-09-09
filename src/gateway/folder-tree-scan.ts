@@ -301,31 +301,49 @@ export async function scanFolderTree(
       // Each pass takes one directory; the loop ends when the queue is empty.
     }
   };
+  // Whatever happens from here on, the claim has to be released. A walk that throws and
+  // leaves the claim standing blocks every later walk for the two-hour staleness window,
+  // and the next walk an operator asks for is the one that matters.
+  let removed = 0;
   try {
-    await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    flush(true);
+    try {
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    } finally {
+      flush(true);
+    }
+    try {
+      // Rows this walk never touched are folders that are gone. Their rules are handled
+      // separately by the orphan screen, which is deliberate: a snapshot must never
+      // delete an operator's rule on its own.
+      removed = pruneFolderTreeBranch(
+        { scopeRoot: options.root, branchPath, seenBefore: startedAt },
+        stateOptions,
+      );
+    } catch (error) {
+      // A stale row left behind is a folder that shows in the tree until the next walk.
+      // That is a far smaller fault than failing a walk that already read the share.
+      log.warn("folder tree prune failed", { branchPath, error: String(error) });
+    }
   } finally {
-    flush(true);
+    try {
+      finishFolderTreeScan(
+        {
+          scopeRoot: options.root,
+          nowMs: Date.now(),
+          durationMs: Date.now() - startedAt,
+          folderCount: folders,
+          unreadableCount: unreadable,
+          truncated,
+        },
+        stateOptions,
+      );
+    } catch (error) {
+      // Never let the bookkeeping replace the real failure on its way out. The claim then
+      // stands until the staleness window clears it, which is the backstop it is for.
+      log.warn("folder tree scan claim not released", { branchPath, error: String(error) });
+    }
   }
-  // Rows this walk never touched are folders that are gone. Their rules are handled
-  // separately by the orphan screen, which is deliberate: a snapshot must never delete an
-  // operator's rule on its own.
-  const removed = pruneFolderTreeBranch(
-    { scopeRoot: options.root, branchPath, seenBefore: startedAt },
-    stateOptions,
-  );
   const durationMs = Date.now() - startedAt;
-  finishFolderTreeScan(
-    {
-      scopeRoot: options.root,
-      nowMs: Date.now(),
-      durationMs,
-      folderCount: folders,
-      unreadableCount: unreadable,
-      truncated,
-    },
-    stateOptions,
-  );
   log.info("folder tree scan finished", {
     branchPath,
     durationMs,
