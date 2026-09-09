@@ -80,6 +80,7 @@
   - **재기동 직후 첫 질문이 가장 느리다(84초).** 긴 세션(48.5k)이 새 세션보다 빠르다(10.5초 대 14~34초).
   - **다음 사람이 볼 것: 색인을 더 늘리기 전에 응답 시간을 다시 잰다.** 지금 `00_공용폴더` 3,302 파일·5만 조각으로 에이전트 SQLite 가 359 MiB 이고 컨테이너 밖에서 여는 데만 15초다(FTS 질의는 1밀리초). 나머지 공유 일곱 개는 2만 8천 파일이다. 기동 로그에 `memory pressure: level=warning ... rss=1000.2 MiB` 가 이미 찍혔다.
   - **결정 대기 하나: 사고 수준.** 작성칸의 사고 수준이 High 인데 우리가 정한 값이 아니라 모델 계약의 기본값이다(Sonnet 5·Opus 5 는 비워 두면 적응형/High). 같은 질문이 High 14.5~33.8초, Minimal 6.5~6.9초다. `agents.defaults.thinkingDefault` 한 줄로 내릴 수 있고 답의 깊이가 함께 얕아진다. 사용자가 고를 일이라 그대로 두었다.
+  - **Z 에서 보고 넘어간 것 셋**: 새 세션도 시작부터 컨텍스트를 47.8k 토큰 쓴다(시스템 프롬프트 + 도구 정의 + 메모리). 모델 선택기의 톱니(모델 구성)가 직원에게도 보이고 누르면 관리자 화면이라 막힌다(W 단계부터 있던 것이다). 상태 볼륨에 `openclaw-agent.sqlite.reindex-lock.sqlite` 가 남아 세션 시작 동기화가 `Memory reindex lock is held` 로 건너뛰어진다(검색 결과에는 영향이 없다).
   - 진단 프로파일러는 템플릿에 `"diagnostics": { "flags": ["reply.profiler"] }` 를 한 줄 넣고 재기동하면 켜진다. 켜면 `agent turn timings ... stages=` 가 로그에 남는다. 측정이 끝나면 그 줄을 지운다(로그가 많아진다).
 
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
