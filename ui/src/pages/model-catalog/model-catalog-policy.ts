@@ -48,8 +48,15 @@ export type ModelAuthSourceProvider = {
   status?: string;
 };
 
-/** Provider health values that mean "this provider can answer right now". */
-const HEALTHY_AUTH_STATUS: ReadonlySet<string> = new Set(["ok", "warning", "degraded"]);
+/**
+ * Provider health values that mean "this provider can answer right now".
+ *
+ * The vocabulary is `AuthProviderHealthStatus` in src/agents/auth-health.ts: "ok" is a
+ * live credential, "expiring" is one that still works and will need renewing, and
+ * "static" is a key that came from configuration or the environment and never expires.
+ * "expired" and "missing" are the two that cannot answer.
+ */
+const HEALTHY_AUTH_STATUS: ReadonlySet<string> = new Set(["ok", "expiring", "static"]);
 
 /** The wildcard entry that opens one whole provider. */
 export function providerWildcard(provider: string): string {

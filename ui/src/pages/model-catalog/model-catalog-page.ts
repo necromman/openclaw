@@ -146,18 +146,28 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     if (!client || !this.connected || !canManageIxAuthUsers()) {
       return;
     }
+    // `models.list` resolves its catalog per agent and refuses the call outright when no
+    // agent can be named, which on an explicit-ownership roster is what an omitted
+    // `agentId` means. Asking the roster first is what keeps the screen from showing an
+    // empty catalog that looks like "this provider answers nothing".
+    let agentId: string | undefined;
     try {
-      const [models, auth] = await Promise.all([
-        client.request<{ models?: ModelCatalogSourceEntry[] }>("models.list", { view: "all" }),
-        client.request<{ providers?: ModelAuthSourceProvider[] }>("models.authStatus", {}),
-      ]);
-      this.catalog = models.models ?? [];
-      this.auth = auth.providers ?? [];
+      const roster = await client.request<{ agents?: { id?: string }[] }>("agents.list", {});
+      agentId = roster.agents?.find((agent) => typeof agent.id === "string")?.id;
     } catch {
-      // The catalog decorates the policy; losing it must not hide the policy itself.
-      this.catalog = [];
-      this.auth = [];
+      agentId = undefined;
     }
+    // Settled rather than all: the catalog and the credential health answer different
+    // questions, and one of them failing must not blank the other.
+    const [models, auth] = await Promise.allSettled([
+      client.request<{ models?: ModelCatalogSourceEntry[] }>("models.list", {
+        view: "all",
+        ...(agentId ? { agentId } : {}),
+      }),
+      client.request<{ providers?: ModelAuthSourceProvider[] }>("models.authStatus", {}),
+    ]);
+    this.catalog = models.status === "fulfilled" ? (models.value.models ?? []) : [];
+    this.auth = auth.status === "fulfilled" ? (auth.value.providers ?? []) : [];
   }
 
   private get groups(): ModelCatalogProviderGroup[] {

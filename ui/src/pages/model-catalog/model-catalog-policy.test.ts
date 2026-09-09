@@ -15,7 +15,7 @@ const catalog = [
 
 const auth = [
   { provider: "openai", displayName: "OpenAI", status: "ok" },
-  { provider: "anthropic", displayName: "Anthropic", status: "error" },
+  { provider: "anthropic", displayName: "Anthropic", status: "missing" },
 ];
 
 describe("buildProviderGroups", () => {
@@ -51,6 +51,17 @@ describe("buildProviderGroups", () => {
       pinned: ["openai/gpt-5.6-luna"],
     });
     expect(groups[0]?.models.map((model) => model.ref)).toEqual(["openai/gpt-5.6-luna"]);
+  });
+
+  it("counts a key from configuration and an expiring credential as working", () => {
+    for (const status of ["static", "expiring"]) {
+      const groups = buildProviderGroups({
+        catalog,
+        auth: [{ provider: "openai", displayName: "OpenAI", status }],
+        allow: [],
+      });
+      expect(groups.find((group) => group.provider === "openai")?.authenticated).toBe(true);
+    }
   });
 
   it("lists an authenticated provider that answers no models", () => {
