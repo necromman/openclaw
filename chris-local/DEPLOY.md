@@ -1517,7 +1517,9 @@ tail -20 /volume1/docker/openclaw/nightly-index.log
 | pptx 만 `failed/converter-unavailable` | 이미지에 LibreOffice 가 없다. D 단계의 빌드 인자를 확인하고 이미지를 다시 만든다                                |
 | 스캔 pdf 가 `ignored/empty` 로 남는다  | 텍스트 층이 없는 이미지 pdf 다. OCR 은 범위 밖이다                                                              |
 | hwp 가 `failed/encrypted` 로 남는다    | 암호가 걸린 문서다. 비밀번호 없이는 읽을 수 없다. `distribution` 은 배포용, `legacy-format` 은 HWP 3.0 이다     |
-| 쓰기 권한 오류                         | 색인 폴더 소유자가 컨테이너의 `node`(uid 1000)가 아니다                                                         |
+| 쓰기 권한 오류                         | 색인 폴더 소유자가 컨테이너의 `node`(uid 1000)가 아니다. `chown -R 1000:1000 <색인 폴더의 부모>` (12.1)          |
+| `folders scan` 이 "another scan is already running" 만 낸다 | 앞의 훑기가 잠금 행을 남기고 죽었다. 두 시간이 지나면 저절로 풀린다. 당장 풀려면 `openclaw folders clear` 로 저장본을 버리고 다시 훑는다(그동안 화면은 NAS 를 직접 읽는다) |
+| 색인이 파일 몇백 개에서 끝나 버린다    | 사람이 쓰고 있는 공유에서 파일 하나가 변환기를 터뜨린 것이다. 잠금 파일(`~$이름.pptx`)과 암호 걸린 PDF 가 그랬고 둘 다 고쳤다. 다른 사례가 나오면 `.idx.err` 마지막 줄이 파일 이름을 말해 준다 |
 | 원본을 지웠는데 답변에 계속 나온다     | 동기를 한 번 더 돌려 사이드카를 지우고 재색인한다                                                               |
 
 ## 13. 진바이오 NAS 배치 (CI/CD)
