@@ -155,7 +155,7 @@ describe("folder access store", () => {
         listAllFolderRules(ROOT)
           .map((row) => `${row.folderPath}:${row.subjectId}`)
           .sort(),
-      ).toEqual(["00:rnd", "00/a:qa", "00x:rnd"]);
+      ).toEqual(["00/a:qa", "00:rnd", "00x:rnd"]);
     });
   });
 
