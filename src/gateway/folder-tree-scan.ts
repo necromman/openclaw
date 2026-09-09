@@ -30,6 +30,7 @@ import {
   beginFolderTreeScan,
   finishFolderTreeScan,
   pruneFolderTreeBranch,
+  readFolderTreeNode,
   recordFolderTreeNodesScanned,
   recordFolderTreeNodesSeen,
   type FolderTreeNode,
@@ -92,8 +93,18 @@ function isInsideRoot(root: string, candidate: string): boolean {
   return candidate === root || candidate.startsWith(`${root}${path.sep}`);
 }
 
+/**
+ * The stored path for one child.
+ *
+ * Normalized to NFC, because that is the form every rule is written in and the form the
+ * Gateway hands back to a browser (folder-access-path.ts). Ten folders on this NAS are
+ * stored decomposed, and a snapshot keyed on the decomposed form would never be found by
+ * a lookup that had already normalized. The absolute path beside it keeps the bytes the
+ * filesystem actually uses, so nothing here ever has to guess a name back.
+ */
 function joinFolderPath(parent: string, name: string): string {
-  return parent.length === 0 ? name : `${parent}/${name}`;
+  const joined = parent.length === 0 ? name : `${parent}/${name}`;
+  return joined.normalize("NFC");
 }
 
 /**
@@ -187,8 +198,17 @@ export async function scanFolderTree(
   const maxFolders = options.maxFolders ?? FOLDER_TREE_MAX_FOLDERS;
   const maxDepth = options.maxDepth ?? FOLDER_TREE_MAX_DEPTH;
   const progressEvery = options.progressEvery ?? 2000;
+  // A branch is re-walked from the absolute path the last walk recorded, when there is
+  // one. Rebuilding it from the normalized rule path would miss a folder whose real name
+  // is stored decomposed, and answer "unreadable" for a folder that is right there.
+  const branchNode =
+    branchPath.length === 0
+      ? undefined
+      : readFolderTreeNode({ scopeRoot: options.root, folderPath: branchPath }, stateOptions);
   const branchAbsolute =
-    branchPath.length === 0 ? options.root : path.join(options.root, ...branchPath.split("/"));
+    branchPath.length === 0
+      ? options.root
+      : (branchNode?.absolutePath ?? path.join(options.root, ...branchPath.split("/")));
   const queue: PendingDirectory[] = [
     { folderPath: branchPath, absolutePath: branchAbsolute, depth: 0 },
   ];
