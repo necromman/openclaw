@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  documentPreviewKindForPath,
-  isDocumentPreviewPath,
-  isHangulDocumentPath,
-} from "./document-preview-kinds.ts";
+import { documentPreviewKindForPath, isDocumentPreviewPath } from "./document-preview-kinds.ts";
 
 describe("documentPreviewKindForPath", () => {
   it("maps every portable document extension to its family", () => {
@@ -48,24 +44,15 @@ describe("documentPreviewKindForPath", () => {
 });
 
 describe("isDocumentPreviewPath", () => {
-  it("accepts every renderable family and rejects hangul and non-documents", () => {
+  it("accepts every renderable family, hangul included, and rejects non-documents", () => {
     expect(isDocumentPreviewPath("report.pdf")).toBe(true);
     expect(isDocumentPreviewPath("report.docx")).toBe(true);
     expect(isDocumentPreviewPath("budget.ods")).toBe(true);
     expect(isDocumentPreviewPath("deck.pptx")).toBe(true);
-    expect(isDocumentPreviewPath("memo.hwp")).toBe(false);
-    expect(isDocumentPreviewPath("memo.hwpx")).toBe(false);
+    expect(isDocumentPreviewPath("memo.hwp")).toBe(true);
+    expect(isDocumentPreviewPath("C:\\docs\\memo.HWPX")).toBe(true);
+    expect(isDocumentPreviewPath(".hwp")).toBe(false);
     expect(isDocumentPreviewPath("index.ts")).toBe(false);
     expect(isDocumentPreviewPath("Makefile")).toBe(false);
-  });
-});
-
-describe("isHangulDocumentPath", () => {
-  it("matches only hwp and hwpx", () => {
-    expect(isHangulDocumentPath("memo.hwp")).toBe(true);
-    expect(isHangulDocumentPath("C:\\docs\\memo.HWPX")).toBe(true);
-    expect(isHangulDocumentPath("report.pdf")).toBe(false);
-    expect(isHangulDocumentPath(".hwp")).toBe(false);
-    expect(isHangulDocumentPath("hwp")).toBe(false);
   });
 });

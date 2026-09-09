@@ -6,6 +6,7 @@ export const KNOWLEDGE_CONVERTER_IDS = [
   "docx-html",
   "xlsx-html",
   "soffice-pdf-text",
+  "hwp-text",
   "copy",
 ] as const;
 
@@ -19,10 +20,19 @@ export type KnowledgeIgnoreReason =
   | "outside-root"
   | "empty";
 
-/** Why a conversion attempt failed. */
+/**
+ * Why a conversion attempt failed.
+ *
+ * The three Hangul-specific values exist so the run report can name a document nobody can
+ * read without a secret, rather than filing it under one blanket failure with every
+ * damaged file.
+ */
 export type KnowledgeFailureReason =
   | "converter-unavailable"
   | "conversion-failed"
+  | "encrypted"
+  | "distribution"
+  | "legacy-format"
   | "read-failed"
   | "write-failed";
 
@@ -95,10 +105,25 @@ export const KNOWLEDGE_CONVERTIBLE_EXTENSIONS = [
   "csv",
   "md",
   "txt",
+  "hwp",
+  "hwpx",
 ] as const;
 
-/** Default `--include` set: the four delivery formats plus the two text formats. */
-export const KNOWLEDGE_DEFAULT_INCLUDE = ["pdf", "docx", "xlsx", "pptx", "md", "txt"] as const;
+/**
+ * Default `--include` set: the four delivery formats, the two Hangul containers, and the
+ * two text formats. Hangul documents are the second most common kind on the customer
+ * share, so leaving them out of the default would leave most of it unsearchable.
+ */
+export const KNOWLEDGE_DEFAULT_INCLUDE = [
+  "pdf",
+  "docx",
+  "xlsx",
+  "pptx",
+  "hwp",
+  "hwpx",
+  "md",
+  "txt",
+] as const;
 
 /** Default `--max-bytes`: 20 MiB, matching the document preview ceiling. */
 export const KNOWLEDGE_DEFAULT_MAX_BYTES = 20 * 1024 * 1024;

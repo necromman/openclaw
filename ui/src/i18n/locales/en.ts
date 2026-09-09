@@ -225,8 +225,6 @@ export const en: TranslationMap & {
     errorConversionFailed:
       "Converting this document for preview failed. It may be password protected or damaged.",
     errorUnsupportedFormat: "This file format cannot be previewed as a document.",
-    hangulNotice:
-      "Preview of Hangul documents (hwp, hwpx) is not available yet. You can still download the file.",
     convertedBy: "Converted for preview",
     loading: "Loading document preview",
   },
@@ -2349,6 +2347,7 @@ export const en: TranslationMap & {
     connection: "Gateway",
     users: "Users",
     departments: "Departments",
+    folders: "Folders",
     audit: "Audit Log",
     sessions: "Sessions",
     usage: "Usage",
@@ -2398,6 +2397,7 @@ export const en: TranslationMap & {
     connection: "Gateway endpoint, credentials, and handshake status.",
     users: "Accounts, roles, departments, and sessions.",
     departments: "Departments, agent bindings, and the folders agents may read.",
+    folders: "Who may see which shared folder.",
     audit: "Sign-ins, questions, file reads, and administrator actions.",
     sessions: "Active sessions and defaults.",
     usage: "API usage and costs.",

@@ -36,11 +36,5 @@ export function documentPreviewKindForPath(path: string): DocumentPreviewKind {
 
 /** True when the Gateway should be asked for a rendered document preview. */
 export function isDocumentPreviewPath(path: string): boolean {
-  const kind = documentPreviewKindForPath(path);
-  return kind !== null && kind !== "hangul";
-}
-
-/** Hangul word processor files carry no converter yet; they only get a notice. */
-export function isHangulDocumentPath(path: string): boolean {
-  return documentPreviewKindForPath(path) === "hangul";
+  return documentPreviewKindForPath(path) !== null;
 }

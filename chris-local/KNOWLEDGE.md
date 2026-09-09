@@ -42,7 +42,7 @@ openclaw knowledge sync --source <문서 폴더> --out <색인 폴더> [옵션]
 | ------------------- | --------------------------- | ------------------------------------------------------------- |
 | `--source <dir>`    | (필수)                      | 읽을 문서 폴더. 절대 쓰지 않는다                              |
 | `--out <dir>`       | (필수)                      | 사이드카를 쓸 색인 폴더. `--source` 안이면 거부               |
-| `--include <목록>`  | `pdf,docx,xlsx,pptx,md,txt` | 쉼표로 구분한 확장자. 목록 밖은 건너뛴다                      |
+| `--include <목록>`  | `pdf,docx,xlsx,pptx,hwp,hwpx,md,txt` | 쉼표로 구분한 확장자. 목록 밖은 건너뛴다             |
 | `--max-bytes <n>`   | `20971520` (20 MiB)         | 이보다 큰 원본은 건너뛴다. 상한 40 MiB                        |
 | `--concurrency <n>` | `2`                         | 동시 변환 수. 상한 8. LibreOffice 가 변환마다 프로세스를 뜬다 |
 | `--dry-run`         | 꺼짐                        | 변환·쓰기·삭제를 하지 않고 계획만 낸다                        |
@@ -66,7 +66,7 @@ created=5  updated=0  deleted=0  skipped=0  ignored=1  failed=0  (3412ms)
   "source": "/mnt/nas/rnd",
   "out": "/mnt/knowledge/rnd",
   "dryRun": false,
-  "include": ["docx", "md", "pdf", "pptx", "txt", "xlsx"],
+  "include": ["docx", "hwp", "hwpx", "md", "pdf", "pptx", "txt", "xlsx"],
   "maxBytes": 20971520,
   "concurrency": 2,
   "startedAt": "2026-09-08T07:40:00.000Z",
@@ -122,10 +122,13 @@ converter: "docx-html"
 | `pdf`                       | `clawpdf` 로 페이지별 텍스트                     | `pdf-text`         | 페이지마다 `## p.N` 제목              |
 | `docx`                      | `document-extract-html.ts` (jszip, 의존성 0)     | `docx-html`        | 제목 단계·글머리표·표를 마크다운 표로 |
 | `xlsx`                      | 같은 모듈                                        | `xlsx-html`        | 시트마다 `## 시트명` + 마크다운 표    |
+| `hwp` `hwpx`                | `document-extract-hangul.ts` (의존성 0)          | `hwp-text`         | 문단·표 칸을 순서대로 (S 단계)        |
 | `pptx` `doc` `xls` `ppt` 등 | `document-convert.ts` (soffice) -> pdf -> 텍스트 | `soffice-pdf-text` | 슬라이드·페이지마다 `## p.N`          |
 | `md` `txt` `csv`            | 디코딩 후 복사                                   | `copy`             | 본문 그대로                           |
 
 **페이지 제목이 요점이다.** 인용이 사이드카의 줄 번호를 주므로, 그 줄 바로 위의 `## p.7` 이 "원본 7쪽" 이라는 뜻이 된다. 문서를 한 덩어리로 뽑으면 그 정보가 사라진다.
+
+**hwp·hwpx 도 LibreOffice 없이 된다 (S 단계).** 오히려 LibreOffice 로는 **안 된다**. 이미지의 LibreOffice 7.4 한글 필터는 2005년 이전 HWP 3.0 만 알아서, 요즘 hwp 를 주면 종료코드 0 을 내고 아무 파일도 만들지 않는다(실측 17개 중 0개 성공). 그래서 내장 리더가 hwp 5.0 의 CFB 컨테이너와 hwpx 의 zip+xml 을 직접 읽는다. 근거·비교표·실측은 [FILE-PREVIEW.md](FILE-PREVIEW.md) 9절.
 
 **docx·xlsx 는 LibreOffice 없이도 된다.** 미리보기용으로 이미 있는 무의존 OOXML 리더를 재사용하고, 그 리더가 못 여는 파일만 LibreOffice 로 넘긴다. pptx 는 처음부터 LibreOffice 경로다.
 
@@ -277,7 +280,9 @@ Memory index failed (rnd-bot): openai embeddings failed: 429 ... credit_balance_
 
 | 항목                | 상태                                                                                                     |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |
-| hwp / hwpx          | **지원하지 않는다.** 사용자 확정 사항이고 변환기도 없다. `ignored/extension` 으로 집계된다               |
+| hwp / hwpx          | **지원한다**(S 단계, 기본 `--include` 에 들어 있다). 서식·그림은 남지 않고 본문·표 칸 글자만 남는다      |
+| 암호·배포용 hwp     | 읽지 못한다. `failed/encrypted` · `failed/distribution` 으로 사유가 따로 잡힌다                          |
+| HWP 3.0             | 읽지 못한다. `failed/legacy-format`. 실측 표본에는 없었다                                                |
 | 이미지 속 글자      | 추출하지 않는다. OCR 이 없으므로 스캔 pdf 는 `ignored/empty` 로 남는다                                   |
 | 20 MiB 초과 파일    | 건너뛴다. 상한을 올려도 40 MiB 에서 변환기가 거부한다                                                    |
 | 신선도              | 동기 주기만큼 늦는다. 파일 감시가 아니라 주기 실행이다                                                   |
@@ -309,6 +314,8 @@ docker compose ... exec gateway openclaw memory index --force --agent rnd-bot
 | `src/knowledge/sidecar.ts`              | 사이드카 이름, frontmatter 쓰기·읽기, 경로 안전 검사 |
 | `src/knowledge/plan.ts`                 | 공유 훑기, 자격 판정, 고아 사이드카 찾기             |
 | `src/knowledge/convert.ts`              | 확장자별 변환기 선택                                 |
+| `src/gateway/document-cfb.ts`           | OLE2 복합 파일 리더 (hwp 컨테이너)                   |
+| `src/gateway/document-extract-hangul.ts` | hwp 5.0 · hwpx 본문 추출                            |
 | `src/knowledge/convert-pdf.ts`          | 페이지별 pdf 텍스트 (`## p.N`)                       |
 | `src/knowledge/html-markdown.ts`        | 미리보기 HTML -> 마크다운                            |
 | `src/knowledge/sync.ts`                 | 증분 판정과 실행                                     |

@@ -32,7 +32,7 @@ async function seed(): Promise<{ source: string; out: string }> {
   const source = tempDirs.make("knowledge-cli-src-");
   const out = tempDirs.make("knowledge-cli-out-");
   await fs.writeFile(path.join(source, "시약-재고.md"), "# 시약 재고\n\n에탄올 12병\n", "utf8");
-  await fs.writeFile(path.join(source, "기타.hwp"), "무시", "utf8");
+  await fs.writeFile(path.join(source, "기타.zip"), "무시", "utf8");
   return { out, source };
 }
 
@@ -43,7 +43,7 @@ describe("knowledgeSyncCommand", () => {
     await knowledgeSyncCommand({ out, source }, runtime);
     expect(lines[0]).toBe("ACTION\tCONVERTER\tSOURCE\tDETAIL");
     expect(lines[1]).toBe("created\tcopy\t시약-재고.md\t-");
-    // The ignored hwp stays out of the default view; only counts mention it.
+    // The ignored archive stays out of the default view; only counts mention it.
     expect(lines).toHaveLength(3);
     expect(lines[2]).toContain("created=1");
     expect(lines[2]).toContain("ignored=1");
@@ -53,7 +53,7 @@ describe("knowledgeSyncCommand", () => {
     const { out, source } = await seed();
     const { lines, runtime } = createRuntime();
     await knowledgeSyncCommand({ out, source, verbose: true }, runtime);
-    expect(lines.join("\n")).toContain("ignored\t-\t기타.hwp\textension");
+    expect(lines.join("\n")).toContain("ignored\t-\t기타.zip\textension");
   });
 
   test("--json prints the summary object instead of the table", async () => {

@@ -7,9 +7,10 @@
  * account, inside the department its agent belongs to - so naming somebody else's id
  * returns "not found" rather than their file.
  *
- * Text extraction reuses the knowledge indexer's converter, so a PDF, Word, Excel or
- * PowerPoint file reads here exactly as it reads in the document index, including the
- * LibreOffice hop and the CP949 fallback for legacy Korean text files.
+ * Text extraction reuses the knowledge indexer's converter, so a PDF, Word, Excel,
+ * PowerPoint or Hangul file reads here exactly as it reads in the document index,
+ * including the LibreOffice hop, the built-in Hangul reader, and the CP949 fallback for
+ * legacy Korean text files.
  */
 import { Type } from "typebox";
 import { createLazyRuntimeModule } from "../../shared/lazy-runtime.js";
@@ -47,7 +48,7 @@ const MediaReadToolSchema = Type.Object(
 );
 
 export const MEDIA_READ_TOOL_DESCRIPTION =
-  "Open one attachment the user uploaded, by the id media_list reported. Images return as images; PDF, Word, Excel, PowerPoint and text return as extracted text. " +
+  "Open one attachment the user uploaded, by the id media_list reported. Images return as images; PDF, Word, Excel, PowerPoint, Hangul (hwp, hwpx) and text return as extracted text. " +
   `Reads at most ${Math.round(MEDIA_READ_MAX_BYTES / (1024 * 1024))} MB and returns at most ${MEDIA_READ_MAX_CHARS} characters. ` +
   MEDIA_REFERENCE_TOOL_HINT;
 

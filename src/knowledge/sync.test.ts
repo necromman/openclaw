@@ -120,10 +120,10 @@ describe("syncKnowledgeIndex", () => {
   test("skips a file over the size ceiling and one with an unlisted extension", async () => {
     const { out, source } = roots();
     await writeSource(source, "big.txt", "가".repeat(500));
-    await writeSource(source, "notes.hwp", "무시");
+    await writeSource(source, "notes.zip", "무시");
     const summary = await syncKnowledgeIndex({ maxBytes: 64, out, source });
     expect(entryFor(summary, "big.txt")).toMatchObject({ action: "ignored", reason: "too-large" });
-    expect(entryFor(summary, "notes.hwp")).toMatchObject({
+    expect(entryFor(summary, "notes.zip")).toMatchObject({
       action: "ignored",
       reason: "extension",
     });

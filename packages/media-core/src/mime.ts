@@ -59,6 +59,13 @@ const EXT_BY_MIME: Record<string, string> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+  // Hangul word processor. Browsers and Windows disagree on the name for the same
+  // container, so every spelling in the wild maps to one extension.
+  "application/x-hwp": ".hwp",
+  "application/haansofthwp": ".hwp",
+  "application/vnd.hancom.hwp": ".hwp",
+  "application/hwp+zip": ".hwpx",
+  "application/vnd.hancom.hwpx": ".hwpx",
   "text/csv": ".csv",
   "text/plain": ".txt",
   "text/markdown": ".md",

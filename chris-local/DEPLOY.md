@@ -477,7 +477,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | ----------- | ------------------------------------------------------------------------------------- |
 | 이미지 증가 | 약 **+580 MiB** (실측 `chris-local/FILE-PREVIEW.md` 6절)                              |
 | 대상 확장자 | pdf, docx, xlsx, pptx, doc, xls, ppt                                                  |
-| 제외        | hwp·hwpx (사용자 확정 범위 밖. 화면에 안내문이 뜬다)                                  |
+| 변환기 불필요 | hwp·hwpx (내장 리더가 읽는다. LibreOffice 로는 오히려 안 된다. FILE-PREVIEW.md 9절) |
 | 폰트        | `fonts-noto-cjk` 계열 + `fonts-nanum`. 폰트가 없어도 변환은 종료코드 0 을 내므로 주의 |
 
 디스크가 빠듯해 변환기를 빼야 하면 빌드 인자에서 `libreoffice-*` 세 개만 지운다. 폰트는 PDF 생성에도 쓰이므로 남긴다.
@@ -1277,7 +1277,7 @@ ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth
 | `memory index` 가 429 로 실패한다      | 임베딩 제공자가 openai 인데 키·크레딧이 없다. 납품 템플릿은 `memory.search.provider: "none"`(내장 FTS 전용)이다 |
 | pptx 만 `failed/converter-unavailable` | 이미지에 LibreOffice 가 없다. D 단계의 빌드 인자를 확인하고 이미지를 다시 만든다                                |
 | 스캔 pdf 가 `ignored/empty` 로 남는다  | 텍스트 층이 없는 이미지 pdf 다. OCR 은 범위 밖이다                                                              |
-| hwp 가 통째로 빠진다                   | 지원 대상이 아니다(사용자 확정). `ignored/extension` 으로 집계된다                                              |
+| hwp 가 `failed/encrypted` 로 남는다    | 암호가 걸린 문서다. 비밀번호 없이는 읽을 수 없다. `distribution` 은 배포용, `legacy-format` 은 HWP 3.0 이다     |
 | 쓰기 권한 오류                         | 색인 폴더 소유자가 컨테이너의 `node`(uid 1000)가 아니다                                                         |
 | 원본을 지웠는데 답변에 계속 나온다     | 동기를 한 번 더 돌려 사이드카를 지우고 재색인한다                                                               |
 

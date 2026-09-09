@@ -4,6 +4,7 @@
 // bridge all already exist for the file preview pane. This module only decides which of
 // them a given extension goes through and shapes the result as Markdown.
 import { convertDocumentToPdf } from "../gateway/document-convert.js";
+import { extractHangulText } from "../gateway/document-extract-hangul.js";
 import { extractDocumentHtml } from "../gateway/document-extract-html.js";
 import { pdfBufferToMarkdown } from "./convert-pdf.js";
 import { documentHtmlToMarkdown } from "./html-markdown.js";
@@ -13,6 +14,8 @@ import type { KnowledgeConverterId, KnowledgeFailureReason } from "./types.js";
 const SOFFICE_EXTENSIONS = new Set(["pptx", "ppt", "doc", "xls", "odt", "ods", "odp", "rtf"]);
 /** Extensions that are already text and only need decoding. */
 const TEXT_EXTENSIONS = new Set(["md", "txt", "csv"]);
+/** Hangul word processor containers, read by the built-in reader. LibreOffice cannot open them. */
+const HANGUL_EXTENSIONS = new Set(["hwp", "hwpx"]);
 
 export type KnowledgeConversion =
   | { ok: true; body: string; converter: KnowledgeConverterId }
@@ -59,6 +62,27 @@ async function convertOoxml(
   return await convertThroughSoffice(buffer, extension);
 }
 
+/**
+ * Reads one Hangul word processor document.
+ *
+ * There is no converter to fall back to: LibreOffice's Hangul filter only understands the
+ * pre-2005 format and exits successfully without writing anything for the rest, so a
+ * failure here is final. The reason is kept so the sync report can say which of the three
+ * unreadable kinds it hit (password, distribution copy, HWP 3.0) instead of one blanket
+ * failure line.
+ */
+async function convertHangul(buffer: Buffer, extension: string): Promise<KnowledgeConversion> {
+  const extracted = await extractHangulText({ buffer, sourceExtension: extension });
+  if (extracted.ok) {
+    return { body: normalizeText(extracted.text), converter: "hwp-text", ok: true };
+  }
+  const reason = extracted.reason;
+  if (reason === "empty" || reason === "encrypted" || reason === "distribution") {
+    return { ok: false, reason };
+  }
+  return { ok: false, reason: reason === "legacy-format" ? "legacy-format" : "conversion-failed" };
+}
+
 async function convertThroughSoffice(
   buffer: Buffer,
   extension: string,
@@ -97,6 +121,9 @@ export async function convertKnowledgeSource(params: {
   }
   if (extension === "docx" || extension === "xlsx") {
     return await convertOoxml(params.buffer, extension);
+  }
+  if (HANGUL_EXTENSIONS.has(extension)) {
+    return await convertHangul(params.buffer, extension);
   }
   if (SOFFICE_EXTENSIONS.has(extension)) {
     return await convertThroughSoffice(params.buffer, extension);

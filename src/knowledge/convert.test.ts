@@ -217,10 +217,35 @@ describe("slide and legacy sources", () => {
   });
 
   test("refuses an extension no extractor claims", async () => {
-    expect(await convertKnowledgeSource({ buffer: Buffer.from("x"), extension: "hwp" })).toEqual({
+    expect(await convertKnowledgeSource({ buffer: Buffer.from("x"), extension: "zip" })).toEqual({
       ok: false,
       reason: "conversion-failed",
     });
+  });
+});
+
+describe("hangul sources", () => {
+  test("reads a hwpx through the built-in reader, never through LibreOffice", async () => {
+    const zip = new JSZip();
+    zip.file("mimetype", "application/hwp+zip");
+    zip.file(
+      "Contents/section0.xml",
+      '<?xml version="1.0"?><hs:sec><hp:p><hp:run><hp:t>시약 재고 현황</hp:t></hp:run></hp:p></hs:sec>',
+    );
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    expect(await convertKnowledgeSource({ buffer, extension: "hwpx" })).toEqual({
+      body: "시약 재고 현황",
+      converter: "hwp-text",
+      ok: true,
+    });
+    expect(convertDocumentToPdfMock).not.toHaveBeenCalled();
+  });
+
+  test("reports an unreadable hwp as a conversion failure", async () => {
+    expect(
+      await convertKnowledgeSource({ buffer: Buffer.from("not a document"), extension: "hwp" }),
+    ).toEqual({ ok: false, reason: "conversion-failed" });
+    expect(convertDocumentToPdfMock).not.toHaveBeenCalled();
   });
 });
 

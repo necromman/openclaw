@@ -2,14 +2,19 @@
 // It runs when no external converter is available, so it must never shell out and
 // must never emit markup a preview iframe could execute.
 import type JSZipArchive from "jszip";
+import { extractHangulText, isHangulExtension } from "./document-extract-hangul.js";
 import {
   formatXlsxDateCell,
   readXlsxDateStyles,
   type XlsxDateKind,
 } from "./document-xlsx-dates.js";
 
-/** Only the two OOXML families whose part layout is simple enough to scan without a parser. */
-const SUPPORTED_EXTENSIONS = new Set(["docx", "xlsx"]);
+/**
+ * The two OOXML families whose part layout is simple enough to scan without a parser,
+ * plus the two Hangul word processor containers, which have no converter behind them at
+ * all and therefore reach a reader only here.
+ */
+const SUPPORTED_EXTENSIONS = new Set(["docx", "xlsx", "hwp", "hwpx"]);
 
 // Preview payloads travel over the gateway connection, so the rendered document
 // is capped well below the raw file cap.
@@ -567,6 +572,21 @@ export async function extractDocumentHtml(params: {
   const extension = params.sourceExtension.trim().toLowerCase().replace(/^\./u, "");
   if (!SUPPORTED_EXTENSIONS.has(extension)) {
     return { ok: false };
+  }
+  if (isHangulExtension(extension)) {
+    const extracted = await extractHangulText({
+      buffer: params.buffer,
+      sourceExtension: extension,
+    });
+    if (!extracted.ok) {
+      return { ok: false };
+    }
+    // Table cells arrive as their own paragraphs, so the body is a flat run of blocks.
+    const body = extracted.text
+      .split(/\n{2,}/u)
+      .map((paragraph) => `<p>${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`)
+      .join("");
+    return { html: wrapDocument("Document preview", body), ok: true };
   }
   let zip: JSZipArchive;
   try {

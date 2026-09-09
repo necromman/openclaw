@@ -5,7 +5,6 @@ import { hasOperatorAdminAccess } from "../../../app/operator-access.ts";
 import { patchSettings, type ChatWorkspaceDock } from "../../../app/settings.ts";
 import {
   isDocumentPreviewPath,
-  isHangulDocumentPath,
 } from "../../../components/file-preview/document-preview-kinds.ts";
 import { t } from "../../../i18n/index.ts";
 import { formatUiError } from "../../../lib/format-error.ts";
@@ -273,10 +272,6 @@ function openFile(
       }
       const name = file.name || basenameForPath(path);
       const documentPath = file.workspacePath || file.path || path;
-      // hwp/hwpx never asked for a conversion, so they carry their own notice.
-      if (isHangulDocumentPath(name)) {
-        return documentSidebarContent(result, documentPath, name, { errorCode: "hangul" });
-      }
       if (file.previewKind === "document" && file.document) {
         return typeof file.content === "string"
           ? documentSidebarContent(result, documentPath, name, {

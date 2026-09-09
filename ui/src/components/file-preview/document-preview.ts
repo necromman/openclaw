@@ -36,7 +36,7 @@ class OpenClawDocumentPreview extends OpenClawLitElement {
   @property({ attribute: false }) content = "";
   @property() sourceFormat = "";
   @property() converter = "";
-  /** Gateway `documentError`, plus the client-side `hangul` notice. Empty when fine. */
+  /** Gateway `documentError`. Empty when the preview rendered. */
   @property() errorCode = "";
   @property({ type: Boolean }) loading = false;
 
@@ -178,8 +178,6 @@ class OpenClawDocumentPreview extends OpenClawLitElement {
         return t("documentPreview.errorConverterUnavailable");
       case "conversion-failed":
         return t("documentPreview.errorConversionFailed");
-      case "hangul":
-        return t("documentPreview.hangulNotice");
       default:
         return t("documentPreview.errorUnsupportedFormat");
     }

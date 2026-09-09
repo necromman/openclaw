@@ -24,7 +24,16 @@ const DOCUMENT_PREVIEW_EXTENSIONS = new Set([
   "ppt",
   "pptx",
   "odp",
+  "hwp",
+  "hwpx",
 ]);
+
+/**
+ * Hangul word processor files never go through LibreOffice: its bundled filter only
+ * understands the pre-2005 format and exits 0 without writing a PDF for everything else.
+ * They go straight to the built-in reader, which returns HTML rather than a PDF.
+ */
+const HANGUL_EXTENSIONS = new Set(["hwp", "hwpx"]);
 
 function documentExtension(name: string): string {
   return path.extname(name).replace(/^\./u, "").toLowerCase();
@@ -110,7 +119,7 @@ export async function buildSessionFileDocumentPreview(params: {
     });
     return;
   }
-  if (params.convert !== false) {
+  if (params.convert !== false && !HANGUL_EXTENSIONS.has(extension)) {
     const converted = await convertDocumentToPdf({
       buffer: read.buffer,
       sourceExtension: extension,
@@ -149,5 +158,11 @@ export async function buildSessionFileDocumentPreview(params: {
     });
     return;
   }
-  markUnsupported(entry, "converter-unavailable");
+  // A Hangul document has no converter behind the built-in reader, so a failure here is
+  // the document itself (password, distribution copy, or the pre-2005 format), not a
+  // missing tool the operator could install.
+  markUnsupported(
+    entry,
+    HANGUL_EXTENSIONS.has(extension) ? "conversion-failed" : "converter-unavailable",
+  );
 }

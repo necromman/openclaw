@@ -90,6 +90,7 @@ RPC sessions.files.get { documentPreview: true }
    +-- pdf            -> 원본 바이트 그대로            format "pdf"
    +-- office + 변환기 -> LibreOffice headless -> PDF   format "pdf"   (src/gateway/document-convert.ts)
    +-- docx/xlsx 폴백 -> jszip 로 OOXML -> 안전 HTML    format "html"  (src/gateway/document-extract-html.ts)
+   +-- hwp/hwpx       -> 내장 한글 리더 -> 안전 HTML    format "html"  (src/gateway/document-extract-hangul.ts)
    +-- 그 외          -> documentError
    |
    v
@@ -103,7 +104,9 @@ UI  <openclaw-document-preview>               ui/src/components/file-preview/doc
 | 파일                                                         | 성격 | 역할                                                                            |
 | ------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------- |
 | `src/gateway/document-convert.ts`                            | 신규 | soffice 탐지·변환·타임아웃·동시성 제한·결과 캐시                                |
-| `src/gateway/document-extract-html.ts`                       | 신규 | jszip 으로 docx/xlsx -> 이스케이프된 HTML (의존성 0)                            |
+| `src/gateway/document-extract-html.ts`                       | 신규 | jszip 으로 docx/xlsx -> 이스케이프된 HTML (의존성 0). 9절에서 hwp/hwpx 도 받는다 |
+| `src/gateway/document-cfb.ts`                                | 신규 | OLE2 복합 파일(CFB) 읽기 전용 리더 (S 단계)                                     |
+| `src/gateway/document-extract-hangul.ts`                     | 신규 | hwp 5.0 / hwpx 본문 추출 (S 단계)                                               |
 | `src/gateway/server-methods/sessions-files-document.ts`      | 신규 | 위 둘을 묶어 `SessionFileEntry` 를 채우는 결정표                                |
 | `packages/gateway-protocol/src/schema/sessions.ts`           | 수정 | `previewKind: "document"` + `document` / `documentError` 필드 + 요청 플래그 2개 |
 | `src/gateway/server-methods/sessions-files.ts`               | 수정 | `sessions.files.get` 에 분기 1개 (`documentPreview === true`)                   |
@@ -133,7 +136,7 @@ UI  <openclaw-document-preview>               ui/src/components/file-preview/doc
 | 미리보기 최대 파일 크기       | 20 MiB                             | base64 로 WS 를 타므로 실제 전송량은 약 1.34배                     |
 | 변환 타임아웃                 | 60초                               | LibreOffice 가 드물게 멈춘다                                       |
 | HTML 폴백 시트 상한           | 12 시트 / 시트당 300행 / 행당 40열 | 잘리면 안내 문구가 붙는다                                          |
-| hwp / hwpx                    | **미지원**                         | 이번 범위 밖. "변환 후 미리보기 예정" 안내만                       |
+| hwp / hwpx                    | **지원** (텍스트 HTML)             | 9절. 서식·그림 없이 본문과 표 칸 글자만 나온다                     |
 | 이미지가 든 docx 의 HTML 폴백 | 이미지 생략                        | 폴백은 텍스트·표 구조만 살린다. 정확한 그림은 LibreOffice 경로에서 |
 
 ### 되돌리기
@@ -291,6 +294,7 @@ Control UI 에서 파일을 붙여 보내면 서버가 `<stateDir>/media/inbound
 | 이미지                        | 이미지 블록으로 모델 문맥에 들어간다(사용자 답변에 첨부되지는 않는다)     |
 | PDF                           | 페이지별 텍스트. 텍스트 층이 없는 스캔본은 "본문 추출 불가" 로 돌아온다   |
 | docx · xlsx                   | 내장 OOXML 리더 -> 마크다운. 비면 LibreOffice -> PDF -> 텍스트로 넘어간다 |
+| hwp · hwpx                    | 내장 한글 리더 -> 텍스트 (9절). LibreOffice 를 거치지 않는다             |
 | pptx · ppt · doc · xls · 기타 | LibreOffice -> PDF -> 텍스트. 변환기가 없으면 "본문 추출 불가"            |
 | txt · md · csv                | UTF-8 로 읽고 실패하면 CP949 로 다시 읽는다                               |
 
@@ -329,3 +333,72 @@ Looking for a file the user uploaded earlier: `media_list` first, then `media_re
 ```bash
 docker compose -f chris-local/docker-compose.ixauth.yml --env-file chris-local/ixauth.env   exec gateway du -sh /home/node/.openclaw/media/inbound
 ```
+
+---
+
+## 9. 한글 문서 hwp / hwpx (2026-09-09, S 단계)
+
+납품처 NAS 공유에서 hwp 가 **29,867개**로 xlsx 다음으로 많은데(pdf 23,355 / docx 7,887), 그때까지 색인도 미리보기도 되지 않았다(`NAS-FOLDER-ACL.md` 2.2). 사용자 확정(2026-09-09)으로 변환기를 넣었다.
+
+### 9-1. LibreOffice 로는 안 된다 (실측)
+
+납품 이미지에는 이미 LibreOffice 7.4.7.2 가 있고 `libhwplo.so` 라는 한글 필터도 들어 있다. 그런데 그 필터는 **2005년 이전의 HWP 3.0** 만 안다. 공유에서 무작위로 고른 실제 파일 18개를 컨테이너 안에서 변환해 봤다.
+
+| 후보                     | 성공 | 실패 | 결과                                                                                         |
+| ------------------------ | ---- | ---- | -------------------------------------------------------------------------------------------- |
+| LibreOffice 7.4.7.2      | 0/17 | 17   | **종료코드 0 인데 PDF 가 만들어지지 않는다.** 0바이트 파일 1개만 빈 PDF 를 냈다              |
+| pyhwp `hwp5txt` 0.1b15   | 15/16 | 1   | 돌기는 하나 **표 칸 글자를 버린다**. 발주서·일일보고 같은 표 문서에서 561자 대신 46자만 나옴 |
+| **내장 리더 (채택)**     | **17/17** | 0 | 표 칸까지 전부. 최대 59ms                                                                    |
+
+pyhwp 를 버린 이유는 세 가지다. (1) 표를 버려서 공유 문서 대부분인 발주서·보고서가 거의 빈 껍데기가 된다. (2) 2020년 이후 유지보수가 없고 의존성 `six` 선언이 빠져 있어 그냥 설치하면 `ModuleNotFoundError` 로 죽는다. (3) 라이선스가 AGPL-3.0 이라 납품 재배포에 법무 확인이 붙는다. LibreOffice 를 최신판으로 올리는 길도 있으나 bookworm 에는 없고, 베이스 이미지를 바꾸는 비용이 이 기능 하나보다 크다.
+
+### 9-2. 그래서 직접 읽는다 (새 의존성 0, 이미지 증가 0)
+
+두 컨테이너 모두 이미 있는 것만으로 열린다.
+
+- **hwp**: OLE2 복합 파일(CFB). `src/gateway/document-cfb.ts` 가 FAT·미니FAT·디렉터리 트리를 따라 스트림을 꺼내고, `document-extract-hangul.ts` 가 `FileHeader` 의 플래그를 보고 `BodyText/SectionN` 을 raw deflate 로 풀어 레코드를 훑는다. 본문은 태그 67(문단 텍스트)에 UTF-16LE 로 들어 있다. 제어문자 중 표·그림·필드 시작 등 21종은 8글자 폭을 차지하므로 그만큼 건너뛴다. 이 처리를 빼면 그 자리의 레이아웃 바이트가 글자로 새어 나온다.
+- **hwpx**: zip + xml. `Contents/sectionN.xml` 의 `<hp:t>` 를 문단(`<hp:p>`) 단위로 모은다. zip 은 이미 루트 의존성인 `jszip` 으로 연다.
+
+읽지 못하는 것은 **읽지 못한다고 말한다.** 암호 문서(플래그 비트 1), 배포용 문서(비트 2, 본문 레코드가 문서별 키로 암호화됨), HWP 3.0 은 각각 `encrypted` · `distribution` · `legacy-format` 이라는 서로 다른 사유로 보고된다. 손상 파일과 한 칸에 뭉뚱그리지 않는다.
+
+상한은 압축 해제 64 MiB, 추출 글자 100만, 구역 256개다. 넘으면 잘리고 잘렸다고 적는다.
+
+### 9-3. 실측 (2026-09-09, 공유 7곳 2013~2025년 문서 18개)
+
+파일명은 고객 자료라 가린다. 크기는 원본 바이트, 시간은 추출에 걸린 시간이다.
+
+| #   | 공유       | 형식 | 크기      | 결과  | 추출 글자 | 시간  |
+| --- | ---------- | ---- | --------- | ----- | --------- | ----- |
+| 1   | 공용       | hwpx | 337,477   | 성공  | 7,783     | 59ms  |
+| 2   | 공용       | hwpx | 1,007,297 | 성공  | 3,013     | 4ms   |
+| 3   | 공용       | hwp  | 131,072   | 성공  | 1,185     | 2ms   |
+| 4   | 공용       | hwp  | 1,685,506 | 성공  | 214,466   | 24ms  |
+| 5   | 공용       | hwp  | 12,800    | 성공  | 540       | 0ms   |
+| 6   | 개인 A     | hwp  | 0         | empty | -         | 0ms   |
+| 7   | 개인 A     | hwp  | 378,880   | 성공  | 1,244     | 0ms   |
+| 8   | 개인 B     | hwp  | 58,880    | 성공  | 4,887     | 1ms   |
+| 9   | 개인 B     | hwp  | 60,928    | 성공  | 531       | 0ms   |
+| 10  | 개인 B     | hwp  | 59,392    | 성공  | 409       | 0ms   |
+| 11  | 개인 C     | hwp  | 384,000   | 성공  | 33,458    | 2ms   |
+| 12  | 개인 D     | hwp  | 30,208    | 성공  | 1,870     | 0ms   |
+| 13  | 개인 D     | hwp  | 94,208    | 성공  | 1,424     | 0ms   |
+| 14  | 개인 E     | hwp  | 48,640    | 성공  | 409       | 0ms   |
+| 15  | 개인 E     | hwp  | 81,920    | 성공  | 544       | 0ms   |
+| 16  | 개인 E     | hwp  | 81,920    | 성공  | 619       | 0ms   |
+| 17  | 디자인PC   | hwp  | 10,752    | 성공  | 256       | 0ms   |
+| 18  | 디자인PC   | hwp  | 30,208    | 성공  | 1,289     | 0ms   |
+
+**내용 있는 17개 전부 성공.** 6번은 휴지통 폴더의 0바이트 파일이라 색인 단계에서 `ignored/empty` 로 빠진다. 한글이 깨진 문서는 하나도 없었고, 표는 칸마다 한 문단으로 풀려 나온다(칸 사이 줄이 끊기지만 검색에는 지장이 없다. trigram 토크나이저라 붙여 쓰든 나눠 쓰든 걸린다).
+
+공유 전체 조사에서 hwpx 는 2개뿐이고 나머지는 전부 hwp 5.0(CFB)이었다. HWP 3.0 은 표본에 없었다.
+
+### 9-4. 안 되는 것
+
+| 항목                   | 이유                                                                            |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| 서식 · 그림 · 표 테두리 | 본문 글자만 뽑는다. 원본 모양대로 보려면 파일을 내려받아 한글에서 연다           |
+| 암호 문서              | 비밀번호 없이는 본문 레코드를 풀 수 없다. `encrypted` 로 보고한다                |
+| 배포용 문서            | 문서별 키로 암호화돼 있다. `distribution` 으로 보고한다                         |
+| HWP 3.0                | 형식이 다르다. `legacy-format` 으로 보고한다. 표본에는 없었다                   |
+| 표 구조                | 병합 셀·행열 관계는 남지 않는다. 칸 글자만 순서대로 남는다                      |
+| 그림 속 글자           | OCR 이 없다                                                                      |
