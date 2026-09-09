@@ -68,7 +68,7 @@ describe("parseSubmittedModelPolicy", () => {
     });
     expect(duplicated.ok && duplicated.policy.allow).toEqual(["openai/a", "openai/b"]);
     const tooLong = parseSubmittedModelPolicy({
-      allow: Array.from({ length: 201 }, (_, index) => `openai/m${index}`),
+      allow: Array.from({ length: 101 }, (_, index) => `openai/m${index}`),
     });
     expect(tooLong.ok).toBe(false);
   });

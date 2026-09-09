@@ -33,8 +33,14 @@ export type IxAuthAdminModelPolicy = {
   utilityModel: string;
 };
 
-/** Longest allowlist this route accepts. Far above any real deployment. */
-export const IX_AUTH_ADMIN_MODEL_ALLOW_MAX = 200;
+/**
+ * Longest allowlist this route accepts.
+ *
+ * Bounded by the shared 4 KiB body limit every route in this namespace reads through, not
+ * by anything about models: a hundred entries is already far past what a deployment names
+ * one by one, and past it the provider wildcard is the answer.
+ */
+export const IX_AUTH_ADMIN_MODEL_ALLOW_MAX = 100;
 
 /** Longest fallback chain this route accepts. */
 export const IX_AUTH_ADMIN_MODEL_FALLBACK_MAX = 8;
