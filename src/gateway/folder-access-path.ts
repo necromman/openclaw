@@ -78,6 +78,11 @@ export function normalizeFolderRulePath(
   if (/^[A-Za-z]:/u.test(candidate)) {
     return undefined;
   }
+  // A path made only of separators names the root of this scope, not the filesystem
+  // root. Refusing it would make the one path every caller can always name unnameable.
+  if (/^\/+$/u.test(candidate)) {
+    return "";
+  }
   if (candidate.startsWith("/")) {
     const root = (scopeRoot ?? "").replaceAll("\\", "/").replace(/\/+$/u, "");
     if (root.length === 0) {
