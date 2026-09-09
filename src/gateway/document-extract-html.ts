@@ -2,7 +2,10 @@
 // It runs when no external converter is available, so it must never shell out and
 // must never emit markup a preview iframe could execute.
 import type JSZipArchive from "jszip";
-import { extractHangulText, isHangulExtension } from "./document-extract-hangul.js";
+import { isHangulExtension } from "./document-extract-hangul.js";
+import { readHangulDocument } from "./document-hangul-read.js";
+import { escapeDocumentHtml as escapeHtml } from "./document-html-escape.js";
+import { markdownToPreviewHtml } from "./document-markdown-html.js";
 import {
   formatXlsxDateCell,
   readXlsxDateStyles,
@@ -24,16 +27,6 @@ const MAX_ROWS_PER_SHEET = 300;
 const MAX_COLUMNS_PER_ROW = 40;
 
 const TRUNCATION_NOTE = "Preview truncated.";
-
-/** Escapes every character that could break out of text or an attribute value. */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 function decodeXmlText(value: string): string {
   return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/gu, (match, entity: string) => {
@@ -542,6 +535,8 @@ ul, ol { margin: 0 0 0.85em 1.25em; padding: 0; }
 li { margin: 0 0 0.25em; }
 section { margin: 0 0 2em; }
 table { border-collapse: collapse; margin: 0 0 1em; max-width: 100%; }
+.table-scroll { overflow-x: auto; margin: 0 0 1em; }
+.table-scroll table { margin: 0; }
 th, td {
   border: 1px solid var(--doc-line);
   padding: 6px 10px;
@@ -574,15 +569,21 @@ export async function extractDocumentHtml(params: {
     return { ok: false };
   }
   if (isHangulExtension(extension)) {
-    const extracted = await extractHangulText({
-      buffer: params.buffer,
-      sourceExtension: extension,
-    });
-    if (!extracted.ok) {
+    const read = await readHangulDocument({ buffer: params.buffer, sourceExtension: extension });
+    if (!read.ok) {
       return { ok: false };
     }
+    if (read.kind === "markdown") {
+      // The forms this share is full of are tables, and the converter keeps them, so the
+      // preview draws them as tables rather than as the column of loose cell text the
+      // plain reader produces.
+      return {
+        html: wrapDocument("Document preview", markdownToPreviewHtml(read.content)),
+        ok: true,
+      };
+    }
     // Table cells arrive as their own paragraphs, so the body is a flat run of blocks.
-    const body = extracted.text
+    const body = read.content
       .split(/\n{2,}/u)
       .map((paragraph) => `<p>${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`)
       .join("");

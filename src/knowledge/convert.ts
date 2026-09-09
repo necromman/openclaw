@@ -4,9 +4,8 @@
 // bridge all already exist for the file preview pane. This module only decides which of
 // them a given extension goes through and shapes the result as Markdown.
 import { convertDocumentToPdf } from "../gateway/document-convert.js";
-import { extractHangulText } from "../gateway/document-extract-hangul.js";
 import { extractDocumentHtml } from "../gateway/document-extract-html.js";
-import { convertHangulToMarkdown } from "../gateway/document-hangul-cli.js";
+import { readHangulDocument } from "../gateway/document-hangul-read.js";
 import { pdfBufferToMarkdown } from "./convert-pdf.js";
 import { documentHtmlToMarkdown } from "./html-markdown.js";
 import type { KnowledgeConverterId, KnowledgeFailureReason } from "./types.js";
@@ -64,59 +63,36 @@ async function convertOoxml(
 }
 
 /**
- * Counts the characters that carry meaning, ignoring Markdown table punctuation.
+ * Reads one Hangul word processor document into Markdown.
  *
- * Comparing raw lengths would favour the Markdown renderer for free: a row of empty
- * cells is all pipes and dashes and no content.
- */
-function contentLength(value: string): number {
-  return (value.match(/[^\s|-]/gu) ?? []).length;
-}
-
-/** rhwp output below this share of the built-in reader's text is treated as a loss. */
-const HANGUL_MARKDOWN_MIN_RATIO = 0.6;
-
-/**
- * Reads one Hangul word processor document.
+ * Which of the two readers answers, and why, lives in
+ * src/gateway/document-hangul-read.ts, because the file preview asks the same question
+ * about the same files and the two must not answer differently.
  *
- * Two readers, in this order. `rhwp` renders the document to Markdown with real tables,
- * merged cells included, and one `## p.N` heading per page; almost every Hangul document
- * on the delivery share is a form, so that structure is most of what the index is for.
- * When the binary is not installed, or it cannot open a particular file, the built-in
- * dependency-free reader still returns the text.
- *
- * LibreOffice is not in this picture at all: its Hangul filter only understands the
- * pre-2005 format and exits successfully without writing anything for everything else.
- *
- * The failure reason comes from the built-in reader, which can tell a password, a
- * distribution copy and an HWP 3.0 file apart. Reporting all three as one blanket failure
- * would leave an operator unable to tell "nobody can read this" from "this one is broken".
+ * The converter id is what the frontmatter records, so the two readers stay
+ * distinguishable in the index: `hwp-markdown` kept the tables, `hwp-text` did not.
  */
 async function convertHangul(buffer: Buffer, extension: string): Promise<KnowledgeConversion> {
-  const extracted = await extractHangulText({ buffer, sourceExtension: extension });
-  if (!extracted.ok && (extracted.reason === "encrypted" || extracted.reason === "distribution")) {
-    // Nobody can read these without the secret, so do not pay for a subprocess to find out.
-    return { ok: false, reason: extracted.reason };
+  const read = await readHangulDocument({ buffer, sourceExtension: extension });
+  if (read.ok) {
+    return {
+      body: read.content,
+      converter: read.kind === "markdown" ? "hwp-markdown" : "hwp-text",
+      ok: true,
+    };
   }
-  const rendered = await convertHangulToMarkdown({ buffer, sourceExtension: extension });
-  if (rendered.ok) {
-    // rhwp renders most documents better than the built-in reader, but on some it emits
-    // a page of empty table rows and drops the body entirely (measured on the delivery
-    // share). That failure looks like success, so it is caught by comparing against the
-    // reader that never loses text, and only then is the richer output accepted.
-    const floor = extracted.ok ? contentLength(extracted.text) * HANGUL_MARKDOWN_MIN_RATIO : 0;
-    if (contentLength(rendered.markdown) >= floor) {
-      return { body: normalizeText(rendered.markdown), converter: "hwp-markdown", ok: true };
-    }
+  // The built-in reader can tell a password, a distribution copy and an HWP 3.0 file
+  // apart. Reporting all three as one blanket failure would leave an operator unable to
+  // tell "nobody can read this" from "this one is broken".
+  if (
+    read.reason === "encrypted" ||
+    read.reason === "distribution" ||
+    read.reason === "legacy-format" ||
+    read.reason === "empty"
+  ) {
+    return { ok: false, reason: read.reason };
   }
-  if (extracted.ok) {
-    return { body: normalizeText(extracted.text), converter: "hwp-text", ok: true };
-  }
-  const reason = extracted.reason;
-  if (reason === "empty") {
-    return { ok: false, reason };
-  }
-  return { ok: false, reason: reason === "legacy-format" ? "legacy-format" : "conversion-failed" };
+  return { ok: false, reason: "conversion-failed" };
 }
 
 async function convertThroughSoffice(
