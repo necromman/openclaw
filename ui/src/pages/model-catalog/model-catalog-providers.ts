@@ -41,8 +41,7 @@ function renderModelSwitch(params: {
   model: ModelCatalogRow;
   callbacks: ModelCatalogProviderCallbacks;
 }): TemplateResult {
-  const enableable = canEnableModel({ group: params.group, model: params.model });
-  const blocked = !enableable;
+  const blocked = !canEnableModel({ group: params.group, model: params.model });
   return html`
     <label
       class=${blocked ? "model-catalog-model model-catalog-model--blocked" : "model-catalog-model"}
@@ -114,9 +113,7 @@ export function renderModelCatalogProviderSection(params: {
     [
       renderSettingsRow({
         title: t("ixAuth.models.allowAll"),
-        description: blocked
-          ? t("ixAuth.models.allowAllBlocked")
-          : t("ixAuth.models.allowAllHelp"),
+        description: blocked ? t("ixAuth.models.allowAllBlocked") : t("ixAuth.models.allowAllHelp"),
         control: html`
           <input
             type="checkbox"
@@ -126,6 +123,8 @@ export function renderModelCatalogProviderSection(params: {
             ?disabled=${blocked || callbacks.busy}
             aria-label=${t("ixAuth.models.providerSwitchLabel", { provider: group.displayName })}
             @change=${(event: Event) =>
+              // SAFETY: the listener is bound to this input element, so its event target
+              // is that element and nothing else can dispatch a change through it.
               callbacks.onToggleProvider(group, (event.target as HTMLInputElement).checked)}
           />
         `,

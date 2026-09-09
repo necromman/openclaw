@@ -186,18 +186,17 @@ describe("setProviderAllowed", () => {
   it("drops every entry of the provider, an older wildcard included", () => {
     const allow = ["openai/*", "openai/gpt-5.6-luna", "anthropic/claude-sonnet-5"];
     const groups = buildProviderGroups({ catalog, auth, allow });
-    expect(setProviderAllowed({ allow, group: groupFor(groups, "openai"), allowed: false })).toEqual(
-      ["anthropic/claude-sonnet-5"],
-    );
+    expect(
+      setProviderAllowed({ allow, group: groupFor(groups, "openai"), allowed: false }),
+    ).toEqual(["anthropic/claude-sonnet-5"]);
   });
 
   it("replaces an older wildcard with the named models when switched on again", () => {
     const allow = ["openai/*"];
     const groups = buildProviderGroups({ catalog, auth, allow });
-    expect(setProviderAllowed({ allow, group: groupFor(groups, "openai"), allowed: true })).toEqual([
-      "openai/gpt-5.6-luna",
-      "openai/gpt-5.6-sol",
-    ]);
+    expect(setProviderAllowed({ allow, group: groupFor(groups, "openai"), allowed: true })).toEqual(
+      ["openai/gpt-5.6-luna", "openai/gpt-5.6-sol"],
+    );
   });
 
   it("falls back to the wildcard only for a provider that answers no models", () => {

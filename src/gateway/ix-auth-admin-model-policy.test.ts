@@ -97,7 +97,10 @@ describe("parseSubmittedModelPolicy", () => {
     const tooLong = `openai/${"m".repeat(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH)}`;
     expect(tooLong.length).toBeGreaterThan(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH);
     expect(parseSubmittedModelPolicy({ primary: tooLong }).ok).toBe(false);
-    const atCap = `openai/${"m".repeat(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH - "openai/".length)}`;
+    // A reference exactly at the cap has to be spelled in segments, because no single
+    // segment may exceed 128 characters. Two of them plus the provider land on the cap.
+    const rest = IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH - "openai/".length - 1;
+    const atCap = `openai/${"m".repeat(128)}/${"m".repeat(rest - 128)}`;
     expect(atCap.length).toBe(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH);
     expect(parseSubmittedModelPolicy({ primary: atCap }).ok).toBe(true);
   });
