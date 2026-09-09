@@ -6,6 +6,7 @@ export const KNOWLEDGE_CONVERTER_IDS = [
   "docx-html",
   "xlsx-html",
   "soffice-pdf-text",
+  "hwp-markdown",
   "hwp-text",
   "copy",
 ] as const;

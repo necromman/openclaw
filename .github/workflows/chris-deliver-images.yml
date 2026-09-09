@@ -80,6 +80,7 @@ jobs:
           provenance: false
           build-args: |
             OPENCLAW_INSTALL_BROWSER=1
+            OPENCLAW_INSTALL_RHWP=1
             OPENCLAW_IMAGE_APT_PACKAGES=fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji fonts-nanum libreoffice-writer libreoffice-calc libreoffice-impress
           tags: |
             ${{ env.GATEWAY_IMAGE }}:chris-main

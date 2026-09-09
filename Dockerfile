@@ -393,6 +393,29 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
         docker-ce-cli docker-compose-plugin; \
     fi
 
+# Optionally install rhwp, the Hangul word processor reader used for .hwp/.hwpx.
+# Build with: docker build --build-arg OPENCLAW_INSTALL_RHWP=1 ...
+# Adds ~15MB. A single Rust binary (github.com/edwardkim/rhwp, MIT) with no Hancom,
+# LibreOffice or font dependency. The gateway probes for it and falls back to its own
+# dependency-free reader when it is absent, so this stays optional.
+# The pinned version is the last release built against a glibc old enough for bookworm;
+# v0.8.3 and newer require GLIBC_2.39 and abort on this base image. Bump the version and
+# the digest together, and re-check that the binary still runs here before doing so.
+ARG OPENCLAW_INSTALL_RHWP=""
+ARG OPENCLAW_RHWP_VERSION="v0.8.2"
+ARG OPENCLAW_RHWP_SHA256="3225246533eca2b10ec2926228aee0d1cbf0ea6de0553e053ec8d6cb79fa9570"
+RUN if [ -n "$OPENCLAW_INSTALL_RHWP" ]; then \
+      set -eu; \
+      url="https://github.com/edwardkim/rhwp/releases/download/${OPENCLAW_RHWP_VERSION}/rhwp-${OPENCLAW_RHWP_VERSION}-linux-x86_64.tar.gz"; \
+      curl -fsSL --connect-timeout 10 --max-time 300 "$url" -o /tmp/rhwp.tar.gz; \
+      echo "${OPENCLAW_RHWP_SHA256}  /tmp/rhwp.tar.gz" | sha256sum -c -; \
+      mkdir -p /tmp/rhwp-extract && tar -xzf /tmp/rhwp.tar.gz -C /tmp/rhwp-extract; \
+      install -d -m 0755 /opt/rhwp; \
+      install -m 0755 /tmp/rhwp-extract/rhwp/rhwp /opt/rhwp/rhwp; \
+      rm -rf /tmp/rhwp.tar.gz /tmp/rhwp-extract; \
+      /opt/rhwp/rhwp --version; \
+    fi
+
 # Expose the CLI binary without requiring npm global writes as non-root.
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs

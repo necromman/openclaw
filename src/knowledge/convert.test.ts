@@ -3,8 +3,9 @@ import iconv from "iconv-lite";
 import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const { convertDocumentToPdfMock, pdfDocument } = vi.hoisted(() => ({
+const { convertDocumentToPdfMock, convertHangulToMarkdownMock, pdfDocument } = vi.hoisted(() => ({
   convertDocumentToPdfMock: vi.fn(),
+  convertHangulToMarkdownMock: vi.fn(),
   pdfDocument: { destroy: vi.fn(), pageCount: 0, text: vi.fn() },
 }));
 
@@ -17,6 +18,10 @@ vi.mock("clawpdf", () => ({
 
 vi.mock("../gateway/document-convert.js", () => ({
   convertDocumentToPdf: convertDocumentToPdfMock,
+}));
+
+vi.mock("../gateway/document-hangul-cli.js", () => ({
+  convertHangulToMarkdown: convertHangulToMarkdownMock,
 }));
 
 const { convertKnowledgeSource, decodeTextBuffer } = await import("./convert.js");
@@ -59,6 +64,8 @@ function inlineCell(value: string): string {
 
 beforeEach(() => {
   convertDocumentToPdfMock.mockReset();
+  convertHangulToMarkdownMock.mockReset();
+  convertHangulToMarkdownMock.mockResolvedValue({ ok: false, reason: "converter-unavailable" });
   pdfDocument.text.mockReset();
   pdfDocument.destroy.mockReset();
   pdfDocument.pageCount = 0;
@@ -225,14 +232,19 @@ describe("slide and legacy sources", () => {
 });
 
 describe("hangul sources", () => {
-  test("reads a hwpx through the built-in reader, never through LibreOffice", async () => {
+  async function buildHwpx(text: string): Promise<Buffer> {
     const zip = new JSZip();
     zip.file("mimetype", "application/hwp+zip");
     zip.file(
       "Contents/section0.xml",
-      '<?xml version="1.0"?><hs:sec><hp:p><hp:run><hp:t>시약 재고 현황</hp:t></hp:run></hp:p></hs:sec>',
+      `<?xml version="1.0"?><hs:sec><hp:p><hp:run><hp:t>${text}</hp:t></hp:run></hp:p></hs:sec>`,
     );
-    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    return await zip.generateAsync({ type: "nodebuffer" });
+  }
+
+  test("falls back to the built-in reader when rhwp is not installed", async () => {
+    convertHangulToMarkdownMock.mockResolvedValue({ ok: false, reason: "converter-unavailable" });
+    const buffer = await buildHwpx("시약 재고 현황");
     expect(await convertKnowledgeSource({ buffer, extension: "hwpx" })).toEqual({
       body: "시약 재고 현황",
       converter: "hwp-text",
@@ -241,7 +253,37 @@ describe("hangul sources", () => {
     expect(convertDocumentToPdfMock).not.toHaveBeenCalled();
   });
 
+  test("prefers the rhwp rendering, which keeps the table grid", async () => {
+    convertHangulToMarkdownMock.mockResolvedValue({
+      markdown: ["## p.1", "", "| 품목 | 수량 |", "| --- | --- |", "| 에탄올 | 12병 |"].join("\n"),
+      ok: true,
+      pages: 1,
+    });
+    const buffer = await buildHwpx("품목 수량 에탄올 12병");
+    expect(await convertKnowledgeSource({ buffer, extension: "hwpx" })).toMatchObject({
+      converter: "hwp-markdown",
+      ok: true,
+    });
+  });
+
+  test("rejects an rhwp rendering that lost the body and keeps the text instead", async () => {
+    // Measured on the delivery share: some documents come back as a page of empty table
+    // rows, which would look like a successful but nearly blank sidecar.
+    convertHangulToMarkdownMock.mockResolvedValue({
+      markdown: ["## p.1", "", "|  |", "| --- |"].join("\n"),
+      ok: true,
+      pages: 1,
+    });
+    const buffer = await buildHwpx("본문이 길게 들어 있는 문서입니다");
+    expect(await convertKnowledgeSource({ buffer, extension: "hwpx" })).toEqual({
+      body: "본문이 길게 들어 있는 문서입니다",
+      converter: "hwp-text",
+      ok: true,
+    });
+  });
+
   test("reports an unreadable hwp as a conversion failure", async () => {
+    convertHangulToMarkdownMock.mockResolvedValue({ ok: false, reason: "conversion-failed" });
     expect(
       await convertKnowledgeSource({ buffer: Buffer.from("not a document"), extension: "hwp" }),
     ).toEqual({ ok: false, reason: "conversion-failed" });
