@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@ix-auth/client-node": "file:../../../packages/client-node",
-    "cookie-parser": "^1.4.7",
-    "express": "^5.1.0"
+    "cookie-parser": "1.4.7",
+    "express": "5.1.0"
   }
 }
