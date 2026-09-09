@@ -416,6 +416,19 @@ const enIxAuth = {
       previewAdmin: "Administrator view (everything)",
       previewHint:
         "Pick somebody to reload the tree the way they see it. A folder they may not see disappears from the list.",
+      orphanTitle: "Rules that point at nothing",
+      orphanBody:
+        "A folder renamed or deleted on the share leaves its rules behind, and so does a department or an account that is removed. Nothing can repair these automatically: a rename cannot be told from a deletion, and re-pointing a rule would re-open a folder somebody closed.",
+      orphanNone:
+        "Every one of the {count} rules still points at a folder and a subject that exist.",
+      orphanSummary: "{count} of {total} rules point at nothing.",
+      orphanMissingFolder: "The folder is not on the share.",
+      orphanMissingSubject: "The department or account is gone.",
+      orphanClear: "Remove these rules",
+      orphanConfirm:
+        "Remove all {count} rules? A folder that was hidden only by one of them becomes visible again to anybody a remaining rule allows.",
+      orphanConfirmYes: "Remove them",
+      orphanConfirmNo: "Keep them",
       error: {
         loadFailed: "The folders could not be read. Reload the page and try again.",
         rejected: "The change was refused. Reload the page and try again.",

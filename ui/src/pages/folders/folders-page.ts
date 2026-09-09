@@ -20,6 +20,7 @@ import { state } from "lit/decorators.js";
 import type {
   FolderRuleSubjectKind,
   FoldersRulesListResult,
+  FoldersRulesOrphansResult,
   FoldersSubjectsListResult,
   FoldersTreeListResult,
 } from "../../../../packages/gateway-protocol/src/schema/folder-rules.js";
@@ -41,6 +42,7 @@ import { canManageIxAuthUsers } from "../../features/ix-auth/ix-auth-admin-acces
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
+import { renderFolderOrphansPanel } from "./folder-orphans-panel.ts";
 import {
   folderSubjectKey,
   renderFolderRulePanel,
@@ -48,7 +50,9 @@ import {
   type FolderRuleTab,
 } from "./folder-rule-panel.ts";
 import {
+  clearFolderOrphans,
   clearFolderRule,
+  fetchFolderOrphans,
   fetchFolderRules,
   fetchFolderSubjects,
   fetchFolderTree,
@@ -81,6 +85,9 @@ export class FoldersPage extends OpenClawLightDomElement {
   @state() private tab: FolderRuleTab = "department";
   @state() private userQuery = "";
   @state() private applyToDescendants = false;
+  @state() private orphans: FoldersRulesOrphansResult | undefined;
+  @state() private orphansLoading = false;
+  @state() private orphansConfirming = false;
   @state() private loading = false;
   @state() private busy = false;
   @state() private errorKey: string | undefined;
@@ -147,6 +154,40 @@ export class FoldersPage extends OpenClawLightDomElement {
     }
     this.loading = false;
     await this.loadRules(this.selectedPath);
+    await this.loadOrphans();
+  }
+
+  /**
+   * Read the rules that point at nothing.
+   *
+   * Kept separate from the tree read: it walks every rule rather than one level, and a
+   * failure here must not stop the screen the operator came for from drawing.
+   */
+  private async loadOrphans(): Promise<void> {
+    const client = this.client;
+    if (!client || !canManageIxAuthUsers()) {
+      return;
+    }
+    this.orphansLoading = true;
+    try {
+      this.orphans = await fetchFolderOrphans(client);
+    } catch {
+      this.orphans = undefined;
+    }
+    this.orphansLoading = false;
+    this.orphansConfirming = false;
+  }
+
+  private async removeOrphans(): Promise<void> {
+    const client = this.client;
+    if (!client) {
+      return;
+    }
+    await this.mutate(async () => {
+      const result = await clearFolderOrphans({ client });
+      this.notice = t("ixAuth.folders.cleared", { count: String(result.removed) });
+    });
+    await this.loadOrphans();
   }
 
   /** Read one level of the share into the map, leaving the rest untouched. */
@@ -248,6 +289,36 @@ export class FoldersPage extends OpenClawLightDomElement {
     this.busy = false;
     await this.loadRules(this.selectedPath);
     await this.refreshLevels();
+  }
+
+  private renderOrphansSection(): TemplateResult {
+    return renderSettingsSection(
+      {
+        title: t("ixAuth.folders.orphanTitle"),
+        description: t("ixAuth.folders.orphanBody"),
+      },
+      [
+        renderSettingsRow({
+          title: "",
+          stacked: true,
+          control: renderFolderOrphansPanel({
+            orphans: this.orphans?.orphans ?? [],
+            ruleCount: this.orphans?.ruleCount ?? 0,
+            available: this.orphans?.available ?? true,
+            loading: this.orphansLoading,
+            busy: this.busy,
+            confirming: this.orphansConfirming,
+            onConfirm: () => {
+              this.orphansConfirming = true;
+            },
+            onCancel: () => {
+              this.orphansConfirming = false;
+            },
+            onClear: () => void this.removeOrphans(),
+          }),
+        }),
+      ],
+    );
   }
 
   /**
@@ -422,6 +493,7 @@ export class FoldersPage extends OpenClawLightDomElement {
               }),
             ],
           ),
+          this.renderOrphansSection(),
         ]),
       )}
     `;

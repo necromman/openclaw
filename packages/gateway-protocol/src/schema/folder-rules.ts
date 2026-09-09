@@ -151,6 +151,58 @@ export const FoldersRulesClearResultSchema = closedObject({
   removed: Type.Integer({ minimum: 0 }),
 });
 
+/**
+ * Why one rule points at nothing.
+ *
+ * A folder has no stable id, so renaming one on the NAS leaves its rules behind naming a
+ * path nobody will ever ask about again. Deleting the department or the person a rule
+ * names does the same from the other side. Neither is repairable automatically: the
+ * server cannot know that "1. inventory" became "01. inventory" rather than being
+ * deleted, and guessing would silently re-open a folder somebody closed.
+ */
+export const FolderOrphanReasonSchema = Type.Union([
+  Type.Literal("missing-folder"),
+  Type.Literal("missing-subject"),
+]);
+
+/** One rule that no longer points at anything, with what it used to say. */
+export const FolderOrphanRuleSchema = closedObject({
+  reason: FolderOrphanReasonSchema,
+  folderPath: Type.String(),
+  absolutePath: NonEmptyString,
+  subjectKind: FolderRuleSubjectKindSchema,
+  subjectId: NonEmptyString,
+  permission: FolderRulePermissionSchema,
+  inherit: Type.Boolean(),
+  updatedAt: Type.Integer(),
+});
+
+export const FoldersRulesOrphansParamsSchema = closedObject({});
+
+export const FoldersRulesOrphansResultSchema = closedObject({
+  root: NonEmptyString,
+  /** False when the mount is not present here; nothing can be judged missing then. */
+  available: Type.Boolean(),
+  /** Total rules under the root, so the screen can say "3 of 41". */
+  ruleCount: Type.Integer({ minimum: 0 }),
+  orphans: Type.Array(FolderOrphanRuleSchema),
+});
+
+/**
+ * Delete orphaned rules.
+ *
+ * `paths` names the folders to clear; an empty list clears every orphan the server finds
+ * on this call. The server re-checks that each one is still orphaned before deleting, so
+ * a folder that came back between the listing and the confirmation keeps its rules.
+ */
+export const FoldersRulesOrphansClearParamsSchema = closedObject({
+  paths: Type.Optional(Type.Array(Type.String())),
+});
+
+export const FoldersRulesOrphansClearResultSchema = closedObject({
+  removed: Type.Integer({ minimum: 0 }),
+});
+
 export const FolderSubjectDepartmentSchema = closedObject({
   slug: NonEmptyString,
   displayName: Type.Optional(NonEmptyString),
@@ -256,6 +308,36 @@ export type FoldersRulesClearParams = {
 };
 
 export type FoldersRulesClearResult = {
+  removed: number;
+};
+
+export type FolderOrphanReason = "missing-folder" | "missing-subject";
+
+export type FolderOrphanRule = {
+  reason: FolderOrphanReason;
+  folderPath: string;
+  absolutePath: string;
+  subjectKind: FolderRuleSubjectKind;
+  subjectId: string;
+  permission: FolderRulePermission;
+  inherit: boolean;
+  updatedAt: number;
+};
+
+export type FoldersRulesOrphansParams = Record<string, never>;
+
+export type FoldersRulesOrphansResult = {
+  root: string;
+  available: boolean;
+  ruleCount: number;
+  orphans: FolderOrphanRule[];
+};
+
+export type FoldersRulesOrphansClearParams = {
+  paths?: string[];
+};
+
+export type FoldersRulesOrphansClearResult = {
   removed: number;
 };
 

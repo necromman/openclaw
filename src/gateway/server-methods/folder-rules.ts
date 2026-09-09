@@ -24,17 +24,20 @@ import {
   errorShape,
   validateFoldersRulesClearParams,
   validateFoldersRulesListParams,
+  validateFoldersRulesOrphansClearParams,
+  validateFoldersRulesOrphansParams,
   validateFoldersRulesSetParams,
   validateFoldersSubjectsListParams,
   validateFoldersTreeListParams,
   type FolderAccessRule,
+  type FolderOrphanRule,
   type FolderSubjectDepartment,
   type FolderSubjectUser,
   type FolderTreeEntry,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { recordUserActivity } from "../../audit/user-activity-audit-recorder.js";
 import { IX_AUTH_DEFAULT_ROLE_MAP } from "../../auth/ix-auth/ix-auth-role-map.js";
-import { listDepartments } from "../../state/departments-store.js";
+import { listDepartments, normalizeDepartmentSlug } from "../../state/departments-store.js";
 import {
   clearFolderRule,
   clearFolderRuleDescendants,
@@ -50,6 +53,7 @@ import {
   resolveDepartmentFolderRoot,
 } from "../department-folder-listing.js";
 import {
+  folderRuleAbsolutePath,
   folderRuleAncestry,
   isExcludedFolderName,
   normalizeFolderRulePath,
@@ -358,6 +362,86 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
     respond(true, { removed });
   },
 
+  "folders.rules.orphans": async ({ params, respond, client, context }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateFoldersRulesOrphansParams,
+        "folders.rules.orphans",
+        respond,
+      )
+    ) {
+      return;
+    }
+    if (!mayManageFolderRules(client)) {
+      respondForbidden(respond);
+      return;
+    }
+    const found = await collectOrphanRules(
+      context.getRuntimeConfig()?.gateway?.auth?.ixAuth?.roleMap,
+    );
+    respond(true, {
+      root: found.root,
+      available: found.available,
+      ruleCount: found.ruleCount,
+      orphans: found.orphans,
+    });
+  },
+
+  "folders.rules.orphansClear": async ({ params, respond, client, context }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateFoldersRulesOrphansClearParams,
+        "folders.rules.orphansClear",
+        respond,
+      )
+    ) {
+      return;
+    }
+    if (!mayManageFolderRules(client)) {
+      respondForbidden(respond);
+      return;
+    }
+    const found = await collectOrphanRules(
+      context.getRuntimeConfig()?.gateway?.auth?.ixAuth?.roleMap,
+    );
+    if (!found.available) {
+      // Nothing may be deleted on the word of a mount that is not here: every rule would
+      // look orphaned and the whole table would go.
+      respondRefused(respond);
+      return;
+    }
+    // The listing is re-taken here rather than trusted from the screen. A folder that
+    // came back between the operator reading the list and confirming it keeps its rules,
+    // and a rule the screen never showed is never deleted by this call.
+    const requested =
+      params.paths === undefined
+        ? undefined
+        : new Set(params.paths.map((path) => normalizeFolderRulePath(path, found.root) ?? path));
+    let removed = 0;
+    for (const orphan of found.orphans) {
+      if (requested && !requested.has(orphan.folderPath)) {
+        continue;
+      }
+      removed += clearFolderRule({
+        scopeRoot: found.root,
+        folderPath: orphan.folderPath,
+        subjectKind: orphan.subjectKind,
+        subjectId: orphan.subjectId,
+      });
+      recordFolderRuleAction({
+        client,
+        action: "folder-rule-clear",
+        folderPath: orphan.folderPath,
+        subjectKind: orphan.subjectKind,
+        subjectId: orphan.subjectId,
+        detail: { removed: 1, orphanReason: orphan.reason },
+      });
+    }
+    respond(true, { removed });
+  },
+
   "folders.subjects.list": ({ params, respond, context, client }) => {
     if (
       !assertValidParams(
@@ -399,6 +483,68 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
     respond(true, { roles, departments, users });
   },
 };
+
+/**
+ * Every rule that no longer points at anything.
+ *
+ * Two ways a rule is orphaned, and both are checked here rather than in two screens:
+ * the folder was renamed or deleted on the NAS, or the department or person the rule
+ * names is gone from this deployment. Neither can be repaired automatically. A rename
+ * cannot be told from a deletion, and a rule that was hiding a folder must never be
+ * quietly re-pointed at whatever now sits at that path.
+ *
+ * Existence is asked of the same listing the tree uses, so a folder the mount cannot
+ * reach at all is reported the same way here as it is there.
+ */
+async function collectOrphanRules(roleMap: Record<string, string> | undefined): Promise<{
+  root: string;
+  available: boolean;
+  ruleCount: number;
+  orphans: FolderOrphanRule[];
+}> {
+  const { root, available } = await resolveDepartmentFolderRoot();
+  const rules = listAllFolderRules(root);
+  if (!available) {
+    return { available, orphans: [], root, ruleCount: rules.length };
+  }
+  const roles = new Set(Object.values(roleMap ?? IX_AUTH_DEFAULT_ROLE_MAP));
+  const departments = new Set(listDepartments().map((row) => normalizeDepartmentSlug(row.slug)));
+  const profiles = new Set(
+    listProfiles()
+      .filter((profile) => !profile.mergedInto)
+      .map((profile) => profile.id),
+  );
+  const folderExists = new Map<string, boolean>();
+  const orphans: FolderOrphanRule[] = [];
+  for (const rule of rules) {
+    let exists = folderExists.get(rule.folderPath);
+    if (exists === undefined) {
+      const listing = await listDepartmentFolders({ root, available, path: rule.folderPath });
+      exists = !isDepartmentFolderRejection(listing) && listing.available;
+      folderExists.set(rule.folderPath, exists);
+    }
+    const subjectExists =
+      rule.subjectKind === "role"
+        ? roles.has(rule.subjectId)
+        : rule.subjectKind === "department"
+          ? departments.has(normalizeDepartmentSlug(rule.subjectId))
+          : profiles.has(rule.subjectId);
+    if (exists && subjectExists) {
+      continue;
+    }
+    orphans.push({
+      reason: exists ? "missing-subject" : "missing-folder",
+      folderPath: rule.folderPath,
+      absolutePath: folderRuleAbsolutePath(root, rule.folderPath),
+      subjectKind: rule.subjectKind,
+      subjectId: rule.subjectId,
+      permission: rule.permission,
+      inherit: rule.inherit,
+      updatedAt: rule.updatedAt,
+    });
+  }
+  return { available, orphans, root, ruleCount: rules.length };
+}
 
 /** One ledger row per rule change, attributed to whoever made it. */
 function recordFolderRuleAction(params: {

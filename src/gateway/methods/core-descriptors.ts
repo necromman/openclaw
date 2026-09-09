@@ -670,6 +670,8 @@ const CORE_GATEWAY_METHOD_SPECS = [
   ["folders.rules.set", "folder-rules", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
   ["folders.rules.clear", "folder-rules", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
   ["folders.subjects.list", "folder-rules", "operator.read", "2026.9"],
+  ["folders.rules.orphans", "folder-rules", "operator.read", "2026.9"],
+  ["folders.rules.orphansClear", "folder-rules", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
 ] as const satisfies readonly CoreGatewayMethodSpecRow[];
 
 export type CoreGatewayHandlerFamily = Exclude<(typeof CORE_GATEWAY_METHOD_SPECS)[number][1], null>;

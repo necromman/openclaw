@@ -9,6 +9,8 @@ import type {
   DepartmentsFoldersListParams,
   FoldersRulesClearParams,
   FoldersRulesListParams,
+  FoldersRulesOrphansClearParams,
+  FoldersRulesOrphansParams,
   FoldersRulesSetParams,
   FoldersSubjectsListParams,
   FoldersTreeListParams,
@@ -139,6 +141,12 @@ export const validateFoldersRulesClearParams = compile<FoldersRulesClearParams>(
 );
 export const validateFoldersSubjectsListParams = compile<FoldersSubjectsListParams>(
   S.FoldersSubjectsListParamsSchema,
+);
+export const validateFoldersRulesOrphansParams = compile<FoldersRulesOrphansParams>(
+  S.FoldersRulesOrphansParamsSchema,
+);
+export const validateFoldersRulesOrphansClearParams = compile<FoldersRulesOrphansClearParams>(
+  S.FoldersRulesOrphansClearParamsSchema,
 );
 export const validateUsersListParams = compile(S.UsersListParamsSchema);
 export const validateUsersMentionableParams = compile(S.UsersMentionableParamsSchema);

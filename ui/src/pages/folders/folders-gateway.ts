@@ -1,9 +1,10 @@
 // Gateway calls the folder-access screen makes, in one place.
 //
-// Five methods, one job: read the share one level at a time, read and write the rules
-// pinned to one folder, and read the subjects a rule may name. Nothing here decides who
-// may call them; the Gateway refuses every one of them for an account that is not an
-// administrator, and this module would rather surface that refusal than pre-empt it.
+// Seven methods, one job: read the share one level at a time, read and write the rules
+// pinned to one folder, read the subjects a rule may name, and list or clear the rules
+// that no longer point at anything. Nothing here decides who may call them; the Gateway
+// refuses every one of them for an account that is not an administrator, and this module
+// would rather surface that refusal than pre-empt it.
 //
 // Optional parameters are assembled by spread rather than written as `key: undefined`,
 // because the build runs with exactOptionalPropertyTypes and an explicit undefined is a
@@ -13,6 +14,8 @@ import type {
   FolderRuleSubjectKind,
   FoldersRulesClearResult,
   FoldersRulesListResult,
+  FoldersRulesOrphansClearResult,
+  FoldersRulesOrphansResult,
   FoldersRulesSetResult,
   FoldersSubjectsListResult,
   FoldersTreeListResult,
@@ -86,4 +89,28 @@ export async function fetchFolderSubjects(
   client: GatewayBrowserClient,
 ): Promise<FoldersSubjectsListResult> {
   return client.request<FoldersSubjectsListResult>("folders.subjects.list", {});
+}
+
+/** Rules whose folder or whose subject is gone. */
+export async function fetchFolderOrphans(
+  client: GatewayBrowserClient,
+): Promise<FoldersRulesOrphansResult> {
+  return client.request<FoldersRulesOrphansResult>("folders.rules.orphans", {});
+}
+
+/**
+ * Delete orphaned rules.
+ *
+ * Paths are sent rather than rule ids because the server re-checks each one before
+ * deleting: a folder that reappeared between the listing and the confirmation keeps
+ * whatever was set on it.
+ */
+export async function clearFolderOrphans(params: {
+  client: GatewayBrowserClient;
+  paths?: string[];
+}): Promise<FoldersRulesOrphansClearResult> {
+  return params.client.request<FoldersRulesOrphansClearResult>(
+    "folders.rules.orphansClear",
+    params.paths === undefined ? {} : { paths: params.paths },
+  );
 }

@@ -4,6 +4,7 @@ export * from "./schema/human-mentions.js";
 export * from "./public-schema-push.js";
 export * from "./public-schema-users.js";
 export * from "./public-schema-plugins.js";
+export * from "./public-schema-folders.js";
 export {
   isCloudWorkerPlacementState,
   ConnectParamsSchema,
@@ -349,21 +350,6 @@ export {
   DepartmentsAgentsSetResultSchema,
   DepartmentsFoldersListParamsSchema,
   DepartmentsFoldersListResultSchema,
-  FolderAccessRuleSchema,
-  FolderTreeEntrySchema,
-  FolderEffectiveRuleSchema,
-  FolderSubjectDepartmentSchema,
-  FolderSubjectUserSchema,
-  FoldersTreeListParamsSchema,
-  FoldersTreeListResultSchema,
-  FoldersRulesListParamsSchema,
-  FoldersRulesListResultSchema,
-  FoldersRulesSetParamsSchema,
-  FoldersRulesSetResultSchema,
-  FoldersRulesClearParamsSchema,
-  FoldersRulesClearResultSchema,
-  FoldersSubjectsListParamsSchema,
-  FoldersSubjectsListResultSchema,
   TaskSuggestionSchema,
   TaskSuggestionEventSchema,
   TaskSuggestionResolutionSchema,
