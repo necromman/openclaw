@@ -45,7 +45,7 @@
   - **운영 실측 통과**: 파일 패널 18개 -> 15개, `기록물` 이 목록에서 사라짐, 직접 열기 `session file not found`, 원장 거부 1건, 색인 `folder-hidden` 폴더당 한 줄 + 사이드카 5개 회수, 고아 목록·정리, hwp 표 렌더. 스크린샷 chris-server `analysis/2026-09-07-openclaw-auth/delivery-v-0*.png`.
   - **선재 실패**: `chris-check` 의 `plugin boundaries`(만료된 deprecation 창)는 그대로다. R 단계부터 빨갛던 포크 테스트 1건(`folder-access-path` 의 `"/"`)은 V 에서 고쳤다.
 
-- **W 단계(2026-09-09, `chris/main` 직접)**: 운영 장애 두 건 + 모델 화면 재설계. 커밋 `60b799e941c` -> `66ba487d36c` -> `ce6bc25e7d9` -> `d7b3c49efe0`. 상세는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 W 행, 함정은 [DEPLOY.md](DEPLOY.md) 3.4 (바)·11.7 (바), 사용법은 [MANUAL.md](MANUAL.md) 10절.
+- **W 단계(2026-09-09, `chris/main` 직접)**: 운영 장애 두 건 + 모델 화면 재설계. 커밋 `60b799e941c` -> `66ba487d36c` -> `ce6bc25e7d9` -> `d7b3c49efe0` -> `79c42bf6ca7` -> `44ee2f41b5e`. 상세는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 W 행, 함정은 [DEPLOY.md](DEPLOY.md) 3.4 (바)·11.7 (바), 사용법은 [MANUAL.md](MANUAL.md) 10절.
   - **기본 모델이 `anthropic/claude-sonnet-5` 로 바뀌었다(사용자 확정).** 질문마다 30초씩 늦던 원인은 OpenAI 구독 로그인의 갱신 실패였고, 그 로그인을 작업 PC 와 NAS 가 나눠 쓴 것이 원인이다. Anthropic 은 setup-token 장기 토큰이라 갱신 자체가 없다. `openai/gpt-5.6-luna` 는 목록에 남아 있지만 **지금 고르면 30초 뒤 실패한다.** 되살리려면 NAS 전용 OpenAI 로그인이나 `OPENAI_API_KEY` 가 필요하다(DEPLOY.md 3.4 (다)·(라)).
   - **`Falling back from WebSockets to HTTPS transport` 는 터널 문제가 아니었다.** 상태 볼륨의 Codex 런타임 바이너리가 찍는 줄이고 위 인증 장애와 한 몸이다. 기본 모델을 옮기면서 함께 사라졌다. Cloudflare 터널 설정은 손대지 않았다.
   - **모델 화면이 바뀌었다.** `/settings/model-catalog` 이 프로바이더별 카탈로그 전체를 그리고 모델마다 스위치 하나다. 저장값은 언제나 켜진 모델의 명시적 목록이고 `provider/*` 와일드카드는 더 쓰지 않는다. **함정: 옛 저장본의 와일드카드를 화면이 열자마자 펼치므로 아무것도 누르지 않아도 저장 버튼이 켜져 있다.** 안내 문구가 그 이유를 말한다.
