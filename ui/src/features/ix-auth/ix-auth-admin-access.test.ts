@@ -38,7 +38,7 @@ describe("what the session probe records", () => {
   // The regression this file exists for. The Gateway sends the console URL to a superadmin
   // and to nobody else, and the flag used to be read from its presence, so an ordinary
   // administrator was shut out of the user and audit screens the Gateway serves them.
-  it("gives an administrator user access without a console URL", async () => {
+  it("gives an administrator the company screens without a console URL", async () => {
     stubProbeResponse({
       authMode: "ix-auth",
       authenticated: true,
@@ -51,8 +51,9 @@ describe("what the session probe records", () => {
     });
     await probeIxAuthSession("");
     expect(canManageIxAuthUsers()).toBe(true);
-    // The department screen is a different question, and the answer to it stays no.
-    expect(canManageIxAuthDepartments()).toBe(false);
+    // The department screen answers the same question since P: running the company's
+    // departments is the same job as running its accounts (AUTH-IXAUTH 5-1).
+    expect(canManageIxAuthDepartments()).toBe(true);
   });
 
   it("gives a system administrator both", async () => {

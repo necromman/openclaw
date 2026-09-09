@@ -58,14 +58,16 @@ describe("department screen access", () => {
     expect(canManageIxAuthDepartments()).toBe(false);
   });
 
-  it("stays closed for an ordinary administrator who may still manage users", () => {
+  // Since P the department routes serve an administrator too, so the menu that guards
+  // this screen asks the same question as the user screen (AUTH-IXAUTH 5-1).
+  it("opens for an ordinary administrator, like the user screen", () => {
     setIxAuthAdminAccess(true);
     setIxAuthSuperAdminAccess(false);
     expect(canManageIxAuthUsers()).toBe(true);
-    expect(canManageIxAuthDepartments()).toBe(false);
+    expect(canManageIxAuthDepartments()).toBe(true);
   });
 
-  it("opens only for a system administrator", () => {
+  it("opens for a system administrator", () => {
     setIxAuthAdminAccess(true);
     setIxAuthSuperAdminAccess(true);
     expect(canManageIxAuthDepartments()).toBe(true);
