@@ -65,7 +65,7 @@ const WIDE_CONTROL_UNITS = 8;
 
 function paragraphText(data: Buffer): string {
   const parts: string[] = [];
-  for (let offset = 0; offset + 1 < data.length; ) {
+  for (let offset = 0; offset + 1 < data.length;) {
     const code = data.readUInt16LE(offset);
     if (code >= 32) {
       parts.push(String.fromCharCode(code));
@@ -256,7 +256,12 @@ async function extractHwpx(buffer: Buffer): Promise<HangulExtraction> {
 
 function finish(paragraphs: readonly string[], container: "hwp" | "hwpx"): HangulExtraction {
   const joined = paragraphs
-    .map((paragraph) => paragraph.replace(/\r/gu, "").replace(/[ \t]+$/gmu, "").trim())
+    .map((paragraph) =>
+      paragraph
+        .replace(/\r/gu, "")
+        .replace(/[ \t]+$/gmu, "")
+        .trim(),
+    )
     .filter((paragraph) => paragraph.length > 0)
     .join("\n\n");
   const text = joined.replace(/\n{3,}/gu, "\n\n").trim();

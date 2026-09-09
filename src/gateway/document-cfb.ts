@@ -80,7 +80,12 @@ export function readCompoundFile(buffer: Buffer): CompoundFile {
   }
   const sectorShift = buffer.readUInt16LE(30);
   const miniSectorShift = buffer.readUInt16LE(32);
-  if (sectorShift < 7 || sectorShift > 20 || miniSectorShift < 4 || miniSectorShift >= sectorShift) {
+  if (
+    sectorShift < 7 ||
+    sectorShift > 20 ||
+    miniSectorShift < 4 ||
+    miniSectorShift >= sectorShift
+  ) {
     throw new Error("unsupported sector layout");
   }
   const sectorSize = 1 << sectorShift;

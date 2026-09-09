@@ -24,7 +24,9 @@ function buildCompoundFile(streams: readonly BuiltStream[]): Buffer {
   const miniChunks: Buffer[] = [];
   const placed = streams.map((stream) => {
     const start = miniChunks.length;
-    const padded = Buffer.alloc(Math.ceil(stream.data.length / MINI_SECTOR_SIZE) * MINI_SECTOR_SIZE);
+    const padded = Buffer.alloc(
+      Math.ceil(stream.data.length / MINI_SECTOR_SIZE) * MINI_SECTOR_SIZE,
+    );
     stream.data.copy(padded);
     for (let offset = 0; offset < padded.length; offset += MINI_SECTOR_SIZE) {
       miniChunks.push(padded.subarray(offset, offset + MINI_SECTOR_SIZE));
@@ -262,8 +264,9 @@ describe("hwpx", () => {
 
 describe("other extensions", () => {
   test("refuses anything this reader does not own", async () => {
-    expect(
-      await extractHangulText({ buffer: Buffer.from("x"), sourceExtension: "docx" }),
-    ).toEqual({ ok: false, reason: "unsupported-format" });
+    expect(await extractHangulText({ buffer: Buffer.from("x"), sourceExtension: "docx" })).toEqual({
+      ok: false,
+      reason: "unsupported-format",
+    });
   });
 });

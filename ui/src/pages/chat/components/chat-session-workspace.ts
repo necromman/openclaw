@@ -3,9 +3,7 @@ import { GatewayRequestError } from "../../../api/gateway.ts";
 import type { ArtifactDownloadResult, SessionWorkspaceGetResult } from "../../../api/types.ts";
 import { hasOperatorAdminAccess } from "../../../app/operator-access.ts";
 import { patchSettings, type ChatWorkspaceDock } from "../../../app/settings.ts";
-import {
-  isDocumentPreviewPath,
-} from "../../../components/file-preview/document-preview-kinds.ts";
+import { isDocumentPreviewPath } from "../../../components/file-preview/document-preview-kinds.ts";
 import { t } from "../../../i18n/index.ts";
 import { formatUiError } from "../../../lib/format-error.ts";
 import { isGatewayMethodAdvertised } from "../../../lib/gateway-methods.ts";
