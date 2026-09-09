@@ -7,7 +7,12 @@
 # 빨간 불이면 다음 커밋에서 고친다.
 #
 # 레인은 셋이다.
-#  - pnpm check: 포맷·린트·타입·저장소 가드(700줄 상한·env 이름 래칫 등) 전량.
+#  - pnpm check:changed: 이번 푸시가 바꾼 파일만 골라 포맷·린트·타입·저장소 가드
+#    (700줄 상한·env 이름 래칫 등)를 돌린다. 전량 pnpm check 는 무료 호스티드 러너
+#    (4 vCPU)에서 oxlint core 한 덩어리가 exit 143 으로 죽고 재시도는 30분 타임아웃으로
+#    끝났다. 기준 ref 를 origin/main 으로 두면 이 포크의 델타가 1075개라 changed-lanes 가
+#    lanes=all 로 번져(--dry-run 계획 명령 1250개) 결과가 같다. 그래서 기준은 푸시 직전
+#    커밋이다.
 #  - 포크 노드 테스트: origin/main(업스트림 기준 태그) 대비 이 포크가 더하거나 고친
 #    테스트 파일만 저장소 공식 러너 scripts/test-projects.mts 로 돌린다. 전체
 #    pnpm test 는 두 시간이 넘어(FORK.md 10-2b) 30분 예산에 들어오지 않는다.
@@ -43,7 +48,7 @@ env:
 
 jobs:
   check:
-    name: pnpm check
+    name: pnpm check:changed
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -62,14 +67,46 @@ jobs:
           df -h /
 
       # persist-credentials 를 기본값으로 두는 이유는 아래 origin/main fetch 다.
+      # fetch-depth 는 이 푸시가 담은 커밋들을 기준 ref 로 잡기 위한 것이다. 얕은 팁
+      # 하나뿐이면 HEAD~1 조차 없다. 20 이면 한 번에 밀어 넣는 커밋 수를 넉넉히 덮고,
+      # 4 GB 히스토리를 다 받지도 않는다.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 20
 
-      # env 이름 래칫(check:env-var-count)은 기준 ref 로 origin/main 을 찾는다.
-      # 얕은 체크아웃에는 그 ref 가 없어서 "Could not resolve env-var count base ref"
-      # 로 죽는다. 4 GB 짜리 히스토리를 다 받지 않고 팁 하나만 얕게 가져와 채운다.
-      - name: 기준 ref 확보 (origin/main)
-        run: git fetch --no-tags --depth=1 origin "+main:refs/remotes/origin/main"
+      # 두 가지를 한다.
+      #  1. origin/main 확보. 저장소 가드 몇 개(env 이름 래칫 등)가 기준 ref 로 그것을
+      #     찾고, 얕은 체크아웃에는 없어서 "Could not resolve ... base ref" 로 죽는다.
+      #     4 GB 짜리 히스토리를 다 받지 않고 팁 하나만 얕게 가져와 채운다.
+      #  2. check:changed 에 넘길 기준 ref 결정. 푸시 직전 커밋(github.event.before)이
+      #     로컬에 있으면 그것, 없으면 HEAD~1. 둘 다 없으면(첫 푸시·강제 푸시·얕은
+      #     경계) 레인을 건너뛴다. origin/main 으로 떨어뜨리면 포크 델타 전량이 잡혀
+      #     lanes=all 이 되고, 그것이 바로 이 레인을 죽이던 전량 검사다.
+      - name: 기준 ref 확보
+        id: base
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "+main:refs/remotes/origin/main"
+          ref=""
+          zero="0000000000000000000000000000000000000000"
+          if [[ -n "${BEFORE_SHA:-}" && "$BEFORE_SHA" != "$zero" ]] &&
+             git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            ref="$BEFORE_SHA"
+          elif git rev-parse --verify -q "HEAD~1^{commit}" >/dev/null; then
+            ref="$(git rev-parse HEAD~1)"
+          fi
+          if [[ -z "$ref" ]]; then
+            echo "ready=0" >> "$GITHUB_OUTPUT"
+            echo "기준 ref 를 못 찾았다. 이 레인은 건너뛴다."
+          else
+            echo "ready=1" >> "$GITHUB_OUTPUT"
+            echo "ref=$ref" >> "$GITHUB_OUTPUT"
+            echo "기준 ref: $ref"
+            git diff --name-only "$ref" HEAD
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -96,24 +133,38 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # upstream ci.yml 의 check-lint-core 스트라이프는 호스티드 러너에서 oxlint 를
-      # --threads=1 로 돌린다. pnpm check 로는 그 인자를 넘길 수 없어서 oxlint 가 쓰는
-      # rayon 풀을 환경변수로 좁힌다.
-      - name: Run pnpm check
+      # --threads=1 로 돌린다. 변경분만 보더라도 한 배치가 러너를 다 먹지 않도록
+      # oxlint 가 쓰는 rayon 풀을 같은 값으로 좁혀 둔다.
+      - name: Run pnpm check:changed
         id: run_check
+        if: steps.base.outputs.ready == '1'
         env:
           RAYON_NUM_THREADS: "1"
+          BASE_REF: ${{ steps.base.outputs.ref }}
         run: |
           set -o pipefail
-          pnpm check 2>&1 | tee "$RUNNER_TEMP/chris-check.log"
+          pnpm check:changed --base "$BASE_REF" --head HEAD 2>&1 |
+            tee "$RUNNER_TEMP/chris-check.log"
+
+      - name: 기준 ref 없음
+        if: steps.base.outputs.ready != '1'
+        run: |
+          {
+            echo "## chris-check 건너뜀: pnpm check:changed"
+            echo
+            echo "푸시 직전 커밋을 못 찾아 변경분을 고를 수 없었다(첫 푸시·강제 푸시·얕은 경계)."
+            echo "다음 푸시에서 다시 돈다."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 실패 요약
         if: failure()
         run: |
           set -uo pipefail
           {
-            echo "## chris-check 실패: pnpm check"
+            echo "## chris-check 실패: pnpm check:changed"
             echo
-            echo "포맷·린트·타입·저장소 가드 중 하나가 실패했다. 배포는 막지 않는다."
+            echo "이번 푸시가 바꾼 파일의 포맷·린트·타입·저장소 가드 중 하나가 실패했다."
+            echo "배포는 막지 않는다."
             echo "다음 커밋에서 고친다. 남은 공간과 메모리:"
             echo
             echo '```'
