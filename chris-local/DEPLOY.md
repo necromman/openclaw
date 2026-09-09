@@ -229,9 +229,9 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | 최신 | `anthropic/claude-fable-5` | 1M | 없음 | 위와 같은 자격증명 |
 | 경량 | `anthropic/claude-haiku-4-5` | 200k | 있음 | 위와 같은 자격증명 |
 | 지난 세대 | `anthropic/claude-opus-4-8` | 1M | 있음 | 위와 같은 자격증명 |
-| 지난 세대 | `anthropic/claude-opus-4-7` | 200k | 있음 | 위와 같은 자격증명 |
-| 지난 세대 | `anthropic/claude-opus-4-6` | 200k | 있음 | 위와 같은 자격증명 |
-| 지난 세대 | `anthropic/claude-sonnet-4-6` | 200k | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-opus-4-7` | 1M | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-opus-4-6` | 1M | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-sonnet-4-6` | 1M | 있음 | 위와 같은 자격증명 |
 
 기본 모델은 `agents.defaults.model.primary`, 나머지 여덟은 `agents.defaults.modelPolicy.allow` 에 적는다. "스트리밍" 열의 뜻은 (차) 에 있다.
 
