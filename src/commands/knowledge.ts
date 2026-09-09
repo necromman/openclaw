@@ -12,6 +12,7 @@ export type KnowledgeSyncCommandOptions = {
   maxBytes?: string;
   concurrency?: string;
   dryRun?: boolean;
+  respectFolderRules?: boolean;
   verbose?: boolean;
   json?: boolean;
 };
@@ -88,6 +89,7 @@ export async function knowledgeSyncCommand(
   const concurrency = parseCount(options.concurrency, "--concurrency", KNOWLEDGE_MAX_CONCURRENCY);
   const summary = await syncKnowledgeIndex({
     dryRun: options.dryRun === true,
+    respectFolderRules: options.respectFolderRules !== false,
     out: requireOption(options.out, "--out"),
     source: requireOption(options.source, "--source"),
     ...(options.include ? { include: options.include.split(",") } : {}),
@@ -104,6 +106,11 @@ export async function knowledgeSyncCommand(
   runtime.log(
     `${summary.dryRun ? "dry-run  " : ""}${formatCounts(summary)}  (${summary.durationMs}ms)`,
   );
+  if (summary.folderRulesApplied) {
+    runtime.log(
+      "Folder permission rules were in force for this share: a folder nobody may see was not read, and any sidecar left from one was removed.",
+    );
+  }
   if (summary.converterMissing) {
     runtime.log(
       "LibreOffice was not found, so slide and legacy office files were left out. Install libreoffice-impress and rerun.",

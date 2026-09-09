@@ -105,9 +105,29 @@ export async function scanKnowledgeSource(params: {
   source: string;
   include: ReadonlySet<string>;
   maxBytes: number;
+  /**
+   * Decides whether one directory, named relative to `--source`, may be walked at all.
+   *
+   * Stopping at the folder rather than filtering the files afterwards is deliberate on
+   * two counts. It is the cheaper answer on a tree measured at 37,356 directories, and
+   * it is the honest one: a folder nobody may see is a folder whose file names were
+   * never read, so nothing about it reaches the report, the index, or this process.
+   */
+  allowDirectory?: (relativePath: string) => boolean;
 }): Promise<KnowledgeScan> {
+  const hiddenDirectories: string[] = [];
+  const allowDirectory = params.allowDirectory;
   const walked = await walkDirectory(params.source, {
-    descend: (entry) => entry.kind === "directory",
+    descend: (entry) => {
+      if (entry.kind !== "directory") {
+        return false;
+      }
+      if (allowDirectory && !allowDirectory(toPosixRelative(entry.relativePath))) {
+        hiddenDirectories.push(toPosixRelative(entry.relativePath));
+        return false;
+      }
+      return true;
+    },
     // "include" rather than "skip" so a symlink is reported as a deliberate omission
     // instead of vanishing. Only real files are ever read, and `descend` above keeps the
     // walk from following a linked directory out of the share.
@@ -115,6 +135,13 @@ export async function scanKnowledgeSource(params: {
     symlinks: "include",
   });
   const scan: KnowledgeScan = { candidates: [], ignored: [], known: new Set() };
+  for (const directory of hiddenDirectories) {
+    scan.ignored.push({
+      reason: "folder-hidden",
+      relativePath: directory,
+      sidecarPath: sidecarRelativePath(directory),
+    });
+  }
   for (const entry of walked.entries) {
     const relativePath = toPosixRelative(entry.relativePath);
     const sidecarPath = sidecarRelativePath(relativePath);

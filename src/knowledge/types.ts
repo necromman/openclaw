@@ -13,12 +13,18 @@ export const KNOWLEDGE_CONVERTER_IDS = [
 
 export type KnowledgeConverterId = (typeof KNOWLEDGE_CONVERTER_IDS)[number];
 
-/** Why a source file produced no sidecar. */
+/**
+ * Why a source file produced no sidecar.
+ *
+ * `folder-hidden` is reported for the folder rather than for each file inside it: the
+ * walk stops at the folder, so the files under it are never seen and cannot be listed.
+ */
 export type KnowledgeIgnoreReason =
   | "extension"
   | "too-large"
   | "symlink"
   | "outside-root"
+  | "folder-hidden"
   | "empty";
 
 /**
@@ -77,6 +83,8 @@ export type KnowledgeSyncSummary = {
   entries: readonly KnowledgeSyncEntry[];
   /** True when at least one source was skipped because no converter was installed. */
   converterMissing: boolean;
+  /** True when folder access rules narrowed this run. */
+  folderRulesApplied: boolean;
 };
 
 /** Frontmatter written at the top of every sidecar. */

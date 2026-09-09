@@ -8,6 +8,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import pMap from "p-map";
 import { convertKnowledgeSource } from "./convert.js";
+import { prepareKnowledgeFolderFilter } from "./folder-rule-filter.js";
 import {
   assertDisjointRoots,
   findOrphanSidecars,
@@ -39,6 +40,14 @@ export type KnowledgeSyncOptions = {
   maxBytes?: number;
   concurrency?: number;
   dryRun?: boolean;
+  /**
+   * Whether the folder access rules narrow this run. Default true.
+   *
+   * `--no-folder-rules` turns it off for a one-off run against a share the rules do not
+   * describe. The rules are inert anyway until at least one is written, so leaving this
+   * on costs nothing in a deployment that is not using the feature.
+   */
+  respectFolderRules?: boolean;
   /** Injected in tests so a summary can be asserted without a moving clock. */
   now?: () => Date;
 };
@@ -223,7 +232,25 @@ export async function syncKnowledgeIndex(
   if (!dryRun) {
     await fs.mkdir(out, { recursive: true });
   }
-  const scan = await scanKnowledgeSource({ include, maxBytes, source });
+  const folderFilter =
+    options.respectFolderRules === false
+      ? undefined
+      : await prepareKnowledgeFolderFilter({ source });
+  // A source folder that is itself hidden from everyone indexes nothing, and the orphan
+  // pass below then takes back whatever an earlier run wrote from it.
+  const sourceHidden = folderFilter !== undefined && !folderFilter.allows("");
+  const scan = sourceHidden
+    ? {
+        candidates: [],
+        ignored: [{ reason: "folder-hidden" as const, relativePath: "", sidecarPath: "" }],
+        known: new Set<string>(),
+      }
+    : await scanKnowledgeSource({
+        include,
+        maxBytes,
+        source,
+        ...(folderFilter ? { allowDirectory: folderFilter.allows } : {}),
+      });
   const context: SyncContext = { dryRun, now, out, source };
   const converted = await pMap(scan.candidates, (candidate) => syncOne(context, candidate), {
     concurrency,
@@ -257,6 +284,7 @@ export async function syncKnowledgeIndex(
   return {
     concurrency,
     converterMissing: entries.some((entry) => entry.reason === "converter-unavailable"),
+    folderRulesApplied: folderFilter !== undefined,
     counts,
     dryRun,
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),

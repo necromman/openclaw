@@ -42,11 +42,16 @@ export function registerKnowledgeCommand(program: Command): void {
       String(KNOWLEDGE_DEFAULT_CONCURRENCY),
     )
     .option("--dry-run", "Report what would change without converting or writing", false)
+    .option(
+      "--no-folder-rules",
+      "Index every folder, ignoring the folder permission rules for this run",
+    )
     .option("--verbose", "Also list skipped and ignored files", false)
     .option("--json", "Output the run summary as JSON", false)
     .action(async (opts: Record<string, unknown>) => {
       const options: KnowledgeSyncCommandOptions = {
         dryRun: Boolean(opts.dryRun),
+        respectFolderRules: opts.folderRules !== false,
         json: Boolean(opts.json),
         verbose: Boolean(opts.verbose),
         ...(optionalOption(opts.source) ? { source: optionalOption(opts.source) } : {}),
