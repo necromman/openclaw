@@ -57,9 +57,9 @@ import { renderModelCatalogProviderSection } from "./model-catalog-providers.ts"
 registerIxAuthEnglish();
 
 /** How many times the screen asks for a catalog before accepting an empty one. */
-const CATALOG_LOAD_ATTEMPTS = 3;
-/** Gap between those attempts. Long enough for a provider resolve, short enough to sit through. */
-const CATALOG_RETRY_DELAY_MS = 1_000;
+const CATALOG_LOAD_ATTEMPTS = 8;
+/** Gap between those attempts. Eight of these cover a cold Gateway's provider resolve. */
+const CATALOG_RETRY_DELAY_MS = 2_000;
 
 const EMPTY_POLICY: IxAuthModelPolicy = {
   primary: "",
@@ -197,7 +197,11 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
    * shows only the models the policy already names, which reads as "this deployment has
    * two models" rather than "ask again in a second".
    *
-   * Three tries a second apart, then stop. A catalog that is genuinely empty is a
+   * The same wait covers the other empty answer: right after a login the identity that
+   * `canManageIxAuthUsers` reads may not be in place yet, and the screen would then hold
+   * a catalog it never asked for.
+   *
+   * Eight tries two seconds apart, then stop. A catalog that is genuinely empty is a
    * different problem and saying so once is enough.
    */
   private async loadCatalogWithRetry(): Promise<void> {
