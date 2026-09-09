@@ -25,6 +25,13 @@
   - **함정: 템플릿 설정이 조용히 무시된다.** 게이트웨이는 마지막으로 받아들인 설정에 최상위 `meta` 가 있었는데 새 설정에 없으면 손상으로 보고 백업을 복원한다(`Config auto-restored from backup ... (missing-meta-vs-last-good)`). 게이트웨이가 마이그레이션을 한 번 기록하면 `meta` 를 스스로 쓰므로 그 뒤 모든 템플릿 렌더가 버려진다. 템플릿에 `meta.migrations.modelPolicyAllowlist` 를 넣어 고쳤다. **설정을 고쳤는데 안 바뀌면 기동 로그의 이 줄을 먼저 본다.**
   - **함정: NAS 는 `/config` 를 이미지가 아니라 호스트 폴더로 마운트한다**(`./ixauth-gateway-config:/config:ro`). 저장소 템플릿을 고치고 푸시해도 반영되지 않는다. `/volume1/docker/openclaw/ixauth-gateway-config/` 의 사본에도 같은 파일을 복사해야 한다(백업 `*.bak-q-20260908`).
 
+- **R 단계(2026-09-09, `chris/main` 직접)**: NAS 폴더 접근권한 0~1단계. 커밋 `657a5e6bb33`(compose) -> `679f70a65e2`(서버) -> `d78ab7765ca`(화면). 설계 정본 [NAS-FOLDER-ACL.md](NAS-FOLDER-ACL.md), 구현 결과는 그 문서 12절, 설치 절차는 [DEPLOY.md](DEPLOY.md) 11.4-1.
+  - **NAS 에 전용 그룹 두 개를 새로 만들었다.** `openclaw-ro`(gid 65540)·`openclaw-rw`(gid 65541), 구성원 없음. 공유 9개 ACL 에 **추가만** 했고 기존 그룹·사용자 항목은 손대지 않았다. 되돌리기는 `synoacltool -del <경로> <인덱스>` 와 `synogroup --del`, 원본 ACL 사본은 NAS 의 `/volume1/docker/openclaw/nas-acl-backup/`.
+  - **컨테이너에 `group_add: 65540` 을 주고 공유 9개를 `/mnt/nas/<공유 이름>` 으로 `:ro` 마운트했다.** `OPENCLAW_NAS_SHARES_ROOT=/volume1`·`OPENCLAW_NAS_GROUP_GID=65540` 이 NAS 의 `ixauth.env` 에 있다. compose 백업은 `docker-compose.nas.yml.bak-20260909-acl`.
+  - **`보안폴더` 7개는 상속이 끊겨 있어 컨테이너에서도 계속 막힌다.** 앱 규칙과 무관하다. NAS ACL 이 앱 권한의 상한이라는 것이 이 배치의 성질이다.
+  - **규칙이 없는 폴더는 아무에게도 보이지 않는다.** 화면(`/settings/folders`, 관리자 이상)에서 규칙을 만들어야 열린다. 판정은 깊은 경로 우선, 같은 경로에서는 개인 > 부서 > 역할, 같은 종류가 여럿이면 더 강한 제한이 이긴다.
+  - **아직 아닌 것**: 세션 파일 목록·미리보기·지식 색인에는 규칙이 걸리지 않는다(2단계). 에이전트가 도구로 읽는 파일과 쓰기는 3단계다.
+
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
 - **납품 라이브 좌표**: `https://jinbio.botops.cloud`(Cloudflare Tunnel, HTTP 200 실측). 호스트는 진바이오 NAS 192.168.2.1(apps01 OpenVPN 경유), compose 프로젝트 `openclaw-ixauth`, 컨테이너 4개(db·ix-auth·gateway·cloudflared), 네트워크 대역 `172.16.240.0/24`(cloudflared 는 `.10` 고정). 시스템 관리자는 `admin@deploy.local` 이고 시험 계정 6개가 함께 있다. 자격증명과 배포 좌표는 `infra/local/jinbio-deploy.md`(git 제외).
 
