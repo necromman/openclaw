@@ -201,8 +201,9 @@ services:
       # directions are what keep the share read only while its pdf, docx, xlsx and pptx
       # files still answer queries. One index per department, mounted separately, so the
       # department boundary that the share mounts draw is drawn again on the index.
-      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/rnd:/mnt/knowledge/rnd
-      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}/qa:/mnt/knowledge/qa
+      # 색인 폴더는 부모째 붙인다. 공유마다 색인 폴더가 하나씩 생기므로
+      # (X 단계) 부서 두 개만 미리 뚫어 두면 새 공유를 색인할 자리가 없다.
+      - ${OPENCLAW_KNOWLEDGE_ROOT:-./knowledge-index}:/mnt/knowledge
     ports:
       # The Gateway is the only service the browser ever reaches.
       - "${OPENCLAW_GATEWAY_PORT:-18800}:18789"

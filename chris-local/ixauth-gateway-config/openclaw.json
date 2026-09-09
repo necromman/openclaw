@@ -139,6 +139,11 @@
         "description": "회사 공용 AI 비서",
         "identity": {
           "name": "공용"
+        },
+        "memory": {
+          "search": {
+            "extraPaths": ["/mnt/knowledge"]
+          }
         }
       }
     }
