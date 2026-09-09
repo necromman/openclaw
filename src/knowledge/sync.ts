@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import pMap from "p-map";
-import { convertKnowledgeSource } from "./convert.js";
+import { convertKnowledgeSource, type KnowledgeConversion } from "./convert.js";
 import { prepareKnowledgeFolderFilter } from "./folder-rule-filter.js";
 import {
   assertDisjointRoots,
@@ -170,10 +170,18 @@ async function syncOne(
   if (context.dryRun) {
     return { ...base, action };
   }
-  const converted = await convertKnowledgeSource({
-    buffer,
-    extension: candidate.extension,
-  });
+  // Every converter failure is one file's failure. A converter that throws instead of
+  // answering used to end the run where it stood, which on a share of forty thousand
+  // files means the index stops at whatever document is unusual that day.
+  let converted: KnowledgeConversion;
+  try {
+    converted = await convertKnowledgeSource({
+      buffer,
+      extension: candidate.extension,
+    });
+  } catch {
+    converted = { ok: false, reason: "conversion-failed" };
+  }
   if (!converted.ok) {
     return {
       ...base,

@@ -110,6 +110,12 @@ async function convertThroughSoffice(
   return { body, converter: "soffice-pdf-text", ok: true };
 }
 
+/** True when a PDF refused to open because it is encrypted. */
+function isPasswordFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /password/iu.test(message);
+}
+
 /** Normalizes an extension the way every entry point here expects it. */
 export function normalizeExtension(value: string): string {
   return value.trim().toLowerCase().replace(/^\./u, "");
@@ -126,10 +132,19 @@ export async function convertKnowledgeSource(params: {
     return body.length > 0 ? { body, converter: "copy", ok: true } : { ok: false, reason: "empty" };
   }
   if (extension === "pdf") {
-    const body = await pdfBufferToMarkdown(params.buffer);
-    return body === undefined
-      ? { ok: false, reason: "empty" }
-      : { body, converter: "pdf-text", ok: true };
+    // A password-protected PDF makes the engine throw rather than answer, and on a real
+    // company share there is always one. Before this was caught, that single file ended
+    // the whole run with "PDF password is required or incorrect" (measured 2026-09-09,
+    // at 1,163 of 6,298 files). Encrypted is reported as its own reason so the report can
+    // tell "nobody can read this" from "this one broke".
+    try {
+      const body = await pdfBufferToMarkdown(params.buffer);
+      return body === undefined
+        ? { ok: false, reason: "empty" }
+        : { body, converter: "pdf-text", ok: true };
+    } catch (error) {
+      return { ok: false, reason: isPasswordFailure(error) ? "encrypted" : "conversion-failed" };
+    }
   }
   if (extension === "docx" || extension === "xlsx") {
     return await convertOoxml(params.buffer, extension);
