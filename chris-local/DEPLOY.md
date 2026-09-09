@@ -261,6 +261,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 - Q 단계의 최상위 `meta` 처리와 충돌하지 않는다. `meta` 는 병합 대상이 아니므로 렌더된 값이 그대로 남고, `Config auto-restored from backup ... (missing-meta-vs-last-good)` 은 다시 나오지 않는다.
 - **모델 설정을 템플릿 아래로 되돌리려면** 상태 볼륨의 `admin-overrides.json` 을 지우고 재기동한다(`docker exec <게이트웨이> rm -f /home/node/.openclaw/admin-overrides.json`).
 - NAS 는 `/config` 를 호스트 폴더로 마운트하므로 `merge-admin-overrides.mjs` 도 `start-gateway.sh` 와 같이 `/volume1/docker/openclaw/ixauth-gateway-config/` 에 복사해야 한다.
+- **프로바이더 전체 허용(`provider/*`)의 대가**: 게이트웨이가 그 항목을 만나면 채팅 모델 목록을 만들 때 전체 모델 탐색을 기다린다. 진바이오 배포에서 첫 조회 약 15초(그 뒤 캐시되어 즉시)이고, 그동안 선택기에 "모델 불러오는 중" 이 보인다. 고정 목록에서는 이 지연이 없다. 또 구독 로그인만 있는 프로바이더는 탐색 결과가 API 키가 있을 때보다 적다.
 - 화면 사용법은 [MANUAL.md](MANUAL.md) 10절, 역할 판정은 [AUTH-IXAUTH.md](AUTH-IXAUTH.md) 5-1.
 
 **시크릿 값은 이 파일에 절대 쓰지 않는다.** 게이트웨이가 `"${환경변수이름}"` 형태의 env SecretRef 를 해석하므로, 값은 `.env` 에만 두고 파일에는 이름만 적는다. `IXAUTH_SERVICE_KEY` 가 쓰는 것과 같은 장치다.
