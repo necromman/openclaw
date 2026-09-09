@@ -36,7 +36,9 @@ export type IxAuthAdminActionName =
   | "users-imported"
   | "department-create"
   | "department-rename"
-  | "department-delete";
+  | "department-delete"
+  // The model policy an administrator set from the model screen.
+  | "model-policy";
 
 /** Record one administrator action against one target account. */
 export function recordIxAuthAdminAction(params: {

@@ -235,6 +235,7 @@ ix-auth 모드의 `/settings` 왼쪽 메뉴는 역할 세 단계로 갈린다. �
 | 기기 | `devices` | `operator.admin`(페어링 승인) | 안 보임 | 안 보임 | 보임 | `ui/src/pages/devices/` |
 | 에이전트 | `agents` | `operator.admin` | 안 보임 | 안 보임 | 보임 | `ui/src/pages/agents/agents-page.ts:718` 외 |
 | 모델 | `model-providers` | `operator.admin`(`config.set`) | 안 보임 | 안 보임 | 보임 | `ui/src/pages/model-providers/` |
+| 모델(채팅) | `model-catalog` | `/auth/admin/models` | 안 보임 | 보임 | 보임 | `src/gateway/ix-auth-admin-models-http.ts` (U 단계에서 신설) |
 | 메모리 | `memory` | 게이트웨이 전역 설정(`plugins.slots.memory`) | 안 보임 | 안 보임 | 보임 | `ui/src/pages/config/memory-page.ts:60` |
 | 고급 | `advanced` | 게이트웨이 설정 편집 | 안 보임 | 안 보임 | 보임 | `ui/src/pages/config/route.ts:74` |
 | 디버그 | `debug` | 진단 | 안 보임 | 안 보임 | 보임 | `ui/src/pages/debug/` |
@@ -243,6 +244,7 @@ ix-auth 모드의 `/settings` 왼쪽 메뉴는 역할 세 단계로 갈린다. �
 
 - **감추는 것으로 끝내지 않는다.** 주소를 직접 입력해도 같은 판정이 라우트 아웃렛을 "권한 없음" 안내로 바꾼다(`ui/src/app/settings-route-access.ts`). 아웃렛을 아예 그리지 않으므로 그 화면의 로더가 게이트웨이에 아무것도 묻지 않는다. 하위 페이지(`ai-agents`·`model-setup`)는 자기 상위 항목의 판정을 따른다.
 - **토큰 모드는 그대로다.** 세 단계 판정은 `authMode: "ix-auth"` 이고 로그인한 세션에서만 켜지고, 그 전에는 전부 거짓이라 화면이 뜨는 도중에 항목이 사라지지 않는다.
+- **모델 화면이 둘인 이유**(U 단계, 2026-09-09). 업스트림 `model-providers` 는 설정을 `config.set` 으로 쓰므로 `operator.admin` 이 필요하고, 그것은 시스템 관리자만 가진다. 그런데 "어떤 모델이 답하고 사람들이 채팅에서 무엇을 고를 수 있는가" 는 사용자·부서와 같은 회사 운영 판단이다. 그래서 그 판단만 하는 좁은 화면 `model-catalog` 를 따로 두고 관리자에게 열었다. 이 화면이 쓰는 것은 `/auth/admin/models` 하나이고, 그 라우트는 문서 전체가 아니라 이름 붙은 네 필드(`primary`·`fallbacks`·`allow`·`utilityModel`)만 받는다. 읽기(`models.list`·`models.authStatus`)는 관리자가 이미 가진 `operator.read` 로 충분하다. 모델 인증(구독 로그인·토큰)을 새로 넣는 것은 이 화면의 일이 아니고, 인증 상태를 보여 주고 없으면 안내만 한다. 저장은 감사 원장에 `admin_action`/`model-policy` 로 남는다. 재기동 후 유지 방식은 [DEPLOY.md](DEPLOY.md) 3.4.
 - **알려진 예외 한 가지**: 중재자는 역할 정의상 `operator.approvals` 를 가지지만 승인 화면은 관리자 전용으로 두었다. 채팅 사이드바의 승인 알림으로는 그대로 처리할 수 있다. 승인 화면까지 열지는 사용자 결정으로 남긴다.
 
 ## 5-2. 시스템 관리자 계정 보호 (P 단계)

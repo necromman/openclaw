@@ -219,7 +219,18 @@ const SETTINGS_NAVIGATION_GROUPS = [
   },
   {
     labelKey: "nav.settingsGroupAgents",
-    routes: ["agents", "labs", "model-providers", "mcp", "memory", "automation"],
+    routes: [
+      "agents",
+      "labs",
+      "model-providers",
+      // The administrator model screen. It sits beside Models rather than inside it
+      // because the two answer to different ranks: this one writes four named leaves
+      // through an identity route, that one writes the config through operator.admin.
+      "model-catalog",
+      "mcp",
+      "memory",
+      "automation",
+    ],
   },
   {
     labelKey: "nav.settingsGroupSecurity",
@@ -240,7 +251,7 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
   },
   {
     labelKey: "nav.settingsGroupAgents",
-    routes: ["agents", "model-providers", "memory"],
+    routes: ["agents", "model-providers", "model-catalog", "memory"],
   },
   // The audit log rides here for the same reason Users does: an identity-server
   // administrator holds no Gateway operator scope, so without an entry in this list the
@@ -276,6 +287,10 @@ const IX_AUTH_ADMIN_SETTINGS_ROUTES: ReadonlySet<NavigationRouteId> = new Set([
   "folders",
   "audit",
   "approvals",
+  // Which model answers and which models chat offers is running the company, not
+  // reconfiguring the deployment, so it stops here rather than at the top rank. The
+  // screen writes through /auth/admin/models, which admits exactly this rank.
+  "model-catalog",
 ]);
 
 export function isSettingsNavigationRouteVisible(
@@ -406,6 +421,7 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   "ai-agents": ["brain", "tabs.aiAgents", "subtitles.aiAgents"],
   "model-setup": ["spark", "tabs.modelSetup", "subtitles.modelSetup"],
   "model-providers": ["box", "routeTitles.modelProviders", "subtitles.modelProviders"],
+  "model-catalog": ["spark", "tabs.modelCatalog", "subtitles.modelCatalog"],
   "memory-import": ["download", "tabs.memoryImport", "subtitles.memoryImport"],
   notifications: ["bell", "routeTitles.notifications", "subtitles.notifications"],
   security: ["shieldCheck", "tabs.security", "subtitles.security"],

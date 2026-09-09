@@ -291,6 +291,7 @@ describe("settings menu for a ranked account", () => {
     "devices",
     "agents",
     "model-providers",
+    "model-catalog",
     "memory",
     "audit",
     "approvals",
@@ -325,6 +326,9 @@ describe("settings menu for a ranked account", () => {
       "departments",
       "folders",
       "talk",
+      // The administrator model screen. It is the one Gateway setting this rank
+      // writes, through an identity route rather than through operator.admin.
+      "model-catalog",
       "audit",
       "approvals",
       "about",

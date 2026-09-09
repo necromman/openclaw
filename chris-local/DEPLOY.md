@@ -249,6 +249,20 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 정본 설정 파일은 `chris-local/ixauth-gateway-config/openclaw.json` 이고, 매 기동마다 상태 볼륨에 덮어쓴다(5절). 모델 설정도 이 파일에 넣는다.
 
+**다만 모델 영역만은 화면이 이긴다(U 단계, 2026-09-09).** 관리자가 설정 > 모델(채팅) 에서 바꾼 값은 상태 볼륨의 `admin-overrides.json` 에 함께 기록되고, `start-gateway.sh` 가 템플릿을 렌더한 다음 그 파일을 다시 얹는다. 그래서 "템플릿이 매 기동 덮어쓴다" 는 서술은 아래 표 바깥의 모든 키에 대해서만 참이다.
+
+| 구분 | 무엇이 이기나 | 왜 |
+| --- | --- | --- |
+| `agents.defaults.model`(기본·대체), `agents.defaults.modelPolicy`, `agents.defaults.utilityModel`, `agents.defaults.imageModel` | **관리자 화면** | 어떤 모델이 답하고 사람들이 무엇을 고를 수 있는지는 회사를 운영하는 판단이다. 매 기동 되돌아가면 화면이 고장 난 것으로 보인다 |
+| `agents.entries.<이미 있는 id>` 의 같은 네 키 | **관리자 화면** | 부서 에이전트를 되켠 날에도 같은 규칙이 필요하다. 없는 에이전트를 이 파일로 만들 수는 없다 |
+| 나머지 전부(신원·부서·도구 정책·신뢰 프록시·`meta`·워크스페이스 시드) | **템플릿** | 납품이 약속한 불변 영역이다. 브라우저에서 바꿀 수 있으면 그것은 운영이 아니라 기기 개조다 |
+
+- 병합기는 `chris-local/ixauth-gateway-config/merge-admin-overrides.mjs` 이고, 위 네 이름만 읽고 나머지는 무시한다. 파일이 없거나 JSON 이 아니거나 `version` 이 1 이 아니면 아무것도 하지 않고 렌더 결과를 그대로 둔다(사유는 stderr 에 한 줄).
+- Q 단계의 최상위 `meta` 처리와 충돌하지 않는다. `meta` 는 병합 대상이 아니므로 렌더된 값이 그대로 남고, `Config auto-restored from backup ... (missing-meta-vs-last-good)` 은 다시 나오지 않는다.
+- **모델 설정을 템플릿 아래로 되돌리려면** 상태 볼륨의 `admin-overrides.json` 을 지우고 재기동한다(`docker exec <게이트웨이> rm -f /home/node/.openclaw/admin-overrides.json`).
+- NAS 는 `/config` 를 호스트 폴더로 마운트하므로 `merge-admin-overrides.mjs` 도 `start-gateway.sh` 와 같이 `/volume1/docker/openclaw/ixauth-gateway-config/` 에 복사해야 한다.
+- 화면 사용법은 [MANUAL.md](MANUAL.md) 10절, 역할 판정은 [AUTH-IXAUTH.md](AUTH-IXAUTH.md) 5-1.
+
 **시크릿 값은 이 파일에 절대 쓰지 않는다.** 게이트웨이가 `"${환경변수이름}"` 형태의 env SecretRef 를 해석하므로, 값은 `.env` 에만 두고 파일에는 이름만 적는다. `IXAUTH_SERVICE_KEY` 가 쓰는 것과 같은 장치다.
 
 #### (가) 외부 API 방식

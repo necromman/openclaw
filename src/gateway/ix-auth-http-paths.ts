@@ -21,6 +21,7 @@ export type IxAuthHttpRoute =
   | "admin-invites"
   | "admin-approvals"
   | "admin-departments"
+  | "admin-models"
   | "admin-users"
   | "admin-audit-export"
   | "outside"
@@ -40,6 +41,7 @@ const IX_AUTH_ADMIN_ACCOUNT_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAut
   "admin-invites",
   "admin-approvals",
   "admin-departments",
+  "admin-models",
   "admin-users",
   "admin-audit-export",
 ]);
@@ -157,6 +159,11 @@ export function classifyIxAuthHttpPath(pathname: string): IxAuthHttpRoute {
       return "admin-approvals";
     case "/auth/admin/departments":
       return "admin-departments";
+    // The model policy an administrator may set: which model answers, which answers
+    // next, and which models chat offers. It is the only Gateway configuration this
+    // namespace writes, and it writes four named leaves rather than a document.
+    case "/auth/admin/models":
+      return "admin-models";
     case "/auth/admin/audit/export.csv":
       return "admin-audit-export";
     default:

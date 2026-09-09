@@ -233,6 +233,39 @@ const enIxAuth = {
       unverified: "Address not confirmed",
       decided: "Done.",
     },
+    models: {
+      title: "Models",
+      forbidden: "Your account cannot manage models.",
+      unrestricted: "Every model of every authenticated provider is offered in chat.",
+      restricted: "{count} entries decide what chat offers.",
+      authenticated: "This provider is signed in.",
+      notAuthenticated:
+        "No working credential. Models are listed, but this provider cannot answer until somebody signs it in on the server.",
+      allowAll: "Allow every model of this provider",
+      allowAllHelp:
+        "Adds the provider wildcard. Individual choices below are dropped, because the wildcard already covers them.",
+      allowedModels: "Models offered in chat",
+      allowedModelsHelp:
+        "Ticked models appear in the chat model picker and on the new-session screen.",
+      noModels: "This provider answered with no models.",
+      defaultsTitle: "Default and fallback",
+      defaultsHelp:
+        "The default answers first. A fallback answers when the one before it cannot. Both have to stay inside the list above.",
+      primary: "Default model",
+      fallbacks: "Fallback models",
+      fallbacksHelp: "Tried in order, top first.",
+      addFallback: "Add a fallback",
+      remove: "Remove",
+      unset: "Gateway default",
+      primaryHidden:
+        "The default model is not in the list above. Allow it, or choose another default.",
+      saveTitle: "Save",
+      saveHelp: "Saved settings take effect at once and are kept across a Gateway restart.",
+      save: "Save",
+      saved: "Saved. The change is live and will survive a restart.",
+      savedNotPersisted:
+        "Saved and live, but it could not be written beside the configuration, so a restart will undo it. Tell whoever runs the server.",
+    },
     departments: {
       title: "Departments",
       description: "Departments, the agents bound to them, and the folders those agents may read.",
@@ -416,6 +449,8 @@ const enIxAuth = {
       usersEmptyFile: "The file has no rows.",
       usersNotFound: "That account no longer exists.",
       departmentsRejected: "The change was refused. Reload the page and try again.",
+      modelNotAllowed: "The default or a fallback is not in the allowed list.",
+      modelWriteFailed: "The Gateway could not write the configuration. Try again.",
       departmentHasMembers: "Somebody is still in that department, so it was not deleted.",
       accountLocked: "This account is locked. Contact an administrator.",
       accountLockedUntil: "Too many attempts. Try again after {time}.",

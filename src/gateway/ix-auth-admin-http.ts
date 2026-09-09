@@ -297,6 +297,13 @@ export async function handleIxAuthAdminHttpRequest(params: {
     await departmentsModule.handleIxAuthAdminDepartmentsRequest({ ...params, admin });
     return;
   }
+  if (params.route === "admin-models") {
+    // Loaded on demand: only the model screen reads or writes this surface, and it pulls
+    // the configuration mutation machinery with it.
+    const modelsModule = await import("./ix-auth-admin-models-http.js");
+    await modelsModule.handleIxAuthAdminModelsRequest({ ...params, admin });
+    return;
+  }
   if (params.route === "admin-invites") {
     await handleInvitesRoute({ ...params, admin });
     return;

@@ -1,8 +1,10 @@
 #!/bin/sh
 # Render the tracked Gateway config into the state volume, then start the Gateway.
 #
-# The template is the single source of truth for this deployment: it is copied over the
-# state copy on every start, so an edit here always takes effect on the next restart.
+# The template is the source of truth for this deployment: it is copied over the state
+# copy on every start, so an edit here always takes effect on the next restart. One region
+# is the exception since stage U and is named at the merge step below: the model settings
+# an administrator owns are merged back on top of the render.
 # Three placeholders are substituted: the browser origin, the signup switch, and the
 # trusted proxy list. They are the values that cannot be known when the file is written
 # and are not secrets (secrets ride in as env SecretRefs such as "${IXAUTH_SERVICE_KEY}",
@@ -81,6 +83,25 @@ sed -e "s|__OPENCLAW_PUBLIC_ORIGIN__|${origin}|g" \
     -e "s|\"__OPENCLAW_SELF_SIGNUP__\"|${self_signup}|g" \
     -e "s|\"__OPENCLAW_TRUSTED_PROXIES__\"|${trusted_proxies}|g" /config/openclaw.json \
   > /home/node/.openclaw/openclaw.json
+
+# One region of that render is not the template's to dictate any more (stage U): which
+# model answers, which model answers when the first cannot, and which models chat offers.
+# An administrator sets those from Settings > Models without holding "operator.admin", and
+# the Gateway records the choice in this file beside the config as well as in the config
+# itself. Merging it back here is what makes the choice survive the next start; without it
+# the render would quietly reinstate yesterday's models and the screen would look broken.
+#
+# Everything else stays exactly as before. The merge reads four named leaves and ignores
+# the rest of the file, so identity, departments, tool policy, the proxy list and the
+# top-level "meta" block are still the template's alone. A missing, damaged or wrongly
+# shaped overrides file changes nothing: the script says so on stderr and leaves the
+# render in place, which is the deployment's known-good state. Deleting the file is
+# therefore the way to put the models back under template control.
+admin_overrides="/home/node/.openclaw/admin-overrides.json"
+if [ -f "$admin_overrides" ]; then
+  node /config/merge-admin-overrides.mjs /home/node/.openclaw/openclaw.json "$admin_overrides" \
+    || echo "admin overrides merge failed; keeping the rendered template" >&2
+fi
 
 # Workspace identity, rendered the same way the config is: from the tracked template on
 # every start. A stock workspace ships a BOOTSTRAP.md whose first beat is "ask the user
