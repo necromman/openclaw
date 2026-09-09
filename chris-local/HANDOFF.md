@@ -45,6 +45,13 @@
   - **운영 실측 통과**: 파일 패널 18개 -> 15개, `기록물` 이 목록에서 사라짐, 직접 열기 `session file not found`, 원장 거부 1건, 색인 `folder-hidden` 폴더당 한 줄 + 사이드카 5개 회수, 고아 목록·정리, hwp 표 렌더. 스크린샷 chris-server `analysis/2026-09-07-openclaw-auth/delivery-v-0*.png`.
   - **선재 실패**: `chris-check` 의 `plugin boundaries`(만료된 deprecation 창)는 그대로다. R 단계부터 빨갛던 포크 테스트 1건(`folder-access-path` 의 `"/"`)은 V 에서 고쳤다.
 
+- **W 단계(2026-09-09, `chris/main` 직접)**: 운영 장애 두 건 + 모델 화면 재설계. 커밋 `60b799e941c` -> `66ba487d36c` -> `ce6bc25e7d9` -> `d7b3c49efe0`. 상세는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 W 행, 함정은 [DEPLOY.md](DEPLOY.md) 3.4 (바)·11.7 (바), 사용법은 [MANUAL.md](MANUAL.md) 10절.
+  - **기본 모델이 `anthropic/claude-sonnet-5` 로 바뀌었다(사용자 확정).** 질문마다 30초씩 늦던 원인은 OpenAI 구독 로그인의 갱신 실패였고, 그 로그인을 작업 PC 와 NAS 가 나눠 쓴 것이 원인이다. Anthropic 은 setup-token 장기 토큰이라 갱신 자체가 없다. `openai/gpt-5.6-luna` 는 목록에 남아 있지만 **지금 고르면 30초 뒤 실패한다.** 되살리려면 NAS 전용 OpenAI 로그인이나 `OPENAI_API_KEY` 가 필요하다(DEPLOY.md 3.4 (다)·(라)).
+  - **`Falling back from WebSockets to HTTPS transport` 는 터널 문제가 아니었다.** 상태 볼륨의 Codex 런타임 바이너리가 찍는 줄이고 위 인증 장애와 한 몸이다. 기본 모델을 옮기면서 함께 사라졌다. Cloudflare 터널 설정은 손대지 않았다.
+  - **모델 화면이 바뀌었다.** `/settings/model-catalog` 이 프로바이더별 카탈로그 전체를 그리고 모델마다 스위치 하나다. 저장값은 언제나 켜진 모델의 명시적 목록이고 `provider/*` 와일드카드는 더 쓰지 않는다. **함정: 옛 저장본의 와일드카드를 화면이 열자마자 펼치므로 아무것도 누르지 않아도 저장 버튼이 켜져 있다.** 안내 문구가 그 이유를 말한다.
+  - **선재 결함 2건을 함께 고쳤다.** 모델 ref 패턴이 슬래시 하나만 받아 `huggingface/deepseek-ai/DeepSeek-R1` 같은 실제 카탈로그 이름을 거부했고(전체 켜기가 `invalid_body`), 허용 목록 상한 100 과 공용 본문 한도 4 KiB 로는 카탈로그 82개가 들어가지 않았다(상한 300, 이 라우트만 64 KiB).
+  - **함정: 한국어 문안은 소스가 아니라 번역 메모리에서 온다.** `ui/src/i18n/locales/ko.ts` 는 빌드 타임 가상 모듈 한 줄이고, 실제 문안은 `ui/src/i18n/.i18n/ko.tm.jsonl` 의 항목을 **영어 원문 해시로 매칭**해 만든다. 영어 문안을 고치면 그 키의 한국어가 조용히 영어로 되돌아간다. 새 키·바뀐 키는 그 파일에 직접 넣어야 한다(해시는 `sha256(공백 정규화한 영어 원문)`).
+
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
 - **납품 라이브 좌표**: `https://jinbio.botops.cloud`(Cloudflare Tunnel, HTTP 200 실측). 호스트는 진바이오 NAS 192.168.2.1(apps01 OpenVPN 경유), compose 프로젝트 `openclaw-ixauth`, 컨테이너 4개(db·ix-auth·gateway·cloudflared), 네트워크 대역 `172.16.240.0/24`(cloudflared 는 `.10` 고정). 시스템 관리자는 `admin@deploy.local` 이고 시험 계정 6개가 함께 있다. 자격증명과 배포 좌표는 `infra/local/jinbio-deploy.md`(git 제외).
 

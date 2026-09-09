@@ -56,6 +56,11 @@ import { renderModelCatalogProviderSection } from "./model-catalog-providers.ts"
 
 registerIxAuthEnglish();
 
+/** How many times the screen asks for a catalog before accepting an empty one. */
+const CATALOG_LOAD_ATTEMPTS = 3;
+/** Gap between those attempts. Long enough for a provider resolve, short enough to sit through. */
+const CATALOG_RETRY_DELAY_MS = 1_000;
+
 const EMPTY_POLICY: IxAuthModelPolicy = {
   primary: "",
   fallbacks: [],
@@ -115,7 +120,7 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     this.connected = snapshot.phase === "connected";
     if (this.connected && (clientChanged || !this.catalogRequested)) {
       this.catalogRequested = true;
-      void this.loadCatalog();
+      void this.loadCatalogWithRetry();
     }
   }
 
@@ -148,11 +153,13 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
    * The full view is asked for on purpose: an allowlist that hides a model must still be
    * able to offer it back, and a screen that could only see what is already allowed could
    * never widen anything.
+   *
+   * Answers whether a catalog arrived, so the caller can ask again.
    */
-  private async loadCatalog(): Promise<void> {
+  private async loadCatalog(): Promise<boolean> {
     const client = this.client;
     if (!client || !this.connected || !canManageIxAuthUsers()) {
-      return;
+      return false;
     }
     // `models.list` resolves its catalog per agent and refuses the call outright when no
     // agent can be named, which on an explicit-ownership roster is what an omitted
@@ -177,6 +184,32 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     this.catalog = models.status === "fulfilled" ? (models.value.models ?? []) : [];
     this.auth = auth.status === "fulfilled" ? (auth.value.providers ?? []) : [];
     this.expandStoredWildcards();
+    return this.catalog.length > 0;
+  }
+
+  /**
+   * Ask again for a little while when the catalog comes back empty.
+   *
+   * The Gateway answers `models.list` before its providers have finished resolving, which
+   * on a machine that has just restarted is the first thing this screen meets: the socket
+   * says connected, the call succeeds, and the answer is an empty catalog. Without a
+   * second attempt that empty answer is final for the life of the page, and the screen
+   * shows only the models the policy already names, which reads as "this deployment has
+   * two models" rather than "ask again in a second".
+   *
+   * Three tries a second apart, then stop. A catalog that is genuinely empty is a
+   * different problem and saying so once is enough.
+   */
+  private async loadCatalogWithRetry(): Promise<void> {
+    for (let attempt = 0; attempt < CATALOG_LOAD_ATTEMPTS; attempt += 1) {
+      if (await this.loadCatalog()) {
+        return;
+      }
+      if (!this.connected) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, CATALOG_RETRY_DELAY_MS));
+    }
   }
 
   private get groups(): ModelCatalogProviderGroup[] {
