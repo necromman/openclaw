@@ -105,6 +105,31 @@ export function indexFolderRulesByPath(
   return byPath;
 }
 
+/**
+ * The rule table prepared once for many folders.
+ *
+ * A listing decides one folder per entry and an index run decides one per directory in a
+ * tree measured at 37,356 of them. Re-grouping the table for every one of those turns a
+ * cheap walk into a quadratic one, so the grouping is lifted out and the subjects the
+ * table names are collected in the same pass.
+ */
+export type FolderRuleIndex = {
+  byPath: Map<string, FolderAccessRule[]>;
+  subjects: { kind: FolderRuleSubjectKind; id: string }[];
+};
+
+/** Prepare one rule table for repeated verdicts. */
+export function buildFolderRuleIndex(rules: readonly FolderAccessRule[]): FolderRuleIndex {
+  const subjects = new Map<string, { kind: FolderRuleSubjectKind; id: string }>();
+  for (const rule of rules) {
+    subjects.set(`${rule.subjectKind}:${rule.subjectId}`, {
+      kind: rule.subjectKind,
+      id: rule.subjectId,
+    });
+  }
+  return { byPath: indexFolderRulesByPath(rules), subjects: [...subjects.values()] };
+}
+
 function resolveAtLevel(
   candidates: readonly FolderAccessRule[],
 ): { permission: FolderRulePermission } | undefined {
@@ -135,6 +160,19 @@ export function resolveFolderAccess(params: {
   identity: FolderAccessIdentity;
   rules: readonly FolderAccessRule[];
 }): FolderAccessVerdict {
+  return resolveFolderAccessIndexed({
+    folderPath: params.folderPath,
+    identity: params.identity,
+    index: buildFolderRuleIndex(params.rules),
+  });
+}
+
+/** The same decision against a table that was prepared once. */
+export function resolveFolderAccessIndexed(params: {
+  folderPath: string | undefined;
+  identity: FolderAccessIdentity;
+  index: FolderRuleIndex;
+}): FolderAccessVerdict {
   if (params.identity.isSuperAdmin) {
     // The same posture the department fence takes: no gate is built for this rank, so
     // none is bypassed either.
@@ -144,7 +182,7 @@ export function resolveFolderAccess(params: {
   if (folderPath === undefined || hasExcludedFolderSegment(folderPath)) {
     return { permission: "hidden", inherited: false };
   }
-  const byPath = indexFolderRulesByPath(params.rules);
+  const byPath = params.index.byPath;
   const chain = folderRuleAncestry(folderPath);
   for (const [depth, level] of chain.entries()) {
     const atLevel = byPath.get(level);
@@ -177,19 +215,13 @@ export function resolveFolderEffectiveRules(params: {
   folderPath: string;
   rules: readonly FolderAccessRule[];
 }): FolderEffectiveRule[] {
-  const subjects = new Map<string, { kind: FolderRuleSubjectKind; id: string }>();
-  for (const rule of params.rules) {
-    subjects.set(`${rule.subjectKind}:${rule.subjectId}`, {
-      kind: rule.subjectKind,
-      id: rule.subjectId,
-    });
-  }
+  const index = buildFolderRuleIndex(params.rules);
   const effective: FolderEffectiveRule[] = [];
-  for (const subject of subjects.values()) {
-    const verdict = resolveFolderAccess({
+  for (const subject of index.subjects) {
+    const verdict = resolveFolderAccessIndexed({
       folderPath: params.folderPath,
       identity: subjectIdentity(subject.kind, subject.id),
-      rules: params.rules,
+      index,
     });
     if (verdict.sourcePath === undefined) {
       continue;
@@ -224,4 +256,40 @@ export function subjectIdentity(kind: FolderRuleSubjectKind, id: string): Folder
     return { departments: [id], isSuperAdmin: false };
   }
   return { gatewayRole: id, departments: [], isSuperAdmin: false };
+}
+
+/**
+ * True when at least one subject named in the rules may see this folder.
+ *
+ * The document index has no person behind it. `openclaw knowledge sync` is run by a cron
+ * entry, and the sidecars it writes land in one shared pool that memory search reads, so
+ * there is no request identity to decide against and no per-reader filter afterwards.
+ *
+ * The only verdict that can be taken at that moment is therefore about the folder rather
+ * than about a reader: index a folder when the operator has deliberately opened it to
+ * somebody, and leave it out when nobody has been named. A folder with no rule anywhere
+ * in its chain is hidden from everyone by the default, so it produces no sidecar, and a
+ * folder that is later hidden loses the sidecar it had (the sync already deletes a
+ * sidecar whose source it no longer walks).
+ *
+ * The remaining gap is stated rather than papered over: a folder opened to one
+ * department is in the same pool as one opened to another, so the index is not itself a
+ * per-department boundary. That boundary is the agent's, and closing it inside the tools
+ * is stage three.
+ */
+export function isFolderVisibleToAnySubject(params: {
+  folderPath: string;
+  index: FolderRuleIndex;
+}): boolean {
+  for (const subject of params.index.subjects) {
+    const verdict = resolveFolderAccessIndexed({
+      folderPath: params.folderPath,
+      identity: subjectIdentity(subject.kind, subject.id),
+      index: params.index,
+    });
+    if (verdict.permission !== "hidden") {
+      return true;
+    }
+  }
+  return false;
 }

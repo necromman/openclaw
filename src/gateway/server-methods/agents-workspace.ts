@@ -13,6 +13,8 @@ import {
 import { listAgentIds, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { normalizeAgentIdStrict } from "../../routing/session-key.js";
+import { prepareFolderAccessGate, type FolderAccessGate } from "../folder-access-guard.js";
+import type { GatewayClient } from "./client-types.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 import { assertValidParams } from "./validation.js";
 import {
@@ -107,9 +109,38 @@ function resolveWorkspaceScopeOrRespond(
   return { agentId, workspaceDir, browserPath };
 }
 
+function respondWorkspacePathNotFound(respond: RespondFn, browserPath: string): void {
+  respond(
+    false,
+    undefined,
+    workspaceError("workspace_path_not_found", "workspace directory not found", {
+      path: browserPath,
+    }),
+  );
+}
+
+/**
+ * The folder gate for one agent workspace, or undefined when rules do not reach it.
+ *
+ * A workspace that is not under the shared mount is not part of the folder plane, and a
+ * gate that answered for it would hide an agent's own files behind a rule table nobody
+ * wrote for them.
+ */
+async function prepareWorkspaceFolderGate(
+  client: GatewayClient | null,
+  workspaceDir: string,
+): Promise<FolderAccessGate | undefined> {
+  const gate = await prepareFolderAccessGate({ client, root: workspaceDir });
+  if (!gate) {
+    return undefined;
+  }
+  // A workspace root the caller may not see answers as an empty, missing workspace.
+  return gate.allowsRoot ? gate : { allowsRoot: false, allows: () => false };
+}
+
 /** Gateway handlers for read-only agent workspace browsing. */
 export const agentsWorkspaceHandlers: GatewayRequestHandlers = {
-  "agents.workspace.list": async ({ params, respond, context }) => {
+  "agents.workspace.list": async ({ params, respond, context, client }) => {
     if (
       !assertValidParams(
         params,
@@ -125,19 +156,18 @@ export const agentsWorkspaceHandlers: GatewayRequestHandlers = {
       return;
     }
     const { agentId, workspaceDir, browserPath } = scope;
+    const gate = await prepareWorkspaceFolderGate(client, workspaceDir);
+    if (gate && !gate.allows(browserPath, "directory")) {
+      respondWorkspacePathNotFound(respond, browserPath);
+      return;
+    }
     const stat = await statWorkspacePath(workspaceDir, browserPath);
     const dirents =
       stat && workspaceStatKind(stat) === "directory"
         ? await listWorkspacePath(workspaceDir, browserPath)
         : undefined;
     if (!dirents) {
-      respond(
-        false,
-        undefined,
-        workspaceError("workspace_path_not_found", "workspace directory not found", {
-          path: browserPath,
-        }),
-      );
+      respondWorkspacePathNotFound(respond, browserPath);
       return;
     }
     const entries = sortWorkspaceEntries(
@@ -145,6 +175,10 @@ export const agentsWorkspaceHandlers: GatewayRequestHandlers = {
         const statKind = workspaceStatKind(dirent);
         const kind = statKind === "directory" ? "directory" : statKind === "file" ? "file" : null;
         if (!kind) {
+          return [];
+        }
+        const entryPath = browserPath ? `${browserPath}/${dirent.name}` : dirent.name;
+        if (gate && !gate.allows(entryPath, kind)) {
           return [];
         }
         return [
@@ -170,7 +204,7 @@ export const agentsWorkspaceHandlers: GatewayRequestHandlers = {
       offset,
     });
   },
-  "agents.workspace.get": async ({ params, respond, context }) => {
+  "agents.workspace.get": async ({ params, respond, context, client }) => {
     if (
       !assertValidParams(params, validateAgentsWorkspaceGetParams, "agents.workspace.get", respond)
     ) {
@@ -191,6 +225,11 @@ export const agentsWorkspaceHandlers: GatewayRequestHandlers = {
       );
     };
     if (!browserPath) {
+      respondNotFound();
+      return;
+    }
+    const gate = await prepareWorkspaceFolderGate(client, workspaceDir);
+    if (gate && !gate.allows(browserPath, "file")) {
       respondNotFound();
       return;
     }

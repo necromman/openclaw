@@ -25,6 +25,7 @@ import { FsSafeError } from "../../infra/fs-safe.js";
 import { pruneMapToMaxSize } from "../../infra/map-size.js";
 import { isPathInside } from "../../infra/path-guards.js";
 import { normalizeAgentId, parseAgentSessionKey } from "../../routing/session-key.js";
+import { prepareFolderAccessGate, type FolderAccessGate } from "../folder-access-guard.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
 import {
   readSessionTranscriptVisibleMessageDeltaCore,
@@ -34,8 +35,12 @@ import {
   type SessionTranscriptReadScope,
 } from "../session-transcript-readers.js";
 import { loadGatewaySessionEntryReadOnly } from "../session-utils.js";
-import { recordFileDownloadActivity } from "../session-view-activity-audit.js";
+import {
+  recordAccessDeniedActivity,
+  recordFileDownloadActivity,
+} from "../session-view-activity-audit.js";
 import { resolveSessionWorkspaceRoots } from "../session-workspace-roots.js";
+import type { GatewayClient } from "./client-types.js";
 import {
   execOpenPath,
   formatOpenPathError,
@@ -607,6 +612,7 @@ async function searchBrowserEntries(params: {
   root: string | WorkspaceRoot;
   query: string;
   relevance: ReadonlyMap<string, SessionFileRelevance>;
+  gate?: FolderAccessGate | undefined;
 }): Promise<{ entries: SessionFileBrowserEntry[]; truncated?: boolean }> {
   const entries: SessionFileBrowserEntry[] = [];
   let visitedEntries = 0;
@@ -632,13 +638,20 @@ async function searchBrowserEntries(params: {
       }
       visitedEntries += 1;
       const browserPath = dir ? `${dir}/${dirent.name}` : dirent.name;
+      const isDirectory = workspaceStatKind(dirent) === "directory";
+      // A hidden folder is not searched and not reported, in that order: descending into
+      // it would put its file names in front of the caller by way of the match count
+      // even when every match was dropped afterwards.
+      if (params.gate && !params.gate.allows(browserPath, isDirectory ? "directory" : "file")) {
+        continue;
+      }
       if (matchesSearch(browserPath, dirent.name, params.query)) {
         const entry = await toBrowserEntry(browserPath, dirent, params.relevance);
         if (entry) {
           entries.push(entry);
         }
       }
-      if (workspaceStatKind(dirent) === "directory" && !SEARCH_SKIP_DIRS.has(dirent.name)) {
+      if (isDirectory && !SEARCH_SKIP_DIRS.has(dirent.name)) {
         await visit(browserPath);
       }
     }
@@ -654,6 +667,7 @@ async function buildBrowserResult(params: {
   path?: string;
   search?: string;
   files: readonly TouchedFile[];
+  gate?: FolderAccessGate | undefined;
 }): Promise<SessionFileBrowserResult | undefined> {
   if (!params.root) {
     return undefined;
@@ -665,6 +679,7 @@ async function buildBrowserResult(params: {
       root: params.workspaceRoot ?? params.root,
       query: search,
       relevance,
+      gate: params.gate,
     });
     return {
       path: "",
@@ -678,6 +693,11 @@ async function buildBrowserResult(params: {
   if (!resolved) {
     return undefined;
   }
+  // A hidden directory answers exactly as a directory that is not there does: the panel
+  // gets no browser at all, and there is nothing in the answer that separates the two.
+  if (params.gate && !params.gate.allows(browserPath, "directory")) {
+    return undefined;
+  }
   const stat = await statWorkspacePath(params.workspaceRoot ?? params.root, browserPath);
   if (!stat || workspaceStatKind(stat) !== "directory") {
     return undefined;
@@ -686,14 +706,22 @@ async function buildBrowserResult(params: {
   if (!dirents) {
     return undefined;
   }
+  const visible = sortDirents(dirents).filter((dirent) => {
+    if (!params.gate) {
+      return true;
+    }
+    const entryPath = browserPath ? `${browserPath}/${dirent.name}` : dirent.name;
+    return params.gate.allows(
+      entryPath,
+      workspaceStatKind(dirent) === "directory" ? "directory" : "file",
+    );
+  });
   const entries = (
     await Promise.all(
-      sortDirents(dirents)
-        .slice(0, MAX_BROWSER_ENTRIES + 1)
-        .map((dirent) => {
-          const entryPath = browserPath ? `${browserPath}/${dirent.name}` : dirent.name;
-          return toBrowserEntry(entryPath, dirent, relevance);
-        }),
+      visible.slice(0, MAX_BROWSER_ENTRIES + 1).map((dirent) => {
+        const entryPath = browserPath ? `${browserPath}/${dirent.name}` : dirent.name;
+        return toBrowserEntry(entryPath, dirent, relevance);
+      }),
     )
   ).filter((entry): entry is SessionFileBrowserEntry => Boolean(entry));
   const parent = path.dirname(browserPath);
@@ -746,6 +774,7 @@ async function buildListResult(params: {
   agentId?: string;
   path?: string;
   search?: string;
+  client?: GatewayClient | null;
 }): Promise<{
   root?: string;
   gitCheckout?: boolean;
@@ -754,13 +783,34 @@ async function buildListResult(params: {
 }> {
   const loaded = await loadSessionFiles(params);
   const root = loaded.root;
+  const gate = await prepareFolderAccessGate({ client: params.client ?? null, root });
+  if (gate && !gate.allowsRoot) {
+    // The workspace itself is a folder this person may not see, so the panel is told
+    // there is nothing here rather than that there is something they cannot have.
+    return { files: [] };
+  }
   const gitCheckout = loaded.diffCwd ? insideGitCheckout(loaded.diffCwd) : undefined;
   const workspaceRoot = root ? await openWorkspaceRoot(root) : undefined;
-  const workspaceFiles = root
-    ? loaded.files.filter((file) =>
-        Boolean(resolveTouchedFilePath({ root, fileRoot: loaded.fileRoot, filePath: file.path })),
-      )
-    : loaded.files;
+  // The touched list names files the run itself opened, so it is a second way into the
+  // same bytes and gets the same verdict as the browser does.
+  const touchedFileVisible = (file: TouchedFile): boolean => {
+    if (!gate || !root) {
+      return true;
+    }
+    const resolved = resolveTouchedFilePath({
+      root,
+      fileRoot: loaded.fileRoot,
+      filePath: file.path,
+    });
+    return resolved === undefined || gate.allows(toDisplayPath(root, resolved), "file");
+  };
+  const workspaceFiles = (
+    root
+      ? loaded.files.filter((file) =>
+          Boolean(resolveTouchedFilePath({ root, fileRoot: loaded.fileRoot, filePath: file.path })),
+        )
+      : loaded.files
+  ).filter(touchedFileVisible);
   const files = await Promise.all(
     workspaceFiles.map((file) =>
       toSessionFileEntry(file, loaded.root, loaded.fileRoot, { workspaceRoot }),
@@ -773,6 +823,7 @@ async function buildListResult(params: {
     path: params.path,
     search: params.search,
     files: workspaceFiles,
+    gate,
   });
   return {
     ...(root ? { root } : {}),
@@ -783,11 +834,34 @@ async function buildListResult(params: {
 }
 
 async function findSessionFile(
-  params: SessionsFilesGetParams,
-): Promise<{ root?: string; file?: SessionFileEntry }> {
+  params: SessionsFilesGetParams & { client?: GatewayClient | null },
+): Promise<{ root?: string; file?: SessionFileEntry; refused?: true }> {
   const loaded = await loadSessionFiles(params);
+  const gate = await prepareFolderAccessGate({
+    client: params.client ?? null,
+    root: loaded.root,
+  });
+  if (gate && !gate.allowsRoot) {
+    return { refused: true };
+  }
   const exactTouched = loaded.files.find((file) => file.path === params.path);
   if (exactTouched) {
+    const resolved =
+      loaded.root === undefined
+        ? undefined
+        : resolveTouchedFilePath({
+            root: loaded.root,
+            fileRoot: loaded.fileRoot,
+            filePath: exactTouched.path,
+          });
+    if (
+      gate &&
+      loaded.root !== undefined &&
+      resolved !== undefined &&
+      !gate.allows(toDisplayPath(loaded.root, resolved), "file")
+    ) {
+      return { ...(loaded.root ? { root: loaded.root } : {}), refused: true };
+    }
     return {
       ...(loaded.root ? { root: loaded.root } : {}),
       file: await toSessionFileEntry(exactTouched, loaded.root, loaded.fileRoot, {
@@ -811,6 +885,10 @@ async function findSessionFile(
   const relevance = buildSessionRelevanceMap(loaded.files, loaded.root, loaded.fileRoot);
   for (const candidate of candidates) {
     const browserPath = toDisplayPath(loaded.root, candidate);
+    // Refused before the read, so a hidden file is never opened just to be discarded.
+    if (gate && !gate.allows(browserPath, "file")) {
+      return { root: loaded.root, refused: true };
+    }
     const sessionKind = relevance.get(browserPath);
     const touched: TouchedFile = {
       path: browserPath,
@@ -876,7 +954,7 @@ function requireSessionFilesAgentId(params: {
 
 /** Gateway handlers for session files and workspace browsing. */
 export const sessionsFilesHandlers: GatewayRequestHandlers = {
-  "sessions.files.list": async ({ params, respond, context }) => {
+  "sessions.files.list": async ({ params, respond, context, client }) => {
     if (
       !assertValidParams(params, validateSessionsFilesListParams, "sessions.files.list", respond)
     ) {
@@ -891,7 +969,7 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
     if (!agentId) {
       return;
     }
-    const result = await buildListResult({ ...params, agentId });
+    const result = await buildListResult({ ...params, agentId, client });
     respond(true, {
       sessionKey: params.sessionKey,
       ...result,
@@ -910,7 +988,19 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
     if (!agentId) {
       return;
     }
-    const result = await findSessionFile({ ...params, agentId });
+    const result = await findSessionFile({ ...params, agentId, client });
+    if (result.refused) {
+      // The same answer a missing file gets, and the only place the refusal is recorded.
+      recordAccessDeniedActivity({
+        client,
+        sessionKey: params.sessionKey,
+        agentId,
+        reason: "folder_rule",
+        surface: "folder-read",
+      });
+      respondSessionFileNotFound(respond, params.path);
+      return;
+    }
     if (!result.file || result.file.missing) {
       respondSessionFileNotFound(respond, params.path);
       return;
@@ -949,7 +1039,13 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
       ...result,
     });
   },
-  "sessions.files.set": async ({ params, respond, context, sessionMutationAuthorization }) => {
+  "sessions.files.set": async ({
+    params,
+    respond,
+    context,
+    client,
+    sessionMutationAuthorization,
+  }) => {
     if (!assertValidParams(params, validateSessionsFilesSetParams, "sessions.files.set", respond)) {
       return;
     }
@@ -994,6 +1090,14 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
       respondSessionFileNotFound(respond, params.path);
       return;
     }
+    // The write lane is not open on the shared mount (it is bind mounted read only, and
+    // opening it is a separate decision with its own conditions), but a hidden folder
+    // must not even be told apart from an absent one by the error a write returns.
+    const writeGate = await prepareFolderAccessGate({ client, root: loaded.root });
+    if (writeGate && !writeGate.allowsRoot) {
+      respondSessionFileNotFound(respond, params.path);
+      return;
+    }
     const candidates = resolveSessionFileCandidates({
       root: loaded.root,
       fileRoot: loaded.fileRoot,
@@ -1002,6 +1106,10 @@ export const sessionsFilesHandlers: GatewayRequestHandlers = {
     let browserPath: string | undefined;
     for (const candidate of candidates) {
       const candidatePath = toDisplayPath(loaded.root, candidate);
+      if (writeGate && !writeGate.allows(candidatePath, "file")) {
+        respondSessionFileNotFound(respond, params.path);
+        return;
+      }
       const stat = await statWorkspacePath(loaded.root, candidatePath);
       if (stat && workspaceStatKind(stat) === "file") {
         browserPath = candidatePath;

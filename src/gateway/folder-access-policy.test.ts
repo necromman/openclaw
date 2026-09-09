@@ -5,6 +5,8 @@ import type {
   FolderRuleSubjectKind,
 } from "../../packages/gateway-protocol/src/schema/folder-rules.js";
 import {
+  buildFolderRuleIndex,
+  isFolderVisibleToAnySubject,
   narrowerPermission,
   resolveFolderAccess,
   resolveFolderEffectiveRules,
@@ -219,5 +221,40 @@ describe("permission helpers", () => {
     expect(subjectIdentity("department", "rnd").departments).toEqual(["rnd"]);
     expect(subjectIdentity("role", "admin").gatewayRole).toBe("admin");
     expect(subjectIdentity("role", "superadmin").isSuperAdmin).toBe(false);
+  });
+});
+
+describe("index-time visibility", () => {
+  it("indexes a folder that any one subject may read", () => {
+    const index = buildFolderRuleIndex([
+      rule({ path: "share", kind: "department", id: "rnd", permission: "read" }),
+    ]);
+    expect(isFolderVisibleToAnySubject({ folderPath: "share", index })).toBe(true);
+    expect(isFolderVisibleToAnySubject({ folderPath: "share/inside", index })).toBe(true);
+  });
+
+  it("leaves out a folder nobody may read", () => {
+    const index = buildFolderRuleIndex([
+      rule({ path: "share", kind: "department", id: "rnd", permission: "read" }),
+      rule({ path: "share/secret", kind: "department", id: "rnd", permission: "hidden" }),
+    ]);
+    expect(isFolderVisibleToAnySubject({ folderPath: "share/secret", index })).toBe(false);
+    expect(isFolderVisibleToAnySubject({ folderPath: "share/secret/deeper", index })).toBe(false);
+  });
+
+  it("leaves out a folder no rule names at all", () => {
+    const index = buildFolderRuleIndex([
+      rule({ path: "share", kind: "department", id: "rnd", permission: "read" }),
+    ]);
+    expect(isFolderVisibleToAnySubject({ folderPath: "other", index })).toBe(false);
+    expect(isFolderVisibleToAnySubject({ folderPath: "", index })).toBe(false);
+  });
+
+  it("leaves out the storage folders that are never company folders", () => {
+    const index = buildFolderRuleIndex([
+      rule({ path: "share", kind: "department", id: "rnd", permission: "read" }),
+    ]);
+    expect(isFolderVisibleToAnySubject({ folderPath: "share/#recycle", index })).toBe(false);
+    expect(isFolderVisibleToAnySubject({ folderPath: "share/@eaDir", index })).toBe(false);
   });
 });

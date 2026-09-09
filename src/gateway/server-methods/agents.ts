@@ -102,6 +102,7 @@ import {
 import { unregisterOpenClawAgentDatabase } from "../../state/openclaw-agent-db-registry.js";
 import { resolveUserPath } from "../../utils.js";
 import { prepareDepartmentGate } from "../department-access.js";
+import { prepareFolderAccessGate } from "../folder-access-guard.js";
 import { resolveCallerMainKey } from "../home-session-key.js";
 import { listAgentsForGateway } from "../session-utils.js";
 import {
@@ -1469,7 +1470,7 @@ export const agentsHandlers: GatewayRequestHandlers = {
       throw error;
     }
   },
-  "agents.files.list": async ({ params, respond, context }) => {
+  "agents.files.list": async ({ params, respond, context, client }) => {
     if (!validateAgentsFilesListParams(params)) {
       respondInvalidMethodParams(
         respond,
@@ -1485,6 +1486,13 @@ export const agentsHandlers: GatewayRequestHandlers = {
       return;
     }
     const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    // A workspace that sits inside the shared mount is subject to the folder rules like
+    // any other folder there; one that does not is untouched by them.
+    const listGate = await prepareFolderAccessGate({ client, root: workspaceDir });
+    if (listGate && !listGate.allowsRoot) {
+      respond(true, { agentId, workspace: workspaceDir, files: [] }, undefined);
+      return;
+    }
     let hideBootstrap = false;
     try {
       hideBootstrap = await agentsHandlerDeps.isWorkspaceSetupCompleted(workspaceDir);
@@ -1494,7 +1502,7 @@ export const agentsHandlers: GatewayRequestHandlers = {
     const files = await listAgentFiles(workspaceDir, { hideBootstrap });
     respond(true, { agentId, workspace: workspaceDir, files }, undefined);
   },
-  "agents.files.get": async ({ params, respond, context }) => {
+  "agents.files.get": async ({ params, respond, context, client }) => {
     if (!validateAgentsFilesGetParams(params)) {
       respondInvalidMethodParams(respond, "agents.files.get", validateAgentsFilesGetParams.errors);
       return;
@@ -1509,6 +1517,11 @@ export const agentsHandlers: GatewayRequestHandlers = {
     }
     const { agentId, workspaceDir, name } = resolved;
     const filePath = path.join(workspaceDir, name);
+    const getGate = await prepareFolderAccessGate({ client, root: workspaceDir });
+    if (getGate && !getGate.allowsRoot) {
+      respondWorkspaceFileMissing({ respond, agentId, workspaceDir, name, filePath });
+      return;
+    }
     let safeRead: ReadResult;
     try {
       const workspaceRoot = await agentsHandlerDeps.root(workspaceDir);
