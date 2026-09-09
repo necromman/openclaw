@@ -123,14 +123,6 @@ services:
       OPENCLAW_CONFIG_DIR: /home/node/.openclaw
       OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
       OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
-      # Where the Codex CLI login file lives. Default is "~/.codex", which is outside the
-      # state volume and therefore disappears the moment the container is recreated. The
-      # Gateway reads this file to bootstrap the ChatGPT-subscription OAuth profile
-      # ("openai:default"), so the delivery stack keeps it inside the volume instead.
-      # The Codex harness is unaffected: it runs with appServer.homeScope "agent" and an
-      # explicit per-agent CODEX_HOME (<agentDir>/codex-home), and it strips the ambient
-      # value before launching. Setup: DEPLOY.md 3.4 (마).
-      CODEX_HOME: /home/node/.openclaw/codex-cli
       OPENCLAW_GATEWAY_PORT: "18789"
       # Read by the committed config through its "${IXAUTH_SERVICE_KEY}" env SecretRef,
       # so the shared secret never has to be written into a tracked file.
@@ -164,16 +156,18 @@ services:
       # tunnel profile below, or the reverse proxy in DEPLOY.md 11.3. Comma separated
       # CIDRs or addresses.
       OPENCLAW_TRUSTED_PROXIES: ${OPENCLAW_TRUSTED_PROXIES:-}
-      # Model provider credentials, empty by default: a deployment that answers from an
-      # internal ollama service needs neither, and one that answers from a ChatGPT
-      # subscription keeps its OAuth profile in the state volume instead. The Gateway
-      # reads these names directly, and the tracked config can also name them through a
-      # "${ANTHROPIC_API_KEY}" SecretRef, so the value stays in the env file. The
-      # department agents are the reason one of them is eventually needed: their
-      # read-only folder boundary does not hold on the subscription runtime
-      # (AUTH-DEPARTMENTS.md 13.9). Setup: DEPLOY.md 3.4.
+      # Model provider credential, empty by default. This delivery answers from Claude
+      # alone (stage Y): the Anthropic setup-token profile in the state volume is what
+      # replies today, and this name is here so an API key can take over without touching
+      # the compose file. The Gateway reads the name directly, and the tracked config can
+      # also point at it through a "${ANTHROPIC_API_KEY}" SecretRef, so the value stays in
+      # the env file. Setup: DEPLOY.md 3.4.
+      #
+      # OPENAI_API_KEY is deliberately absent. Nothing in this stack routes to OpenAI any
+      # more: the Codex plugin is off, the model allowlist is Claude only, and passing a
+      # name whose provider cannot be selected only invites the belief that it does
+      # something. Bringing OpenAI back is DEPLOY.md 3.4 (사).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       # Declarative config: the tracked template is copied over the state copy on every

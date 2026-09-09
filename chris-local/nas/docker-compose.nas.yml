@@ -93,14 +93,6 @@ services:
       OPENCLAW_CONFIG_DIR: /home/node/.openclaw
       OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
       OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
-      # Where the Codex CLI login file lives. Default is "~/.codex", which is outside the
-      # state volume and therefore disappears the moment the container is recreated. The
-      # Gateway reads this file to bootstrap the ChatGPT-subscription OAuth profile
-      # ("openai:default"), so the delivery stack keeps it inside the volume instead.
-      # The Codex harness is unaffected: it runs with appServer.homeScope "agent" and an
-      # explicit per-agent CODEX_HOME (<agentDir>/codex-home), and it strips the ambient
-      # value before launching. Setup: DEPLOY.md 3.4 (마).
-      CODEX_HOME: /home/node/.openclaw/codex-cli
       OPENCLAW_GATEWAY_PORT: "18789"
       IXAUTH_SERVICE_KEY: ${IXAUTH_SERVICE_KEY:?set IXAUTH_SERVICE_KEY}
       OPENCLAW_PUBLIC_ORIGIN: ${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}
@@ -108,8 +100,9 @@ services:
       OPENCLAW_NAS_ROOT: ${OPENCLAW_NAS_ROOT:-}
       OPENCLAW_KNOWLEDGE_ROOT: ${OPENCLAW_KNOWLEDGE_ROOT:-}
       OPENCLAW_TRUSTED_PROXIES: ${OPENCLAW_TRUSTED_PROXIES:-}
+      # Claude alone answers here (stage Y). OPENAI_API_KEY is gone with the Codex
+      # plugin: no route in this stack reaches OpenAI any more. DEPLOY.md 3.4.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TZ: ${OPENCLAW_TZ:-Asia/Seoul}
     volumes:
       - ./ixauth-gateway-config:/config:ro
