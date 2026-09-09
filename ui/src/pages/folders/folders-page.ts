@@ -475,14 +475,22 @@ export class FoldersPage extends OpenClawLightDomElement {
   private renderIndexLine(): TemplateResult {
     const root = this.tree.get("");
     const scan = root?.scan;
+    const stamp = scan?.finishedAt
+      ? {
+          time: new Date(scan.finishedAt).toLocaleString(),
+          count: String(scan.folderCount ?? 0),
+          path: scan.branchPath,
+        }
+      : undefined;
+    // A branch refresh counted only that branch. Saying "4 folders" without saying which
+    // branch reads as the whole share having shrunk overnight.
     const status =
       this.scanning || scan?.running
         ? t("ixAuth.folders.indexRunning")
-        : scan?.finishedAt
-          ? t("ixAuth.folders.indexAt", {
-              time: new Date(scan.finishedAt).toLocaleString(),
-              count: String(scan.folderCount ?? 0),
-            })
+        : stamp
+          ? stamp.path
+            ? t("ixAuth.folders.indexAtBranch", stamp)
+            : t("ixAuth.folders.indexAt", stamp)
           : t("ixAuth.folders.indexNever");
     return html`
       <div class="folders-index">

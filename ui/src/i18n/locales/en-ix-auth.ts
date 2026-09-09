@@ -385,6 +385,9 @@ const enIxAuth = {
       // click, so the screen has to say how old what it is showing is.
       indexNever: "No stored folder list yet, so the share is being read as you open it.",
       indexAt: "Folder list stored {time}, {count} folders.",
+      // A branch refresh counts only that branch, so the line has to say which one, or
+      // the number reads as the whole share having shrunk to four folders.
+      indexAtBranch: "{path} stored {time}, {count} folders in that branch.",
       indexRunning: "Reading the share again. This screen updates when it finishes.",
       refresh: "Refresh",
       refreshTitleRoot: "Read the whole share again",
