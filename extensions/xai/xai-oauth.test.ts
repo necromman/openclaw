@@ -7,6 +7,7 @@ import {
 } from "openclaw/plugin-sdk/plugin-test-runtime";
 import type { OAuthCredential } from "openclaw/plugin-sdk/provider-auth";
 import { withProxyFixture } from "openclaw/plugin-sdk/test-env";
+import { markdownToIR } from "openclaw/plugin-sdk/text-chunking";
 import { fetch as undiciFetch, MockAgent, type Dispatcher } from "undici";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createXaiDeviceCodeAuthMethod, createXaiOAuthAuthMethod } from "./xai-oauth-entry.js";
@@ -670,7 +671,13 @@ describe("xAI OAuth", () => {
     expect(progress.stop).toHaveBeenCalledWith("xAI OAuth complete");
   });
 
-  it("falls back for unsafe xAI device-code lifetime fields", async () => {
+  it.each([
+    { completeUri: undefined, expectedUrl: "https://accounts.x.ai/oauth2/device" },
+    {
+      completeUri: "https://accounts.x.ai/oauth2/device?user_code=ABCD-1234&source=cli",
+      expectedUrl: "https://accounts.x.ai/oauth2/device?user_code=ABCD-1234&source=cli",
+    },
+  ])("preserves the device-code note link $expectedUrl", async ({ completeUri, expectedUrl }) => {
     const progress = {
       update: vi.fn(),
       stop: vi.fn(),
@@ -689,6 +696,7 @@ describe("xAI OAuth", () => {
           device_code: "device-code-1",
           user_code: "ABCD-1234",
           verification_uri: "https://accounts.x.ai/oauth2/device",
+          verification_uri_complete: completeUri,
           expires_in: Number.MAX_SAFE_INTEGER,
           interval: Number.MAX_SAFE_INTEGER,
         }),
@@ -724,6 +732,12 @@ describe("xAI OAuth", () => {
       expect.stringContaining("Code expires in 5 minutes."),
       "xAI OAuth",
     );
+    const [message] = note.mock.calls[0]!;
+    expect(markdownToIR(message, { linkify: false }).links.map((link) => link.href)).toEqual([
+      expectedUrl,
+    ]);
+    expect(message).toContain("\nCode: ABCD-1234\n");
+    expect(ctx.openUrl).toHaveBeenCalledWith(expectedUrl);
     expect(progress.stop).toHaveBeenCalledWith("xAI OAuth complete");
   });
 });
