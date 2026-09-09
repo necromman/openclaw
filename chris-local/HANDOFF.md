@@ -34,6 +34,17 @@
   - **운영 실측 통과(2026-09-09)**: 관리자 트리 11개, 규칙 저장·상속·깊은 경로 우선, 미리보기에서 숨김 확인, 직원 메뉴 없음, 감사 원장 2건. 스크린샷은 chris-server `analysis/2026-09-07-openclaw-auth/delivery-r-0*.png` 6장.
   - **아직 아닌 것**: 세션 파일 목록·미리보기·지식 색인에는 규칙이 걸리지 않는다(2단계). 에이전트가 도구로 읽는 파일과 쓰기는 3단계다.
 
+- **V 단계(2026-09-09, `chris/main` 직접)**: NAS 폴더 접근권한 **2단계**(적용 지점)와 한글 미리보기 표. 커밋 `da48894d22c` -> `d0ffdef53c1` -> `2dad03a3b16` -> `d0948323dff` -> `cfb183bb685` -> `092893d81fd`. 정본은 [NAS-FOLDER-ACL.md](NAS-FOLDER-ACL.md) 13절, 색인 규칙은 [KNOWLEDGE.md](KNOWLEDGE.md) 8-1, 미리보기는 [FILE-PREVIEW.md](FILE-PREVIEW.md) 9-6, 사용자 안내는 [MANUAL.md](MANUAL.md) 8-1.
+  - **규칙이 파일을 읽는 경로에 걸린다.** 게이트 하나(`src/gateway/folder-access-guard.ts`)를 세션 파일 목록·열기·쓰기, 에이전트 파일, 워크스페이스 브라우저에 붙였다. 문서 미리보기는 파일 읽기를 지나므로 함께 닫힌다. 거부는 없는 파일과 **같은 문구**이고 원장에 `access_denied`/`folder-read` 로 남는다.
+  - **함정: 게이트를 넓게 잡으면 제품이 닫힌다.** 규칙의 기본값이 숨김이라, 게이트가 에이전트 홈 워크스페이스까지 덮으면 아무 파일도 안 보인다. 게이트는 브라우징 루트가 `/mnt/nas` 안일 때만 만들어지고, 호스트 연결·시스템 관리자에게는 만들어지지 않는다. 새 표면을 붙일 때 이 조건을 같이 붙여야 한다.
+  - **색인은 사람이 아니라 폴더로 판정한다.** 크론이 돌리고 사이드카는 공용 풀이라 사람별 필터가 없다. "누구 하나라도 볼 수 있는 폴더만 색인한다" 가 그 시점에 성립하는 유일한 문장이다. 걷기 자체를 자르므로 파일 이름도 안 읽고, 걷지 않은 폴더의 사이드카는 기존 고아 정리가 지운다(회수 장치를 따로 만들지 않았다).
+  - **함정: 어떤 공유에 규칙을 처음 하나 쓰면 그 공유의 색인 범위가 규칙이 있는 곳으로 좁아진다.** 규칙이 한 번도 언급하지 않은 공유는 종전대로 전부 색인한다(그러지 않으면 손대지도 않은 색인이 통째로 비워진다). 처음 걸 때는 `--dry-run --verbose` 로 먼저 본다. 한 번만 끄려면 `--no-folder-rules`.
+  - **고아 규칙 화면**을 `/settings/folders` 아래 절에 넣었다. 폴더가 없어진 규칙과 부서·계정이 없어진 규칙 둘 다 모은다. 자동 복구는 하지 않고 두 번 물어 지운다.
+  - **한글 문서 미리보기가 표를 표로 그린다.** 두 리더 선택 규칙을 `document-hangul-read.ts` 한 곳으로 모았고, 마크다운을 HTML 로 그리는 최소 렌더러를 새로 넣었다(새 npm 의존성 0, 전부 이스케이프 후 이 파일만 태그를 만든다).
+  - **함정: 납품 구성에는 게이트가 걸릴 표면이 아직 없다.** 에이전트가 `main` 하나이고 그 워크스페이스가 컨테이너 홈이라(O 단계) 파일 패널이 NAS 를 보지 않는다. 공유를 에이전트 워크스페이스로 물리는 날 그대로 작동한다. V 실측은 NAS 설정 템플릿에 임시 에이전트를 붙였다 지우는 방식으로 했다(백업 `openclaw.json.bak-v-20260909`).
+  - **운영 실측 통과**: 파일 패널 18개 -> 15개, `기록물` 이 목록에서 사라짐, 직접 열기 `session file not found`, 원장 거부 1건, 색인 `folder-hidden` 폴더당 한 줄 + 사이드카 5개 회수, 고아 목록·정리, hwp 표 렌더. 스크린샷 chris-server `analysis/2026-09-07-openclaw-auth/delivery-v-0*.png`.
+  - **선재 실패**: `chris-check` 의 `plugin boundaries`(만료된 deprecation 창)는 그대로다. R 단계부터 빨갛던 포크 테스트 1건(`folder-access-path` 의 `"/"`)은 V 에서 고쳤다.
+
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
 - **납품 라이브 좌표**: `https://jinbio.botops.cloud`(Cloudflare Tunnel, HTTP 200 실측). 호스트는 진바이오 NAS 192.168.2.1(apps01 OpenVPN 경유), compose 프로젝트 `openclaw-ixauth`, 컨테이너 4개(db·ix-auth·gateway·cloudflared), 네트워크 대역 `172.16.240.0/24`(cloudflared 는 `.10` 고정). 시스템 관리자는 `admin@deploy.local` 이고 시험 계정 6개가 함께 있다. 자격증명과 배포 좌표는 `infra/local/jinbio-deploy.md`(git 제외).
 
