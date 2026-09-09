@@ -134,6 +134,7 @@
 
 ## 7. 이번 작업에서 배운 함정 (재발 방지)
 
+- **같은 ChatGPT 구독 로그인을 작업 PC 와 서버가 나눠 쓰면 서버가 죽는다(2026-09-09 운영 장애).** 구독 OAuth 는 갱신할 때 refresh 토큰을 회전시키므로, `~/.codex/auth.json` 을 복사해 NAS 에 넣어 두고 PC 에서 계속 codex 를 쓰면 PC 가 갱신할 때마다 NAS 사본이 무효가 된다. 증상은 질문마다 30초 지연 + `auth refresh request failed: code=-32603` + 예비 모델로 폴백이고, 사용자 화면에는 `Falling back from WebSockets to HTTPS transport` 도 함께 반복된다(그 문장은 게이트웨이도 Cloudflare 도 아니고 상태 볼륨의 Codex 런타임 바이너리가 찍는다). 30초는 재시도가 아니라 취소되지 않는 토큰 fetch 타임아웃 하나이고(`extensions/openai/openai-chatgpt-oauth-token.runtime.ts` 의 `TOKEN_REQUEST_TIMEOUT_MS`), runtime-only 프로필의 갱신 실패는 `OAuthRefreshFailureError` 가 아니라 평범한 `Error` 로 던져져 실패 쿨다운(`markAuthProfileFailure`)이 걸리지 않아 **질문마다 같은 값을 다시 문다**. 서버에 옮긴 로그인은 서버 것으로 보고, PC 에서 다시 쓰려면 서버용 계정을 따로 만든다. 상세와 대처는 [DEPLOY.md](DEPLOY.md) 3.4 (바)·11.7 (바).
 - **O 단계에서 배운 것.** compose 네트워크의 주소 대역(`ipam`)은 돌고 있는 네트워크에 반영되지 않는다. 바꿨으면 `down` 후 `up` 이 한 번 필요하고, NAS 의 cron 은 `up -d` 만 부르므로 그 한 번은 손으로 한다(볼륨은 남는다). 에이전트를 설정에서 지울 때는 부서 바인딩(`department_agents`)을 먼저 지운다. 바인딩 명령이 "설정에 없는 id" 를 거부하기 때문인데, O 단계에서 `--clear` 만은 받아 주도록 고쳤다. `src/gateway/server-http.ts` 는 이미 696줄이라 몇 줄만 더해도 700줄 상한에 걸린다.
 
 - 단위 테스트 통과 후 라이브에서만 드러난 결함이 15건(비루프백 바인드 가드가 ix-auth 를 "인증 없음" 판정, 페어링 면제가 루프백에만, 타 부서 전사 HTTP 200 등). 라이브 게이트를 빼면 안 된다.
