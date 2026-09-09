@@ -13,10 +13,11 @@
 //
 // Rank, not scope.
 //
-// `operator.admin` says a connection may call these methods. It does not say who is
+// The descriptor scope says a connection may call these methods. It does not say who is
 // calling: every signed-in browser session on this deployment carries the same scope
-// list, because scopes come from one shared role definition. So the rank check below is
-// the real gate, and it reads the authorization facts on the connection rather than the
+// list, because scopes come from one shared role definition, and an identity-server
+// administrator does not hold `operator.admin` at all. So the rank check below is the
+// real gate, and it reads the authorization facts on the connection rather than the
 // ledger's attribution bag.
 import {
   ErrorCodes,
