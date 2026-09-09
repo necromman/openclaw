@@ -25,7 +25,12 @@ export type KnowledgeIgnoreReason =
   | "symlink"
   | "outside-root"
   | "folder-hidden"
-  | "empty";
+  | "empty"
+  // The file was listed by the walk and gone by the time it was measured. On a live
+  // company share this is ordinary: Office writes a `~$name.pptx` lock file next to a
+  // document it has open and deletes it seconds later. It is not an error, and it must
+  // not end a run that is halfway through forty thousand files.
+  | "vanished";
 
 /**
  * Why a conversion attempt failed.

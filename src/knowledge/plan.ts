@@ -78,7 +78,17 @@ async function classify(params: {
   if (!params.include.has(extension)) {
     return { reason: "extension", relativePath: params.relativePath, sidecarPath };
   }
-  const stat = await fs.stat(params.absolutePath);
+  // A share that people are working in changes under the walk. Office keeps a `~$` lock
+  // file beside every open document and removes it when the document closes, so a file
+  // listed a moment ago is routinely gone by the time it is measured. Before this was
+  // caught, one such file ended the whole run with ENOENT and the index stopped where it
+  // stood (measured 2026-09-09 on the delivery share, at 711 of 6,298 files).
+  let stat: Awaited<ReturnType<typeof fs.stat>>;
+  try {
+    stat = await fs.stat(params.absolutePath);
+  } catch {
+    return { reason: "vanished", relativePath: params.relativePath, sidecarPath };
+  }
   if (stat.size === 0) {
     return { reason: "empty", relativePath: params.relativePath, sidecarPath, size: 0 };
   }
