@@ -133,6 +133,8 @@ Use `/exec ask=always` with a message to require human approval for that run. It
 
 Auto-review approval is single-use. On the gateway, OpenClaw supplies the resolved executable path to the reviewer and pins execution to that same path. An enforceable command chain or pipeline can be reviewed as one request when every executable resolves and OpenClaw can rebuild the complete command with those exact paths. Commands that cannot be reduced to one enforceable execution plan—such as heredocs, shell expansions, or unsupported wrapper quoting—fall back to human approval even if the model would otherwise allow them.
 
+Model preparation and completion each receive the configured `tools.exec.reviewer.timeoutMs` budget. A timeout returns to human approval immediately; pending preparation and provider cleanup remain owned until they settle. Preparation that finishes after its timeout does not start a review.
+
 Codex app-server command approvals that are not already decided by explicit runtime or native policy use the human approval route. OpenClaw does not run its configured exec reviewer for these requests because Codex does not expose an enforceable resolved executable that can bind the review decision to the command Codex runs.
 
 ### Inline eval (`strictInlineEval`)
