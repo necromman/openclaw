@@ -154,7 +154,7 @@ describe("folder access store", () => {
       expect(
         listAllFolderRules(ROOT)
           .map((row) => `${row.folderPath}:${row.subjectId}`)
-          .sort(),
+          .toSorted(),
       ).toEqual(["00/a:qa", "00:rnd", "00x:rnd"]);
     });
   });
