@@ -182,7 +182,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 | 4    | 모델 키를 준다                         | **3.4 (라)**                                        |
 | 5    | 문서 색인을 만들고 주기 실행을 건다    | **12절**, [KNOWLEDGE.md](KNOWLEDGE.md)              |
 
-11.4(`nas-sample` 자리표시자와 실제 공유 매핑)와 12절(`knowledge-index` 마크다운 사이드카)은 **부서 에이전트가 있을 때만 의미가 있다.** 지금 배치에서는 compose 가 그 폴더들을 마운트만 하고 아무 에이전트도 읽지 않는다. 마운트를 지우지 않고 남긴 이유는 하나다: 쓰지 않는 마운트는 값이 들지 않고, 되켜는 날 필요한 것이 바로 그 배선이다.
+11.4(`nas-sample` 자리표시자와 실제 공유 매핑)와 12절(`knowledge-index` 마크다운 사이드카)은 **부서 에이전트가 있을 때만 의미가 있다.** 지금 배치에서는 compose 가 그 폴더들을 마운트만 하고 아무 에이전트도 읽지 않는다. 마운트를 지우지 않고 남긴 이유는 하나다: 쓰지 않는 마운트는 값이 들지 않고, 되켜는 날 그 연결이 그대로 필요하다.
 
 #### (가) 템플릿에 에이전트를 되살린다
 
@@ -209,7 +209,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 - `skipBootstrap: true` 가 없으면 **첫 턴이 EROFS 로 죽는다.** 읽기 전용 마운트를 워크스페이스로 쓰면 워크스페이스 부트스트랩 파일 쓰기가 실패한다([AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 13.7).
 - `model` 을 적지 않으면 `agents.defaults.model.primary`(구독 경로)로 떨어지고, 그 경로에서는 **폴더 경계가 서지 않는다**(3.4 (다) 끝의 경고, AUTH-DEPARTMENTS 13.9). 부서 에이전트에는 API 키 모델을 반드시 명시한다.
 - `agents.defaults.modelPolicy.allow` 에 그 모델이 없으면 화면에서 고를 수 없다. 부서 에이전트를 켤 때 그 목록도 함께 넓힌다.
-- 그다음 부서에 묶는다. 이것만은 설정이 아니라 상태 DB 에 있고 CLI 로만 한다. 되돌리기는 `--clear` 다.
+- 그다음 부서에 묶는다. 이 값은 상태 DB 에 있고 CLI 로만 바꾼다. 되돌리기는 `--clear` 다.
 
   ```bash
   docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --agent rnd-bot --set rnd
@@ -219,30 +219,49 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 모델 이름만 담고 키도 계정도 담지 않는다.
 
-**이 납품은 Claude 단독이다**(사용자 지시 2026-09-09, Y 단계). OpenAI 는 키도 로그인도 두지 않고, codex 플러그인도 꺼져 있다. 화면의 모델 선택 목록에는 아래 세 모델만 나온다.
+**이 납품은 Claude 단독이다**(사용자 지시 2026-09-09, Y 단계). OpenAI 는 키도 로그인도 두지 않고, codex 플러그인도 꺼져 있다. **채팅 모델 선택기에는 실제로 답하는 Claude 아홉 개가 나온다**(Z 단계, 2026-09-09. Y 단계의 세 개에서 여섯 개를 더했다).
 
-| 자리 | 모델 | 설정 키 | 어떻게 인증하나 |
-| --- | --- | --- | --- |
-| 기본 | `anthropic/claude-sonnet-5` | `agents.defaults.model.primary` | Claude setup-token (사), 또는 `ANTHROPIC_API_KEY` |
-| 선택(상위) | `anthropic/claude-opus-5` | `agents.defaults.modelPolicy.allow` | 위와 같은 자격증명 |
-| 선택(경량) | `anthropic/claude-haiku-4-5` | `agents.defaults.modelPolicy.allow` | 위와 같은 자격증명 |
+| 자리 | 모델 | 컨텍스트 | 스트리밍 | 어떻게 인증하나 |
+| --- | --- | --- | --- | --- |
+| 기본 | `anthropic/claude-sonnet-5` | 1M | 없음 | Claude setup-token (사), 또는 `ANTHROPIC_API_KEY` |
+| 상위 | `anthropic/claude-opus-5` | 1M | 없음 | 위와 같은 자격증명 |
+| 최신 | `anthropic/claude-fable-5-1` | 1M | 없음 | 위와 같은 자격증명 + (자) 의 user-agent 헤더 |
+| 최신 | `anthropic/claude-fable-5` | 1M | 없음 | 위와 같은 자격증명 |
+| 경량 | `anthropic/claude-haiku-4-5` | 200k | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-opus-4-8` | 1M | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-opus-4-7` | 200k | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-opus-4-6` | 200k | 있음 | 위와 같은 자격증명 |
+| 지난 세대 | `anthropic/claude-sonnet-4-6` | 200k | 있음 | 위와 같은 자격증명 |
+
+기본 모델은 `agents.defaults.model.primary`, 나머지 여덟은 `agents.defaults.modelPolicy.allow` 에 적는다. "스트리밍" 열의 뜻은 (차) 에 있다.
 
 - **대체 모델(`fallbacks`)은 비어 있다.** 하나뿐인 자격증명으로 도는 배포에서 대체 모델은 같은 실패를 한 번 더 무는 일이다. 키 이름은 복수형 `fallbacks` 이고 배열이며, 단수 `fallback` 을 적으면 설정 스키마가 거부해 게이트웨이가 뜨지 않는다(`AgentModelSchema` 는 `.strict()`).
 - `agents.defaults.modelPolicy.allow` 에 **고르게 할 모델을 전부** 적는다. 기본 모델이 아닌 모델은 목록에 남기는 것만으로는 사용자가 고를 수 없고, `allow` 에 있어야 직접 고를 수 있다(`src/agents/model-selection-shared.ts` 의 `addConfiguredRef` 주석).
 - `allow` 를 비우거나 빈 배열로 두면 **전부 허용**이다. 차단이 아니다.
-- **왜 이 세 개인가.** 카탈로그의 Anthropic 모델 7개를 운영 setup-token 으로 하나씩 실제 호출해 본 결과다(2026-09-09, `agent exec --model` 로 한 번씩).
+- **왜 이 아홉 개인가.** 관리자 모델 화면이 보여 주는 Anthropic 항목을 하나도 빠뜨리지 않고 운영 setup-token 으로 실제 호출해 본 결과다(2026-09-09 Z 단계, 컨테이너 안에서 `agent exec --model` 로 한 번씩 + 채팅 화면에서 한 번씩).
 
-  | 모델 | 결과 | 켰나 |
+  | 모델 | 실측 | 켰나 |
   | --- | --- | --- |
   | `claude-sonnet-5` | HTTP 200 | 켬 (기본) |
-  | `claude-opus-5` | HTTP 200 | 켬 (상위) |
-  | `claude-haiku-4-5` | HTTP 200 | 켬 (경량) |
-  | `claude-opus-4-8` | HTTP 200 | 끔. 지난 세대 Opus 라 선택기만 길어진다 |
-  | `claude-fable-5` | HTTP 200 | 끔. 위 셋과 쓰임이 겹친다 |
-  | `claude-fable-5-1` | HTTP 400 `claude_code_version_too_old` | **끔.** 이 게이트웨이가 보내는 클라이언트 판이 낮아 호출 자체가 거절된다 |
-  | `claude-mythos-5` | HTTP 404 `not_found_error` | **끔.** 이 자격증명으로는 없는 모델이다 |
+  | `claude-opus-5` | HTTP 200 | 켬 |
+  | `claude-fable-5-1` | 헤더 조정 전 HTTP 400, 조정 후 HTTP 200 | 켬. 근거는 (자) |
+  | `claude-fable-5` | HTTP 200 | 켬 |
+  | `claude-haiku-4-5` | HTTP 200 | 켬 |
+  | `claude-opus-4-8` | HTTP 200 | 켬 |
+  | `claude-opus-4-7` | HTTP 200 | 켬 |
+  | `claude-opus-4-6` | HTTP 200 | 켬 |
+  | `claude-sonnet-4-6` | HTTP 200 | 켬 |
+  | `claude-haiku-4-5-20251001` | HTTP 200 | **끔.** `claude-haiku-4-5` 와 같은 모델의 날짜 고정본이라 선택기에 이름이 같은 줄이 둘 생긴다 |
+  | `claude-mythos-5` | HTTP 404 `not_found_error` | **끔.** 이 자격증명에 없는 모델이다. user-agent 를 올려도 그대로 404 다 |
+  | `claude-opus-4-5-20251101` | 러너가 `Unknown model` 로 거절 | **끔.** 화면에는 보이지만 부를 수 없다 |
+  | `claude-opus-4-5` | 러너가 `Unknown model` 로 거절 | **끔.** 위와 같다 |
+  | `claude-sonnet-4-5-20250929` | 러너가 `Unknown model` 로 거절 | **끔.** 위와 같다 |
 
-  뒤 둘은 켜면 **고르는 즉시 실패한다.** 카탈로그에 이름이 있다는 것과 이 자격증명으로 부를 수 있다는 것은 다른 말이고, 그 차이는 실제로 한 번 불러 봐야만 안다.
+  **함정: 관리자 화면의 목록과 러너가 부를 수 있는 목록이 다르다.**\
+  `models list --all` 이 보여 주는 정적 카탈로그는 Anthropic 7종이지만, 관리자 화면은 프로바이더에 물어본 결과(디스커버리)까지 그려서 13~14줄이 된다.\
+  그중 4.5 세대 세 줄은 러너의 모델 해석이 모르는 이름이라 켜면 답이 아예 오지 않는다. 채팅 화면에는 답풍선이 생기지 않고 작성칸 위에 `Unknown model: ...` 한 줄만 뜬다.\
+  실측 화면은 chris-server `analysis/2026-09-07-openclaw-auth/delivery-z-02-admin-catalog-9on.png` 이다.\
+  카탈로그에 이름이 있다는 것과 이 자격증명으로 부를 수 있다는 것은 다른 말이고, 그 차이는 실제로 한 번 불러 봐야만 안다. **모델을 새로 켤 때는 반드시 채팅에서 한 번 답을 받아 본다.**
 
 세션 사이드바에서 "새 세션 - Claude Code"·"새 세션 - Codex" 항목을 없애는 것은 별개 키다.
 
@@ -495,7 +514,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 게이트웨이가 이 파일을 `bootstrapOnly` 로 읽어 **runtime-only** 프로필을 만드는 것이 두 번째 조건이다(`src/agents/auth-profiles/external-cli-sync.ts`). 갱신이 한 번이라도 성공해야 상태 저장소에 영구 저장되는데, 처음부터 실패하므로 영구 저장본이 생기지 않는다. `models auth list` 의 `Profiles:` 에 `anthropic:manual` 만 있고 `openai:default` 이 없으면 그 상태다(`models status` 는 런타임 오버레이까지 보여 주므로 둘 다 보인다).
 
-**왜 30초인가.** 재시도가 아니라 **취소되지 않는 fetch 타임아웃 하나**다.
+**왜 30초인가.** **취소되지 않는 fetch 타임아웃 하나**가 그대로 드러난 값이다.
 
 | 층 | 값 | 위치 |
 | --- | --- | --- |
@@ -570,6 +589,75 @@ docker exec -u node openclaw-ixauth_gateway_1 node openclaw.mjs models auth list
 | 로그인 파일 | 상태 볼륨 `codex-cli/auth.json`, NAS 호스트 `codex-auth.json` | **서버 전용 로그인을 새로 만든다.** 지운 사본은 NAS `/volume1/docker/openclaw/openai-removed-y-20260909/` 에 있지만 낡은 refresh 토큰이라 그대로는 살아나지 않는다 |
 
 인증 저장소에는 지울 OpenAI 프로필이 애초에 없었다. (바) 대로 갱신이 한 번도 성공하지 못해 `openai:default` 이 영구 저장된 적이 없기 때문이고, `models auth list` 가 `anthropic:manual` 하나만 보이는 것이 그 증거다.
+
+#### (자) Fable 5.1 이 400 을 내던 이유와 헤더 한 줄 (Z 단계, 2026-09-09)
+
+`claude-fable-5-1` 만 HTTP 400 으로 거절됐다. 응답 본문을 끝까지 읽으면 이유가 그대로 적혀 있다.
+
+```
+{"type":"error","error":{"type":"invalid_request_error",
+ "message":"Claude Code 2.1.75 does not support this model; version 2.1.251 or newer is required. ...",
+ "details":{"error_code":"claude_code_version_too_old"}}}
+```
+
+setup-token(`sk-ant-oat01-`)으로 부를 때 게이트웨이는 자기를 Claude Code 클라이언트로 밝힌다. 그 판 번호가 `packages/ai` 의 상수 하나로 굳어 있다.
+
+| 항목 | 값 | 위치 |
+| --- | --- | --- |
+| user-agent | `claude-cli/2.1.75` | `packages/ai/src/providers/anthropic-model-contract.ts` 의 `ANTHROPIC_CLAUDE_CODE_VERSION` |
+| x-app | `cli` | `packages/ai/src/transports/anthropic-transport-stream.ts` |
+| anthropic-beta | `claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14` | 같은 파일 |
+
+서버가 요구하는 최소 판은 2.1.251 이고 상수는 2.1.75 다. **코드를 고치지 않고 설정으로 덮는다.** 전송 계층이 기본 헤더 위에 `model.headers` 를 병합하므로, 프로바이더 설정에 user-agent 한 줄을 적으면 그 값이 나간다.
+
+```json
+{
+  "models": {
+    "providers": {
+      "anthropic": { "headers": { "user-agent": "claude-cli/2.1.251" } }
+    }
+  }
+}
+```
+
+정본 템플릿 `chris-local/ixauth-gateway-config/openclaw.json` 에 이 블록이 들어 있다. 넣은 뒤 같은 호출이 HTTP 200 이고, 한국어 답도 정상이며, 나머지 여덟 모델의 응답도 달라지지 않았다(2026-09-09 실측).
+
+- **이 값의 성질.** 게이트웨이는 원래도 Claude Code 클라이언트를 자처한다(위 표의 세 줄 전부가 업스트림 기본값이다). 바뀌는 것은 판 번호 하나뿐이고, 전송 계층이 이 모델의 응답 형식을 실제로 처리한다는 것은 답을 받아서 확인했다.
+- **되돌리기.** 템플릿에서 `models.providers.anthropic.headers` 를 지우고 재기동한다. 그러면 `claude-fable-5-1` 만 다시 400 이 되므로 `modelPolicy.allow` 에서도 함께 뺀다.
+- **업스트림이 상수를 올리면 이 줄은 필요 없어진다.** 포크 동기화 때 `ANTHROPIC_CLAUDE_CODE_VERSION` 이 2.1.251 이상이면 헤더 줄을 지운다.
+
+#### (차) 모델별 응답 시간과 스트리밍 (Z 단계 실측, 2026-09-09)
+
+**모델이 느린 것이 아니다.** 진바이오 배포에서 한 번의 질문에 드는 시간은 아래처럼 나뉜다(게이트웨이 진단 프로파일러 `diagnostics.flags: ["reply.profiler"]` 로 잰 값, 서버 유휴 상태 loadavg 1.0).
+
+| 구간 | 실측 | 무엇인가 |
+| --- | --- | --- |
+| 답 준비 | 약 2.2초 | 워크스페이스 확인 1.1초 + 세션 기준선 0.95초 + 지시문 해석 |
+| 컨텍스트 조립 ~ 모델 호출 시작 | 약 3.9초(누적) | 이력 로드, 도구 목록 |
+| Anthropic 첫 응답 | 0.6~3.2초 | `model-fetch response ... elapsedMs` |
+| 답 생성 + 도구 실행 | 1초 ~ 70초 | 비서가 사내 문서를 찾아보면 여기가 길어진다 |
+
+같은 질문(다섯 줄짜리 절차 안내)을 모델을 바꿔 가며 잰 값이다. 시간은 보내고 나서 답이 화면에 다 나올 때까지다.
+
+| 모델 | 문서를 안 찾는 질문 | 문서를 찾는 질문 | 화면에 흘러나오나 |
+| --- | --- | --- | --- |
+| Sonnet 5 | 7.0초 | 14.5 / 17.9 / 33.8초 | 아니오. 끝나면 한꺼번에 |
+| Opus 5 | 19초 | 더 길다 | 아니오 |
+| Fable 5.1 | 6.9초 | - | 아니오 |
+| Fable 5 | 9.0초 | - | 아니오 |
+| Haiku 4.5 | - | 16.6 / 17.4초 | 예. 12.9초부터 0.3초 간격으로 |
+| Opus 4.8 | 17.7초 | - | 예. 13.6초부터 |
+| Opus 4.7 | 7.4초 | - | 예 |
+| Opus 4.6 | 8.2초 | - | 예 |
+| Sonnet 4.6 | 9.8초 | - | 예 |
+
+- **Sonnet 5·Opus 5·Fable 5·Fable 5.1 은 답을 흘려보내지 않는다.** 업스트림 전송 계층이 이 네 모델에서는 스트림을 끝까지 모아 두었다가 한 번에 내보낸다(`packages/ai/src/transports/anthropic-transport-stream.ts` 의 `usesClaudeStreamingRefusalContract` -> `createDeferredEventBuffer`, 플러시는 `message_stop` 뒤 한 번). 중간에 거절 판정이 바뀌면 이미 보여 준 글자가 틀린 것이 되기 때문이고, 끄는 설정은 없다. 실측에서 Sonnet 5 는 글자 수가 0 에서 301 로 한 번에 뛰었고 Haiku 4.5 는 0.3초 간격으로 늘었다.
+- **답이 늦는 진짜 이유는 사내 문서 검색이다.** 비서가 `/mnt/knowledge` 색인을 뒤지기 시작하면 도구 실행이 60~70초까지 간다. 실측 한 건은 모델 호출 시작 3.9초, 첫 도구 실행 14.1초, 완료 79.8초였고 출력 토큰 2.5천 개였다. 그 대신 답에 "진바이오텍 취업규칙 제51조" 같은 근거가 붙는다.
+- **터널과 웹소켓은 원인이 아니다.** 측정 내내 웹소켓 프레임이 계속 들어왔고, 기동 이후 로그에 `Falling back from WebSockets to HTTPS transport` 가 0건이다.
+- **색인 부하도 원인이 아니었다.** 측정 시각은 18:00~19:20 KST 이고 야간 색인 크론은 03:20 이다. 측정 중 색인 프로세스 0개, 게이트웨이 CPU 0.3%, 메모리 477 MiB / 3 GiB.
+- **긴 세션이 새 세션보다 빠르다.** 누적 대화량 48.5k 토큰인 홈 세션은 10.5초, 방금 만든 세션은 14~34초였다. 새 세션이 세션 상태와 색인을 처음 여는 값을 물기 때문이다. 게이트웨이를 다시 띄운 직후 첫 질문은 84초로 가장 느리다.
+- **알아 둘 것: 색인이 커지면 이 시간이 늘어난다.** 지금 색인은 `00_공용폴더` 3,302 파일 · 5만 조각이고 에이전트 SQLite 가 359 MiB 다. 컨테이너 밖에서 이 파일을 여는 데만 15초가 걸린다(FTS 질의 자체는 1밀리초다). 12절의 나머지 공유 일곱 개(2만 8천 파일)를 더하기 전에 응답 시간을 다시 재고, 게이트웨이 메모리 경고(`memory pressure: level=warning`)를 함께 본다.
+- 사용자에게 알려 줄 기준은 [MANUAL.md](MANUAL.md) 10절에 같은 값으로 적혀 있다.
 
 #### 확인
 

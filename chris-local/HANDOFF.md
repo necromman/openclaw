@@ -71,6 +71,16 @@
   - **운영 실측 통과(2026-09-09 16:39:57 KST 배포 뒤)**: 관리자·직원 각각 새 세션에서 `anthropic/claude-sonnet-5` 2초, 직원이 선택기에서 Opus 5 로 바꾸니 `anthropic/claude-opus-5` 4초. 선택기는 양쪽 모두 Claude 3개뿐이고 새 세션 화면에 CLI 실행 항목이 없다. 재기동 뒤 기동 로그의 `admin overrides applied: ...` 로 기본 모델·허용 목록이 유지되는 것을 확인했고, 로그 393줄에 `-32603`·`Falling back from WebSockets`·`codex` 0건이다. 배포가 두 번(16:39:57, 17:04:57) 일어나 재기동이 두 번이었고 두 번 다 값이 유지됐다. 스크린샷 chris-server `analysis/2026-09-07-openclaw-auth/delivery-y-01..08-*.png` 8장.
   - **남긴 것**: 상태 볼륨의 codex 런타임 npm 패키지(`/home/node/.openclaw/npm/projects/`)는 지우지 않았다. 플러그인이 꺼져 실행되지 않고, 지우면 되살릴 때 다시 받아야 한다.
 
+- **Z 단계(2026-09-09, `chris/main` 직접)**: 채팅 모델 확대와 응답 지연 규명. 정본은 [DEPLOY.md](DEPLOY.md) 3.4 표·(자)·(차), 사용자 안내는 [MANUAL.md](MANUAL.md) 2·10·11절, 상세는 [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절 Z 행.
+  - **채팅 모델이 아홉 개다.** Y 단계의 세 개(sonnet-5·opus-5·haiku-4-5)에 fable-5·fable-5-1·opus-4-8·opus-4-7·opus-4-6·sonnet-4-6 을 더했다. 전부 운영 setup-token 으로 실제 호출해 HTTP 200 을 받았고 채팅 화면에서도 한 번씩 답을 받았다. 저장 위치는 상태 볼륨의 `admin-overrides.json`(관리자 화면이 쓴다)과 템플릿 `chris-local/ixauth-gateway-config/openclaw.json` 두 곳이고 두 값을 맞춰 두었다.
+  - **fable-5-1 의 HTTP 400 은 user-agent 한 줄이었다.** setup-token 경로에서 게이트웨이가 자기를 `claude-cli/2.1.75` 로 밝히는데(상수는 `packages/ai/src/providers/anthropic-model-contract.ts` 의 `ANTHROPIC_CLAUDE_CODE_VERSION`) 서버가 2.1.251 이상을 요구한다. 템플릿의 `models.providers.anthropic.headers` 로 그 값만 덮어 200 이 됐고 코드는 건드리지 않았다. 업스트림 상수가 올라가면 그 줄을 지운다.
+  - **함정: 관리자 모델 화면의 목록과 러너가 부를 수 있는 목록이 다르다.** 화면은 프로바이더 디스커버리까지 그려서 13~14줄이 되는데, 4.5 세대 세 줄(`claude-opus-4-5`·`claude-opus-4-5-20251101`·`claude-sonnet-4-5-20250929`)은 러너가 `Unknown model` 로 거절한다. 켜면 답풍선이 생기지 않고 작성칸 위에 그 한 줄만 뜬다. `claude-mythos-5` 는 404 로 이 자격증명에 없다. **모델을 켤 때는 반드시 채팅에서 한 번 답을 받아 본다.**
+  - **"답이 한꺼번에 나온다" 는 고장이 아니다.** 업스트림 전송 계층이 Sonnet 5·Opus 5·Fable 5·Fable 5.1 에서는 스트림을 끝까지 모았다가 한 번에 내보낸다(`usesClaudeStreamingRefusalContract` -> `createDeferredEventBuffer`). 끄는 설정이 없어 고치지 않았고, 대신 글자가 흘러나오는 모델(Haiku 4.5·Opus 4.8/4.7/4.6·Sonnet 4.6)을 열어 사용자가 고를 수 있게 했다.
+  - **"늦게 나온다" 는 사내 문서 검색이다.** 한 턴의 고정 비용은 약 4초(워크스페이스 확인 1.1초, 세션 기준선 0.95초, 컨텍스트 조립까지 3.9초)이고 Anthropic 첫 응답은 0.6~3.2초다. 문서를 찾지 않는 질문은 7초, `/mnt/knowledge` 를 뒤지는 질문은 60~80초다. 웹소켓·터널·색인 부하는 원인이 아니었다(측정 중 `Falling back from WebSockets` 0건, 색인 프로세스 0개, 게이트웨이 CPU 0.3%).
+  - **재기동 직후 첫 질문이 가장 느리다(84초).** 긴 세션(48.5k)이 새 세션보다 빠르다(10.5초 대 14~34초).
+  - **다음 사람이 볼 것: 색인을 더 늘리기 전에 응답 시간을 다시 잰다.** 지금 `00_공용폴더` 3,302 파일·5만 조각으로 에이전트 SQLite 가 359 MiB 이고 컨테이너 밖에서 여는 데만 15초다(FTS 질의는 1밀리초). 나머지 공유 일곱 개는 2만 8천 파일이다. 기동 로그에 `memory pressure: level=warning ... rss=1000.2 MiB` 가 이미 찍혔다.
+  - 진단 프로파일러는 템플릿에 `"diagnostics": { "flags": ["reply.profiler"] }` 를 한 줄 넣고 재기동하면 켜진다. 켜면 `agent turn timings ... stages=` 가 로그에 남는다. 측정이 끝나면 그 줄을 지운다(로그가 많아진다).
+
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
 - **납품 라이브 좌표**: `https://jinbio.botops.cloud`(Cloudflare Tunnel, HTTP 200 실측). 호스트는 진바이오 NAS 192.168.2.1(apps01 OpenVPN 경유), compose 프로젝트 `openclaw-ixauth`, 컨테이너 4개(db·ix-auth·gateway·cloudflared), 네트워크 대역 `172.16.240.0/24`(cloudflared 는 `.10` 고정). 시스템 관리자는 `admin@deploy.local` 이고 시험 계정 6개가 함께 있다. 자격증명과 배포 좌표는 `infra/local/jinbio-deploy.md`(git 제외).
 
