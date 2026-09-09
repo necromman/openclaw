@@ -1393,7 +1393,9 @@ docker compose --env-file chris-local/ixauth.env   -f chris-local/docker-compose
 
 ## 12. NAS 문서를 검색 가능하게 만들기 (마크다운 사이드카 색인)
 
-> **이 절도 부서 에이전트를 켤 때만 필요하다** (3.3-1 의 5번). 지금은 색인을 읽는 에이전트가 없다. `knowledge-index` 폴더는 compose 가 마운트만 하고 비워 둔다.
+> **2026-09-09 (X 단계)부터 진바이오 배치에서 실제로 돈다.** 공용 비서 `main` 이 색인 폴더를
+> `memory.search.extraPaths` 로 보고, 호스트 cron 이 매일 새벽 색인을 돌린다(12.3). 그 전까지는
+> "부서 에이전트를 켤 때만 필요한" 절이었다.
 
 > 정본은 [KNOWLEDGE.md](KNOWLEDGE.md). 여기에는 설치·운영에 필요한 최소 절차만 둔다.
 
@@ -1414,49 +1416,97 @@ sudo mkdir -p /srv/knowledge/rnd /srv/knowledge/qa
 sudo chown -R 1000:1000 /srv/knowledge     # 컨테이너의 node 사용자
 ```
 
-compose 가 `/mnt/knowledge/rnd`·`/mnt/knowledge/qa` 로 쓰기 가능하게 마운트하고,
-`start-gateway.sh` 는 `OPENCLAW_KNOWLEDGE_ROOT` 가 비어 있지 않을 때만 두 부서 에이전트의
-`extraPaths` 를 그 경로로 렌더링한다. 비우면 빈 목록이라 이 기능이 없던 때와 동작이 같다.
+compose 가 색인 폴더의 **부모를** `/mnt/knowledge` 로 쓰기 가능하게 마운트한다(X 단계).
+그 아래에 공유 이름으로 폴더가 하나씩 생긴다(`/mnt/knowledge/00_공용폴더`). 전에는 `rnd`·`qa`
+두 개만 뚫려 있어 실제 공유를 색인할 자리가 없었다.
+
+**호스트 쪽 폴더의 소유자가 컨테이너의 `node`(uid 1000)여야 한다.** 아니면 색인이 첫 파일에서
+`Permission denied` 로 멈춘다(2026-09-09 실측).
+
+```bash
+sudo chown -R 1000:1000 /volume1/docker/openclaw/knowledge-index
+```
+
+색인 폴더를 실제로 읽는 것은 에이전트의 `memory.search.extraPaths` 다. 납품 템플릿
+(`ixauth-gateway-config/openclaw.json`)의 `agents.entries.main` 에 `"/mnt/knowledge"` 한 줄이
+들어 있다. U 단계의 `admin-overrides.json` 병합은 모델 네 항목만 건드리므로 이 값과 겹치지 않는다.
 
 **색인 폴더를 NAS 에 두지 않는다.** 공유는 읽기 전용이 원칙이고, 색인이 호스트에 있는 이유가 그것이다.
 
 ### 12.2 첫 색인과 확인
 
+진바이오 배치(NAS 안에서 도는 스택)의 명령이다. 다른 호스트라면 compose 파일 이름만 다르다.
+
 ```bash
-CO="docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml"
-$CO up -d
+D=/var/packages/Docker/target/usr/bin/docker
+G=openclaw-ixauth_gateway_1
 
-$CO exec gateway openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd
-$CO exec gateway openclaw knowledge sync --source /mnt/nas/qa  --out /mnt/knowledge/qa
+# 먼저 규모를 본다. 파일 수와 제외 사유만 세고 변환하지 않는다
+sudo $D exec $G openclaw knowledge sync --source /mnt/nas/00_공용폴더   --out /mnt/knowledge/00_공용폴더 --dry-run --json > /tmp/dry.json
 
-# 사이드카가 생겼는지
-$CO exec gateway sh -c "ls /mnt/knowledge/rnd"
+# 실제 색인. 몇 시간이 걸릴 수 있으므로 붙잡고 기다리지 않는다
+sudo $D exec -d $G sh -lc   'openclaw knowledge sync --source /mnt/nas/00_공용폴더 --out /mnt/knowledge/00_공용폴더    > /tmp/first-index.log 2>&1'
 
-# 렌더링된 설정에 extraPaths 가 들어갔는지
-$CO exec gateway sh -c "grep -A3 extraPaths /home/node/.openclaw/openclaw.json"
+# 진행 상황
+sudo $D exec $G sh -lc 'find /mnt/knowledge/00_공용폴더 -name "*.md" | wc -l'
 
-# 색인기에 알린다. 이 단계를 빼면 사이드카가 있어도 검색에 안 잡힌다
-$CO exec gateway openclaw memory index --force --agent rnd-bot
-$CO exec gateway openclaw memory search "에탄올 재고" --agent rnd-bot
+# 사이드카를 검색 색인에 반영한다. 이 단계를 빼면 사이드카가 있어도 검색에 안 잡힌다
+sudo $D exec $G openclaw memory index --force --agent main
+sudo $D exec $G openclaw memory search "출장 신청서" --agent main
 ```
 
 색인은 임베딩을 부르지 않는다. 납품 템플릿의 `memory.search.provider` 가 `"none"` 이라 내장 FTS 만
 쓰고, 한국어는 같은 절의 `store.fts.tokenizer: "trigram"` 이 받는다. 기본값 `openai` 로 두면 키가
 없는 사내 배포에서 색인이 통째로 실패한다(12.4). 근거와 대안은 KNOWLEDGE.md 7.4.
 
-### 12.3 주기 실행은 호스트 타이머로 한다
+첫 색인의 실측(파일 수·소요·용량)은 KNOWLEDGE.md 7.2 에 있다.
+
+### 12.3 주기 실행은 호스트 cron 이 한다 (진바이오 배치)
 
 ix-auth 모드에서 컨테이너 안 CLI 는 게이트웨이 RPC 인가가 없어 `openclaw cron add` 가
-`unauthorized` 로 막힌다(H 단계에서 확인된 제약과 같은 것이다). `knowledge sync` 자체는 RPC 를
-쓰지 않아 잘 돌므로, 잡을 만드는 쪽만 밖으로 뺀다.
+`unauthorized` 로 막힌다(H 단계에서 확인된 제약과 같은 것이다). `knowledge sync` 와
+`folders scan` 은 RPC 를 쓰지 않아 잘 돌므로, 잡을 만드는 쪽만 밖으로 뺀다. DSM 6 에는 systemd 가
+없어 `deploy.sh` 와 같은 `/etc/crontab` 관례를 쓴다.
 
-```ini
-# /etc/systemd/system/openclaw-knowledge.service  (Type=oneshot)
-ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth.env exec -T gateway \
-  sh -lc 'openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd && openclaw memory index --force --agent rnd-bot'
+정본 스크립트는 `chris-local/nas/nightly-index.sh`, NAS 위의 실물은
+`/volume1/docker/openclaw/nightly-index.sh` 다. 하는 일은 순서대로 셋이다.
+
+1. `openclaw folders scan` - 폴더 트리 저장본 갱신(공유 전체, 몇십 초)
+2. `openclaw knowledge sync` - 스크립트 머리의 `SHARES` 에 적힌 공유만 문서 사이드카 색인
+3. `openclaw memory index --force --agent main` - 사이드카를 검색 색인에 반영
+
+```
+# /etc/crontab 에 한 줄 (칸 구분은 탭이다). deploy.sh 줄은 그대로 둔다.
+20	3	*	*	*	root	/volume1/docker/openclaw/nightly-index.sh
 ```
 
-타이머 유닛과 30분 주기 예시는 KNOWLEDGE.md 7.3 에 있다.
+**새벽에 도는 이유**는 이 NAS 가 2코어이고 낮에는 회사의 파일 서버여서다. 문서 변환은 코어를 오래
+물고 있어, 업무 시간에 돌리면 사람이 파일을 여는 속도가 같이 느려진다. 03:20 은 DSM 자체 작업
+(03:00·05:00)과도 겹치지 않는다.
+
+지키는 규칙은 `deploy.sh` 와 같은 성격이다.
+
+| 규칙 | 왜 |
+| --- | --- |
+| `mkdir` 잠금으로 단일 실행 | 첫 색인은 몇 시간이 걸린다. 겹치면 같은 파일을 두 번 변환하며 2코어를 통째로 잡는다 |
+| 여섯 시간 넘은 잠금은 걷어낸다 | 죽은 실행이 남긴 잠금 때문에 색인이 영영 멈추는 것을 막는다 |
+| 잠금·로그를 `deploy.sh` 와 따로 둔다 | 배포와 색인이 서로를 막지 않는다 |
+| 로그 1MB 회전 (`nightly-index.log`, `.1`) | 실패 기록이 몇 달 뒤에도 남는다 |
+| 컨테이너가 running 이 아니면 아무것도 안 한다 | 배포 중에 색인이 끼어들지 않는다 |
+| 공유 하나가 실패해도 다음 공유는 돈다 | 한 파일 때문에 그날 전체를 잃지 않는다 |
+| 실패는 다음 주기로 넘긴다 | 증분이라 다음 실행이 남은 것만 한다 |
+
+```bash
+# 손으로 돌려 보기 (같은 잠금을 쓴다)
+sudo /volume1/docker/openclaw/nightly-index.sh --tree-only   # 트리만
+sudo /volume1/docker/openclaw/nightly-index.sh --dry-run     # 색인 계획만
+tail -20 /volume1/docker/openclaw/nightly-index.log
+```
+
+**색인 범위를 넓히려면** 스크립트 머리의 `SHARES` 에 공유 이름을 한 줄 더한다. 넣기 전에
+`--dry-run` 으로 파일 수를 본다. 민감 공유(인사·급여)는 넣지 않는다. 사이드카는 사람별 필터가
+없는 공용 풀이라, 색인하는 순간 그 내용이 비서의 검색·요약을 통해 나갈 수 있다
+([NAS-FOLDER-ACL.md](NAS-FOLDER-ACL.md) 14.8).
 
 ### 12.4 자주 나오는 증상
 
@@ -1525,11 +1575,13 @@ NAS 는 2코어 Celeron 이라 게이트웨이 이미지를 스스로 빌드할 
 /volume1/docker/openclaw/
   docker-compose.nas.yml      chris-local/nas/ 에서 복사
   deploy.sh                   chris-local/nas/ 에서 복사 (실행권한 필요)
+  nightly-index.sh            chris-local/nas/ 에서 복사 (실행권한 필요, 12.3)
   ixauth-gateway-config/      chris-local/ixauth-gateway-config/ 에서 복사
   nas-sample/                 chris-local/nas-sample/ 에서 복사
-  knowledge-index/rnd, /qa    빈 폴더
+  knowledge-index/            색인 폴더의 부모. 소유자는 uid 1000 이어야 한다 (12.1)
   ixauth.env                  호스트에서 만든다 (0600, root 소유). 복사하지 않는다
   deploy.log                  deploy.sh 가 만든다
+  nightly-index.log           nightly-index.sh 가 만든다
 ```
 
 `docker-compose.nas.yml` 은 `docker-compose.ixauth.yml` 의 형제다. 다른 점은 셋뿐이고 파일 머리말에 적혀 있다. `build:` 대신 `image:`, 컨테이너별 `mem_limit`, 개발용 수신함(mailpit) 제거.

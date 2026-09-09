@@ -198,69 +198,140 @@ compose 가 두 쌍을 마운트한다.
 cd chris-local
 C="docker compose -f docker-compose.ixauth.yml --env-file ixauth.env"
 
-$C exec gateway openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd
-$C exec gateway openclaw knowledge sync --source /mnt/nas/qa  --out /mnt/knowledge/qa
+# 먼저 규모를 본다. 파일 수와 제외 사유를 세어 준다
+$C exec gateway openclaw knowledge sync --source /mnt/nas/00_공용폴더   --out /mnt/knowledge/00_공용폴더 --dry-run --json
+
+$C exec gateway openclaw knowledge sync --source /mnt/nas/00_공용폴더   --out /mnt/knowledge/00_공용폴더
 
 # 색인기에 새 파일을 알린다
-$C exec gateway openclaw memory index --force --agent rnd-bot
-$C exec gateway openclaw memory index --force --agent qa-bot
+$C exec gateway openclaw memory index --force --agent main
 
 # 확인
-$C exec gateway openclaw memory search "에탄올 재고" --agent rnd-bot
+$C exec gateway openclaw memory search "출장 신청서" --agent main
 ```
 
-`knowledge sync` 는 게이트웨이 RPC 를 쓰지 않는다(폴더를 읽어 폴더에 쓸 뿐이다). 그래서 ix-auth 모드에서 다른 CLI 명령이 인가 때문에 막히는 것과 달리 컨테이너 안에서 그대로 돈다.
+`knowledge sync` 는 게이트웨이 RPC 를 쓰지 않는다(폴더를 읽어 폴더에 쓸 뿐이다). 그래서 ix-auth
+모드에서 다른 CLI 명령이 인가 때문에 막히는 것과 달리 컨테이너 안에서 그대로 돈다.
 
-`memory index --force` 를 빼면 사이드카가 있어도 검색에 안 잡힌다. **사이드카 생성과 색인은 별개의 단계다.**
+`memory index --force` 를 빼면 사이드카가 있어도 검색에 안 잡힌다. **사이드카 생성과 색인은 별개의
+단계다.**
+
+#### 진바이오 첫 색인 실측 (2026-09-09, X 단계)
+
+공유 아홉 개를 한꺼번에 색인하면 파일 50만 개다. `00_공용폴더` 하나로 시작해 규모를 재고 나머지
+일정을 그 수치로 잡는다.
+
+**계획 단계 (`--dry-run`)**
+
+| 항목 | 값 |
+| --- | --- |
+| 색인 대상 | **6,298 파일** (원본 합계 6.22 GB) |
+| 제외: 확장자 밖 | 32,222 (eml 16,179 · jpg 8,684 · png 2,135 · mp4 967 등) |
+| 제외: 숨김 폴더 | 1,523 줄 (폴더당 한 줄. `@eaDir`·`#recycle`·`#경영회의`·`##직원전용`) |
+| 제외: 20 MiB 초과 | 194 |
+| 제외: 빈 파일 | 1 |
+| 계획을 세우는 데 걸린 시간 | 163초 (변환은 하지 않는다) |
+
+**실제 색인** (2026-09-09 15:11 시작, 이 보고 시점에 진행 중)
+
+| 항목 | 값 |
+| --- | --- |
+| 만든 사이드카 | 808 / 6,298 (13 MB) |
+| 사이드카 하나 평균 | 약 16 KB |
+| 속도 | 0.2~0.85 개/초 (같은 기계에서 이미지 배포·트리 훑기·질의가 함께 돌던 값) |
+| 남은 시간 추정 | 2~4시간 |
+| 6,298개를 다 만들었을 때 예상 용량 | 약 100 MB (원본 6.22 GB 의 1.6%) |
+
+진행 확인:
+
+```bash
+sudo $D exec openclaw-ixauth_gateway_1 sh -lc   'find /mnt/knowledge/00_공용폴더 -name "*.md" | wc -l; du -sh /mnt/knowledge/00_공용폴더'
+```
+
+**첫 색인에서 드러난 결함 하나를 고쳤다.** 실행이 711개에서 멈췄다. 파워포인트가 열려 있는 문서
+옆에 만드는 `~$이름.pptx` 잠금 파일을 훑기가 보고, 크기를 재려는 순간에는 사라져 있어 ENOENT 가
+그대로 올라가 **실행 전체가 끝났다.** 사람이 쓰고 있는 공유에서는 평범한 일이므로 제외 사유
+`vanished` 로 적고 다음 파일로 간다. 변환 단계는 이미 파일마다 `read-failed` 로 받아 넘기고
+있었고, 계획 단계만 치명적이었다.
+
+**나머지 공유의 규모 (2026-09-09, 컨테이너 안에서 잰 값)**
+
+컨테이너가 보는 것만 센다. 각 공유의 `보안폴더` 는 NAS ACL 이 막고 있어(NAS-FOLDER-ACL.md 12.1)
+그 안은 훑기에도 색인에도 잡히지 않는다. 호스트에서 root 로 세면 훨씬 큰 값이 나오는 이유가 이것이다.
+
+| 공유 | 폴더 | 색인 대상 파일 | 원본 | 20 MiB 초과(제외) | 비고 |
+| --- | --- | --- | --- | --- | --- |
+| `00_공용폴더` | 2,441 | **6,298** | 6.22 GB | 194 | 첫 색인 대상 |
+| `02_최병만` | 479 | 2,308 | 0.34 GB | 4 | hwp 1,258 |
+| `03_장혜린` | 1 | 3 | 0 | 0 | 거의 전부 보안폴더 안 |
+| `04_김서희` | 189 | 1,014 | 0.10 GB | 0 | xlsx 808 |
+| `05_이대훈` | 4,204 | 1,431 | 0.23 GB | 5 | 웹 자산 위주(jpg·php·gif) |
+| `06_박정현` | 3,615 | 14,870 | 5.83 GB | 121 | hwp 7,966 · pdf 4,554 |
+| `디자인PC` | 8,026 | 2,287 | 3.65 GB | 409 | 파일 99,288개 중 대부분이 이미지 |
+| `이영준한의원` | 1 | 0 | 0 | 0 | zip 하나뿐 |
+| **합계(색인 대상 8개)** | **18,956** | **28,211** | **16.4 GB** | 733 | |
+| `01_이화정` (제외) | 169 | 400 | 0.55 GB | 13 | 관리자 전용. 색인하지 않는다 |
+
+**일정 산정.** 실측 속도 0.5개/초(보수적으로)로 잡으면 파일 수를 이렇게 나눈다.
+
+| 공유 | 색인 대상 | 예상 소요 | 몇 밤 |
+| --- | --- | --- | --- |
+| `00_공용폴더` | 6,298 | 3~4시간 | 1 |
+| `06_박정현` | 14,870 | 8~9시간 | 2 |
+| `02_최병만` | 2,308 | 1~2시간 | 같은 밤에 하나 더 |
+| `디자인PC` | 2,287 | 1~2시간 | 같은 밤에 하나 더 |
+| `05_이대훈` | 1,431 | 1시간 | |
+| `04_김서희` | 1,014 | 1시간 | |
+| `03_장혜린`·`이영준한의원` | 3 | 즉시 | |
+| **합계** | **28,211** | **16~20시간** | **밤 4~5회** |
+
+한 번에 하나씩 늘린다. `nightly-index.sh` 의 `SHARES` 에 공유를 하나 더하고 그 다음 날 로그로
+결과를 본 뒤 다음 공유를 더한다. 두 번째 밤부터는 이미 만든 사이드카를 건너뛰므로(크기·시각이
+같으면 원본을 읽지도 않는다) 새 문서만 변환한다.
+
+**용량은 제약이 아니다.** 사이드카는 원본의 약 1.6% 이고 8개 공유 전부라도 300 MB 를 넘지 않는다.
+`/volume1` 여유는 2.9 TB 다. **제약은 시간과 CPU** 이며, 그래서 업무 시간을 피한다.
 
 ### 7.3 주기 실행
 
-**납품 스택에서는 호스트 systemd 타이머를 쓴다.** 게이트웨이 cron 자체는 셸 명령 잡을 지원하지만
-(`--command` 는 `sh -lc` 로 돈다), ix-auth 모드에서 컨테이너 안 CLI 는 게이트웨이 RPC 인가가 없어
-등록 자체가 막힌다. 실측(2026-09-08)에서 아래가 그대로 재현된다.
+**납품 스택에서는 호스트의 일정 관리가 이 명령을 부른다.** 게이트웨이 cron 자체는 셸 명령 잡을
+지원하지만(`--command` 는 `sh -lc` 로 돈다), ix-auth 모드에서 컨테이너 안 CLI 는 게이트웨이 RPC
+인가가 없어 **등록 자체가 막힌다.** 실측(2026-09-08)에서 아래가 그대로 재현된다.
 
 ```bash
-$C exec gateway openclaw cron add --name knowledge-sync-rnd --every 30m --command "..."
+$C exec gateway openclaw cron add --name knowledge-sync --every 30m --command "..."
 # {"ok":false,"error":{"type":"cli_error","message":"unauthorized"}}
 ```
 
 `knowledge sync` 자체는 RPC 를 쓰지 않아 같은 컨테이너에서 잘 돈다. 막히는 것은 cron **등록**뿐이다.
-인가가 있는 세션(관리자 화면)에서 만드는 길도 있지만, 절차서에 남길 것은 사람 손이 필요 없는 쪽이라
-타이머를 정본으로 둔다. ix-auth 를 쓰지 않는 설치에서는 위 `cron add` 가 그대로 동작한다.
 
-호스트에서는 systemd 타이머가 같은 일을 한다.
+**진바이오 배치(DSM 6, systemd 없음)는 `/etc/crontab` 한 줄 + 스크립트 하나다.** 정본은
+`chris-local/nas/nightly-index.sh` 이고 절차는 [DEPLOY.md](DEPLOY.md) 12.3 이다. 스크립트가
+`folders scan` -> `knowledge sync` -> `memory index` 를 순서대로 돌리고, `deploy.sh` 와 같은
+`mkdir` 잠금·로그 회전 규칙을 쓴다.
+
+```
+20	3	*	*	*	root	/volume1/docker/openclaw/nightly-index.sh
+```
+
+**주기를 30분이 아니라 하루 한 번으로 잡았다.** 기준은 두 가지가 부딪힌다. 사람이 문서를 올린 뒤
+몇 분 안에 찾히길 바라는가, 그리고 그동안 NAS 가 얼마나 느려져도 되는가. 이 배치의 NAS 는 2코어
+DS218+ 이고 낮에는 회사의 파일 서버다. 문서 변환은 코어를 오래 물고 있어 업무 시간에 돌리면 사람이
+파일을 여는 속도가 같이 느려진다. 그래서 업무 시간을 피해 새벽에 한 번 돌리고, 새 문서는 다음 날
+아침부터 검색된다. 급하면 손으로 한 번 돌린다.
+
+systemd 가 있는 호스트라면 타이머가 더 낫다.
 
 ```ini
-# /etc/systemd/system/openclaw-knowledge.service
-[Unit]
-Description=Knowledge sidecar sync
-
-[Service]
-Type=oneshot
-WorkingDirectory=/opt/openclaw/chris-local
-ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth.env exec -T gateway \
-  sh -lc 'openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd && openclaw memory index --force --agent rnd-bot'
+# /etc/systemd/system/openclaw-knowledge.service  (Type=oneshot)
+ExecStart=/usr/bin/docker compose -f docker-compose.ixauth.yml --env-file ixauth.env exec -T gateway   sh -lc 'openclaw knowledge sync --source /mnt/nas/rnd --out /mnt/knowledge/rnd && openclaw memory index --force --agent main'
 ```
 
 ```ini
 # /etc/systemd/system/openclaw-knowledge.timer
-[Unit]
-Description=Run knowledge sidecar sync every 30 minutes
-
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=30min
-
-[Install]
-WantedBy=timers.target
+OnCalendar=*-*-* 03:20:00
 ```
-
-```bash
-sudo systemctl enable --now openclaw-knowledge.timer
-systemctl list-timers openclaw-knowledge.timer
-```
-
-주기를 정할 때 기준은 **사람이 문서를 올린 뒤 몇 분 안에 찾히길 바라는가**다. 30분이면 최악의 경우 30분 늦는다. 공유가 크면 첫 실행만 오래 걸리고 이후에는 바뀐 파일만 변환한다.
 
 ### 7.4 임베딩 없이 색인한다
 
@@ -343,6 +414,79 @@ $C exec gateway openclaw knowledge sync   --source /mnt/nas/00_공용폴더 --ou
 ### 여전히 남는 구멍
 
 한 부서에 열어 준 폴더와 다른 부서에 열어 준 폴더가 같은 색인 풀에 들어간다. **색인 자체는 부서 경계가 아니다.** 부서를 나누려면 색인 폴더를 나누고 에이전트마다 `extraPaths` 를 달리 준다(7절). 도구 계층에서 닫는 것은 폴더 권한 3단계다.
+
+## 8-2. NAS 자체 색인(Universal Search)을 쓸 수 있나 (2026-09-09 조사)
+
+사용자 질문: "인덱싱이 NAS 에도 되어 있지 않아? NAS 인덱싱을 이용하면 어때?"
+
+**답: 쓰지 않는다.** 조사 결과와 근거를 남긴다. 읽기 전용으로만 조사했고 NAS 설정은 한 줄도
+바꾸지 않았다.
+
+### 무엇이 돌고 있나
+
+| 항목 | 값 |
+| --- | --- |
+| 패키지 | **SynoFinder 1.5.2-0323** (Universal Search). `synopkg status` = started |
+| 데몬 | `synoelasticd`(PID 상주, 누적 CPU 1시간 17분) · `fileindexd` · `synoindexd`(미디어) |
+| 색인 대상 공유 8개 | `00_공용폴더` `01_이화정` `02_최병만` `03_장혜린` `04_김서희` `05_이대훈` `06_박정현` `디자인PC` (`이영준한의원` 만 빠져 있다) |
+| 대상 종류 | 설정에 `document`·`photo`·`video`·`audio` 가 모두 `true` |
+| 상태 | `fileindex -a is_idle` = `yes` (밀린 작업 없음). 로그가 실시간으로 갱신된다 |
+| 갱신 방식 | 파일 이벤트 감시(`synotifyd_event_mask`)라 사실상 실시간이다 |
+
+**즉 NAS 는 이미 문서 본문까지 색인하고 있다.** 그런데도 쓰지 않는 이유는 아래 셋이다.
+
+### (가) 폴더 트리에 쓸 수 있나 - 쓸 이유가 없다
+
+색인에 디렉터리 항목도 들어 있다(`00_공용폴더` 색인에 3,189개). 그러나 우리 훑기는 공유 11개
+19,136 폴더를 **17.5초**에 끝낸다([NAS-FOLDER-ACL.md](NAS-FOLDER-ACL.md) 14.7). 남의 색인을
+읽으려고 접근 경로와 권한을 새로 만들 만한 이득이 없다.
+
+### (나) 문서 본문에 쓸 수 있나 - **못 쓴다**
+
+`00_공용폴더` 색인 전체를 덤프해(24,655 문서) 확장자별로 본문 필드(`SYNOMDTextContent`) 길이를
+쟀다.
+
+| 확장자 | 색인된 문서 | 본문 필드 있음 | 본문 길이 중앙값 | 상위 10% | 최대 |
+| --- | --- | --- | --- | --- | --- |
+| pdf | 1,609 | 1,608 | **59자** | 2,448자 | 39,557자 |
+| xlsx | 1,311 | 1,311 | **0자** | 5,202자 | 182,171자 |
+| docx | 831 | 831 | **0자** | 664자 | 43,220자 |
+| **hwp** | 685 | **55 (8%)** | 975자 | 2,769자 | 7,526자 |
+| pptx | 251 | 251 | 0자 | 2,416자 | 100,097자 |
+
+세 가지가 걸린다.
+
+1. **본문이 대부분 비어 있다.** 중앙값이 0~59자다. 절반이 넘는 문서에서 본문이 사실상 없고,
+   있는 것도 앞부분만 남은 경우가 많다. 우리 사이드카는 문서 하나에 평균 **16 KB** 의 본문을
+   쪽 표시(`## p.N`)와 표까지 살려 담는다.
+2. **한글(hwp) 이 8% 다.** 이 회사 문서의 큰 축이 hwp 인데(00_공용폴더 808개, 06_박정현 7,966개)
+   NAS 색인은 그중 55개에서만 본문을 얻었다. 우리는 rhwp + 내장 리더로 전부 읽는다(5절).
+3. **파일 수도 다르다.** 우리가 보는 pdf 3,024개 중 색인에는 1,609개만 있다.
+
+### (다) 권한 경계 - 다시 걸러야 한다
+
+NAS 색인은 우리 앱의 폴더 규칙을 모른다. `01_이화정` 도 본문까지 색인돼 있다(검색 실측으로
+확인). 그 결과를 그대로 쓰면 관리자만 봐야 할 폴더가 비서의 답변으로 새어 나간다. 즉 NAS 색인을
+쓰더라도 **우리 규칙으로 한 번 더 걸러야** 하므로, 규칙 판정을 없앨 수 있는 것도 아니다.
+
+> **운영에 알려 둘 것**: 이것은 우리 앱과 무관하게 **DSM 의 Universal Search 가 이미 하고 있는
+> 일**이다. NAS 에 계정이 있고 그 공유에 접근권이 있는 사람은 DSM 검색으로 `01_이화정` 의 문서
+> 본문을 찾을 수 있다. 그것을 막으려면 DSM 의 색인 설정에서 그 공유를 빼야 하고, 그것은 NAS
+> 관리자의 결정이다(우리는 설정을 바꾸지 않았다).
+
+### 접근 방법도 좁다
+
+| 경로 | 가능한가 |
+| --- | --- |
+| 호스트 CLI `synoelastic -a search/dump` | **된다.** 다만 root 권한이 필요하고 NAS 호스트에서만 돈다. 게이트웨이 컨테이너에서는 부를 수 없다 |
+| DSM 웹 API `SYNO.Finder.FileIndexing.Search` | API 는 존재한다. 그러나 로그인이 필요하고 관리자 계정은 2단계 인증이라 `SYNO.API.Auth` 가 403 을 낸다. 쓰려면 전용 DSM 계정을 새로 만들어야 하고, 결과는 그 계정의 NAS 권한으로 걸러진다 |
+| 색인 파일 직접 읽기 | Lucene 계열 자체 포맷이고 `SynoFinder` 사용자 소유다. 컨테이너의 `openclaw-ro` 그룹으로는 읽히지 않는다 |
+
+### 결론
+
+**우리 사이드카 색인을 그대로 간다.** NAS 색인은 "파일을 이름으로 찾는" 용도로는 이미 충분히
+좋고 사람이 DSM 에서 그렇게 쓰면 된다. 우리가 필요한 것은 **문서 본문 전체**이고, 그것은 NAS
+색인에 없다. 이 조사 때문에 설계를 바꾸지 않았다.
 
 ## 9. 되돌리기
 

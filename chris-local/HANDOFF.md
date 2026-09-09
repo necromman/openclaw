@@ -52,6 +52,16 @@
   - **선재 결함 2건을 함께 고쳤다.** 모델 ref 패턴이 슬래시 하나만 받아 `huggingface/deepseek-ai/DeepSeek-R1` 같은 실제 카탈로그 이름을 거부했고(전체 켜기가 `invalid_body`), 허용 목록 상한 100 과 공용 본문 한도 4 KiB 로는 카탈로그 82개가 들어가지 않았다(상한 300, 이 라우트만 64 KiB).
   - **함정: 한국어 문안은 소스가 아니라 번역 메모리에서 온다.** `ui/src/i18n/locales/ko.ts` 는 빌드 타임 가상 모듈 한 줄이고, 실제 문안은 `ui/src/i18n/.i18n/ko.tm.jsonl` 의 항목을 **영어 원문 해시로 매칭**해 만든다. 영어 문안을 고치면 그 키의 한국어가 조용히 영어로 되돌아간다. 새 키·바뀐 키는 그 파일에 직접 넣어야 한다(해시는 `sha256(공백 정규화한 영어 원문)`).
 
+
+- **X 단계(2026-09-09, `chris/main` 직접)**: 폴더 트리 인덱싱과 문서 색인 운영. 커밋 `adb2b4ea354` -> `e784cd9c0f4` -> `409f834b4b0` -> `43ab54c7cd3` -> `2e2a974c84b` -> `9801bc56100`. 정본은 [NAS-FOLDER-ACL.md](NAS-FOLDER-ACL.md) 14절과 [KNOWLEDGE.md](KNOWLEDGE.md) 7.2~7.3·8-2, 절차는 [DEPLOY.md](DEPLOY.md) 12절, 사용자 안내는 [MANUAL.md](MANUAL.md) 4-1·8-1.
+  - **트리가 느렸던 이유는 폴더 수가 아니었다.** 목록 코드가 `readdir` 뒤 이름 하나마다 `realpath`+`stat` 를 불러, 파일 3,127개가 든 폴더 한 단계가 856ms 였다. `readdir(withFileTypes)` 로 바꾸니 5ms 다. 그 위에 폴더 구조 저장본(상태 DB `folder_tree_nodes`·`folder_tree_scans`)을 두어 화면이 NAS 를 아예 읽지 않게 했다. **저장본이 없는 가지는 종전대로 직접 읽는다** - 저장본은 화면을 빠르게 할 뿐 동작의 전제가 아니다.
+  - **훑기는 `openclaw folders scan` 이고 RPC 를 쓰지 않는다.** 그래서 ix-auth 배포의 컨테이너 안에서 그대로 돈다(`cron add` 가 막히는 것과 대비된다). 실측 **19,136 폴더 17.5초**, 못 읽은 폴더 7개(= 각 공유의 보안폴더). 2절의 37,356 은 호스트 root 기준이고 컨테이너가 보는 것은 19,136 이다.
+  - **공유별 권한이 정해졌다(사용자 확정).** **관리자 전용은 `01_이화정` 하나**이고 나머지 여덟 공유는 직원·중재자·임원 읽기다. **민감 공유에는 "관리자 읽기" 를 주지 않는다** - 읽기를 주는 순간 그 폴더가 색인 대상 자격을 얻고, 사이드카 풀에는 사람별 칸막이가 없어 인사·급여가 공용 비서의 검색으로 새어 나간다. 관리자는 폴더 화면 트리(숨김도 보인다)와 NAS 탐색기로 본다. 규칙 표 현황은 NAS-FOLDER-ACL.md 14.8.
+  - **문서 색인이 실제로 돈다.** compose 의 색인 마운트를 부모째(`/mnt/knowledge`)로 바꾸고 호스트 폴더 소유자를 uid 1000 으로 고쳤다(아니면 첫 파일에서 Permission denied). 공용 비서에 `memory.search.extraPaths` 를 물렸고, `/etc/crontab` 에 03:20 한 줄로 `nightly-index.sh` 가 `folders scan` -> `knowledge sync` -> `memory index` 를 돌린다. **업무 시간을 피하는 이유**는 2코어 NAS 가 낮에는 회사 파일 서버라서다.
+  - **함정: 사람이 쓰는 공유에서는 색인이 파일 하나에 통째로 죽는다.** 첫 색인이 두 번 멈췄다. 파워포인트 잠금 파일(`~$이름.pptx`)이 훑기와 stat 사이에 사라져 ENOENT 로 끝났고(711개), 암호 걸린 PDF 가 예외를 던져 또 끝났다(1,163개). 둘 다 그 파일 하나만 건너뛰도록 고쳤다(`vanished`·`encrypted`). **새 변환기나 새 훑기를 붙일 때 같은 함정을 밟지 않는다 - 파일 하나의 실패는 파일 하나의 실패여야 한다.**
+  - **NAS 자체 색인(Universal Search)은 쓰지 않는다.** 켜져 있고 공유 8개를 본문까지 색인하지만, 본문 필드 중앙값이 0~59자이고 한글 문서는 8%만 본문이 있으며(우리 사이드카는 평균 16KB), 접근이 호스트 root CLI 아니면 2단계 인증이 걸린 DSM 계정뿐이고, 우리 폴더 규칙을 모른다. 조사 수치는 KNOWLEDGE.md 8-2. **다시 조사하지 않는다.**
+  - **알아 둘 것: `01_이화정` 은 DSM 색인에는 본문까지 들어 있다.** 우리 앱은 그 공유를 읽지 않지만 NAS 계정으로 DSM 검색을 쓰는 사람에게는 보인다. 그 경계는 NAS 관리자의 몫이다.
+  - **진행 중**: 첫 색인(`00_공용폴더` 6,298개)이 아직 돌고 있다. 확인은 `sudo $D exec openclaw-ixauth_gateway_1 sh -lc 'find /mnt/knowledge/00_공용폴더 -name "*.md" | wc -l'`. 나머지 7개 공유는 `nightly-index.sh` 의 `SHARES` 에 한 번에 하나씩 더한다(합계 28,211 파일, 밤 4~5회).
 - **작업 규칙이 바뀌었다(2026-09-08 사용자 확정)**: `chris/main` 에서 직접 커밋·푸시하고 브랜치를 만들지 않는다. WSL 의 `pnpm check`·vitest·`pnpm format` 왕복과 로컬 compose 실측을 하지 않고, GitHub Actions 이미지 빌드 성공과 `https://jinbio.botops.cloud` 실측으로 판정한다. 상세는 CLAUDE.md 4절·FORK.md 3절·이 문서 6절.
 - **납품 라이브 좌표**: `https://jinbio.botops.cloud`(Cloudflare Tunnel, HTTP 200 실측). 호스트는 진바이오 NAS 192.168.2.1(apps01 OpenVPN 경유), compose 프로젝트 `openclaw-ixauth`, 컨테이너 4개(db·ix-auth·gateway·cloudflared), 네트워크 대역 `172.16.240.0/24`(cloudflared 는 `.10` 고정). 시스템 관리자는 `admin@deploy.local` 이고 시험 계정 6개가 함께 있다. 자격증명과 배포 좌표는 `infra/local/jinbio-deploy.md`(git 제외).
 
