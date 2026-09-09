@@ -241,16 +241,24 @@ const enIxAuth = {
       authenticated: "This provider is signed in.",
       notAuthenticated:
         "No working credential. Models are listed, but this provider cannot answer until somebody signs it in on the server.",
-      allowAll: "Allow every model of this provider",
+      allowAll: "Every model of this provider",
       allowAllHelp:
-        "Adds the provider wildcard. Individual choices below are dropped, because the wildcard already covers them.",
+        "Switches every model below on or off at once. What gets saved is always the models that are switched on, named one by one.",
+      allowAllBlocked:
+        "This provider has no working credential, so its models cannot be switched on. Models already switched on can still be switched off.",
+      providerSwitchLabel: "Offer every model of {provider} in chat",
+      modelSwitchLabel: "Offer {model} in chat",
+      modelBlocked:
+        "This provider has no working credential. Switched on, this model would appear in the chat picker and fail the moment somebody picked it.",
       allowedModels: "Models offered in chat",
       allowedModelsHelp:
-        "Ticked models appear in the chat model picker and on the new-session screen.",
+        "A model switched on appears in the chat model picker and on the new-session screen. A model switched off disappears from both.",
+      wildcardExpanded:
+        "This setting was saved as 'every model of a provider'. Those models are shown switched on here, and saving names them one by one, which is what keeps the chat model picker from waiting for a full provider check the first time it opens.",
       noModels: "This provider answered with no models.",
       defaultsTitle: "Default and fallback",
       defaultsHelp:
-        "The default answers first. A fallback answers when the one before it cannot. Both have to stay inside the list above.",
+        "The default answers first. A fallback answers when the one before it cannot. Switching a fallback off above removes it from this chain as well, because a chain is an order and losing one place is plain to see. Switching the default off does not: something has to answer, so the screen refuses to save until another default is chosen.",
       primary: "Default model",
       fallbacks: "Fallback models",
       fallbacksHelp: "Tried in order, top first.",

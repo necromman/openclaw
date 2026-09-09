@@ -41,13 +41,18 @@ import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import {
   allowlistCovers,
   buildProviderGroups,
+  expandProviderWildcards,
+  hasExpandableWildcard,
+  pruneFallbacks,
   selectableModelRefs,
+  setProviderAllowed,
   toggleAllowedModel,
-  toggleProviderAll,
   type ModelAuthSourceProvider,
   type ModelCatalogProviderGroup,
+  type ModelCatalogRow,
   type ModelCatalogSourceEntry,
 } from "./model-catalog-policy.ts";
+import { renderModelCatalogProviderSection } from "./model-catalog-providers.ts";
 
 registerIxAuthEnglish();
 
@@ -72,6 +77,8 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
   @state() private busy = false;
   @state() private errorKey: string | undefined;
   @state() private noticeKey: string | undefined;
+  /** True once a saved `provider/*` was expanded into the models behind it. */
+  @state() private wildcardExpanded = false;
 
   private client: GatewayBrowserClient | null = null;
   private stopGateway: (() => void) | undefined;
@@ -132,6 +139,7 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     };
     this.saved = next;
     this.draft = { ...next, fallbacks: [...next.fallbacks], allow: [...next.allow] };
+    this.expandStoredWildcards();
   }
 
   /**
@@ -168,6 +176,7 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     ]);
     this.catalog = models.status === "fulfilled" ? (models.value.models ?? []) : [];
     this.auth = auth.status === "fulfilled" ? (auth.value.providers ?? []) : [];
+    this.expandStoredWildcards();
   }
 
   private get groups(): ModelCatalogProviderGroup[] {
@@ -188,6 +197,53 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     this.noticeKey = undefined;
   }
 
+  /**
+   * Write a new allowlist and let the fallback chain follow it.
+   *
+   * A fallback that is no longer offered is dropped here rather than reported: the chain
+   * is an order, and a person who switches a model off can see the order lose one place.
+   * The primary is left alone on purpose, because the screen refuses to save while it is
+   * hidden and a replacement has to be chosen by somebody.
+   */
+  private applyAllow(allow: string[]): void {
+    this.patchDraft({
+      allow,
+      fallbacks: pruneFallbacks({ allow, fallbacks: this.draft.fallbacks }),
+    });
+  }
+
+  /**
+   * Turn a saved `provider/*` into the models it stood for.
+   *
+   * Older saves and hand-edited configurations still carry one. The screen shows those
+   * models switched on, and because the draft now names them, the next save replaces the
+   * wildcard with the list. That is the point: a wildcard in the configuration makes the
+   * chat model picker probe the whole provider the first time it opens, about fifteen
+   * seconds on the delivery (DEPLOY.md 3.4).
+   *
+   * Called after both loads because either can finish first, and it does nothing once
+   * there is no wildcard left with a catalog behind it.
+   */
+  private expandStoredWildcards(): void {
+    const groups = this.groups;
+    if (!hasExpandableWildcard(groups)) {
+      return;
+    }
+    this.wildcardExpanded = true;
+    this.draft = {
+      ...this.draft,
+      allow: expandProviderWildcards({ allow: this.draft.allow, groups }),
+    };
+  }
+
+  private toggleModel(model: ModelCatalogRow): void {
+    this.applyAllow(toggleAllowedModel(this.draft.allow, model.ref));
+  }
+
+  private toggleProvider(group: ModelCatalogProviderGroup, allowed: boolean): void {
+    this.applyAllow(setProviderAllowed({ allow: this.draft.allow, group, allowed }));
+  }
+
   private async save(): Promise<void> {
     this.busy = true;
     const result = await saveIxAuthModelPolicy({ basePath: this.basePath, policy: this.draft });
@@ -205,63 +261,10 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
     };
     this.saved = stored;
     this.draft = { ...stored, fallbacks: [...stored.fallbacks], allow: [...stored.allow] };
+    // Whatever was stored is now an explicit list, so the expansion notice has nothing
+    // left to warn about.
+    this.wildcardExpanded = false;
     this.noticeKey = result.persisted ? "saved" : "savedNotPersisted";
-  }
-
-  private renderModelRow(group: ModelCatalogProviderGroup): TemplateResult {
-    if (group.models.length === 0) {
-      return renderSettingsRow({ title: t("ixAuth.models.noModels") });
-    }
-    return renderSettingsRow({
-      title: t("ixAuth.models.allowedModels"),
-      description: t("ixAuth.models.allowedModelsHelp"),
-      stacked: true,
-      control: html`
-        <div class="model-catalog-models">
-          ${group.models.map(
-            (model) => html`
-              <label class="model-catalog-model">
-                <input
-                  type="checkbox"
-                  .checked=${group.allowAll || model.allowed}
-                  ?disabled=${group.allowAll || this.busy}
-                  @change=${() => this.patchDraft({ allow: toggleAllowedModel(this.draft.allow, model.ref) })}
-                />
-                <span>${model.name}</span>
-                <code>${model.ref}</code>
-              </label>
-            `,
-          )}
-        </div>
-      `,
-    });
-  }
-
-  private renderProviderSection(group: ModelCatalogProviderGroup): TemplateResult {
-    return renderSettingsSection(
-      {
-        title: group.displayName,
-        description: group.authenticated
-          ? t("ixAuth.models.authenticated")
-          : t("ixAuth.models.notAuthenticated"),
-      },
-      [
-        renderSettingsRow({
-          title: t("ixAuth.models.allowAll"),
-          description: t("ixAuth.models.allowAllHelp"),
-          control: html`
-            <input
-              type="checkbox"
-              .checked=${group.allowAll}
-              ?disabled=${this.busy}
-              @change=${() =>
-                this.patchDraft({ allow: toggleProviderAll(this.draft.allow, group.provider) })}
-            />
-          `,
-        }),
-        this.renderModelRow(group),
-      ],
-    );
   }
 
   private renderDefaultsSection(): TemplateResult {
@@ -369,6 +372,14 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
               control: html`<div role="status">${t(`ixAuth.models.${this.noticeKey}`)}</div>`,
             })
           : nothing,
+        this.wildcardExpanded
+          ? renderSettingsRow({
+              title: "",
+              control: html`<div class="callout" role="status">
+                ${t("ixAuth.models.wildcardExpanded")}
+              </div>`,
+            })
+          : nothing,
         hiddenPrimary
           ? renderSettingsRow({
               title: "",
@@ -422,7 +433,16 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
         renderSettingsPage([
           this.renderStatusSection(),
           this.renderDefaultsSection(),
-          ...this.groups.map((group) => this.renderProviderSection(group)),
+          ...this.groups.map((group) =>
+            renderModelCatalogProviderSection({
+              group,
+              callbacks: {
+                busy: this.busy,
+                onToggleModel: (model) => this.toggleModel(model),
+                onToggleProvider: (target, allowed) => this.toggleProvider(target, allowed),
+              },
+            }),
+          ),
         ]),
       )}
     `;

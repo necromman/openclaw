@@ -17,6 +17,13 @@
 // the three states are one field and not three, and the chat picker and the new-session
 // screen both get them without a second rule.
 //
+// The wildcard is still read here and still accepted from a submission, but the screen no
+// longer writes one. A stored wildcard makes the chat model picker probe the whole
+// provider the first time it opens, which the delivery measured at about fifteen seconds
+// (DEPLOY.md 3.4). So the administration screen expands a wildcard it finds into the
+// models behind it and saves those, and this file keeps reading the old shape so a
+// deployment that still has one keeps working until somebody saves.
+//
 // An empty list means "no restriction" to the Gateway, which is not the same promise as
 // "every model of the providers we authenticated". It is kept reachable because it is
 // what the shipped default means, but the screen names it plainly.
@@ -34,25 +41,66 @@ export type IxAuthAdminModelPolicy = {
 };
 
 /**
+ * Longest reference this route stores.
+ *
+ * The catalog's longest real entries are of the shape
+ * `together/meta-llama/Llama-3.3-70B-Instruct-Turbo`, well under half of this. The cap is
+ * here so the allowlist has a worst case that can be multiplied out, which is what the
+ * body limit below is derived from.
+ */
+export const IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH = 160;
+
+/**
  * Longest allowlist this route accepts.
  *
- * Bounded by the shared 4 KiB body limit every route in this namespace reads through, not
- * by anything about models: a hundred entries is already far past what a deployment names
- * one by one, and past it the provider wildcard is the answer.
+ * The screen no longer stores a provider wildcard: what it saves is always the models an
+ * administrator switched on, one by one, because a wildcard in the configuration makes
+ * the chat model picker wait for a full provider probe on its first open (DEPLOY.md 3.4).
+ * That turns the catalog size into the real bound, and the delivery's catalog is already
+ * eighty-two entries. Three hundred leaves room for the catalog to grow without an
+ * administrator meeting a limit that only exists because of how the value is written.
+ *
+ * The arithmetic that keeps this inside `IX_AUTH_ADMIN_MODELS_BODY_MAX_BYTES`: one JSON
+ * array element costs the reference plus two quotes and a comma, so the allowlist alone
+ * is at most (160 + 3) * 300 = 48900 bytes. The other three fields add at most three more
+ * references plus their names, under 700 bytes, so the whole document stays below 50 KiB
+ * against a 64 KiB limit.
  */
-export const IX_AUTH_ADMIN_MODEL_ALLOW_MAX = 100;
+export const IX_AUTH_ADMIN_MODEL_ALLOW_MAX = 300;
 
 /** Longest fallback chain this route accepts. */
 export const IX_AUTH_ADMIN_MODEL_FALLBACK_MAX = 8;
 
 /**
+ * Body limit for `/auth/admin/models` alone.
+ *
+ * Every other route in the `/auth/*` namespace reads a form: an address, a password, a
+ * role. The shared 4 KiB (`IX_AUTH_BODY_MAX_BYTES`) is generous for those and stays where
+ * it is. This one reads a list, and the list is the catalog. It lives here rather than
+ * beside the route because it is derived from the two caps directly above it, and a
+ * reader changing one of them has to see the third number move.
+ */
+export const IX_AUTH_ADMIN_MODELS_BODY_MAX_BYTES = 64 * 1024;
+
+/**
  * One model reference: `provider/model`, or `provider/*` for the whole provider.
  *
  * Deliberately narrow. The reference travels into the configuration file, so a value
- * carrying whitespace, quotes or path segments would be a way to write something other
- * than a model name into it.
+ * carrying whitespace, quotes or backslashes would be a way to write something other than
+ * a model name into it.
+ *
+ * The model half may itself carry slashes, because real catalog entries do:
+ * `huggingface/deepseek-ai/DeepSeek-R1`, `together/meta-llama/Llama-3.3-70B-Instruct-Turbo`,
+ * `nvidia/z-ai/glm-5.1`. Refusing those refused the very models the screen lists, so
+ * switching a provider on failed with `invalid_body` and said nothing about why. Every
+ * segment still has to begin with a letter or a digit, which is what keeps `..`, a
+ * leading dot, and an empty segment out: a relative path cannot be spelled here.
  */
-const MODEL_REF_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}\/(?:\*|[A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/u;
+const MODEL_REF_SEGMENT = "[A-Za-z0-9][A-Za-z0-9._:-]{0,127}";
+const MODEL_REF_PATTERN = new RegExp(
+  `^[a-z0-9][a-z0-9._-]{0,63}/(?:\\*|${MODEL_REF_SEGMENT}(?:/${MODEL_REF_SEGMENT}){0,4})$`,
+  "u",
+);
 
 /** True when a reference is a whole-provider wildcard. */
 export function isProviderWildcardRef(ref: string): boolean {
@@ -70,7 +118,7 @@ function normalizeRef(value: unknown): string | undefined {
     return undefined;
   }
   const trimmed = value.trim();
-  if (trimmed.length === 0) {
+  if (trimmed.length === 0 || trimmed.length > IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH) {
     return undefined;
   }
   return MODEL_REF_PATTERN.test(trimmed) ? trimmed : undefined;

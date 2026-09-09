@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   applyModelPolicyToConfig,
   buildModelPolicyOverridesDocument,
+  IX_AUTH_ADMIN_MODEL_ALLOW_MAX,
+  IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH,
+  IX_AUTH_ADMIN_MODELS_BODY_MAX_BYTES,
   parseSubmittedModelPolicy,
   policyHidesItsOwnModels,
   readModelPolicyFromConfig,
@@ -62,15 +65,77 @@ describe("parseSubmittedModelPolicy", () => {
     }
   });
 
+  // The catalog this delivery lists carries these verbatim. A pattern that stopped at one
+  // slash refused them, so switching such a provider on failed with `invalid_body`.
+  it("accepts a model id that carries slashes of its own", () => {
+    for (const primary of [
+      "huggingface/deepseek-ai/DeepSeek-R1",
+      "together/meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "nvidia/z-ai/glm-5.1",
+      "ollama-cloud/gpt-oss:120b",
+    ]) {
+      const parsed = parseSubmittedModelPolicy({ primary });
+      expect(parsed.ok && parsed.policy.primary).toBe(primary);
+    }
+  });
+
+  it("still refuses a path, a quote, a backslash, or whitespace inside a longer id", () => {
+    for (const primary of [
+      "together/meta-llama/../../etc/passwd",
+      "together/meta-llama/.hidden",
+      "together/meta-llama//Llama",
+      'together/meta-llama/"Llama"',
+      "together/meta-llama\\Llama",
+      "together/meta llama/Llama",
+      "together/a/b/c/d/e/f",
+    ]) {
+      expect(parseSubmittedModelPolicy({ primary }).ok).toBe(false);
+    }
+  });
+
+  it("refuses a reference past the length cap the body limit is derived from", () => {
+    const tooLong = `openai/${"m".repeat(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH)}`;
+    expect(tooLong.length).toBeGreaterThan(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH);
+    expect(parseSubmittedModelPolicy({ primary: tooLong }).ok).toBe(false);
+    const atCap = `openai/${"m".repeat(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH - "openai/".length)}`;
+    expect(atCap.length).toBe(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH);
+    expect(parseSubmittedModelPolicy({ primary: atCap }).ok).toBe(true);
+  });
+
   it("drops duplicates and refuses an allowlist longer than the cap", () => {
     const duplicated = parseSubmittedModelPolicy({
       allow: ["openai/a", "openai/a", "openai/b"],
     });
     expect(duplicated.ok && duplicated.policy.allow).toEqual(["openai/a", "openai/b"]);
+    const atCap = parseSubmittedModelPolicy({
+      allow: Array.from(
+        { length: IX_AUTH_ADMIN_MODEL_ALLOW_MAX },
+        (_, index) => `openai/m${index}`,
+      ),
+    });
+    expect(atCap.ok).toBe(true);
     const tooLong = parseSubmittedModelPolicy({
-      allow: Array.from({ length: 101 }, (_, index) => `openai/m${index}`),
+      allow: Array.from(
+        { length: IX_AUTH_ADMIN_MODEL_ALLOW_MAX + 1 },
+        (_, index) => `openai/m${index}`,
+      ),
     });
     expect(tooLong.ok).toBe(false);
+  });
+
+  // The whole point of the raised cap: the delivery's catalog is eighty-two models, and
+  // the screen now saves them one by one instead of a provider wildcard.
+  it("takes a whole catalog named one model at a time", () => {
+    const allow = Array.from({ length: 82 }, (_, index) => `openai/gpt-5.6-model-${index}`);
+    const parsed = parseSubmittedModelPolicy({ primary: allow[0], allow });
+    expect(parsed.ok && parsed.policy.allow).toHaveLength(82);
+  });
+
+  it("keeps the allowlist inside the body limit this route reads through", () => {
+    const longestRef = `openai/${"m".repeat(IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH - "openai/".length)}`;
+    const worstCase = Array.from({ length: IX_AUTH_ADMIN_MODEL_ALLOW_MAX }, () => longestRef);
+    const body = JSON.stringify({ primary: "", fallbacks: [], allow: worstCase, utilityModel: "" });
+    expect(body.length).toBeLessThan(IX_AUTH_ADMIN_MODELS_BODY_MAX_BYTES);
   });
 });
 

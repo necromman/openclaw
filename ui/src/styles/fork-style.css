@@ -251,3 +251,129 @@ wa-select.settings-select::part(combobox) {
   mask-image: none;
   text-overflow: ellipsis;
 }
+
+/* ── 9. Model screen switches ──
+ *
+ * Settings > Models (chat) lists every model of every provider, eighty rows on the
+ * delivery, and each row is one yes-or-no answer: is this model offered in the chat
+ * picker. A pair of add/remove buttons says what would happen if you pressed one; a
+ * switch says which of the two states the row is in, which is the thing a person is
+ * scanning the list for.
+ *
+ * The switch is a real `input[type="checkbox"][role="switch"]`, so the browser keeps the
+ * keyboard behaviour, the label association and the checked state, and only the name a
+ * screen reader gives it changes. `appearance: none` is what lets it be drawn.
+ *
+ * It is drawn as a rounded rectangle rather than a pill because section 3 of this file
+ * caps corners at 5px, and a 20px-tall pill would need 10px. The 4px radius reads as a
+ * switch all the same: the travel of the knob is what says "on" or "off", not the shape
+ * of the ends. The knob itself is a circle, which the cap explicitly exempts.
+ *
+ * A row whose provider has no working credential is dimmed and its switch disabled. That
+ * provider cannot answer, so offering its models would put them in the picker only to
+ * fail the moment somebody picked one. A model already in the allowlist stays switched on
+ * and stays switchable off, because taking a model away is safe whatever the credential
+ * says and silently dropping a stored choice is not. */
+.fork-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  inline-size: 34px;
+  block-size: 20px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.fork-switch::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.fork-switch:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.fork-switch:checked::after {
+  background: var(--accent-foreground);
+  transform: translateX(14px);
+}
+
+:root[dir="rtl"] .fork-switch:checked::after {
+  transform: translateX(-14px);
+}
+
+.fork-switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.fork-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* The model list itself. One column of rows so the switches line up down the left edge
+ * and the eye can run the column instead of hunting; the reference is monospaced and
+ * muted because it is the value the configuration stores, not the label a person reads. */
+.model-catalog-models {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.model-catalog-model {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.model-catalog-model__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-catalog-model__ref {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.model-catalog-model--blocked {
+  opacity: 0.55;
+}
+
+/* Fallback chips keep their remove buttons: the value there is an order, and a switch
+ * cannot say "third". */
+.model-catalog-fallbacks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.model-catalog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

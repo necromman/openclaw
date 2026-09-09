@@ -34,6 +34,7 @@ import { recordIxAuthAdminAction } from "./ix-auth-admin-ledger.js";
 import {
   applyModelPolicyToConfig,
   buildModelPolicyOverridesDocument,
+  IX_AUTH_ADMIN_MODELS_BODY_MAX_BYTES,
   parseSubmittedModelPolicy,
   policyHidesItsOwnModels,
   readModelPolicyFromConfig,
@@ -91,7 +92,11 @@ async function writeOverridesDocument(params: {
 }
 
 async function handleReplacePolicy(params: ModelsRouteParams): Promise<void> {
-  const body = await readIxAuthJsonBody(params.req, params.res);
+  const body = await readIxAuthJsonBody(
+    params.req,
+    params.res,
+    IX_AUTH_ADMIN_MODELS_BODY_MAX_BYTES,
+  );
   if (!body) {
     return;
   }

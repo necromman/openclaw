@@ -147,12 +147,20 @@ export function rejectDisallowedOrigin(params: {
   return true;
 }
 
-/** Read a small JSON object body, answering 400 and returning undefined on anything else. */
+/**
+ * Read a small JSON object body, answering 400 and returning undefined on anything else.
+ *
+ * `maxBytes` exists for the one route in this namespace whose body is a list rather than
+ * a form: `/auth/admin/models` submits the whole allowlist at once, and a catalog of
+ * eighty models does not fit in a login form's budget. Every other route keeps the 4 KiB
+ * default by simply not passing anything, so widening one route cannot widen the rest.
+ */
 export async function readIxAuthJsonBody(
   req: IncomingMessage,
   res: ServerResponse,
+  maxBytes: number = IX_AUTH_BODY_MAX_BYTES,
 ): Promise<Record<string, unknown> | undefined> {
-  const body = await readJsonBody(req, IX_AUTH_BODY_MAX_BYTES);
+  const body = await readJsonBody(req, maxBytes);
   if (!body.ok) {
     sendJson(res, 400, { error: "invalid_body" });
     return undefined;
