@@ -45,6 +45,17 @@ describe("markdownToPreviewHtml", () => {
     expect(html).toContain("<p>다음 문단</p>");
   });
 
+  it("turns the converter's literal cell break back into a break", () => {
+    const html = markdownToPreviewHtml("| a |\n| --- |\n| 직위<br>과장 |");
+    expect(html).toContain("<td>직위<br>과장</td>");
+  });
+
+  it("still escapes every other tag in a cell", () => {
+    const html = markdownToPreviewHtml("| a |\n| --- |\n| <img src=x onerror=1> |");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+  });
+
   it("renders bullet and numbered lists", () => {
     expect(markdownToPreviewHtml("- one\n- two")).toBe("<ul><li>one</li><li>two</li></ul>");
     expect(markdownToPreviewHtml("1. one\n2. two")).toBe("<ol><li>one</li><li>two</li></ol>");

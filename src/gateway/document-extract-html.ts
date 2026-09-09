@@ -536,7 +536,10 @@ li { margin: 0 0 0.25em; }
 section { margin: 0 0 2em; }
 table { border-collapse: collapse; margin: 0 0 1em; max-width: 100%; }
 .table-scroll { overflow-x: auto; margin: 0 0 1em; }
-.table-scroll table { margin: 0; }
+/* A form with eight columns must scroll rather than squeeze every cell into one
+   character per line, which is what happens in a narrow preview pane. */
+.table-scroll table { margin: 0; min-width: max-content; }
+.table-scroll th, .table-scroll td { min-width: 4.5em; max-width: 26em; }
 th, td {
   border: 1px solid var(--doc-line);
   padding: 6px 10px;

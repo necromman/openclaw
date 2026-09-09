@@ -83,10 +83,18 @@ function alignments(separator: string): TableAlignment[] {
  * for.
  */
 function renderInline(escaped: string): string {
-  return escaped
-    .replace(/`([^`]+)`/gu, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/gu, "<strong>$1</strong>")
-    .replace(/(^|[^*])\*([^*]+)\*(?!\*)/gu, "$1<em>$2</em>");
+  return (
+    escaped
+      // The converter writes a line break inside a table cell as a literal <br>, because a
+      // Markdown table row cannot contain a newline. It is escaped with everything else
+      // first and only this one shape, which carries no attributes and nothing executable,
+      // is turned back into markup. Leaving it escaped printed "<br>" in the middle of
+      // every approval box on the delivery share.
+      .replace(/&lt;br\s*\/?&gt;/gu, "<br>")
+      .replace(/`([^`]+)`/gu, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/gu, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*]+)\*(?!\*)/gu, "$1<em>$2</em>")
+  );
 }
 
 function cellHtml(value: string, tag: "th" | "td", align: TableAlignment): string {
