@@ -9,7 +9,7 @@ import { readWorkspaceFile } from "./workspace-fs.js";
  * Document previews carry whole files, not the 256 KiB inline slice, so they get
  * their own much larger cap. Anything past it is reported instead of shipped.
  */
-export const MAX_DOCUMENT_PREVIEW_BYTES = 20 * 1024 * 1024;
+const MAX_DOCUMENT_PREVIEW_BYTES = 20 * 1024 * 1024;
 
 /** Extensions the document lane knows how to render or convert. */
 const DOCUMENT_PREVIEW_EXTENSIONS = new Set([

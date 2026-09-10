@@ -38,7 +38,7 @@ function digestUserAgent(userAgent: string | undefined): Uint8Array | null {
 }
 
 /** Mint an unguessable, URL-safe token for a cookie or a CSRF header. */
-export function mintIxAuthSecretToken(): string {
+function mintIxAuthSecretToken(): string {
   return randomBytes(IX_AUTH_TOKEN_BYTES).toString("base64url");
 }
 

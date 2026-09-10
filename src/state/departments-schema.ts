@@ -62,8 +62,6 @@ export type DepartmentsDatabase = {
 };
 
 export type DepartmentRow = DepartmentsDatabase["departments"];
-export type DepartmentMemberRow = DepartmentsDatabase["department_members"];
-export type DepartmentAgentRow = DepartmentsDatabase["department_agents"];
 
 const ensuredDatabases = new WeakSet<DatabaseSync>();
 

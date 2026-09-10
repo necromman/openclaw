@@ -20,7 +20,7 @@
 import path from "node:path";
 
 /** Longest folder path a rule may name. The deepest measured real path was 586 bytes. */
-export const MAX_FOLDER_RULE_PATH_LENGTH = 1024;
+const MAX_FOLDER_RULE_PATH_LENGTH = 1024;
 
 /**
  * Folder names that never take part in rules or listings.

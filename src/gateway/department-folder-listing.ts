@@ -19,7 +19,7 @@ import path from "node:path";
  * The compose file mounts every department share at `/mnt/nas/<slug>` regardless of where
  * they live on the host, so this is the path that exists on this side of the boundary.
  */
-export const DEFAULT_DEPARTMENT_FOLDER_ROOT = "/mnt/nas";
+const DEFAULT_DEPARTMENT_FOLDER_ROOT = "/mnt/nas";
 
 /** Upper bound on one listing. A share with more folders than this is not a picker. */
 const MAX_DEPARTMENT_FOLDER_ENTRIES = 500;

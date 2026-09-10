@@ -13,7 +13,7 @@ import { sendJson } from "./http-common.js";
 import { checkBrowserOrigin } from "./origin-check.js";
 
 /** Login bodies are tiny; anything larger is not a login form. */
-export const IX_AUTH_BODY_MAX_BYTES = 4 * 1024;
+const IX_AUTH_BODY_MAX_BYTES = 4 * 1024;
 
 /** Uniform failure body. Never distinguishes "no such account" from "wrong password". */
 export const IX_AUTH_INVALID_CREDENTIALS = {
@@ -53,7 +53,7 @@ export type IxAuthHttpDependencies = {
 };
 
 /** Audit-shaped record of one authentication decision on the HTTP line. */
-export type IxAuthSecurityEvent = {
+type IxAuthSecurityEvent = {
   action:
     | "ix-auth.login.succeeded"
     | "ix-auth.login.failed"

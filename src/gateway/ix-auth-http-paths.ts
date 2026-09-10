@@ -57,7 +57,7 @@ export type IxAuthAdminUsersTarget =
   | { kind: "action"; userId: string; action: IxAuthAdminUserAction };
 
 /** Per-account operations, each its own path segment. */
-export type IxAuthAdminUserAction =
+type IxAuthAdminUserAction =
   | "roles"
   | "departments"
   | "password-reset"

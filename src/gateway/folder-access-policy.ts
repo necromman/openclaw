@@ -68,11 +68,6 @@ export function narrowerPermission(
   return PERMISSION_STRENGTH[left] <= PERMISSION_STRENGTH[right] ? left : right;
 }
 
-/** True when the permission lets the folder appear in a listing at all. */
-export function isFolderVisible(permission: FolderRulePermission): boolean {
-  return permission !== "hidden";
-}
-
 function matchesIdentity(rule: FolderAccessRule, identity: FolderAccessIdentity): boolean {
   if (rule.subjectKind === "user") {
     return identity.profileId !== undefined && rule.subjectId === identity.profileId;
@@ -90,7 +85,7 @@ function matchesIdentity(rule: FolderAccessRule, identity: FolderAccessIdentity)
  * Callers hand in whatever the store returned for the ancestry chain; this keeps the
  * walk below independent of how the rows arrived.
  */
-export function indexFolderRulesByPath(
+function indexFolderRulesByPath(
   rules: readonly FolderAccessRule[],
 ): Map<string, FolderAccessRule[]> {
   const byPath = new Map<string, FolderAccessRule[]>();

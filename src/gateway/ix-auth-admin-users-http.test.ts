@@ -8,7 +8,8 @@ import { IX_AUTH_DEFAULT_ROLE_MAP } from "../auth/ix-auth/ix-auth-role-map.js";
 import type { IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
 import { insertIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
-import { handleIxAuthHttpRequest, type IxAuthHttpDependencies } from "./ix-auth-http.js";
+import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
+import { handleIxAuthHttpRequest } from "./ix-auth-http.js";
 import { resetIxAuthInviteLinks } from "./ix-auth-invite-links.js";
 
 const SERVICE_KEY = "service-key-that-is-long-enough-000000"; // pragma: allowlist secret

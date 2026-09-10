@@ -15,7 +15,7 @@ export type DocumentConverterInfo = {
 };
 
 /** Hard wall-clock budget for one conversion; LibreOffice can hang on damaged input. */
-export const DOCUMENT_CONVERT_TIMEOUT_MS = 60_000;
+const DOCUMENT_CONVERT_TIMEOUT_MS = 60_000;
 
 /** Result of rendering one workspace document to PDF. */
 export type ConvertDocumentResult =

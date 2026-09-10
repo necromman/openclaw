@@ -45,7 +45,7 @@ export function ixAuthAuditActorFacts(principal: IxAuthPrincipal | undefined): {
 }
 
 /** Shape one audit actor for the ledger. */
-export function toUserActivityActor(actor: IxAuthAuditActor): UserActivityAuditActor {
+function toUserActivityActor(actor: IxAuthAuditActor): UserActivityAuditActor {
   return {
     source: "profile",
     profileId: actor.profileId,
@@ -70,7 +70,7 @@ export function readClientAuditActor(
  * identity server in the picture. Recording them as an operator keeps the row honest
  * rather than attributing the action to nobody.
  */
-export function operatorActivityActor(
+function operatorActivityActor(
   client:
     | Pick<GatewayClient, "authenticatedUserId" | "authenticatedUserProfile">
     | null

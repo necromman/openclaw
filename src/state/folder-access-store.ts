@@ -32,12 +32,12 @@ const SUBJECT_KINDS: readonly FolderRuleSubjectKind[] = ["role", "department", "
 const PERMISSIONS: readonly FolderRulePermission[] = ["hidden", "read", "write"];
 
 /** True when a stored string is still one of the kinds this build understands. */
-export function isFolderRuleSubjectKind(value: string): value is FolderRuleSubjectKind {
+function isFolderRuleSubjectKind(value: string): value is FolderRuleSubjectKind {
   return (SUBJECT_KINDS as readonly string[]).includes(value);
 }
 
 /** True when a stored string is still one of the permissions this build understands. */
-export function isFolderRulePermission(value: string): value is FolderRulePermission {
+function isFolderRulePermission(value: string): value is FolderRulePermission {
   return (PERMISSIONS as readonly string[]).includes(value);
 }
 
@@ -301,12 +301,4 @@ export function clearFolderRuleDescendants(
     options,
     { operationLabel: "folderAccess.rule.clearDescendants" },
   );
-}
-
-/** How many rules exist under one scope root. Cheap enough for a screen header. */
-export function countFolderRules(
-  scopeRoot: string,
-  options: OpenClawStateDatabaseOptions = {},
-): number {
-  return listAllFolderRules(scopeRoot, options).length;
 }

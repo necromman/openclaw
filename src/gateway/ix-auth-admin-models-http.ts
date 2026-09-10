@@ -43,10 +43,10 @@ import {
 import { readIxAuthJsonBody, type IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
 
 /** File name of the document the start script merges back over the rendered template. */
-export const IX_AUTH_ADMIN_MODEL_OVERRIDES_FILE = "admin-overrides.json";
+const IX_AUTH_ADMIN_MODEL_OVERRIDES_FILE = "admin-overrides.json";
 
 /** Where that document lives: beside the configuration file, in the state volume. */
-export function resolveAdminModelOverridesPath(): string {
+function resolveAdminModelOverridesPath(): string {
   return path.join(path.dirname(createConfigIO().configPath), IX_AUTH_ADMIN_MODEL_OVERRIDES_FILE);
 }
 

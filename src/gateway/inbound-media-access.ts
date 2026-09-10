@@ -37,7 +37,7 @@ export type InboundMediaReader = {
 };
 
 /** Why one attachment read was refused. Diagnostic and ledger text, never sent to the caller. */
-export type InboundMediaDenialReason =
+type InboundMediaDenialReason =
   | "no-ownership-record"
   | "no-reader-profile"
   | "department-boundary"

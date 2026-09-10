@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import { classifyIxAuthHttpPath } from "./ix-auth-http-paths.js";
-import { handleIxAuthHttpRequest, type IxAuthHttpDependencies } from "./ix-auth-http.js";
+import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
+import { handleIxAuthHttpRequest } from "./ix-auth-http.js";
 import { readIxAuthInviteLink, resetIxAuthInviteLinks } from "./ix-auth-invite-links.js";
 
 const SERVICE_KEY = "service-key-that-is-long-enough-000000"; // pragma: allowlist secret

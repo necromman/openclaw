@@ -15,7 +15,7 @@ import { callIxAuthEndpoint, type IxAuthRelayFailure } from "./ix-auth-client.js
 import type { IxAuthAdminCall } from "./ix-auth-admin-client.js";
 
 /** Account states the identity server uses. `LOCKED` is automatic, not administrative. */
-export type IxAuthUserStatus =
+type IxAuthUserStatus =
   | "ACTIVE"
   | "LOCKED"
   | "DISABLED"
@@ -82,7 +82,7 @@ function fieldCount(record: Record<string, unknown>, key: string): number {
  * An unreadable id or email means the row cannot be acted on, so it is dropped rather
  * than shown as a half-account an administrator would then click.
  */
-export function readIxAuthUserSummary(value: unknown): IxAuthUserSummary | undefined {
+function readIxAuthUserSummary(value: unknown): IxAuthUserSummary | undefined {
   const record = asOptionalRecord(value);
   const id = record ? fieldText(record, "id") : undefined;
   const email = record ? fieldText(record, "email") : undefined;
@@ -353,7 +353,7 @@ export async function deleteIxAuthUser(
 }
 
 /** One row's outcome in a bulk import. */
-export type IxAuthBulkRowResult = {
+type IxAuthBulkRowResult = {
   line: number;
   email?: string;
   status: string;

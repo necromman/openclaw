@@ -61,7 +61,7 @@ export function isGatewayAdmin(client: Pick<GatewayClient, "connect"> | null): b
  * inside their own department; only a super administrator, who carries no department
  * gate at all, passes untouched.
  */
-export function departmentAccessForTarget(params: {
+function departmentAccessForTarget(params: {
   cfg?: OpenClawConfig;
   client: GatewayClient | null;
   target: Pick<SessionSharingTarget, "agentId">;

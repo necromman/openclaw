@@ -11,10 +11,10 @@ import {
 } from "../state/user-activity-audit-store.js";
 import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
 
-export const DEFAULT_USER_ACTIVITY_LIST_LIMIT = 100;
-export const MAX_USER_ACTIVITY_LIST_LIMIT = 500;
+const DEFAULT_USER_ACTIVITY_LIST_LIMIT = 100;
+const MAX_USER_ACTIVITY_LIST_LIMIT = 500;
 /** One export is a spreadsheet, not a database dump. */
-export const MAX_USER_ACTIVITY_EXPORT_ROWS = 10_000;
+const MAX_USER_ACTIVITY_EXPORT_ROWS = 10_000;
 
 export type UserActivityAuditReader =
   /** A caller the identity server vouched for; departments decide what they see. */

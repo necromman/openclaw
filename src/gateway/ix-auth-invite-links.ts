@@ -24,7 +24,7 @@ const IX_AUTH_INVITE_LINK_MAX_ENTRIES = 200;
  * the wait almost always ends early. It is short because on an SMTP deployment no webhook
  * ever arrives, and the whole window would then be added to every invitation.
  */
-export const IX_AUTH_INVITE_LINK_WAIT_MS = 800;
+const IX_AUTH_INVITE_LINK_WAIT_MS = 800;
 
 type InviteLinkEntry = { link: string; capturedAtMs: number };
 

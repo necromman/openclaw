@@ -25,7 +25,7 @@ export type HangulConverterInfo = {
 };
 
 /** Wall-clock budget for one document. A 200-page notice takes well under a second. */
-export const HANGUL_CONVERT_TIMEOUT_MS = 60_000;
+const HANGUL_CONVERT_TIMEOUT_MS = 60_000;
 
 /** Pages past this are dropped, matching the PDF lane's ceiling. */
 const MAX_PAGES = 1000;
@@ -233,7 +233,7 @@ async function runConverter(binary: string, args: string[]): Promise<boolean> {
 async function collectPages(directory: string): Promise<{ markdown: string; pages: number }> {
   const names = (await fs.readdir(directory))
     .filter((name) => name.toLowerCase().endsWith(".md"))
-    .sort((left, right) => left.localeCompare(right, "en"))
+    .toSorted((left, right) => left.localeCompare(right, "en"))
     .slice(0, MAX_PAGES);
   const sections: string[] = [];
   let used = 0;

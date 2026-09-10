@@ -58,11 +58,7 @@ import {
 } from "./ix-auth-http-shared.js";
 import { withSerializedRateLimitAttempt } from "./rate-limit-attempt-serialization.js";
 
-export {
-  isAllowedIxAuthBrowserOrigin,
-  type IxAuthHttpDependencies,
-  type IxAuthSecurityEvent,
-} from "./ix-auth-http-shared.js";
+export { isAllowedIxAuthBrowserOrigin } from "./ix-auth-http-shared.js";
 
 /** Built-in console route, trailing slash included so the page derives its own base. */
 const IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH = `${IX_AUTH_ADMIN_PROXY_BASE_PATH}/`;

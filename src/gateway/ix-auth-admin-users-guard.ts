@@ -39,7 +39,7 @@ export const IX_AUTH_MANAGEABLE_ROLE_CODES: readonly string[] = Object.freeze([
 ]);
 
 /** Identity role codes that map onto a Gateway super-admin name. */
-export function superAdminRoleCodes(settings: IxAuthRuntimeSettings): string[] {
+function superAdminRoleCodes(settings: IxAuthRuntimeSettings): string[] {
   return Object.entries(settings.roleMap)
     .filter(([, name]) => settings.superAdminRoles.includes(name))
     .map(([code]) => code);

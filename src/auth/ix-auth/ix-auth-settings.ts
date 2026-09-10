@@ -22,10 +22,6 @@ import {
 
 const settingsCacheByServiceKeyPath = new Map<string, IxAuthRuntimeSettings>();
 
-/** Drop cached settings so a config reload re-resolves the service key. */
-export function resetIxAuthSettingsCache(): void {
-  settingsCacheByServiceKeyPath.clear();
-}
 
 function buildDefaultJwksUrl(baseUrl: string): string {
   return new URL(".well-known/jwks.json", `${baseUrl.replace(/\/+$/u, "")}/`).toString();
@@ -109,7 +105,3 @@ export async function resolveIxAuthRuntimeSettings(params: {
   return settings;
 }
 
-/** True when the effective Gateway auth mode delegates identity to IX-Auth. */
-export function isIxAuthGatewayMode(mode: string | undefined): boolean {
-  return mode === "ix-auth";
-}

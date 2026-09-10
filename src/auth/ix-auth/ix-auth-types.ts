@@ -91,12 +91,6 @@ export type IxAuthRuntimeSettings = {
   absoluteTimeoutMs: number;
 };
 
-/** Outcome of one login relay, before any cookie is written. */
-export type IxAuthLoginOutcome =
-  | { kind: "authenticated"; principal: IxAuthPrincipal; csrfToken: string; sessionToken: string }
-  | { kind: "mfa-required"; challenge: string }
-  | { kind: "rejected"; status: number; code: string; message: string; lockedUntilMs?: number };
-
 /** Reason a session-cookie lookup failed. Kept coarse so callers cannot enumerate. */
 export type IxAuthSessionRejection =
   | "no-cookie"

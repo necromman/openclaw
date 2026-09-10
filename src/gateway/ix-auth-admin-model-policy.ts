@@ -70,7 +70,7 @@ export const IX_AUTH_ADMIN_MODEL_REF_MAX_LENGTH = 160;
 export const IX_AUTH_ADMIN_MODEL_ALLOW_MAX = 300;
 
 /** Longest fallback chain this route accepts. */
-export const IX_AUTH_ADMIN_MODEL_FALLBACK_MAX = 8;
+const IX_AUTH_ADMIN_MODEL_FALLBACK_MAX = 8;
 
 /**
  * Body limit for `/auth/admin/models` alone.
@@ -104,12 +104,12 @@ const MODEL_REF_PATTERN = new RegExp(
 );
 
 /** True when a reference is a whole-provider wildcard. */
-export function isProviderWildcardRef(ref: string): boolean {
+function isProviderWildcardRef(ref: string): boolean {
   return ref.endsWith("/*");
 }
 
 /** The provider half of a reference, or an empty string when there is none. */
-export function providerOfModelRef(ref: string): string {
+function providerOfModelRef(ref: string): string {
   const slash = ref.indexOf("/");
   return slash > 0 ? ref.slice(0, slash) : "";
 }

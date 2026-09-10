@@ -53,13 +53,13 @@ export const FOLDER_TREE_DEFAULT_CONCURRENCY = 2;
 export const FOLDER_TREE_MAX_CONCURRENCY = 8;
 
 /** Folders one walk will record before it stops and says so. */
-export const FOLDER_TREE_MAX_FOLDERS = 200_000;
+const FOLDER_TREE_MAX_FOLDERS = 200_000;
 
 /** Depth one walk will descend. The deepest measured real path was 23 levels. */
-export const FOLDER_TREE_MAX_DEPTH = 40;
+const FOLDER_TREE_MAX_DEPTH = 40;
 
 /** How long a claimed walk may be silent before another process takes the claim. */
-export const FOLDER_TREE_SCAN_STALE_MS = 2 * 60 * 60 * 1000;
+const FOLDER_TREE_SCAN_STALE_MS = 2 * 60 * 60 * 1000;
 
 export type FolderTreeScanSummary = {
   root: string;

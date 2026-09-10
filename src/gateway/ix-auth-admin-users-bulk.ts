@@ -28,7 +28,7 @@ import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
  * A staff list is hundreds of people, not thousands, and every created row sends a mail;
  * a file larger than this is a mistake worth reporting rather than a job worth running.
  */
-export const IX_AUTH_BULK_IMPORT_MAX_ROWS = 500;
+const IX_AUTH_BULK_IMPORT_MAX_ROWS = 500;
 
 /** The uploaded file is text, so the JSON envelope carrying it needs real room. */
 const IX_AUTH_BULK_BODY_MAX_BYTES = 256 * 1024;
@@ -50,7 +50,7 @@ const IX_AUTH_BULK_COLUMN_ALIASES: Readonly<
 const IX_AUTH_BULK_VALUE_SEPARATORS = /[;|]/u;
 
 /** One parsed row, still unvalidated. */
-export type IxAuthBulkImportRow = {
+type IxAuthBulkImportRow = {
   line: number;
   email: string;
   name?: string;
@@ -58,7 +58,7 @@ export type IxAuthBulkImportRow = {
   departments: string[];
 };
 
-export type IxAuthBulkParseResult =
+type IxAuthBulkParseResult =
   | { ok: true; rows: IxAuthBulkImportRow[] }
   | { ok: false; error: "empty" | "too_many_rows" | "missing_email_column"; count?: number };
 
@@ -116,7 +116,7 @@ function splitMultiValue(cell: string): string[] {
  * A header row is required, because a file whose columns are guessed at by position puts
  * somebody's name in the role column and nobody notices until the invitations arrive.
  */
-export function parseIxAuthBulkCsv(csv: string): IxAuthBulkParseResult {
+function parseIxAuthBulkCsv(csv: string): IxAuthBulkParseResult {
   const lines = csv
     .split(/\r?\n/u)
     .map((line) => line.trim())

@@ -30,7 +30,7 @@ import {
 import { folderRuleAbsolutePath } from "./folder-access-path.js";
 
 /** One subfolder, with the extra fact the snapshot can afford to carry. */
-export type FolderLevelEntry = {
+type FolderLevelEntry = {
   name: string;
   path: string;
   absolutePath: string;
@@ -38,7 +38,7 @@ export type FolderLevelEntry = {
   hasChildren?: boolean;
 };
 
-export type FolderLevel = {
+type FolderLevel = {
   root: string;
   available: boolean;
   path: string;

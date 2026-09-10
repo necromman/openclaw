@@ -14,7 +14,8 @@ import {
 } from "../state/departments-store.js";
 import { insertIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
-import { handleIxAuthHttpRequest, type IxAuthHttpDependencies } from "./ix-auth-http.js";
+import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
+import { handleIxAuthHttpRequest } from "./ix-auth-http.js";
 
 const SERVICE_KEY = "service-key-that-is-long-enough-000000"; // pragma: allowlist secret
 const CSRF_TOKEN = "csrf-token-value";
