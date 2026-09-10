@@ -89,7 +89,12 @@ jobs:
       #     ·.claude)가 전부 거기 걸린다. 그 트리에는 업스트림 레인이 볼 것이 없으므로
       #     (Java·Gradle·마크다운·compose·에이전트 설정) 목록에서 뺀다. 이 워크플로
       #     자신도 뺀다. 도구 표면으로 분류돼 린트 대상을 좁히지 못하고 lint:core 전량
-      #     으로 되돌아가는데, 그 린트는 YAML 을 보지도 않는다.
+      #     으로 되돌아가는데, 그 린트는 YAML 을 보지도 않는다. config/ 도 같은 이유로
+      #     뺀다. 그 아래 파일이 하나라도 목록에 들면 tooling 레인이 켜지고, 좁힌
+      #     oxlint 배치 대신 lint:core·lint:scripts 전량으로 되돌아간다. 그 전량 린트가
+      #     이 러너(4 vCPU·RAYON_NUM_THREADS=1)에서 30분 예산을 넘겨 잡을 통째로
+      #     날린다(2026-09-10 run 34439256893). config/knip*.config.ts 는 dead export
+      #     scan 이 매번 읽어 실제로 돌려 보므로 검사 없이 지나가는 것이 아니다.
       - name: 기준 ref 와 검사 대상 확보
         id: base
         env:
@@ -116,7 +121,7 @@ jobs:
           echo "기준 ref: $ref"
           list="$RUNNER_TEMP/chris-check-paths.txt"
           git diff --name-only --diff-filter=d "$ref" HEAD |
-            grep -Ev '^(ix-auth/|chris-local/|\.claude/|\.github/workflows/chris-)' \
+            grep -Ev '^(ix-auth/|chris-local/|\.claude/|config/|\.github/workflows/chris-)' \
             > "$list" || true
           count="$(grep -c . "$list" || true)"
           echo "검사 대상 $count 개"
