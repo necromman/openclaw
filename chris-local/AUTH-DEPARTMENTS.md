@@ -267,6 +267,10 @@ CREATE INDEX IF NOT EXISTS idx_department_agents_department
 | `src/gateway/inbound-media-access.ts`                      | **채팅 첨부 열람.** 참조 자체로 판정한다(7-1)                               |
 | `src/gateway/openai-http.ts` · `openresponses-http.ts`     | Gateway 클라이언트가 없는 표면도 생성 게이트를 지나게 한다                  |
 
+**2026-09-10 보강 (세션 상세 가시성·홈 표식).** `sessions.describe`·`sessions.get` 은 부서 게이트와 함께 `sessions.list` 가 쓰는 공유 필터(`prepareSessionSharing().entryFilter`)를 **조건 없이** 적용한다. 전에는 역할 상한이 설정된 배치에서만 걸어서, 상한이 없는 배치에서 남의 초안이 목록에는 없는데 키를 알면 열렸다. 이제 목록에 없는 것은 상세에서도 없다(`{ session: null }`·빈 전사).
+
+세션 행에는 홈 표식 `home: true` 가 실린다(목록·상세·검색 공통). 홈 세션 키는 사람마다 `<main>-u<16진수 16자리>` 로 다르고 옛 공용 홈 `agent:main:main` 도 그대로 남아 있으므로, **홈 판정은 이 표식이나 `src/gateway/home-session-key.ts` 의 `isHomeSessionKey` 로만 한다.** 내 홈 키 하나와 견주는 코드는 남의 홈을 놓친다.
+
 계획 3.2 의 훅 10곳 표 대비:
 
 | 계획 3.2 항목                                   | 상태                                                                                                                               |
