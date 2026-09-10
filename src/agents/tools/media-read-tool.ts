@@ -35,10 +35,10 @@ const getKnowledgeConvertModule = createLazyRuntimeModule(
 );
 
 /** Ceiling on the bytes this tool will read from the media store for one call. */
-export const MEDIA_READ_MAX_BYTES = 20 * 1024 * 1024;
+const MEDIA_READ_MAX_BYTES = 20 * 1024 * 1024;
 
 /** Ceiling on the characters handed back to the model after extraction. */
-export const MEDIA_READ_MAX_CHARS = 60_000;
+const MEDIA_READ_MAX_CHARS = 60_000;
 
 const MediaReadToolSchema = Type.Object(
   {
@@ -47,7 +47,7 @@ const MediaReadToolSchema = Type.Object(
   { additionalProperties: false },
 );
 
-export const MEDIA_READ_TOOL_DESCRIPTION =
+const MEDIA_READ_TOOL_DESCRIPTION =
   "Open one attachment the user uploaded, by the id media_list reported. Images return as images; PDF, Word, Excel, PowerPoint, Hangul (hwp, hwpx) and text return as extracted text. " +
   `Reads at most ${Math.round(MEDIA_READ_MAX_BYTES / (1024 * 1024))} MB and returns at most ${MEDIA_READ_MAX_CHARS} characters. ` +
   MEDIA_REFERENCE_TOOL_HINT;

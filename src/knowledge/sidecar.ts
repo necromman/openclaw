@@ -74,7 +74,7 @@ function serializeValue(value: string | number): string {
 }
 
 /** Renders the frontmatter block, including both fences and the trailing newline. */
-export function renderFrontmatter(meta: KnowledgeSidecarMeta): string {
+function renderFrontmatter(meta: KnowledgeSidecarMeta): string {
   const lines = [FRONTMATTER_FENCE];
   for (const [key, field] of META_FIELDS) {
     lines.push(`${key}: ${serializeValue(meta[field])}`);

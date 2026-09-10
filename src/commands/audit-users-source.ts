@@ -116,7 +116,7 @@ function describeGatewayUnavailable(error: unknown): string {
  * not a narrower page but an honest label on the wider one, so the difference between the
  * two answers is never silent.
  */
-export function formatLocalLedgerNotice(error: unknown): string {
+function formatLocalLedgerNotice(error: unknown): string {
   return [
     `Local read: ${describeGatewayUnavailable(error)}.`,
     "Rows come from the state database on this host, so this page is the whole ledger",

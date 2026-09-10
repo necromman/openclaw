@@ -49,13 +49,7 @@ export type KnowledgeFailureReason =
   | "write-failed";
 
 /** What happened to one source file (or one orphan sidecar) during a sync. */
-export type KnowledgeSyncAction =
-  | "created"
-  | "updated"
-  | "skipped"
-  | "deleted"
-  | "ignored"
-  | "failed";
+type KnowledgeSyncAction = "created" | "updated" | "skipped" | "deleted" | "ignored" | "failed";
 
 /** One row of the run report. */
 export type KnowledgeSyncEntry = {
@@ -102,26 +96,6 @@ export type KnowledgeSidecarMeta = {
   convertedAt: string;
   converter: KnowledgeConverterId;
 };
-
-/** Source extensions the sync understands, and how each one is read. */
-export const KNOWLEDGE_CONVERTIBLE_EXTENSIONS = [
-  "pdf",
-  "docx",
-  "xlsx",
-  "pptx",
-  "doc",
-  "xls",
-  "ppt",
-  "odt",
-  "ods",
-  "odp",
-  "rtf",
-  "csv",
-  "md",
-  "txt",
-  "hwp",
-  "hwpx",
-] as const;
 
 /**
  * Default `--include` set: the four delivery formats, the two Hangul containers, and the

@@ -67,7 +67,7 @@ function clampMaxBytes(value: number | undefined): number {
 }
 
 /** Normalizes an `--include` list; an empty or absent list falls back to the default. */
-export function resolveIncludeSet(include: readonly string[] | undefined): Set<string> {
+function resolveIncludeSet(include: readonly string[] | undefined): Set<string> {
   const values = (include ?? KNOWLEDGE_DEFAULT_INCLUDE)
     .flatMap((entry) => entry.split(","))
     .map((entry) => entry.trim().toLowerCase().replace(/^\./u, ""))

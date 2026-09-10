@@ -25,7 +25,7 @@ export type KnowledgeCandidate = {
 };
 
 /** A source file that will not be converted, and why. */
-export type KnowledgeIgnored = {
+type KnowledgeIgnored = {
   relativePath: string;
   sidecarPath: string;
   reason: KnowledgeIgnoreReason;

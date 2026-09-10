@@ -16,8 +16,6 @@ import {
 } from "../state/user-activity-audit-store.js";
 import { resolveUserActivityAuditPolicy, type UserActivityAuditPolicy } from "./audit-config.js";
 
-export type { UserActivityAuditActor };
-
 export type UserActivityRecordParams = {
   kind: UserActivityAuditKind;
   actor: UserActivityAuditActor;

@@ -83,7 +83,7 @@ export async function resolveMediaReferenceContext(params: {
  * (AUTH-DEPARTMENTS 6.3). An unbound agent is shared ground and only reaches shared
  * ground, so both sides must carry the same binding, including "none".
  */
-export async function isSameDepartmentAgent(
+async function isSameDepartmentAgent(
   context: MediaReferenceContext,
   agentId: string | undefined,
 ): Promise<boolean> {

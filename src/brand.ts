@@ -47,16 +47,10 @@ export const BRAND_LINKS = {
 } as const;
 
 /** Neutral label for the upstream "ClawHub" marketplace. */
-export const BRAND_SKILL_HUB_NAME = "Skill Hub";
+const BRAND_SKILL_HUB_NAME = "Skill Hub";
 
 /** Neutral label for the upstream "OpenClaw Cloud" hosted offering. */
-export const BRAND_CLOUD_NAME = "Cloud";
-
-/**
- * Legal attribution. The upstream code is MIT licensed, so this notice stays
- * verbatim on the About page no matter what the brand above says.
- */
-export const BRAND_UPSTREAM_LICENSE_NOTICE = "© 2026 OpenClaw Foundation. MIT License.";
+const BRAND_CLOUD_NAME = "Cloud";
 
 /**
  * Fork feature flags. These hide a surface without removing its code, so an

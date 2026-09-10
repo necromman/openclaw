@@ -39,8 +39,3 @@ export function readSessionActivityActor(
 ): UserActivityAuditActor | undefined {
   return sessionKey ? sessionActors.get(sessionKey) : undefined;
 }
-
-/** Drop every binding. Test seam; the map is process-local state. */
-export function clearSessionActivityActorsForTest(): void {
-  sessionActors.clear();
-}

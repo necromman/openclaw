@@ -62,7 +62,7 @@ const MediaListOutputSchema = Type.Object(
   { additionalProperties: false },
 );
 
-export const MEDIA_LIST_TOOL_DESCRIPTION =
+const MEDIA_LIST_TOOL_DESCRIPTION =
   "List files the user attached to chat, newest first: id, original name, type, size, upload time, conversation and agent. " +
   `Optional 'search' matches the file name; at most ${INBOUND_MEDIA_LIST_MAX} rows. ` +
   MEDIA_REFERENCE_TOOL_HINT;
