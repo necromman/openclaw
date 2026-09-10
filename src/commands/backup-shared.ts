@@ -25,6 +25,7 @@ import {
 } from "../skills/loading/skill-root-discovery.js";
 import { tryRealpath } from "../skills/loading/symlink-targets.js";
 import { recordBackupRunOutcome } from "../state/backup-run-records.js";
+import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 import { pathExists, resolveUserPath, shortenHomePath } from "../utils.js";
 import {
   createBackupResourceInventory,
@@ -44,6 +45,8 @@ export function recordBackupOutcomeBestEffort(
   params: Parameters<typeof recordBackupRunOutcome>[0],
 ): void {
   try {
+    // A rejected private input must not be reopened for best-effort outcome writes.
+    assertNotUpdateCapturePath(resolveOpenClawStateSqlitePath(), resolveStateDir());
     recordBackupRunOutcome(params);
   } catch (error) {
     const label = params.kind === "git" ? "Git backup" : "backup";
@@ -334,8 +337,23 @@ async function resolveBackupPlanFromPaths(params: {
   }
 
   const uniqueCandidates: BackupAssetCandidate[] = [];
+  const skipped: SkippedBackupAsset[] = [];
   const seenCanonicalPaths = new Set<string>();
   for (const candidate of [...candidates].toSorted(compareCandidates)) {
+    // Check both the original selection and the already resolved target before deduplication.
+    const privateSelection = isUpdateCapturePath(candidate.sourcePath, stateDir);
+    const privateTarget =
+      candidate.canonicalPath !== candidate.sourcePath &&
+      isUpdateCapturePath(candidate.canonicalPath, stateDir);
+    if (privateSelection || privateTarget) {
+      skipped.push({
+        kind: candidate.kind,
+        sourcePath: candidate.sourcePath,
+        displayPath: shortenHomePath(candidate.sourcePath),
+        reason: "private",
+      });
+      continue;
+    }
     if (seenCanonicalPaths.has(candidate.canonicalPath)) {
       continue;
     }
@@ -343,18 +361,8 @@ async function resolveBackupPlanFromPaths(params: {
     uniqueCandidates.push(candidate);
   }
   const included: BackupAsset[] = [];
-  const skipped: SkippedBackupAsset[] = [];
 
   for (const candidate of uniqueCandidates) {
-    if (isUpdateCapturePath(candidate.canonicalPath, stateDir)) {
-      skipped.push({
-        kind: candidate.kind,
-        sourcePath: candidate.canonicalPath,
-        displayPath: shortenHomePath(candidate.canonicalPath),
-        reason: "private",
-      });
-      continue;
-    }
     if (!candidate.exists) {
       if (
         candidate.kind === "agent" &&
@@ -474,6 +482,10 @@ function resolveManagedSkillSymlinkTargetCandidates(params: {
     allowedSymlinkTargetRealPaths: [],
   });
   for (const candidate of discovered.candidates) {
+    // Preserve the operator's lexical selection before promoting its real target.
+    if (isUpdateCapturePath(candidate.skillDir, params.stateDir)) {
+      continue;
+    }
     if (
       !loadSingleSkillDirectory({
         skillDir: candidate.skillDir,
@@ -554,7 +566,9 @@ export async function resolveBackupAgentRoot(
   config: OpenClawConfig,
   agentId: string,
 ): Promise<BackupAgentRoot> {
-  const sourcePath = await canonicalizePathForContainment(resolveAgentDir(config, agentId));
+  const selectedPath = resolveAgentDir(config, agentId);
+  assertNotUpdateCapturePath(selectedPath, resolveStateDir());
+  const sourcePath = await canonicalizePathForContainment(selectedPath);
   return {
     agentId,
     sourcePath,
