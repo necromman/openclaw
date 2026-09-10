@@ -235,11 +235,13 @@ test("sessions.describe and sessions.get hide foreign drafts at operator role bo
     { name: "missing profile", client: missingProfile, cfg: roleConfig("view"), hidden: true },
     { name: "owner", client: identifiedClient(ownerId), cfg: roleConfig("view"), hidden: false },
     { name: "admin", client: admin, cfg: roleConfig("view"), hidden: false },
+    // A draft belongs to the person who made it whether or not roles are configured,
+    // and the list has always hidden it. Describe now answers the same way.
     {
       name: "no roles",
       client: identifiedClient(profileId("draft-outsider")),
       cfg: {},
-      hidden: false,
+      hidden: true,
     },
   ] as const;
 
@@ -268,6 +270,18 @@ test("sessions.describe and sessions.get hide foreign drafts at operator role bo
       transcript.payload?.messages.map((message) => message.content),
       name,
     ).toEqual(hidden ? [] : ["foreign draft transcript"]);
+  }
+
+  for (const { name, client, cfg, hidden } of cases) {
+    const listed = await listSessions({
+      client,
+      context: requestContext(cfg),
+      request: { agentId: "main" },
+    });
+    expect(
+      listed.sessions.some((row) => row.key === sessionKey),
+      `${name} list parity`,
+    ).toBe(!hidden);
   }
 
   const originalRead = sessionTranscriptReaders.readRecentSessionMessagesWithStatsAsync;

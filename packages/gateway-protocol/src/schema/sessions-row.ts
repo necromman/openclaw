@@ -89,6 +89,8 @@ export const SessionRowSchema = Type.Object(
     accountId: Type.Optional(NonEmptyString),
     peerKind: Type.Optional(SessionPeerKindSchema),
     isMain: Type.Optional(Type.Boolean()),
+    /** Present on every home session row, including other people's person-scoped homes. */
+    home: Type.Optional(Type.Literal(true)),
     isBackground: Type.Optional(Type.Boolean()),
     chatType: Type.Optional(
       Type.Union([Type.Literal("direct"), Type.Literal("group"), Type.Literal("channel")]),

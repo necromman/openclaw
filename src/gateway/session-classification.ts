@@ -18,6 +18,7 @@ import {
   normalizeSessionKeyPreservingOpaquePeerIds,
   parseThreadSessionSuffix,
 } from "../sessions/session-key-utils.js";
+import { isHomeSessionKey } from "./home-session-key.js";
 
 const BACKGROUND_CLASSIFICATIONS = new Set<SessionClassification>([
   "acp",
@@ -36,6 +37,12 @@ type GatewaySessionClassification = {
   accountId?: string;
   peerKind?: SessionPeerKind;
   isMain: boolean;
+  /**
+   * Set on every home session, whoever owns it. The configured main word and each
+   * person-scoped `<main>-u<hex>` landing page answer to it, so a client never has to
+   * guess whether an unfamiliar key is somebody's home.
+   */
+  home?: true;
   // Classification only: this does not change session visibility, sharing,
   // retention, or authorization semantics.
   isBackground: boolean;
@@ -143,6 +150,7 @@ export function sessionClassificationForRow(
     classification = classifyRest(rest);
   }
 
+  const home = isMain || isHomeSessionKey({ key: canonicalKey, cfg });
   const peerKind: SessionPeerKind | undefined =
     route?.peerKind === "dm" || hasLegacyDirectPeer ? "direct" : route?.peerKind;
   return {
@@ -151,6 +159,7 @@ export function sessionClassificationForRow(
     ...(route?.accountId ? { accountId: route.accountId } : {}),
     ...(peerKind ? { peerKind } : {}),
     isMain,
+    ...(home ? { home: true as const } : {}),
     isBackground: BACKGROUND_CLASSIFICATIONS.has(classification),
   };
 }

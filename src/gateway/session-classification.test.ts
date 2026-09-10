@@ -44,6 +44,27 @@ describe("sessionClassificationForRow", () => {
     });
   });
 
+  it("marks every home session, not only the caller's own", () => {
+    const cfg = { agents: { list: [{ id: "main", default: true }] } } as OpenClawConfig;
+    for (const key of [
+      "agent:main:main",
+      "agent:main:main-u0123456789abcdef",
+      "agent:work:main-ufedcba9876543210",
+    ]) {
+      expect(sessionClassificationForRow(cfg, key, "main", entry()), key).toMatchObject({
+        home: true,
+      });
+    }
+    // Only the configured word classifies as "main"; person-scoped homes stay ordinary
+    // rows so nothing but the home marker changes for them.
+    expect(
+      sessionClassificationForRow(cfg, "agent:main:main-u0123456789abcdef", "main", entry()),
+    ).toMatchObject({ classification: "custom", isMain: false });
+    expect(
+      sessionClassificationForRow(cfg, "agent:main:planning", "main", entry()),
+    ).not.toHaveProperty("home");
+  });
+
   it("canonicalizes structural casing while preserving opaque peer ids", () => {
     expect(
       classification({

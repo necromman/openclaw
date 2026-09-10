@@ -2,9 +2,8 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import { validateSessionsDescribeParams } from "../../../packages/gateway-protocol/src/index.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { prepareDepartmentGate } from "../department-access.js";
-import { hasOperatorBoundary } from "../operator-role-policy.js";
 import { resolveRequestedSessionAgentId as resolveRequestedGlobalAgentId } from "../session-request-agent.js";
-import { createSessionListEntryFilter, prepareSessionSharing } from "../session-sharing.js";
+import { prepareSessionSharing } from "../session-sharing.js";
 import { readRecentSessionMessagesWithStatsAsync } from "../session-transcript-readers.js";
 import { buildGatewaySessionRow } from "../session-utils.js";
 import { readSessionPlacementFields } from "./session-placement-read-projection.js";
@@ -18,19 +17,23 @@ import { assertValidParams } from "./validation.js";
  * The department verdict is folded in here so knowing a session key is not enough to
  * read one: the list hides it and this refuses it, which are the two halves the fence
  * needs to be real.
+ *
+ * The sharing filter is taken unconditionally, exactly as `sessions.list` takes it. An
+ * earlier version asked for it only where an operator session cap was configured, which
+ * left the drafts and incognito rows the list already hides readable to anyone who could
+ * name the key - and made a session appear in chat that never appeared in the sidebar.
  */
 function createRoleVisibilityFilter(
-  client: Parameters<typeof hasOperatorBoundary>[0],
-  cfg: Parameters<typeof hasOperatorBoundary>[1],
+  client: Parameters<typeof prepareSessionSharing>[0]["client"],
+  cfg: Parameters<typeof prepareSessionSharing>[0]["cfg"],
 ) {
-  const boundaryFilter = hasOperatorBoundary(client, cfg)
-    ? createSessionListEntryFilter({ client, cfg })
-    : undefined;
+  const sharing = prepareSessionSharing({ client, cfg });
+  const boundaryFilter = sharing.entryFilter;
   const departmentGate = prepareDepartmentGate({ cfg, client });
   if (!boundaryFilter && !departmentGate) {
     return undefined;
   }
-  const isCreator = prepareSessionSharing({ client, cfg }).isCreator;
+  const isCreator = sharing.isCreator;
   return (
     agentId: string,
     key: string,

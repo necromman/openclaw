@@ -20,7 +20,7 @@
 import { createHash } from "node:crypto";
 import { GATEWAY_OWNER_PROFILE_ID } from "../../packages/gateway-protocol/src/schema/users.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { normalizeMainKey } from "../routing/session-key.js";
+import { normalizeMainKey, parseAgentSessionKey } from "../routing/session-key.js";
 import type { GatewayClient } from "./server-methods/client-types.js";
 
 /** Caller shape this needs: the verified profile attached at handshake, or nothing. */
@@ -57,4 +57,33 @@ export function resolveCallerMainKey(params: {
   }
   const digest = createHash("sha256").update(profileId).digest("hex").slice(0, 16);
   return `${configured}-u${digest}`;
+}
+
+/** Person-scoped home suffix minted by `resolveCallerMainKey`: `-u` plus 16 lowercase hex. */
+const PERSON_HOME_SUFFIX = /^-u[0-9a-f]{16}$/;
+
+/**
+ * Whether a session key names a home session - anyone's, not just the caller's.
+ *
+ * Home keys stopped being one word per deployment: every person's landing page is
+ * `<configured main>-u<16 hex>`, and the pre-split shared thread still carries the bare
+ * configured word. A reader who may see other people's sessions therefore meets home keys
+ * that are not their own, and comparing against one caller's key would miss them. This
+ * judges the shape instead, so every home session answers the same way no matter whose it
+ * is or which era it was created in.
+ */
+export function isHomeSessionKey(params: {
+  key: string | undefined | null;
+  cfg?: { session?: { mainKey?: string } } | undefined;
+}): boolean {
+  const raw = (params.key ?? "").trim().toLowerCase();
+  if (!raw) {
+    return false;
+  }
+  const rest = parseAgentSessionKey(raw)?.rest ?? raw;
+  const configured = normalizeMainKey(params.cfg?.session?.mainKey);
+  if (rest === configured) {
+    return true;
+  }
+  return rest.startsWith(configured) && PERSON_HOME_SUFFIX.test(rest.slice(configured.length));
 }
