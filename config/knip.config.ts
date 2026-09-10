@@ -157,7 +157,9 @@ const repositoryScriptEntries = [
 // which Knip cannot follow in either direction.
 function listScriptShimEntries(dir = "scripts"): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const entryPath = path.join(dir, entry.name);
+    // Knip matches entry globs with forward slashes, so a Windows checkout must not
+    // hand it path.join's backslashes.
+    const entryPath = path.posix.join(dir, entry.name);
     if (entry.isDirectory()) {
       return listScriptShimEntries(entryPath);
     }
