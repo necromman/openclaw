@@ -17,8 +17,10 @@ import {
 } from "../lib/sessions/route-navigation.ts";
 import {
   areUiSessionKeysEquivalent,
+  isUiHomeSessionRow,
   normalizeAgentId,
   parseAgentSessionKey,
+  resolveUiConfiguredMainKey,
   resolveUiDefaultAgentId,
 } from "../lib/sessions/session-key.ts";
 import { AppSidebarBase } from "./app-sidebar-base.ts";
@@ -636,9 +638,19 @@ export class AppSidebarSessionNavigationElement extends AppSidebarBase {
         !adopted.has(session.key) &&
         !areUiSessionKeysEquivalent(session.key, mainSessionKey),
     );
+    // Home rows never become sidebar roots. Every person has their own home key and the
+    // pre-split shared thread still exists, so a home row that is not the viewer's own
+    // would otherwise root itself and collect every session spawned from it as a child.
+    const configuredMainKey = resolveUiConfiguredMainKey({
+      agentsList: this.context?.agents.state.agentsList,
+      hello: this.context?.gateway.snapshot.hello,
+    });
+    const isHomeRow = (row: { key: string; home?: boolean }): boolean =>
+      areUiSessionKeysEquivalent(row.key, mainSessionKey) ||
+      isUiHomeSessionRow(row, configuredMainKey);
     const mainSessionKeys = new Set<string>([mainSessionKey]);
     const scopedRootRows = rootRows.filter((row) => {
-      if (areUiSessionKeysEquivalent(row.key, mainSessionKey)) {
+      if (isHomeRow(row)) {
         mainSessionKeys.add(row.key);
         return false;
       }
@@ -654,7 +666,7 @@ export class AppSidebarSessionNavigationElement extends AppSidebarBase {
         sessionMatchesArchivedFilter(lineageRoot, this.sessionsStatusFilter)) &&
       (lineageAgentId === selected || lineageRouteAgentId === selected) &&
       !adopted.has(lineageRoot.key) &&
-      !areUiSessionKeysEquivalent(lineageRoot.key, mainSessionKey) &&
+      !isHomeRow(lineageRoot) &&
       !scopedRootRows.some((row) => row.key === lineageRoot.key)
     ) {
       scopedRootRows.push(lineageRoot);

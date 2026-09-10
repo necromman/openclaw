@@ -4,6 +4,8 @@ import {
   canArchiveSessionRow,
   canDeleteSessionRows,
   canonicalUiSessionKeyForPersistence,
+  isUiHomeSessionKey,
+  isUiHomeSessionRow,
   isUiSelectedGlobalSessionKey,
   parseSessionKeyParts,
   resolveUiSessionNavigationParentKey,
@@ -39,6 +41,44 @@ describe("session archive eligibility", () => {
           { key: "global", kind: "global", archived: true },
           { key: "agent:main:work", archived: false },
         ],
+        "home",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("home session recognition", () => {
+  // The Gateway mints one home key per person, so the viewer's own key is only ever
+  // one of them. Everything that treats home rows specially has to see all of them.
+  it.each([
+    ["own home", "agent:main:home-u0123456789abcdef", true],
+    ["another person's home", "agent:main:home-ufedcba9876543210", true],
+    ["shared home from before the split", "agent:main:home", true],
+    ["home under another agent", "agent:work:home-ufedcba9876543210", true],
+    ["bare configured word", "home", true],
+    ["ordinary session", "agent:main:work", false],
+    ["prefix lookalike", "agent:main:homework", false],
+    ["short suffix", "agent:main:home-u0123456789abcde", false],
+    ["non-hex suffix", "agent:main:home-uzzzzzzzzzzzzzzzz", false],
+  ] as const)("resolves %s", (_name, key, expected) => {
+    expect(isUiHomeSessionKey(key, "home-u0123456789abcdef")).toBe(expected);
+    expect(isUiHomeSessionRow({ key }, "home-u0123456789abcdef")).toBe(expected);
+  });
+
+  it("trusts the server marker on a row whose key shape is unfamiliar", () => {
+    expect(isUiHomeSessionRow({ key: "agent:main:legacy-landing", home: true }, "home")).toBe(true);
+  });
+
+  it("protects every home row from archive and delete", () => {
+    for (const key of ["agent:main:home", "agent:main:home-ufedcba9876543210"]) {
+      expect(
+        canArchiveSessionRow({ key, sessionId: "durable-session" }, "home-u0123456789abcdef"),
+      ).toBe(false);
+      expect(canDeleteSessionRows([{ key }], "home-u0123456789abcdef")).toBe(false);
+    }
+    expect(
+      canArchiveSessionRow(
+        { key: "agent:main:work", sessionId: "durable-session", home: true },
         "home",
       ),
     ).toBe(false);

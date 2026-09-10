@@ -334,8 +334,49 @@ export function resolveAgentIdFromSessionKey(sessionKey: string | undefined | nu
   return normalizeAgentId(parsed?.agentId ?? DEFAULT_AGENT_ID);
 }
 
+/** Person-scoped home suffix the Gateway mints: `-u` plus 16 lowercase hex. */
+const PERSON_HOME_SUFFIX_PATTERN = /-u[0-9a-f]{16}$/;
+
+/** The deployment-wide home word behind a possibly person-scoped main key. */
+function homeSessionBaseKey(configuredMainKey: string | undefined | null): string {
+  return normalizeMainKey(configuredMainKey).replace(PERSON_HOME_SUFFIX_PATTERN, "");
+}
+
+/**
+ * Whether a key names a home session - the viewer's own, someone else's, or the shared
+ * one that predates per-person homes.
+ *
+ * The Gateway advertises one home key per person, so a viewer who can see other people's
+ * sessions meets home keys that will never equal their own. Comparing shapes keeps every
+ * home out of the sidebar tree; the row marker below is preferred when the server sends it.
+ */
+export function isUiHomeSessionKey(
+  sessionKey: string | undefined | null,
+  configuredMainKey: string | undefined | null,
+): boolean {
+  const rest =
+    normalizeLowercaseStringOrEmpty(parseAgentSessionKey(sessionKey)?.rest) ||
+    normalizeLowercaseStringOrEmpty(sessionKey);
+  if (!rest) {
+    return false;
+  }
+  const base = homeSessionBaseKey(configuredMainKey);
+  return rest === base || rest.replace(PERSON_HOME_SUFFIX_PATTERN, "") === base;
+}
+
+/** Row-level home verdict: the server marker first, the key shape as the older-server fallback. */
+export function isUiHomeSessionRow(
+  row: { key: string; home?: boolean } | null | undefined,
+  configuredMainKey: string | undefined | null,
+): boolean {
+  if (!row) {
+    return false;
+  }
+  return row.home === true || isUiHomeSessionKey(row.key, configuredMainKey);
+}
+
 function isProtectedSessionLifecycleKey(
-  row: { key: string; kind?: string },
+  row: { key: string; kind?: string; home?: boolean },
   configuredMainKey: string,
 ): boolean {
   const normalizedKey = normalizeLowercaseStringOrEmpty(row.key);
@@ -347,17 +388,13 @@ function isProtectedSessionLifecycleKey(
   ) {
     return true;
   }
-  return (
-    row.key === "main" ||
-    normalizeLowercaseStringOrEmpty(parseAgentSessionKey(row.key)?.rest) ===
-      normalizeMainKey(configuredMainKey)
-  );
+  return row.key === "main" || isUiHomeSessionRow(row, configuredMainKey);
 }
 
 // Archive policy shared by the chat picker, sidebar recents, and Sessions
 // table: Gateway drains live work; main/global/unknown rows stay protected.
 export function canArchiveSessionRow(
-  row: { key: string; kind?: string; sessionId?: string },
+  row: { key: string; kind?: string; sessionId?: string; home?: boolean },
   configuredMainKey: string,
 ): boolean {
   return Boolean(row.sessionId?.trim() && !isProtectedSessionLifecycleKey(row, configuredMainKey));
@@ -368,6 +405,7 @@ export function canDeleteSessionRows(
   rows: ReadonlyArray<{
     key: string;
     kind?: string;
+    home?: boolean;
     hasActiveRun?: boolean;
     archived?: boolean;
   }>,

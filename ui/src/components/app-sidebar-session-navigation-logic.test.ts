@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GatewaySessionRow, SessionsListResult } from "../api/types.ts";
+import { isUiHomeSessionRow } from "../lib/sessions/session-key.ts";
 import { createTestGatewayClient } from "../test-helpers/gateway-client.ts";
 import { gatewayHelloForMethods } from "../test-helpers/gateway-methods.ts";
 import { collectKnownSessionRows, fetchSessionLineage } from "./app-sidebar-child-session-data.ts";
@@ -426,6 +427,46 @@ describe("sidebar navigation lineage ownership", () => {
         isChild: false,
         children: [],
       },
+    ]);
+  });
+
+  it("keeps sessions spawned from any home session flat while real parents still group", () => {
+    // The old shared home and every person-scoped home are ancestors of ordinary work,
+    // and the sidebar must not root them: doing so folded the whole list under one row.
+    const homes: GatewaySessionRow[] = [
+      { key: "agent:main:main", kind: "direct", updatedAt: 4, home: true },
+      { key: "agent:main:main-u0123456789abcdef", kind: "direct", updatedAt: 5 },
+    ];
+    const spawnedFromHome = homes.map((home, index) => ({
+      key: `agent:main:from-home-${index}`,
+      kind: "direct" as const,
+      updatedAt: 6 + index,
+      parentSessionKey: home.key,
+    }));
+    const rows = [...homes, ...spawnedFromHome, navigationParent, child];
+    const roots = rows.filter((row) => !isUiHomeSessionRow(row, "main-u0123456789abcdef"));
+    const projected = projectSessionTree({
+      roots,
+      agentRows: rows,
+      childRowsByParent: {},
+      loadingChildKeys: new Set(),
+      knownSessionAttention: [],
+      toSidebarSession: (row, isChild) =>
+        ({
+          key: row.key,
+          isChild,
+          attention: { kind: "none" },
+          runningChildCount: 0,
+          failedChildCount: 0,
+        }) as SidebarRecentSession,
+    });
+
+    expect(
+      projected.map((row) => ({ key: row.key, children: row.children.map((entry) => entry.key) })),
+    ).toEqual([
+      { key: spawnedFromHome[0]?.key, children: [] },
+      { key: spawnedFromHome[1]?.key, children: [] },
+      { key: navigationParent.key, children: [child.key] },
     ]);
   });
 
