@@ -10,6 +10,7 @@ import {
 } from "../config/config.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
+import { assertNotUpdateCapturePath, isUpdateCapturePath } from "../infra/update-capture-paths.js";
 import {
   resolveActivatedPluginBackupInventory,
   type ActivatedPluginBackupInventory,
@@ -64,7 +65,7 @@ export function resolveRequiredBackupPath(
 }
 
 type BackupAssetKind = "state" | "config" | "credentials" | "workspace" | "agent" | "managed skill";
-type BackupSkipReason = "covered" | "missing" | "regenerable" | "unresolved";
+type BackupSkipReason = "covered" | "missing" | "regenerable" | "unresolved" | "private";
 
 export type BackupAsset = {
   kind: BackupAssetKind;
@@ -185,6 +186,12 @@ async function resolveBackupPlanFromPaths(params: {
   const onlyConfig = params.onlyConfig ?? false;
   const stateDir = params.stateDir;
   const configPath = params.configPath;
+  for (const sourcePath of [
+    configPath,
+    ...(params.configCapture?.files ?? []).map((file) => file.canonicalPath),
+  ]) {
+    assertNotUpdateCapturePath(sourcePath, stateDir);
+  }
   const oauthDir = params.oauthDir;
   const archiveRoot = buildBackupArchiveRoot(params.nowMs);
   const requestedWorkspaceDirs = params.workspaceDirs ?? [];
@@ -339,6 +346,15 @@ async function resolveBackupPlanFromPaths(params: {
   const skipped: SkippedBackupAsset[] = [];
 
   for (const candidate of uniqueCandidates) {
+    if (isUpdateCapturePath(candidate.canonicalPath, stateDir)) {
+      skipped.push({
+        kind: candidate.kind,
+        sourcePath: candidate.canonicalPath,
+        displayPath: shortenHomePath(candidate.canonicalPath),
+        reason: "private",
+      });
+      continue;
+    }
     if (!candidate.exists) {
       if (
         candidate.kind === "agent" &&

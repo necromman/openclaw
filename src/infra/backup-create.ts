@@ -54,6 +54,7 @@ import {
   type LegacyAuditBackupSnapshot,
 } from "./state-migrations.audit-backup.js";
 import { withLegacyAuditMigrationLease } from "./state-migrations.audit-coordination.js";
+import { isUpdateCapturePath } from "./update-capture-paths.js";
 
 const loadTarRuntime = createLazyRuntimeModule(() => import("tar"));
 
@@ -560,6 +561,14 @@ export async function createBackupArchive(
       const resolvedEntryPath = path.resolve(entryPath);
       if (resolvedEntryPath === manifestPath) {
         return true;
+      }
+      if (
+        isUpdateCapturePath(
+          sourcePathRemaps.get(resolvedEntryPath) ?? resolvedEntryPath,
+          plan.stateDir,
+        )
+      ) {
+        return false;
       }
       const isDirectory =
         "isDirectory" in entryStat ? entryStat.isDirectory() : entryStat.type === "Directory";
