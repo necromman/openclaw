@@ -9,6 +9,7 @@
 // They are ordinary Gateway methods (`models.list`, `models.authStatus`) that an
 // administrator already holds `operator.read` for, so asking for them a second way would
 // only be a second thing to keep in step.
+import { readStringValue } from "@openclaw/normalization-core/string-coerce";
 import { readIxAuthCsrfToken } from "./ix-auth-session-api.ts";
 
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
@@ -105,16 +106,16 @@ function readStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
 }
 
-function readString(value: unknown): string {
-  return typeof value === "string" ? value : "";
+function textOrEmpty(value: unknown): string {
+  return readStringValue(value) ?? "";
 }
 
 function readPolicy(body: Record<string, unknown>): IxAuthModelPolicy {
   return {
-    primary: readString(body.primary),
+    primary: textOrEmpty(body.primary),
     fallbacks: readStrings(body.fallbacks),
     allow: readStrings(body.allow),
-    utilityModel: readString(body.utilityModel),
+    utilityModel: textOrEmpty(body.utilityModel),
   };
 }
 
@@ -126,7 +127,7 @@ export async function fetchIxAuthModelPolicy(
   if (result.kind === "failed") {
     return result;
   }
-  const overridesPath = readString(result.body.overridesPath);
+  const overridesPath = textOrEmpty(result.body.overridesPath);
   return {
     ...readPolicy(result.body),
     ...(overridesPath ? { overridesPath } : {}),

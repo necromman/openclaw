@@ -4,6 +4,9 @@
 // identity server therefore applies its own `ixauth:users:write` check a second time and
 // records the real person in its audit ledger, so a Gateway bug cannot turn a member into
 // an administrator and an invitation is never attributed to "the Gateway".
+import { asFiniteNumber } from "@openclaw/normalization-core/number-coercion";
+import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
+import { readStringValue } from "@openclaw/normalization-core/string-coerce";
 import { callIxAuthEndpoint, type IxAuthRelayFailure, type IxAuthRequestMeta } from "./ix-auth-client.js";
 import type { IxAuthRuntimeSettings } from "./ix-auth-types.js";
 
@@ -27,22 +30,11 @@ export type IxAuthPendingSignup = {
 /** One identity-server group, as seen by the invitation form. */
 export type IxAuthGroupSummary = { groupId: string; code: string; name: string };
 
-function readString(record: Record<string, unknown>, key: string): string | undefined {
+function fieldText(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
-  if (typeof value === "string") {
-    return value;
-  }
   // Identity ids arrive as numbers on some routes and strings on others; both name the
   // same row, so they are normalized here rather than at each call site.
-  return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  // SAFETY: the guard above rejected null, arrays, and non-objects.
-  return value as Record<string, unknown>;
+  return readStringValue(value) ?? asFiniteNumber(value)?.toString();
 }
 
 /**
@@ -65,7 +57,7 @@ export async function createIxAuthInvitedUser(
   if (!result.ok) {
     return result;
   }
-  const userId = readString(result.data, "id");
+  const userId = fieldText(result.data, "id");
   if (!userId) {
     return {
       ok: false,
@@ -106,11 +98,11 @@ export async function listIxAuthGroups(
   }
   const groups: IxAuthGroupSummary[] = [];
   for (const entry of result.items ?? []) {
-    const record = asRecord(entry);
-    const groupId = record ? readString(record, "id") : undefined;
-    const code = record ? readString(record, "code") : undefined;
+    const record = asOptionalRecord(entry);
+    const groupId = record ? fieldText(record, "id") : undefined;
+    const code = record ? fieldText(record, "code") : undefined;
     if (record && groupId && code) {
-      groups.push({ groupId, code, name: readString(record, "name") ?? code });
+      groups.push({ groupId, code, name: fieldText(record, "name") ?? code });
     }
   }
   return { ok: true, groups };
@@ -135,7 +127,7 @@ export async function createIxAuthGroup(
   if (!result.ok) {
     return result;
   }
-  const groupId = readString(result.data, "id");
+  const groupId = fieldText(result.data, "id");
   if (!groupId) {
     return {
       ok: false,
@@ -224,16 +216,16 @@ export async function listIxAuthPendingSignups(
   }
   const pending: IxAuthPendingSignup[] = [];
   for (const entry of result.items ?? []) {
-    const record = asRecord(entry);
-    const userId = record ? readString(record, "userId") ?? readString(record, "id") : undefined;
-    const email = record ? readString(record, "email") : undefined;
+    const record = asOptionalRecord(entry);
+    const userId = record ? fieldText(record, "userId") ?? fieldText(record, "id") : undefined;
+    const email = record ? fieldText(record, "email") : undefined;
     if (record && userId && email) {
       pending.push({
         userId,
         email,
-        name: readString(record, "name") ?? email,
+        name: fieldText(record, "name") ?? email,
         emailVerified: record.emailVerified === true,
-        createdAt: readString(record, "createdAt"),
+        createdAt: fieldText(record, "createdAt"),
       });
     }
   }

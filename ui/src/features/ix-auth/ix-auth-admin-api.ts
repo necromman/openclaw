@@ -3,6 +3,7 @@
 // Every call here rides the session cookie plus the session-bound CSRF token, and the
 // Gateway forwards it to the identity server as the signed-in administrator. A member
 // reaching these routes is refused by the Gateway, not by hiding the buttons.
+import { asOptionalObjectRecord, readStringField } from "@openclaw/normalization-core/record-coerce";
 import { readIxAuthCsrfToken } from "./ix-auth-session-api.ts";
 
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
@@ -144,13 +145,8 @@ function readStringListField(record: unknown, key: string): string[] {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
 }
 
-function readStringField(record: unknown, key: string): string | undefined {
-  if (record === null || typeof record !== "object") {
-    return undefined;
-  }
-  // SAFETY: the null and typeof guard directly above proves this is an object.
-  const value = (record as Record<string, unknown>)[key];
-  return typeof value === "string" ? value : undefined;
+function fieldText(record: unknown, key: string): string | undefined {
+  return readStringField(asOptionalObjectRecord(record), key);
 }
 
 function readCountField(record: unknown, key: string): number {
@@ -173,15 +169,15 @@ export async function fetchIxAuthDepartmentDirectory(
   const raw = Array.isArray(result.body.departments) ? result.body.departments : [];
   const departments: IxAuthDepartmentOption[] = [];
   for (const entry of raw) {
-    const code = readStringField(entry, "code");
+    const code = fieldText(entry, "code");
     if (!code) {
       continue;
     }
     departments.push({
       code,
-      name: readStringField(entry, "name") ?? code,
-      slug: readStringField(entry, "slug"),
-      identityName: readStringField(entry, "identityName"),
+      name: fieldText(entry, "name") ?? code,
+      slug: fieldText(entry, "slug"),
+      identityName: fieldText(entry, "identityName"),
       memberCount: readCountField(entry, "memberCount"),
       agents: readStringListField(entry, "agents"),
     });
@@ -189,18 +185,18 @@ export async function fetchIxAuthDepartmentDirectory(
   const rawOrphans = Array.isArray(result.body.orphans) ? result.body.orphans : [];
   const orphans: IxAuthOrphanDepartment[] = [];
   for (const entry of rawOrphans) {
-    const slug = readStringField(entry, "slug");
+    const slug = fieldText(entry, "slug");
     if (!slug) {
       continue;
     }
     orphans.push({
       slug,
-      name: readStringField(entry, "name") ?? slug,
+      name: fieldText(entry, "name") ?? slug,
       memberCount: readCountField(entry, "memberCount"),
       agents: readStringListField(entry, "agents"),
     });
   }
-  return { prefix: readStringField(result.body, "prefix") ?? "", departments, orphans };
+  return { prefix: fieldText(result.body, "prefix") ?? "", departments, orphans };
 }
 
 /** List the departments an invitation may place someone into. */
@@ -232,9 +228,9 @@ export async function createIxAuthDepartment(params: {
     return result;
   }
   return {
-    code: readStringField(result.body, "code") ?? "",
-    slug: readStringField(result.body, "slug") ?? params.slug,
-    name: readStringField(result.body, "name") ?? params.name,
+    code: fieldText(result.body, "code") ?? "",
+    slug: fieldText(result.body, "slug") ?? params.slug,
+    name: fieldText(result.body, "name") ?? params.name,
   };
 }
 
@@ -259,8 +255,8 @@ export async function renameIxAuthDepartment(params: {
     return result;
   }
   return {
-    slug: readStringField(result.body, "slug") ?? params.slug,
-    name: readStringField(result.body, "name") ?? params.name,
+    slug: fieldText(result.body, "slug") ?? params.slug,
+    name: fieldText(result.body, "name") ?? params.name,
   };
 }
 
@@ -285,7 +281,7 @@ export async function deleteIxAuthDepartment(params: {
     return result;
   }
   return {
-    slug: readStringField(result.body, "slug") ?? params.slug,
+    slug: fieldText(result.body, "slug") ?? params.slug,
     unboundAgents: readStringListField(result.body, "unboundAgents"),
   };
 }
@@ -314,11 +310,11 @@ export async function issueIxAuthInvite(params: {
     return result;
   }
   return {
-    email: readStringField(result.body, "email") ?? params.email,
-    userId: readStringField(result.body, "userId") ?? "",
+    email: fieldText(result.body, "email") ?? params.email,
+    userId: fieldText(result.body, "userId") ?? "",
     departments: readStringListField(result.body, "departments"),
     departmentFailed: result.body.departmentFailed === true,
-    inviteLink: readStringField(result.body, "inviteLink"),
+    inviteLink: fieldText(result.body, "inviteLink"),
   };
 }
 
@@ -333,8 +329,8 @@ export async function fetchIxAuthInviteLinks(
   const raw = Array.isArray(result.body.invites) ? result.body.invites : [];
   const invites: IxAuthInviteLink[] = [];
   for (const entry of raw) {
-    const email = readStringField(entry, "email");
-    const link = readStringField(entry, "link");
+    const email = fieldText(entry, "email");
+    const link = fieldText(entry, "link");
     if (email && link) {
       const captured =
         entry !== null && typeof entry === "object"
@@ -376,8 +372,8 @@ export async function fetchIxAuthPendingSignups(
   const raw = Array.isArray(result.body.pending) ? result.body.pending : [];
   const pending: IxAuthPendingSignup[] = [];
   for (const entry of raw) {
-    const userId = readStringField(entry, "userId");
-    const email = readStringField(entry, "email");
+    const userId = fieldText(entry, "userId");
+    const email = fieldText(entry, "email");
     if (userId && email) {
       const verified =
         entry !== null && typeof entry === "object"
@@ -387,9 +383,9 @@ export async function fetchIxAuthPendingSignups(
       pending.push({
         userId,
         email,
-        name: readStringField(entry, "name") ?? email,
+        name: fieldText(entry, "name") ?? email,
         emailVerified: verified,
-        createdAt: readStringField(entry, "createdAt"),
+        createdAt: fieldText(entry, "createdAt"),
       });
     }
   }

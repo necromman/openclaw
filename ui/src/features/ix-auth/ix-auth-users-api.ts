@@ -4,6 +4,8 @@
 // invitation routes beside it. Nothing here is a permission check: an account that may
 // not manage users is refused by the Gateway, and the screen only decides what is worth
 // drawing.
+import { asFiniteNumber } from "@openclaw/normalization-core/number-coercion";
+import { readStringField } from "@openclaw/normalization-core/record-coerce";
 import { readIxAuthCsrfToken } from "./ix-auth-session-api.ts";
 
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
@@ -168,44 +170,38 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
-function readString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" ? value : undefined;
-}
-
 function readStrings(record: Record<string, unknown>, key: string): string[] {
   const value = record[key];
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
-function readNumber(record: Record<string, unknown>, key: string): number {
-  const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+function fieldCount(record: Record<string, unknown>, key: string): number {
+  return asFiniteNumber(record[key]) ?? 0;
 }
 
 function readUser(value: unknown): IxAuthManagedUser | undefined {
   const record = readRecord(value);
-  const id = record ? readString(record, "id") : undefined;
-  const email = record ? readString(record, "email") : undefined;
+  const id = record ? readStringField(record, "id") : undefined;
+  const email = record ? readStringField(record, "email") : undefined;
   if (!record || !id || !email) {
     return undefined;
   }
-  const status = readString(record, "status") ?? "ACTIVE";
+  const status = readStringField(record, "status") ?? "ACTIVE";
   return {
     id,
     email,
-    displayName: readString(record, "displayName") ?? email,
+    displayName: readStringField(record, "displayName") ?? email,
     // SAFETY: an unexpected status only affects the label, never a decision.
     status: status as IxAuthUserStatus,
     roles: readStrings(record, "roles"),
-    gatewayRole: readString(record, "gatewayRole"),
+    gatewayRole: readStringField(record, "gatewayRole"),
     isSuperAdmin: record.isSuperAdmin === true,
     departments: readStrings(record, "departments"),
-    lastLoginAt: readString(record, "lastLoginAt"),
-    createdAt: readString(record, "createdAt"),
+    lastLoginAt: readStringField(record, "lastLoginAt"),
+    createdAt: readStringField(record, "createdAt"),
     locked: record.locked === true,
-    lockedUntil: readString(record, "lockedUntil"),
-    failedCount: readNumber(record, "failedCount"),
+    lockedUntil: readStringField(record, "lockedUntil"),
+    failedCount: fieldCount(record, "failedCount"),
     self: record.self === true,
   };
 }
@@ -253,9 +249,9 @@ export async function fetchIxAuthUsers(params: {
   }
   return {
     users,
-    page: readNumber(result.body, "page"),
-    size: readNumber(result.body, "size"),
-    total: readNumber(result.body, "total"),
+    page: fieldCount(result.body, "page"),
+    size: fieldCount(result.body, "size"),
+    total: fieldCount(result.body, "total"),
     departmentFilterApplied: result.body.departmentFilterApplied === true,
   };
 }
@@ -281,7 +277,7 @@ export async function fetchIxAuthUserDetail(params: {
     user,
     emailVerified: result.body.emailVerified === true,
     mfaEnabled: result.body.mfaEnabled === true,
-    sessionCount: readNumber(result.body, "sessionCount"),
+    sessionCount: fieldCount(result.body, "sessionCount"),
   };
 }
 
@@ -369,8 +365,8 @@ export async function runIxAuthUserAction(params: {
   const sessions = readRecord(result.body.sessions);
   return {
     kind: "ok",
-    inviteLink: readString(result.body, "inviteLink"),
-    revoked: sessions ? readNumber(sessions, "identitySessions") : undefined,
+    inviteLink: readStringField(result.body, "inviteLink"),
+    revoked: sessions ? fieldCount(sessions, "identitySessions") : undefined,
   };
 }
 
@@ -412,19 +408,19 @@ export async function importIxAuthUsers(params: {
     const record = readRecord(entry);
     if (record) {
       results.push({
-        line: readNumber(record, "line"),
-        email: readString(record, "email"),
-        status: readString(record, "status") ?? "FAILED",
-        error: readString(record, "error"),
+        line: fieldCount(record, "line"),
+        email: readStringField(record, "email"),
+        status: readStringField(record, "status") ?? "FAILED",
+        error: readStringField(record, "error"),
       });
     }
   }
   return {
-    total: readNumber(result.body, "total"),
-    created: readNumber(result.body, "created"),
-    failed: readNumber(result.body, "failed"),
-    invited: readNumber(result.body, "invited"),
-    departmentFailures: readNumber(result.body, "departmentFailures"),
+    total: fieldCount(result.body, "total"),
+    created: fieldCount(result.body, "created"),
+    failed: fieldCount(result.body, "failed"),
+    invited: fieldCount(result.body, "invited"),
+    departmentFailures: fieldCount(result.body, "departmentFailures"),
     results,
   };
 }

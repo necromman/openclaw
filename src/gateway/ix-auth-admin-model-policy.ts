@@ -27,6 +27,7 @@
 // An empty list means "no restriction" to the Gateway, which is not the same promise as
 // "every model of the providers we authenticated". It is kept reachable because it is
 // what the shipped default means, but the screen names it plainly.
+import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 
 /** The models region of the configuration, as an administrator sees and submits it. */
 export type IxAuthAdminModelPolicy = {
@@ -209,16 +210,8 @@ export function policyHidesItsOwnModels(policy: IxAuthAdminModelPolicy): boolean
 
 type MutableRecord = Record<string, unknown>;
 
-function asRecord(value: unknown): MutableRecord | undefined {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  // SAFETY: the guard directly above proves this is a plain object.
-  return value as MutableRecord;
-}
-
 function childRecord(parent: MutableRecord, key: string): MutableRecord {
-  const existing = asRecord(parent[key]);
+  const existing = asOptionalRecord(parent[key]);
   if (existing) {
     return existing;
   }
@@ -267,16 +260,16 @@ export function readModelPolicyFromConfig(config: unknown): IxAuthAdminModelPoli
     allow: [],
     utilityModel: "",
   };
-  const defaults = asRecord(asRecord(asRecord(config)?.agents)?.defaults);
+  const defaults = asOptionalRecord(asOptionalRecord(asOptionalRecord(config)?.agents)?.defaults);
   if (!defaults) {
     return empty;
   }
-  const modelRecord = asRecord(defaults.model);
+  const modelRecord = asOptionalRecord(defaults.model);
   const primaryValue = typeof defaults.model === "string" ? defaults.model : modelRecord?.primary;
   return {
     primary: typeof primaryValue === "string" ? primaryValue : "",
     fallbacks: readStringArray(modelRecord?.fallbacks),
-    allow: readStringArray(asRecord(defaults.modelPolicy)?.allow),
+    allow: readStringArray(asOptionalRecord(defaults.modelPolicy)?.allow),
     utilityModel: typeof defaults.utilityModel === "string" ? defaults.utilityModel : "",
   };
 }

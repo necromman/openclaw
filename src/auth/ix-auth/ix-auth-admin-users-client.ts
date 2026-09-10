@@ -8,6 +8,9 @@
 // The identity server's own shapes are normalized once, here, so no Gateway route and no
 // browser screen has to know that an account id arrives as a number on one route and a
 // string on the next.
+import { asFiniteNumber } from "@openclaw/normalization-core/number-coercion";
+import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
+import { readStringValue } from "@openclaw/normalization-core/string-coerce";
 import { callIxAuthEndpoint, type IxAuthRelayFailure } from "./ix-auth-client.js";
 import type { IxAuthAdminCall } from "./ix-auth-admin-client.js";
 
@@ -57,22 +60,11 @@ export type IxAuthUserPage = {
   total: number;
 };
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  // SAFETY: the guard above rejected null, arrays, and non-objects.
-  return value as Record<string, unknown>;
-}
-
-function readString(record: Record<string, unknown>, key: string): string | undefined {
+function fieldText(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
-  if (typeof value === "string") {
-    return value;
-  }
   // Identity ids arrive as numbers on some routes and strings on others; both name the
   // same row, so they are normalized here rather than at each call site.
-  return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
+  return readStringValue(value) ?? asFiniteNumber(value)?.toString();
 }
 
 function readStringList(record: Record<string, unknown>, key: string): string[] {
@@ -80,9 +72,8 @@ function readStringList(record: Record<string, unknown>, key: string): string[] 
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
-function readNumber(record: Record<string, unknown>, key: string): number {
-  const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+function fieldCount(record: Record<string, unknown>, key: string): number {
+  return asFiniteNumber(record[key]) ?? 0;
 }
 
 /**
@@ -92,25 +83,25 @@ function readNumber(record: Record<string, unknown>, key: string): number {
  * than shown as a half-account an administrator would then click.
  */
 export function readIxAuthUserSummary(value: unknown): IxAuthUserSummary | undefined {
-  const record = asRecord(value);
-  const id = record ? readString(record, "id") : undefined;
-  const email = record ? readString(record, "email") : undefined;
+  const record = asOptionalRecord(value);
+  const id = record ? fieldText(record, "id") : undefined;
+  const email = record ? fieldText(record, "email") : undefined;
   if (!record || !id || !email) {
     return undefined;
   }
-  const status = readString(record, "status") ?? "";
+  const status = fieldText(record, "status") ?? "";
   return {
     id,
     email,
-    name: readString(record, "name") ?? email,
+    name: fieldText(record, "name") ?? email,
     // SAFETY: the membership test directly above proves the cast.
     status: IX_AUTH_USER_STATUSES.has(status) ? (status as IxAuthUserStatus) : "ACTIVE",
     roles: readStringList(record, "roles"),
     groups: readStringList(record, "groups"),
-    failedCount: readNumber(record, "failedCount"),
-    lockedUntil: readString(record, "lockedUntil"),
-    lastLoginAt: readString(record, "lastLoginAt"),
-    createdAt: readString(record, "createdAt"),
+    failedCount: fieldCount(record, "failedCount"),
+    lockedUntil: fieldText(record, "lockedUntil"),
+    lastLoginAt: fieldText(record, "lastLoginAt"),
+    createdAt: fieldText(record, "createdAt"),
   };
 }
 
@@ -157,9 +148,9 @@ export async function listIxAuthUsers(
   return {
     ok: true,
     users,
-    page: readNumber(result.data, "page"),
-    size: readNumber(result.data, "size"),
-    total: readNumber(result.data, "total"),
+    page: fieldCount(result.data, "page"),
+    size: fieldCount(result.data, "size"),
+    total: fieldCount(result.data, "total"),
   };
 }
 
@@ -218,7 +209,7 @@ export async function getIxAuthUserDetail(
       message: "the identity server returned an unreadable account",
     };
   }
-  const mfa = asRecord(result.data.mfa);
+  const mfa = asOptionalRecord(result.data.mfa);
   const sessions = Array.isArray(result.data.sessions) ? result.data.sessions : [];
   return {
     ok: true,
@@ -338,7 +329,7 @@ export async function revokeIxAuthUserSessions(
     accessToken: params.accessToken,
     meta: params.meta,
   });
-  return result.ok ? { ok: true, revoked: readNumber(result.data, "revoked") } : result;
+  return result.ok ? { ok: true, revoked: fieldCount(result.data, "revoked") } : result;
 }
 
 /**
@@ -415,25 +406,25 @@ export async function importIxAuthUsers(
   const rows = Array.isArray(result.data.results) ? result.data.results : [];
   const results: IxAuthBulkRowResult[] = [];
   for (const entry of rows) {
-    const record = asRecord(entry);
+    const record = asOptionalRecord(entry);
     if (!record) {
       continue;
     }
     results.push({
-      line: readNumber(record, "line"),
-      email: readString(record, "email"),
-      status: readString(record, "status") ?? "FAILED",
-      userId: readString(record, "userId"),
-      error: readString(record, "error"),
+      line: fieldCount(record, "line"),
+      email: fieldText(record, "email"),
+      status: fieldText(record, "status") ?? "FAILED",
+      userId: fieldText(record, "userId"),
+      error: fieldText(record, "error"),
     });
   }
   return {
     ok: true,
     summary: {
-      total: readNumber(result.data, "total"),
-      created: readNumber(result.data, "created"),
-      failed: readNumber(result.data, "failed"),
-      invited: readNumber(result.data, "invited"),
+      total: fieldCount(result.data, "total"),
+      created: fieldCount(result.data, "created"),
+      failed: fieldCount(result.data, "failed"),
+      invited: fieldCount(result.data, "invited"),
       results,
     },
   };
