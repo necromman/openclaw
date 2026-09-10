@@ -485,6 +485,46 @@ const config = {
     // asserted by the focused Beam mirror tests; production wires only the service.
     "extensions/beam/src/mirror.ts": ["exports", "types"],
     "src/infra/heartbeat-wake.ts": ["exports"],
+    // Fork (chris) surfaces below. The Gateway loads its IX-Auth request stage through a
+    // lazy `import()` pair in ix-auth-http-stage.ts, which Knip cannot follow, so the two
+    // request entry points read as unused in the production graph.
+    "src/gateway/ix-auth-http.ts": ["exports"],
+    "src/gateway/ix-auth-admin-proxy.ts": ["exports", "types"],
+    // The Control UI's Vite build reads the PWA manifest name and description across the
+    // workspace boundary (ui/vite.config.ts imports ../src/brand.ts); Knip's ui workspace
+    // does not follow that edge back into the root workspace.
+    "src/brand.ts": ["exports"],
+    // This fork's CLI banner ships no mascot, so the seasonal art module is reachable only
+    // from its own focused test; the shared day hash it calls stays with upstream.
+    "src/shared/lobster-day.ts": ["exports"],
+    // Focused fork tests consume these explicit seams (parsers, probes, guards, cache
+    // resets); production reaches the same behaviour through the surrounding helpers in
+    // each owning module. The full-tree companion scan still audits every one of them
+    // against its real test consumer.
+    "extensions/codex/src/doctor-workspace-boundary.ts": ["exports"],
+    "src/audit/tool-read-paths.ts": ["exports"],
+    "src/auth/ix-auth/ix-auth-jwks.ts": ["exports"],
+    "src/commands/audit-users-source.ts": ["exports"],
+    "src/gateway/cookie-header.ts": ["exports"],
+    "src/gateway/department-access.ts": ["exports"],
+    "src/gateway/department-folder-listing.ts": ["exports"],
+    "src/gateway/document-convert.ts": ["exports", "types"],
+    "src/gateway/document-hangul-cli.ts": ["exports", "types"],
+    "src/gateway/document-xlsx-dates.ts": ["exports"],
+    "src/gateway/folder-access-policy.ts": ["exports"],
+    "src/gateway/inbound-media-access.ts": ["exports"],
+    "src/gateway/ix-auth-admin-model-policy.ts": ["exports"],
+    "src/gateway/ix-auth-connection-scopes.ts": ["exports"],
+    "src/gateway/ix-auth-invite-links.ts": ["exports"],
+    "src/gateway/user-activity-audit-query.ts": ["exports"],
+    "src/knowledge/convert-pdf.ts": ["exports"],
+    "src/knowledge/html-markdown.ts": ["exports"],
+    "src/state/ix-auth-sessions-store.ts": ["exports"],
+    "ui/src/features/ix-auth/ix-auth-department-labels.ts": ["exports"],
+    "ui/src/features/ix-auth/ix-auth-form-state.ts": ["exports"],
+    "ui/src/features/ix-auth/ix-auth-role-labels.ts": ["exports"],
+    "ui/src/pages/departments/departments-gateway.ts": ["exports"],
+    "ui/src/pages/users/user-detail-panel.ts": ["exports"],
   },
   workspaces: {
     ".": {
