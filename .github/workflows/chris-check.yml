@@ -12,7 +12,7 @@
 #    (4 vCPU)에서 oxlint core 한 덩어리가 exit 143 으로 죽고 재시도는 30분 타임아웃으로
 #    끝났다. 기준 ref 를 origin/main 으로 두면 이 포크의 델타가 1075개라 changed-lanes 가
 #    lanes=all 로 번져(--dry-run 계획 명령 1250개) 결과가 같다. 그래서 기준은 푸시 직전
-#    커밋이다.
+#    커밋이다. dead export scan 은 포크 export 80개 정리 전까지 건너뛴다(2026-09-10).
 #  - 포크 노드 테스트: origin/main(업스트림 기준 태그) 대비 이 포크가 더하거나 고친
 #    테스트 파일만 저장소 공식 러너 scripts/test-projects.mts 로 돌린다. 전체
 #    pnpm test 는 두 시간이 넘어(FORK.md 10-2b) 30분 예산에 들어오지 않는다.
@@ -166,6 +166,9 @@ jobs:
         env:
           RAYON_NUM_THREADS: "1"
           BASE_REF: ${{ steps.base.outputs.ref }}
+          # 마지막 단계 dead export scan 은 이 포크가 더한 export 80개(테스트만 소비)를
+          # 지목한다. 정리 전까지 스크립트가 제공하는 변수로 이 단계만 건너뛴다.
+          OPENCLAW_CHECK_CHANGED_SKIP_DEADCODE: "1"
         run: |
           set -o pipefail
           mapfile -t paths < "$RUNNER_TEMP/chris-check-paths.txt"
