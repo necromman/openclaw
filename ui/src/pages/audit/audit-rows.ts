@@ -21,7 +21,7 @@ export const AUDIT_ACTIVITY_KIND_OPTIONS = [
   "access_denied",
 ] as const;
 
-export type AuditActivityKind = (typeof AUDIT_ACTIVITY_KIND_OPTIONS)[number];
+type AuditActivityKind = (typeof AUDIT_ACTIVITY_KIND_OPTIONS)[number];
 
 export type AuditActivityFilters = {
   person: string;

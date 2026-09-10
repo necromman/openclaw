@@ -4,7 +4,6 @@ import {
   canArchiveSessionRow,
   canDeleteSessionRows,
   canonicalUiSessionKeyForPersistence,
-  isUiHomeSessionKey,
   isUiHomeSessionRow,
   isUiSelectedGlobalSessionKey,
   parseSessionKeyParts,
@@ -61,7 +60,6 @@ describe("home session recognition", () => {
     ["short suffix", "agent:main:home-u0123456789abcde", false],
     ["non-hex suffix", "agent:main:home-uzzzzzzzzzzzzzzzz", false],
   ] as const)("resolves %s", (_name, key, expected) => {
-    expect(isUiHomeSessionKey(key, "home-u0123456789abcdef")).toBe(expected);
     expect(isUiHomeSessionRow({ key }, "home-u0123456789abcdef")).toBe(expected);
   });
 

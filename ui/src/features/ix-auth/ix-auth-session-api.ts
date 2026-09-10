@@ -315,7 +315,7 @@ export async function submitIxAuthMfaCode(params: {
 }
 
 /** End the session on both the Gateway and the identity server. */
-export async function submitIxAuthLogout(basePath: string): Promise<void> {
+async function submitIxAuthLogout(basePath: string): Promise<void> {
   const csrfToken = readIxAuthCsrfToken();
   try {
     await fetch(resolveIxAuthEndpoint(basePath, "logout"), {

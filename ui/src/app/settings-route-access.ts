@@ -27,7 +27,7 @@ import { readGatewayOperatorAccess } from "./operator-access.ts";
  * A subpage is judged by the entry that owns it, so hiding Agents also closes the agent
  * editor it links to rather than leaving a back door one URL deep.
  */
-export function isSettingsRouteAccessDenied(params: {
+function isSettingsRouteAccessDenied(params: {
   routeId: RouteId;
   settingsTakeover: boolean;
   canAdmin: boolean;
@@ -49,7 +49,7 @@ export function isSettingsRouteAccessDenied(params: {
  * It keeps the page title so the address the person typed still names something, and says
  * in one line who may open it.
  */
-export function renderSettingsAccessDenied(routeId: RouteId) {
+function renderSettingsAccessDenied(routeId: RouteId) {
   return html`
     <section class="content-header">
       <div>

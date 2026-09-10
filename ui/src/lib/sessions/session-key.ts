@@ -350,7 +350,7 @@ function homeSessionBaseKey(configuredMainKey: string | undefined | null): strin
  * sessions meets home keys that will never equal their own. Comparing shapes keeps every
  * home out of the sidebar tree; the row marker below is preferred when the server sends it.
  */
-export function isUiHomeSessionKey(
+function isUiHomeSessionKey(
   sessionKey: string | undefined | null,
   configuredMainKey: string | undefined | null,
 ): boolean {

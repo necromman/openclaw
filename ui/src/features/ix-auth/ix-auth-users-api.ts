@@ -55,7 +55,7 @@ export type IxAuthUserDetail = {
 };
 
 /** One row's outcome in a bulk import. */
-export type IxAuthImportRow = {
+type IxAuthImportRow = {
   line: number;
   email?: string;
   status: string;

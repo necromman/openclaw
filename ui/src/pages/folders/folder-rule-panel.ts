@@ -51,7 +51,7 @@ export function folderSubjectKey(kind: FolderRuleSubjectKind, id: string): strin
 }
 
 /** The reverse, for a selector whose value is a key. Undefined for the administrator view. */
-export function parseFolderSubjectKey(
+function parseFolderSubjectKey(
   value: string,
 ): { kind: FolderRuleSubjectKind; id: string } | undefined {
   const separator = value.indexOf(":");
@@ -67,7 +67,7 @@ export function parseFolderSubjectKey(
 }
 
 /** The account rows worth drawing on the people tab: search hits, plus anyone already ruled. */
-export function matchFolderUsers(params: {
+function matchFolderUsers(params: {
   users: readonly FolderSubjectUser[];
   query: string;
   ruledIds: readonly string[];
@@ -89,7 +89,7 @@ export function matchFolderUsers(params: {
 }
 
 /** The sentence under one row: what the Gateway answers today, and where it comes from. */
-export function folderEffectiveSentence(params: {
+function folderEffectiveSentence(params: {
   rules: FoldersRulesListResult | undefined;
   kind: FolderRuleSubjectKind;
   id: string;

@@ -66,12 +66,12 @@ export type ModelAuthSourceProvider = {
 const HEALTHY_AUTH_STATUS: ReadonlySet<string> = new Set(["ok", "expiring", "static"]);
 
 /** The wildcard entry that opens one whole provider. */
-export function providerWildcard(provider: string): string {
+function providerWildcard(provider: string): string {
   return `${provider}/*`;
 }
 
 /** The provider half of a model reference, or an empty string when there is none. */
-export function providerOf(ref: string): string {
+function providerOf(ref: string): string {
   const slash = ref.indexOf("/");
   return slash > 0 ? ref.slice(0, slash) : "";
 }
