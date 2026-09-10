@@ -49,9 +49,10 @@ export async function refreshFolderTree(params: {
   client: GatewayBrowserClient;
   path?: string;
 }): Promise<FoldersTreeRefreshResult> {
-  return params.client.request<FoldersTreeRefreshResult>("folders.tree.refresh", {
-    ...(params.path === undefined ? {} : { path: params.path }),
-  });
+  return params.client.request<FoldersTreeRefreshResult>(
+    "folders.tree.refresh",
+    params.path === undefined ? {} : { path: params.path },
+  );
 }
 
 /** Every rule that bears on one folder: its own, its inherited, and the verdict. */

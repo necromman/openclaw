@@ -294,7 +294,9 @@ export class FoldersPage extends OpenClawLightDomElement {
 
   /** Redraw every level the operator has open, now that the snapshot moved under them. */
   private async reloadOpenLevels(): Promise<void> {
-    for (const path of [...this.tree.keys()]) {
+    // The snapshot is taken before the loop: loadLevel writes back into the same map.
+    const openPaths = [...this.tree.keys()];
+    for (const path of openPaths) {
       await this.loadLevel(path);
     }
   }

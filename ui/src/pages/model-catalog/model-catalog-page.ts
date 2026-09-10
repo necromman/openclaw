@@ -212,7 +212,9 @@ export class ModelCatalogPage extends OpenClawLightDomElement {
       if (!this.connected) {
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, CATALOG_RETRY_DELAY_MS));
+      await new Promise((resolve) => {
+        setTimeout(resolve, CATALOG_RETRY_DELAY_MS);
+      });
     }
   }
 

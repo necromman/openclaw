@@ -66,9 +66,9 @@ export function registerFoldersCommand(program: Command): void {
     .description("Forget the folder snapshot; the screen reads the NAS live again")
     .option("--root <dir>", "Mount root to forget")
     .action(async (opts: Record<string, unknown>) => {
-      const options: FoldersClearCommandOptions = {
-        ...(optionalOption(opts.root) ? { root: optionalOption(opts.root) } : {}),
-      };
+      const options: FoldersClearCommandOptions = optionalOption(opts.root)
+        ? { root: optionalOption(opts.root) }
+        : {};
       await runCommandWithRuntime(defaultRuntime, async () => {
         await foldersClearCommand(options, defaultRuntime);
       });

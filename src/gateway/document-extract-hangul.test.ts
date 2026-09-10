@@ -179,7 +179,7 @@ describe("isHangulExtension", () => {
 describe("compound file reader", () => {
   test("lists storages and streams by full path", () => {
     const container = readCompoundFile(buildHwp({ flags: 1, paragraphs: ["가"] }));
-    expect([...container.streamNames].sort()).toEqual(["BodyText/Section0", "FileHeader"]);
+    expect(container.streamNames.toSorted()).toEqual(["BodyText/Section0", "FileHeader"]);
     expect(container.readStream("FileHeader")?.length).toBe(256);
     expect(container.readStream("BodyText/Missing")).toBeUndefined();
   });

@@ -407,8 +407,7 @@ export class UsersPage extends OpenClawLightDomElement {
       canDelete: this.session?.user?.isSuperAdmin === true,
       // An administrator manages everyone except the rank that could reverse them. The
       // Gateway enforces the same rule, so this only keeps the screen honest about it.
-      protectedTarget:
-        detail.user.isSuperAdmin === true && this.session?.user?.isSuperAdmin !== true,
+      protectedTarget: detail.user.isSuperAdmin && this.session?.user?.isSuperAdmin !== true,
       deleteArmed: this.deleteArmed,
       notice: this.notice,
       onDisplayNameInput: (value) => {

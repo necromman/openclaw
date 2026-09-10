@@ -160,7 +160,7 @@ function extractHwp(buffer: Buffer): HangulExtraction {
   const compressed = (flags & 0b1) !== 0;
   const sections = container.streamNames
     .filter((name) => /^BodyText\/Section\d+$/u.test(name))
-    .sort((left, right) => sectionIndex(left) - sectionIndex(right))
+    .toSorted((left, right) => sectionIndex(left) - sectionIndex(right))
     .slice(0, MAX_SECTIONS);
   const paragraphs: string[] = [];
   for (const name of sections) {
@@ -236,7 +236,7 @@ async function extractHwpx(buffer: Buffer): Promise<HangulExtraction> {
   }
   const names = Object.keys(zip.files)
     .filter((name) => /^Contents\/section\d+\.xml$/u.test(name))
-    .sort((left, right) => sectionIndex(stripXml(left)) - sectionIndex(stripXml(right)))
+    .toSorted((left, right) => sectionIndex(stripXml(left)) - sectionIndex(stripXml(right)))
     .slice(0, MAX_SECTIONS);
   if (names.length === 0) {
     return { ok: false, reason: "parse-failed" };
