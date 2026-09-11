@@ -281,6 +281,7 @@ describe("members panel", () => {
     const host = draw(
       renderDepartmentMembersPanel({
         members: [managedUser({ self: true })],
+        total: 1,
         query: "",
         results: [],
         searched: false,
