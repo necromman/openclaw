@@ -291,7 +291,11 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
   }
   const prefix = params.deps.settings.departmentGroupPrefix;
   const current = target.groups.filter((code) => prefix.length > 0 && code.startsWith(prefix));
-  let failed = false;
+  // Every step that did not take is named, not merely counted: an administrator who sees
+  // "partly applied" needs to know which department to look at, and the set the account
+  // is now in is reported as it actually stands rather than as it was asked for.
+  const failedDepartments: string[] = [];
+  const applied = new Set(current);
   for (const code of current) {
     if (requested.includes(code)) {
       continue;
@@ -300,7 +304,7 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
     if (!group) {
       // A department the account is in but the prefix no longer names. Left alone rather
       // than guessed at: removing it would need a group id this listing does not have.
-      failed = true;
+      failedDepartments.push(code);
       continue;
     }
     const removed = await removeIxAuthGroupMember({
@@ -308,7 +312,11 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
       groupId: group.groupId,
       userId: params.userId,
     });
-    failed = failed || !removed.ok;
+    if (removed.ok) {
+      applied.delete(code);
+    } else {
+      failedDepartments.push(code);
+    }
   }
   const grant = await grantIxAuthDepartments({
     deps: params.deps,
@@ -317,6 +325,10 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
     requested: requested.filter((code) => !current.includes(code)),
     fillAllWhenEmpty: false,
   });
+  for (const code of grant.granted) {
+    applied.add(code);
+  }
+  failedDepartments.push(...grant.failedCodes);
   const takedown = await endIxAuthUserSessions({
     ...params,
     target,
@@ -327,12 +339,14 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
     admin: params.admin,
     action: "user-departments",
     targetUserId: params.userId,
-    detail: { from: current, to: requested },
+    detail: { from: current, to: requested, failed: failedDepartments },
   });
   sendJson(params.res, 200, {
     userId: params.userId,
-    departments: requested,
-    departmentFailed: failed || grant.failed,
+    departments: [...applied],
+    requested,
+    departmentFailed: failedDepartments.length > 0,
+    failedDepartments,
     sessions: takedown,
   });
 }

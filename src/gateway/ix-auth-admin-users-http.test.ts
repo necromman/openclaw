@@ -363,17 +363,47 @@ describe("listing", () => {
     expect(listCall?.search).toContain("role=MEMBER");
   });
 
-  it("narrows by department over the fetched page and says so", async () => {
+  it("narrows by department over the whole directory, with the department's own total", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    // Three pages of 100 on the identity server; every third account is in QA, so the
+    // department has 100 people and a page of 25 must show 25 of 100, not 8 of 300.
+    const everyone = Array.from({ length: 300 }, (_, index) =>
+      userView({
+        id: String(5000 + index),
+        email: `person${index}@example.test`,
+        groups: index % 3 === 0 ? ["dept-qa"] : ["dept-rnd"],
+      }),
+    );
+    const calls = stubIdentityServer({
+      "/admin/users": (call) => {
+        const search = new URLSearchParams(call.search);
+        const page = Number(search.get("page"));
+        const size = Number(search.get("size"));
+        return jsonResponse({
+          data: { items: everyone.slice(page * size, page * size + size), page, size, total: 300 },
+        });
+      },
+    });
+    const answer = await callAdmin({
+      pathname: "/auth/admin/users?department=dept-qa&page=1&size=25",
+      headers: adminHeaders(session),
+    });
+    const body = JSON.parse(answer.body());
+    expect(body.total).toBe(100);
+    expect(body.page).toBe(1);
+    expect(body.users).toHaveLength(25);
+    // Page 1 of the department starts at its 26th member, who is index 75 overall.
+    expect(body.users[0].id).toBe("5075");
+    expect(body.departmentFilterApplied).toBe(true);
+    expect(calls.filter((call) => call.path === "/admin/users")).toHaveLength(3);
+  });
+
+  it("answers an empty department with no rows and a total of zero", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
     stubIdentityServer({
       "/admin/users": () =>
         jsonResponse({
-          data: {
-            items: [userView(), userView({ id: "3001", groups: ["dept-qa"] })],
-            page: 0,
-            size: 25,
-            total: 2,
-          },
+          data: { items: [userView(), userView({ id: "3001" })], page: 0, size: 100, total: 2 },
         }),
     });
     const answer = await callAdmin({
@@ -381,9 +411,8 @@ describe("listing", () => {
       headers: adminHeaders(session),
     });
     const body = JSON.parse(answer.body());
-    expect(body.users).toHaveLength(1);
-    expect(body.users[0].id).toBe("3001");
-    expect(body.departmentFilterApplied).toBe(true);
+    expect(body.users).toEqual([]);
+    expect(body.total).toBe(0);
   });
 });
 
@@ -680,6 +709,8 @@ describe("bulk import", () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
     const calls = stubIdentityServer({
       "/admin/groups": () => jsonResponse({ data: [{ id: 11, code: "dept-rnd", name: "R&D" }] }),
+      // The identity server numbers a JSON row by its array position from one, not by
+      // the spreadsheet line the file used.
       "/admin/users/bulk": () =>
         jsonResponse({
           data: {
@@ -688,9 +719,9 @@ describe("bulk import", () => {
             failed: 1,
             invited: 1,
             results: [
-              { line: 2, email: "person0@example.test", status: "CREATED", userId: 9001 },
+              { line: 1, email: "person0@example.test", status: "CREATED", userId: 9001 },
               {
-                line: 3,
+                line: 2,
                 email: "bad",
                 status: "FAILED",
                 error: "이메일 형식이 올바르지 않습니다.",
@@ -713,9 +744,90 @@ describe("bulk import", () => {
     expect(body.created).toBe(1);
     expect(body.failed).toBe(1);
     expect(body.departmentFailures).toBe(0);
+    // Reported back with the spreadsheet's own line numbers, header included.
+    expect(body.results.map((row: { line: number }) => row.line)).toEqual([2, 3]);
+    expect(body.results[0].departments).toEqual({ granted: ["dept-rnd"], failed: [] });
     const bulkCall = calls.find((call) => call.path === "/admin/users/bulk");
     expect(JSON.parse(bulkCall?.body ?? "{}").users).toHaveLength(2);
     expect(calls.some((call) => call.path === "/admin/groups/11/members")).toBe(true);
+  });
+
+  it("connects each person to their own department, in the identity server's numbering", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/groups": () =>
+        jsonResponse({
+          data: [
+            { id: 11, code: "dept-rnd", name: "R&D" },
+            { id: 12, code: "dept-qa", name: "QA" },
+          ],
+        }),
+      "/admin/users/bulk": () =>
+        jsonResponse({
+          data: {
+            total: 2,
+            created: 2,
+            failed: 0,
+            invited: 2,
+            results: [
+              { line: 1, email: "rnd@example.test", status: "CREATED", userId: 9001 },
+              { line: 2, email: "qa@example.test", status: "CREATED", userId: 9002 },
+            ],
+          },
+        }),
+      "POST /admin/groups/11/members": () => new Response(null, { status: 204 }),
+      "POST /admin/groups/12/members": () => new Response(null, { status: 204 }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/users/bulk",
+      headers: adminHeaders(session),
+      body: {
+        csv: "email,departments\nrnd@example.test,dept-rnd\nqa@example.test,dept-qa\n",
+      },
+    });
+    expect(answer.status()).toBe(200);
+    const placements = calls
+      .filter((call) => call.method === "POST" && call.path.endsWith("/members"))
+      .map((call) => ({ path: call.path, userId: JSON.parse(call.body).userId }));
+    // The first person goes into R&D and the second into QA: nobody is skipped and nobody
+    // inherits the row above.
+    expect(placements).toEqual([
+      { path: "/admin/groups/11/members", userId: 9001 },
+      { path: "/admin/groups/12/members", userId: 9002 },
+    ]);
+    const body = JSON.parse(answer.body());
+    expect(body.departmentFailures).toBe(0);
+    expect(body.results[1]).toMatchObject({
+      line: 3,
+      email: "qa@example.test",
+      departments: { granted: ["dept-qa"], failed: [] },
+    });
+  });
+
+  it("leaves a result alone when its address does not match the row at that position", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      "/admin/groups": () => jsonResponse({ data: [{ id: 11, code: "dept-rnd", name: "R&D" }] }),
+      "/admin/users/bulk": () =>
+        jsonResponse({
+          data: {
+            total: 1,
+            created: 1,
+            failed: 0,
+            invited: 1,
+            results: [{ line: 1, email: "someone-else@example.test", status: "CREATED", userId: 9009 }],
+          },
+        }),
+    });
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: "/auth/admin/users/bulk",
+      headers: adminHeaders(session),
+      body: { csv: "email,departments\nrnd@example.test,dept-rnd\n" },
+    });
+    expect(answer.status()).toBe(200);
+    expect(calls.some((call) => call.path.endsWith("/members"))).toBe(false);
   });
 
   it("refuses a role an ordinary administrator may not grant", async () => {

@@ -86,7 +86,6 @@ export class UsersPage extends OpenClawLightDomElement {
   @state() private users: IxAuthManagedUser[] = [];
   @state() private total = 0;
   @state() private pageIndex = 0;
-  @state() private departmentFilterApplied = false;
   @state() private departments: IxAuthDepartmentOption[] = [];
   @state() private query = "";
   @state() private statusFilter = "";
@@ -152,13 +151,20 @@ export class UsersPage extends OpenClawLightDomElement {
     this.errorKey = undefined;
     this.users = page.users;
     this.total = page.total;
-    this.departmentFilterApplied = page.departmentFilterApplied;
   }
 
-  /** Re-read the open account so the panel shows what the server now holds. */
-  private async selectUser(userId: string): Promise<void> {
+  /**
+   * Re-read the open account so the panel shows what the server now holds.
+   *
+   * Choosing a row clears the last result; refreshing after an action keeps it, because
+   * the invitation link or the session count that action produced is the one thing the
+   * administrator is looking at, and re-reading the account is not a reason to lose it.
+   */
+  private async selectUser(userId: string, options?: { keepNotice?: boolean }): Promise<void> {
     this.deleteArmed = false;
-    this.notice = undefined;
+    if (!options?.keepNotice) {
+      this.notice = undefined;
+    }
     const detail = await fetchIxAuthUserDetail({ basePath: this.basePath, userId });
     if (isIxAuthUsersFailure(detail)) {
       this.errorKey = detail.errorKey;
@@ -186,8 +192,41 @@ export class UsersPage extends OpenClawLightDomElement {
     const userId = this.selected?.user.id;
     await this.reload();
     if (userId) {
-      await this.selectUser(userId);
+      await this.selectUser(userId, { keepNotice: true });
     }
+  }
+
+  /**
+   * Save the department set, and say plainly when only part of it took.
+   *
+   * The Gateway answers 200 for a change it could only partly apply, naming the
+   * departments that did not take. Reading that as "saved" is how a person ends up
+   * outside a department their administrator believes they are in.
+   */
+  private async saveDepartments(userId: string): Promise<void> {
+    await this.mutate(async () => {
+      const result = await replaceIxAuthUserDepartments({
+        basePath: this.basePath,
+        userId,
+        departments: this.selectedDepartments,
+      });
+      if (isIxAuthUsersFailure(result)) {
+        return result;
+      }
+      this.notice = result.departmentFailed
+        ? t("ixAuth.users.departmentsPartiallyApplied", {
+            codes: this.describeDepartments(result.failedDepartments),
+          })
+        : t("ixAuth.users.departmentsSaved");
+      return result;
+    });
+  }
+
+  /** Department names for a list of codes, falling back to the code itself. */
+  private describeDepartments(codes: readonly string[]): string {
+    return codes
+      .map((code) => this.departments.find((item) => item.code === code)?.name ?? code)
+      .join(", ");
   }
 
   private async runAction(action: IxAuthUserActionName): Promise<void> {
@@ -379,11 +418,6 @@ export class UsersPage extends OpenClawLightDomElement {
         <span
           >${t("ixAuth.users.countLabel", { shown: String(shown), total: String(this.total) })}</span
         >
-        ${
-          this.departmentFilterApplied
-            ? html`<span>${t("ixAuth.users.departmentFilterNote")}</span>`
-            : nothing
-        }
       </div>
     `;
   }
@@ -435,14 +469,7 @@ export class UsersPage extends OpenClawLightDomElement {
         const remaining = this.selectedDepartments.filter((item) => item !== code);
         this.selectedDepartments = checked ? [...remaining, code] : remaining;
       },
-      onSaveDepartments: () =>
-        void this.mutate(() =>
-          replaceIxAuthUserDepartments({
-            basePath: this.basePath,
-            userId: detail.user.id,
-            departments: this.selectedDepartments,
-          }),
-        ),
+      onSaveDepartments: () => void this.saveDepartments(detail.user.id),
       onToggleStatus: () =>
         void this.mutate(() =>
           updateIxAuthUser({

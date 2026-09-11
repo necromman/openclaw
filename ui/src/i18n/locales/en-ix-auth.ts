@@ -159,8 +159,6 @@ const enIxAuth = {
       empty: "No accounts match these filters.",
       loading: "Loading",
       countLabel: "{shown} of {total}",
-      departmentFilterNote:
-        "The department filter narrows the page shown here, not the whole directory.",
       previousPage: "Previous",
       nextPage: "Next",
       columnName: "Name",
@@ -190,6 +188,9 @@ const enIxAuth = {
       deactivate: "Deactivate",
       rolesHelp: "Changing a role ends that person's sessions right away.",
       departmentsHelp: "Departments decide whose sessions this person can read.",
+      departmentsSaved: "Departments saved.",
+      departmentsPartiallyApplied:
+        "Only part of the change was applied. These departments did not take: {codes}. Check the boxes above against what the identity server holds and save again.",
       superAdminProtected:
         "This is a system administrator account. Only another system administrator can change its role, departments, or status.",
       mfaOn: "Two-step verification is on",
@@ -223,6 +224,8 @@ const enIxAuth = {
       importResult: "{created} created, {failed} failed.",
       importDepartmentFailures: "{count} rows were created without their department.",
       importRowFailed: "Line {line}: {error}",
+      importRowDepartmentsFailed:
+        "Line {line} ({email}): the account was created, but these departments were not applied: {codes}",
     },
     approvals: {
       title: "Signup approvals",
@@ -330,6 +333,12 @@ const enIxAuth = {
       memberAdd: "Add",
       memberAdded: "{email} joined {name}.",
       memberRemoved: "{email} left {name}.",
+      memberChangeIncomplete:
+        "The change for {email} was only partly applied. These departments did not take: {codes}. Check the list and try again.",
+      membersTruncated:
+        "Showing the first {shown} of {total} members. Use the user screen with the department filter to reach the rest.",
+      memberCountProjected:
+        "The identity server did not answer, so these counts only include people who have signed in here. Someone placed in a department who has not signed in yet is not counted.",
       memberSearchEmpty: "No account matched.",
       agentsTitle: "Agents",
       agentsDescription:
@@ -486,6 +495,8 @@ const enIxAuth = {
       modelNotAllowed: "The default or a fallback is not in the allowed list.",
       modelWriteFailed: "The Gateway could not write the configuration. Try again.",
       departmentHasMembers: "Somebody is still in that department, so it was not deleted.",
+      memberCountUnavailable:
+        "The identity server could not say whether anyone is still in that department, so it was not deleted. Try again shortly.",
       accountLocked: "This account is locked. Contact an administrator.",
       accountLockedUntil: "Too many attempts. Try again after {time}.",
       accountDisabled: "This account is disabled.",

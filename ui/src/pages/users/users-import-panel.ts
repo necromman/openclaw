@@ -79,6 +79,11 @@ class IxAuthUsersImport extends OpenClawLightDomContentsElement {
 
   private renderSummary(summary: IxAuthImportSummary): TemplateResult {
     const failures = summary.results.filter((row) => row.status !== "CREATED");
+    // Created, but not placed where the file said: reported per line, so the
+    // administrator can finish each person by hand instead of guessing from a count.
+    const partial = summary.results.filter(
+      (row) => row.status === "CREATED" && (row.departments?.failed.length ?? 0) > 0,
+    );
     return html`
       <div>
         <p>
@@ -102,6 +107,15 @@ class IxAuthUsersImport extends OpenClawLightDomContentsElement {
               ${t("ixAuth.users.importRowFailed", {
                 line: String(row.line),
                 error: row.error ?? row.status,
+              })}
+            </li>`,
+          )}
+          ${partial.map(
+            (row) => html`<li>
+              ${t("ixAuth.users.importRowDepartmentsFailed", {
+                line: String(row.line),
+                email: row.email ?? "",
+                codes: (row.departments?.failed ?? []).join(", "),
               })}
             </li>`,
           )}

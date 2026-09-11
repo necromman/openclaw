@@ -252,7 +252,7 @@ async function handleApprovalsRoute(params: {
           // Approving a signup chooses no role, so there is nothing to fill in.
           fillAllWhenEmpty: false,
         })
-      : { granted: [], failed: false };
+      : { granted: [], failed: false, failedCodes: [] };
   recordIxAuthAdminAction({
     deps: params.deps,
     admin: params.admin,

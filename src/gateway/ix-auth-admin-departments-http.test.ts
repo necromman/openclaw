@@ -178,6 +178,24 @@ function groupListing(): Response {
   });
 }
 
+/** One account as the identity server's directory lists it. */
+function directoryUser(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: "31",
+    email: "person@example.test",
+    name: "Person",
+    status: "PENDING",
+    failedCount: 0,
+    roles: ["MEMBER"],
+    groups: [],
+    ...overrides,
+  };
+}
+
+function emptyDirectory(): Response {
+  return jsonResponse({ data: { items: [], page: 0, size: 100, total: 0 } });
+}
+
 async function call(params: {
   method: string;
   cookie: string;
@@ -216,11 +234,28 @@ describe("GET /auth/admin/departments", () => {
     const cookie = seedSession(["SUPERADMIN"]);
     upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
     setDepartmentAgent({ agentId: "rnd-bot", departmentSlug: "rnd", nowMs: Date.now() });
-    stubIdentityServer({ "GET /admin/groups": groupListing });
+    stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      // Two people in R&D on the identity server, neither of whom has signed in here.
+      "GET /admin/users": () =>
+        jsonResponse({
+          data: {
+            items: [
+              directoryUser({ id: "31", groups: ["dept-rnd"] }),
+              directoryUser({ id: "32", groups: ["dept-rnd", "staff-all"] }),
+              directoryUser({ id: "33", groups: ["staff-all"] }),
+            ],
+            page: 0,
+            size: 100,
+            total: 3,
+          },
+        }),
+    });
     const answer = await call({ method: "GET", cookie });
     expect(answer.status()).toBe(200);
     const parsed = JSON.parse(answer.body());
     expect(parsed.prefix).toBe("dept-");
+    expect(parsed.memberCountSource).toBe("identity");
     expect(parsed.departments).toEqual([
       {
         code: "dept-rnd",
@@ -228,17 +263,31 @@ describe("GET /auth/admin/departments", () => {
         // The operator-authored name wins over the identity server's group name.
         name: "Research",
         identityName: "R and D",
-        memberCount: 0,
+        memberCount: 2,
         agents: ["rnd-bot"],
       },
     ]);
     expect(parsed.orphans).toEqual([]);
   });
 
+  it("falls back to the sign-in projection for counts, and says so, when the directory will not answer", async () => {
+    const cookie = seedSession(["SUPERADMIN"]);
+    upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
+    stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      "GET /admin/users": () => jsonResponse({ error: { code: "FORBIDDEN" } }, 403),
+    });
+    const answer = await call({ method: "GET", cookie });
+    expect(answer.status()).toBe(200);
+    const parsed = JSON.parse(answer.body());
+    expect(parsed.memberCountSource).toBe("projection");
+    expect(parsed.departments[0].memberCount).toBe(0);
+  });
+
   it("reports a department the identity server no longer lists", async () => {
     const cookie = seedSession(["SUPERADMIN"]);
     upsertDepartment({ slug: "legacy", displayName: "Old Team", nowMs: Date.now() });
-    stubIdentityServer({ "GET /admin/groups": groupListing });
+    stubIdentityServer({ "GET /admin/groups": groupListing, "GET /admin/users": emptyDirectory });
     const answer = await call({ method: "GET", cookie });
     expect(answer.status()).toBe(200);
     expect(JSON.parse(answer.body()).orphans).toEqual([
@@ -393,6 +442,48 @@ describe("DELETE /auth/admin/departments", () => {
       error: "department_has_members",
       memberCount: 1,
     });
+    expect(listDepartments().map((row) => row.slug)).toEqual(["rnd"]);
+    expect(calls.some((entry) => entry.method === "DELETE")).toBe(false);
+  });
+
+  it("counts members from the directory when the membership read is not served", async () => {
+    const cookie = seedSession(["SUPERADMIN"]);
+    upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
+    const calls = stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      // What the deployed identity server actually answers for this read.
+      "GET /admin/groups/7/members": () =>
+        jsonResponse({ error: { code: "METHOD_NOT_ALLOWED" } }, 405),
+      "GET /admin/users": () =>
+        jsonResponse({
+          data: {
+            items: [directoryUser({ id: "31", groups: ["dept-rnd"] })],
+            page: 0,
+            size: 100,
+            total: 1,
+          },
+        }),
+    });
+    const answer = await call({ method: "DELETE", cookie, body: { slug: "rnd" } });
+    expect(answer.status()).toBe(409);
+    expect(JSON.parse(answer.body())).toEqual({ error: "department_has_members", memberCount: 1 });
+    expect(calls.some((entry) => entry.method === "DELETE")).toBe(false);
+  });
+
+  it("refuses to delete on the sign-in projection alone when the identity server gives no count", async () => {
+    const cookie = seedSession(["SUPERADMIN"]);
+    // Nobody has signed in here, so the projection says the department is empty. That is
+    // not an answer, and the delete must not go through on it.
+    upsertDepartment({ slug: "rnd", displayName: "Research", nowMs: Date.now() });
+    const calls = stubIdentityServer({
+      "GET /admin/groups": groupListing,
+      "GET /admin/groups/7/members": () =>
+        jsonResponse({ error: { code: "METHOD_NOT_ALLOWED" } }, 405),
+      "GET /admin/users": () => jsonResponse({ error: { code: "FORBIDDEN" } }, 403),
+    });
+    const answer = await call({ method: "DELETE", cookie, body: { slug: "rnd" } });
+    expect(answer.status()).toBe(503);
+    expect(JSON.parse(answer.body())).toEqual({ error: "member_count_unavailable" });
     expect(listDepartments().map((row) => row.slug)).toEqual(["rnd"]);
     expect(calls.some((entry) => entry.method === "DELETE")).toBe(false);
   });

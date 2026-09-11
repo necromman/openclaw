@@ -10,9 +10,14 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import {
   getIxAuthUserDetail,
   listIxAuthUsers,
+  type IxAuthUserSummary,
 } from "../auth/ix-auth/ix-auth-admin-users-client.js";
 import { sendJson } from "./http-common.js";
-import { sendRelayFailure, type IxAuthAdminContext } from "./ix-auth-admin-context.js";
+import {
+  scanIxAuthDirectory,
+  sendRelayFailure,
+  type IxAuthAdminContext,
+} from "./ix-auth-admin-context.js";
 import { handleIxAuthAdminUserAction } from "./ix-auth-admin-users-actions.js";
 import { handleIxAuthUsersImport } from "./ix-auth-admin-users-bulk.js";
 import { isSelfIxAuthUser } from "./ix-auth-admin-users-guard.js";
@@ -51,42 +56,61 @@ async function handleListUsers(params: {
   const status = url.searchParams.get("status")?.toUpperCase();
   const role = url.searchParams.get("role")?.toUpperCase();
   const department = normalizeOptionalString(url.searchParams.get("department"));
-  const page = await listIxAuthUsers({
-    ...params.admin.call,
+  const filters = {
     query: normalizeOptionalString(url.searchParams.get("query")),
     status: status && IX_AUTH_LISTABLE_STATUSES.has(status) ? status : undefined,
     // A role code the deployment does not use answers with an empty page rather than an
     // error, which is the identity server's own contract for this filter.
     role: role && /^[A-Z][A-Z0-9_]*$/u.test(role) ? role : undefined,
-    page: readPositiveInteger(url.searchParams.get("page"), 0, Number.MAX_SAFE_INTEGER),
-    size: readPositiveInteger(
-      url.searchParams.get("size"),
-      IX_AUTH_USERS_DEFAULT_PAGE_SIZE,
-      IX_AUTH_USERS_MAX_PAGE_SIZE,
-    ),
-  });
-  if (!page.ok) {
-    sendRelayFailure(params.res, page);
-    return;
-  }
-  const rows = page.users.map((user) =>
+  };
+  const pageIndex = readPositiveInteger(
+    url.searchParams.get("page"),
+    0,
+    Number.MAX_SAFE_INTEGER,
+  );
+  const size = readPositiveInteger(
+    url.searchParams.get("size"),
+    IX_AUTH_USERS_DEFAULT_PAGE_SIZE,
+    IX_AUTH_USERS_MAX_PAGE_SIZE,
+  );
+  const project = (user: IxAuthUserSummary) =>
     projectIxAuthUser({
       user,
       settings: params.deps.settings,
       self: isSelfIxAuthUser({ admin: params.admin, userId: user.id }),
-    }),
-  );
+    });
+  if (!department) {
+    const page = await listIxAuthUsers({ ...params.admin.call, ...filters, page: pageIndex, size });
+    if (!page.ok) {
+      sendRelayFailure(params.res, page);
+      return;
+    }
+    sendJson(params.res, 200, {
+      users: page.users.map(project),
+      page: page.page,
+      size: page.size,
+      total: page.total,
+      departmentFilterApplied: false,
+    });
+    return;
+  }
   // The identity server's list API filters by text, status, and role, but not by group.
-  // Narrowing by department therefore happens here, over the page that was fetched, and
-  // the response says so: a screen that showed "3 of 40" without that flag would look
-  // like it had lost rows.
-  const filtered = department ? rows.filter((row) => row.departments.includes(department)) : rows;
+  // Narrowing by department is therefore done over the whole directory, so the total and
+  // the pages are the department's own: filtering one fetched page instead produced a
+  // "next" button that led to an empty page and a count that added up to more people
+  // than the deployment has.
+  const scan = await scanIxAuthDirectory({ admin: params.admin, ...filters });
+  if (!scan.ok) {
+    sendRelayFailure(params.res, scan.failure);
+    return;
+  }
+  const rows = scan.users.map(project).filter((row) => row.departments.includes(department));
   sendJson(params.res, 200, {
-    users: filtered,
-    page: page.page,
-    size: page.size,
-    total: page.total,
-    departmentFilterApplied: department !== undefined,
+    users: rows.slice(pageIndex * size, pageIndex * size + size),
+    page: pageIndex,
+    size,
+    total: rows.length,
+    departmentFilterApplied: true,
   });
 }
 

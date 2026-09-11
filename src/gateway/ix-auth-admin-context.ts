@@ -15,6 +15,10 @@ import {
   listIxAuthGroups,
   type IxAuthAdminCall,
 } from "../auth/ix-auth/ix-auth-admin-client.js";
+import {
+  listIxAuthUsers,
+  type IxAuthUserSummary,
+} from "../auth/ix-auth/ix-auth-admin-users-client.js";
 import type { IxAuthRelayFailure } from "../auth/ix-auth/ix-auth-client.js";
 import { canUseIxAuthAdminApi } from "../auth/ix-auth/ix-auth-role-map.js";
 import {
@@ -168,7 +172,12 @@ export function readIxAuthDepartmentCodesFromBody(body: Record<string, unknown>)
   return [...new Set(codes)];
 }
 
-export type IxAuthDepartmentGrant = { granted: string[]; failed: boolean };
+export type IxAuthDepartmentGrant = {
+  granted: string[];
+  failed: boolean;
+  /** The codes that did not take, so a screen can name them instead of saying "some". */
+  failedCodes: string[];
+};
 
 /**
  * Put one account into the departments it was invited into.
@@ -186,22 +195,22 @@ export async function grantIxAuthDepartments(params: {
   fillAllWhenEmpty: boolean;
 }): Promise<IxAuthDepartmentGrant> {
   if (params.requested.length === 0 && !params.fillAllWhenEmpty) {
-    return { granted: [], failed: false };
+    return { granted: [], failed: false, failedCodes: [] };
   }
   const listing = await listIxAuthDepartmentGroups({ deps: params.deps, admin: params.admin });
   if (!listing.ok) {
-    return { granted: [], failed: true };
+    return { granted: [], failed: true, failedCodes: [...params.requested] };
   }
   const wanted =
     params.requested.length > 0
       ? params.requested
       : listing.departments.map((department) => department.code);
   const granted: string[] = [];
-  let failed = false;
+  const failedCodes: string[] = [];
   for (const code of wanted) {
     const match = listing.departments.find((department) => department.code === code);
     if (!match) {
-      failed = true;
+      failedCodes.push(code);
       continue;
     }
     const added = await addIxAuthGroupMember({
@@ -212,8 +221,82 @@ export async function grantIxAuthDepartments(params: {
     if (added.ok) {
       granted.push(code);
     } else {
-      failed = true;
+      failedCodes.push(code);
     }
   }
-  return { granted, failed };
+  return { granted, failed: failedCodes.length > 0, failedCodes };
+}
+
+/** Accounts fetched per relay call while walking the whole directory. The server caps at 100. */
+const IX_AUTH_DIRECTORY_SCAN_PAGE_SIZE = 100;
+
+/**
+ * Pages the directory walk will read before giving up.
+ *
+ * A company of a few hundred people is a handful of pages. The cap is there so a server
+ * that keeps answering "more" (a broken total, a page counter that never advances) cannot
+ * hold a request open forever; hitting it is reported as a failure, not as a short list.
+ */
+const IX_AUTH_DIRECTORY_SCAN_MAX_PAGES = 50;
+
+export type IxAuthDirectoryScan =
+  | { ok: true; users: IxAuthUserSummary[] }
+  | { ok: false; failure: IxAuthRelayFailure };
+
+/**
+ * Read every account the identity server lists for one query.
+ *
+ * The identity server's list filters by text, status, and role, but knows nothing about
+ * departments, and its group-membership read is not answered by the deployed version.
+ * Everything the fork needs to say about "who is in this department" therefore comes
+ * from walking the list and reading each account's groups, which is the one source that
+ * includes people who have never signed in here.
+ */
+export async function scanIxAuthDirectory(params: {
+  admin: IxAuthAdminContext;
+  query?: string;
+  status?: string;
+  role?: string;
+}): Promise<IxAuthDirectoryScan> {
+  const users: IxAuthUserSummary[] = [];
+  const seen = new Set<string>();
+  for (let page = 0; page < IX_AUTH_DIRECTORY_SCAN_MAX_PAGES; page += 1) {
+    const result = await listIxAuthUsers({
+      ...params.admin.call,
+      query: params.query,
+      status: params.status,
+      role: params.role,
+      page,
+      size: IX_AUTH_DIRECTORY_SCAN_PAGE_SIZE,
+    });
+    if (!result.ok) {
+      return { ok: false, failure: result };
+    }
+    let added = 0;
+    for (const user of result.users) {
+      if (seen.has(user.id)) {
+        continue;
+      }
+      seen.add(user.id);
+      users.push(user);
+      added += 1;
+    }
+    // Done when the server says so, or when a page brought nothing new, which is the
+    // same fact stated by a server whose total is wrong.
+    if (result.users.length < IX_AUTH_DIRECTORY_SCAN_PAGE_SIZE || users.length >= result.total) {
+      return { ok: true, users };
+    }
+    if (added === 0) {
+      return { ok: true, users };
+    }
+  }
+  return {
+    ok: false,
+    failure: {
+      ok: false,
+      status: 502,
+      code: "IXAUTH_DIRECTORY_TOO_LARGE",
+      message: "directory walk exceeded its page limit",
+    },
+  };
 }

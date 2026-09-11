@@ -96,6 +96,8 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   @state() private selectedSlug: string | undefined;
   @state() private selectedAgentId: string | undefined;
   @state() private members: IxAuthManagedUser[] = [];
+  /** How many people the department holds, which can exceed the rows fetched. */
+  @state() private membersTotal = 0;
   @state() private searchQuery = "";
   @state() private searchResults: IxAuthManagedUser[] = [];
   @state() private searched = false;
@@ -197,6 +199,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     const department = this.selectedDepartment();
     if (!department) {
       this.members = [];
+      this.membersTotal = 0;
       return;
     }
     const page = await fetchIxAuthUsers({
@@ -209,6 +212,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
       return;
     }
     this.members = page.users;
+    this.membersTotal = page.total;
   }
 
   private async selectDepartment(slug: string): Promise<void> {
@@ -357,10 +361,17 @@ export class DepartmentsPage extends OpenClawLightDomElement {
         departments: join ? [...remaining, department.code] : remaining,
       });
       if (!isIxAuthUsersFailure(result)) {
-        this.notice = t(
-          join ? "ixAuth.departments.memberAdded" : "ixAuth.departments.memberRemoved",
-          { email: user.email, name: department.name },
-        );
+        // A 200 with failures named in it is a partial change, and is said so: the
+        // person may still be in, or still be out of, the department just clicked.
+        this.notice = result.departmentFailed
+          ? t("ixAuth.departments.memberChangeIncomplete", {
+              email: user.email,
+              codes: result.failedDepartments.join(", "),
+            })
+          : t(join ? "ixAuth.departments.memberAdded" : "ixAuth.departments.memberRemoved", {
+              email: user.email,
+              name: department.name,
+            });
         await this.loadMembers();
         this.searchResults = [];
         this.searched = false;
@@ -472,6 +483,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
             departments: this.directory?.departments ?? [],
             loading: this.loading,
             ...(this.selectedSlug ? { selectedSlug: this.selectedSlug } : {}),
+            ...(this.directory ? { memberCountSource: this.directory.memberCountSource } : {}),
             onSelect: (slug) => void this.selectDepartment(slug),
           }),
         }),
@@ -551,6 +563,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
           stacked: true,
           control: renderDepartmentMembersPanel({
             members: this.members,
+            total: this.membersTotal,
             query: this.searchQuery,
             results: this.searchResults,
             searched: this.searched,

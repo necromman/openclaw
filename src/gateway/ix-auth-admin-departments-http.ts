@@ -43,6 +43,7 @@ import {
 import { sendJson } from "./http-common.js";
 import {
   listIxAuthDepartmentGroups,
+  scanIxAuthDirectory,
   sendRelayFailure,
   type IxAuthAdminContext,
   type IxAuthDepartmentGroup,
@@ -81,7 +82,12 @@ function slugForGroupCode(code: string, prefix: string): string | undefined {
  * user screens read this list to choose from, and offering a code no group answers to
  * would produce an "unknown department" the moment someone picked it.
  */
-function projectDepartments(params: { groups: readonly IxAuthDepartmentGroup[]; prefix: string }): {
+function projectDepartments(params: {
+  groups: readonly IxAuthDepartmentGroup[];
+  prefix: string;
+  /** Members per group code as the identity server lists them, or undefined when it would not say. */
+  identityCounts: ReadonlyMap<string, number> | undefined;
+}): {
   departments: Record<string, unknown>[];
   orphans: Record<string, unknown>[];
 } {
@@ -101,12 +107,19 @@ function projectDepartments(params: { groups: readonly IxAuthDepartmentGroup[]; 
     // The operator-authored name wins when there is one. `upsertDepartment` stores the
     // bare slug for a department nobody has named, and that is not a display name.
     const chosen = row && row.display_name !== slug ? row.display_name : group.name;
+    // The identity server's count includes people who have never signed in here; the
+    // projection only knows who has. The response says which one it is giving.
+    const memberCount = params.identityCounts
+      ? (params.identityCounts.get(group.code) ?? 0)
+      : row
+        ? listDepartmentMembers(slug).length
+        : 0;
     departments.push({
       code: group.code,
       slug,
       name: chosen,
       identityName: group.name,
-      memberCount: row ? listDepartmentMembers(slug).length : 0,
+      memberCount,
       agents: agentsFor(slug),
     });
   }
@@ -132,8 +145,68 @@ async function handleList(params: DepartmentsRouteParams): Promise<void> {
     return;
   }
   const prefix = params.deps.settings.departmentGroupPrefix;
-  const projected = projectDepartments({ groups: listing.departments, prefix });
-  sendJson(params.res, 200, { prefix, ...projected });
+  const counted = await countIdentityMembers({ admin: params.admin, prefix });
+  const projected = projectDepartments({
+    groups: listing.departments,
+    prefix,
+    identityCounts: counted,
+  });
+  sendJson(params.res, 200, {
+    prefix,
+    memberCountSource: counted ? "identity" : "projection",
+    ...projected,
+  });
+}
+
+/**
+ * Members per department code, read from the identity server's own directory.
+ *
+ * Undefined when the directory could not be read, so the caller can fall back to the
+ * sign-in projection and say so, rather than showing every department as empty.
+ */
+async function countIdentityMembers(params: {
+  admin: IxAuthAdminContext;
+  prefix: string;
+}): Promise<Map<string, number> | undefined> {
+  const scan = await scanIxAuthDirectory({ admin: params.admin });
+  if (!scan.ok) {
+    return undefined;
+  }
+  const counts = new Map<string, number>();
+  for (const user of scan.users) {
+    for (const code of user.groups) {
+      if (params.prefix.length > 0 && code.startsWith(params.prefix)) {
+        counts.set(code, (counts.get(code) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+/**
+ * How many people the identity server still places in one group.
+ *
+ * The group-membership read is asked first, as the contract documents it; the deployed
+ * server answers it with 405, so the directory walk is the working path. Neither answer
+ * is ever replaced by the local projection: that only knows who has signed in here, and
+ * "nobody has signed in yet" is not "nobody is in it".
+ */
+async function countGroupMembers(params: {
+  admin: IxAuthAdminContext;
+  group: IxAuthDepartmentGroup;
+}): Promise<number | undefined> {
+  const members = await countIxAuthGroupMembers({
+    ...params.admin.call,
+    groupId: params.group.groupId,
+  });
+  if (members.ok) {
+    return members.count;
+  }
+  const scan = await scanIxAuthDirectory({ admin: params.admin });
+  if (!scan.ok) {
+    return undefined;
+  }
+  return scan.users.filter((user) => user.groups.includes(params.group.code)).length;
 }
 
 /** Read and check the `{ slug, name }` body both writers take. */
@@ -263,11 +336,14 @@ async function handleDelete(params: DepartmentsRouteParams): Promise<void> {
   // A department the identity server no longer lists is an orphan row: there is no group
   // to delete, and clearing the projection is the whole job.
   if (group) {
-    const members = await countIxAuthGroupMembers({ ...params.admin.call, groupId: group.groupId });
-    // A membership count the identity server would not answer is not proof of emptiness,
-    // so the local projection carries the check on its own rather than the delete
-    // proceeding on a missing answer.
-    const occupied = members.ok ? members.count : listDepartmentMembers(slug).length;
+    const occupied = await countGroupMembers({ admin: params.admin, group });
+    // A count the identity server would not give is not proof of emptiness. The delete
+    // waits for an answer rather than proceeding on the sign-in projection, which cannot
+    // see a person who was placed in the department and has not signed in yet.
+    if (occupied === undefined) {
+      sendJson(params.res, 503, { error: "member_count_unavailable" });
+      return;
+    }
     if (occupied > 0) {
       sendJson(params.res, 409, { error: "department_has_members", memberCount: occupied });
       return;

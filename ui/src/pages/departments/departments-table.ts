@@ -43,6 +43,12 @@ export function renderDepartmentsTable(params: {
   departments: readonly IxAuthDepartmentOption[];
   loading: boolean;
   selectedSlug?: string;
+  /**
+   * Where the member counts came from. Counts that only know who has signed in are not
+   * head counts, and shown as such they would invite deleting a department that is not
+   * empty; the note under the table says so when that is all the Gateway could give.
+   */
+  memberCountSource?: "identity" | "projection";
   onSelect: (slug: string) => void;
 }): TemplateResult {
   if (params.departments.length === 0) {
@@ -72,6 +78,13 @@ export function renderDepartmentsTable(params: {
         </tbody>
       </table>
     </div>
+    ${
+      params.memberCountSource === "projection"
+        ? html`<div class="callout" role="note">
+            ${t("ixAuth.departments.memberCountProjected")}
+          </div>`
+        : nothing
+    }
   `;
 }
 

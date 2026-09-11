@@ -40,6 +40,8 @@ function renderMemberRow(params: {
 /** Members of one department, plus a search box that adds one more. */
 export function renderDepartmentMembersPanel(params: {
   members: readonly IxAuthManagedUser[];
+  /** How many people the department holds; more than `members` when the page was capped. */
+  total: number;
   query: string;
   results: readonly IxAuthManagedUser[];
   searched: boolean;
@@ -53,6 +55,16 @@ export function renderDepartmentMembersPanel(params: {
   const candidates = params.results.filter((user) => !memberIds.has(user.id));
   return html`
     <div class="departments-members">
+      ${
+        params.total > params.members.length
+          ? html`<div class="callout" role="note">
+              ${t("ixAuth.departments.membersTruncated", {
+                shown: String(params.members.length),
+                total: String(params.total),
+              })}
+            </div>`
+          : nothing
+      }
       ${
         params.members.length === 0
           ? html`<p class="muted">${t("ixAuth.departments.membersEmpty")}</p>`

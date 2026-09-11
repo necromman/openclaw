@@ -242,22 +242,41 @@ export async function handleIxAuthUsersImport(params: {
     });
     return;
   }
+  // The identity server numbers a JSON row by its position in the array it was sent,
+  // starting at one; the file numbers it by the spreadsheet line, starting at two under
+  // the header. Matching the two by number once connected every result to the row after
+  // it, so the first person lost their department and each of the next got the previous
+  // person's. Rows are therefore matched by position, and the address is checked so a
+  // reordered answer can never place someone into a department they were not listed in.
   let departmentFailures = 0;
+  const results: Record<string, unknown>[] = [];
   for (const result of imported.summary.results) {
-    const row = parsed.rows.find((candidate) => candidate.line === result.line);
-    if (!row || !result.userId || row.departments.length === 0) {
+    const row = parsed.rows[result.line - 1];
+    const matched =
+      row !== undefined &&
+      (result.email === undefined || result.email.toLowerCase() === row.email.toLowerCase());
+    if (!matched) {
+      results.push({ ...result });
       continue;
     }
-    const grant = await grantIxAuthDepartments({
-      deps: params.deps,
-      admin: params.admin,
-      userId: result.userId,
-      requested: row.departments,
-      fillAllWhenEmpty: false,
-    });
-    if (grant.failed) {
-      departmentFailures += 1;
+    const reported: Record<string, unknown> = { ...result, line: row.line };
+    if (result.userId && row.departments.length > 0) {
+      const grant = await grantIxAuthDepartments({
+        deps: params.deps,
+        admin: params.admin,
+        userId: result.userId,
+        requested: row.departments,
+        fillAllWhenEmpty: false,
+      });
+      reported.departments = { granted: grant.granted, failed: grant.failedCodes };
+      if (grant.failed) {
+        departmentFailures += 1;
+      }
+    } else if (row.departments.length > 0) {
+      // The account was not created, so nothing was granted; the row already says why.
+      reported.departments = { granted: [], failed: [] };
     }
+    results.push(reported);
   }
   recordIxAuthAdminAction({
     deps: params.deps,
@@ -270,5 +289,5 @@ export async function handleIxAuthUsersImport(params: {
       departmentFailures,
     },
   });
-  sendJson(params.res, 200, { ...imported.summary, departmentFailures });
+  sendJson(params.res, 200, { ...imported.summary, results, departmentFailures });
 }

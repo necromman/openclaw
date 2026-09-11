@@ -41,6 +41,11 @@ export type IxAuthOrphanDepartment = {
 export type IxAuthDepartmentDirectory = {
   /** Group-code prefix that marks a department, `"dept-"` by default. */
   prefix: string;
+  /**
+   * Where the member counts came from. The identity server's directory counts everyone
+   * placed in a department; the sign-in projection only counts people seen here.
+   */
+  memberCountSource: "identity" | "projection";
   departments: IxAuthDepartmentOption[];
   orphans: IxAuthOrphanDepartment[];
 };
@@ -86,6 +91,8 @@ function mapAdminErrorToKey(status: number, code: string): string {
       return "adminConflict";
     case "department_has_members":
       return "departmentHasMembers";
+    case "member_count_unavailable":
+      return "memberCountUnavailable";
     case "identity_unavailable":
       return "identityUnavailable";
     default:
@@ -196,7 +203,13 @@ export async function fetchIxAuthDepartmentDirectory(
       agents: readStringListField(entry, "agents"),
     });
   }
-  return { prefix: fieldText(result.body, "prefix") ?? "", departments, orphans };
+  return {
+    prefix: fieldText(result.body, "prefix") ?? "",
+    memberCountSource:
+      fieldText(result.body, "memberCountSource") === "projection" ? "projection" : "identity",
+    departments,
+    orphans,
+  };
 }
 
 /** List the departments an invitation may place someone into. */

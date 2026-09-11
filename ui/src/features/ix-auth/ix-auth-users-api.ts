@@ -55,11 +55,14 @@ export type IxAuthUserDetail = {
 };
 
 /** One row's outcome in a bulk import. */
-type IxAuthImportRow = {
+export type IxAuthImportRow = {
+  /** The spreadsheet line, header counted, so the row can be found in the file. */
   line: number;
   email?: string;
   status: string;
   error?: string;
+  /** Present when the row asked for departments: which took and which did not. */
+  departments?: { granted: string[]; failed: string[] };
 };
 
 export type IxAuthImportSummary = {
@@ -114,6 +117,8 @@ function mapUsersErrorToKey(status: number, code: string): string {
       return "identityUnavailable";
     case "not_found":
       return "usersNotFound";
+    case "member_count_unavailable":
+      return "memberCountUnavailable";
     default:
       return status === 400 ? "adminRejected" : "unknown";
   }
@@ -323,21 +328,36 @@ export async function replaceIxAuthUserRoles(params: {
   );
 }
 
-/** Replace the whole department set. */
+/**
+ * Replace the whole department set.
+ *
+ * A 200 here is not "done": the Gateway applies the change one department at a time
+ * against the identity server, and reports the ones that did not take. Callers show
+ * those by name rather than treating the answer as a plain success.
+ */
 export async function replaceIxAuthUserDepartments(params: {
   basePath: string;
   userId: string;
   departments: readonly string[];
-}): Promise<{ kind: "ok"; departmentFailed: boolean } | IxAuthUsersFailure> {
+}): Promise<
+  | { kind: "ok"; departmentFailed: boolean; failedDepartments: string[]; departments: string[] }
+  | IxAuthUsersFailure
+> {
   const result = await callUsersRoute({
     basePath: params.basePath,
     path: `/${encodeURIComponent(params.userId)}/departments`,
     method: "PUT",
     body: { departments: [...params.departments] },
   });
-  return result.kind === "failed"
-    ? result
-    : { kind: "ok", departmentFailed: result.body.departmentFailed === true };
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    kind: "ok",
+    departmentFailed: result.body.departmentFailed === true,
+    failedDepartments: readStrings(result.body, "failedDepartments"),
+    departments: readStrings(result.body, "departments"),
+  };
 }
 
 /** The per-account buttons, each one relay call. */
@@ -407,11 +427,20 @@ export async function importIxAuthUsers(params: {
   for (const entry of rows) {
     const record = readRecord(entry);
     if (record) {
+      const departments = readRecord(record.departments);
       results.push({
         line: fieldCount(record, "line"),
         email: readStringField(record, "email"),
         status: readStringField(record, "status") ?? "FAILED",
         error: readStringField(record, "error"),
+        ...(departments
+          ? {
+              departments: {
+                granted: readStrings(departments, "granted"),
+                failed: readStrings(departments, "failed"),
+              },
+            }
+          : {}),
       });
     }
   }

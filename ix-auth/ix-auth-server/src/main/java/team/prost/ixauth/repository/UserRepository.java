@@ -60,6 +60,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("select distinct g.id from User u join u.groups g where u.id = :userId")
     List<Long> findGroupIds(@Param("userId") Long userId);
 
+    // OPENCLAW-FORK-DELTA: 계약(docs/contract/http-api.md)의 GET /admin/groups/{id}/members 구현용.
+    // 그룹 구성원을 로그인 여부와 무관하게 원본에서 센다. 순서는 id 오름차순으로 고정한다.
+    @Query("select u from User u join u.groups g where g.id = :groupId order by u.id")
+    List<User> findAllByGroupId(@Param("groupId") Long groupId);
+
     @Query("select distinct r.id from User u join u.roles r where u.id = :userId")
     List<Long> findDirectRoleIds(@Param("userId") Long userId);
 

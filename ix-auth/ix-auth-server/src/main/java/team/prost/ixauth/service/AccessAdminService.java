@@ -164,6 +164,18 @@ public class AccessAdminService {
         return group;
     }
 
+    /**
+     * 그룹 구성원 조회. 계약에 있는 GET 을 구현한다.
+     *
+     * <p>OPENCLAW-FORK-DELTA: 원본에는 추가·삭제만 있고 조회가 없어, 부서를 지우려는 관리자가
+     * "비었는가" 를 확인할 길이 로그인 이력뿐이었다. 아직 로그인하지 않은 사람도 구성원이다.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<team.prost.ixauth.domain.User> listMembers(Long groupId) {
+        getGroup(groupId);
+        return userRepository.findAllByGroupId(groupId);
+    }
+
     @Transactional
     public void addMember(Long groupId, Long userId, Long actorId) {
         var group = getGroup(groupId);

@@ -154,6 +154,22 @@ public class AccessAdminController {
         return ApiResponse.ok(g.getRoles().stream().map(r -> r.getCode()).sorted().toList());
     }
 
+    /**
+     * 그룹 구성원 목록. 계약 표의 {@code GET /admin/groups/{id}/members}.
+     *
+     * <p>OPENCLAW-FORK-DELTA: 원본 컨트롤러에는 POST·DELETE 만 있어 GET 이 405 였다.
+     * 비밀 없이 신원 네 칸만 준다. 화면이 부서를 비웠는지 확인하는 데 그 이상은 필요 없다.</p>
+     */
+    @GetMapping("/groups/{id}/members")
+    public ApiResponse<List<Map<String, Object>>> listMembers(@PathVariable Long id) {
+        guard.require(AdminGuard.ROLES_READ);
+        return ApiResponse.ok(service.listMembers(id).stream()
+                .<Map<String, Object>>map(u -> Map.of(
+                        "id", u.getId(), "email", u.getEmail(), "name", u.getName(),
+                        "status", u.getStatus().name()))
+                .toList());
+    }
+
     @PostMapping("/groups/{id}/members")
     public ResponseEntity<Void> addMember(@PathVariable Long id, @RequestBody MemberRequest req) {
         var actor = guard.require(AdminGuard.ROLES_WRITE);

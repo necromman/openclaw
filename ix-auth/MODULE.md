@@ -43,7 +43,7 @@ IX-Auth 는 포크의 **신원 공급자**다. 포크(OpenClaw Gateway)는 BFF �
 4. 이 문서 6절 "포크 로컬 델타" 표에 기록한다
 ```
 
-**급해서 벤더 트리에서 먼저 고쳐야 한다면**, 그 자리에 `// OPENCLAW-FORK-DELTA:` 주석을 남기고 6절 표에 반드시 적는다. 표에 없는 델타는 다음 재동기화에서 조용히 사라진다.
+**급해서 벤더 트리에서 먼저 고쳐야 한다면**, 그 자리에 `// OPENCLAW-FORK-DELTA:` 주석을 남기고 6절 표에 반드시 적는다. 표에 없는 델타는 다음 재동기화에서 알림 없이 사라진다.
 
 ## 4. 포크에서 쓰지 않는 부분
 
@@ -78,6 +78,7 @@ IX-Auth 는 포크의 **신원 공급자**다. 포크(OpenClaw Gateway)는 BFF �
 | `config/BootstrapRunner.java` | 최초 관리자에게 `SUPERADMIN` 을 먼저 찾아 부여(없으면 종전대로 `ADMIN`) | 위 시드가 없는 원본 스키마에서도 동작이 같고, 있는 곳에서는 무인 설치 직후 superadmin 이 1명 생긴다 | 제안 가치 있음. 원본에 역할 계층이 생기면 함께 올린다 |
 | `admin-ui/index.html` | fetch 3곳에 `forkCsrfHeaders()` 추가 | 게이트웨이 BFF(`/admin/identity/`) 뒤에서 열릴 때 세션 CSRF 토큰을 함께 보낸다. 쿠키가 없으면 헤더가 붙지 않아 독립 실행 동작은 그대로다 | 원본에는 무의미한 델타. 재동기화 때 다시 얹는다 |
 | `db/migration/{postgresql,mariadb,mysql}/V15__openclaw_executive_role.sql` | 신규. 역할 `EXECUTIVE` 시드(권한 부여 없음) | 포크가 임원 단계를 더해 5단계가 됐다. V14 는 고치지 않고 새 버전으로만 얹는다(2.2 규칙). 임원의 전 부서 열람은 역할이 아니라 `dept-` 그룹 전체 소속에서 나온다 | V14 와 같은 이유로 원본 반영 대상이 아니다 |
+| `api/admin/AccessAdminController.java`, `service/AccessAdminService.java`, `repository/UserRepository.java` | `GET /admin/groups/{id}/members` 구현(구성원 id·email·name·status 배열). 서비스 `listMembers`, 리포지토리 `findAllByGroupId` 추가 | 계약 표(`http-api.md` 역할·권한·그룹)에는 GET 이 있는데 컨트롤러에는 POST·DELETE 만 있어 운영에서 405 였다(2026-09-11 실측). 포크의 부서 삭제가 "비었는가" 를 로그인 투영으로 대신 판단하는 결함(ENTERPRISE-ACCESS-PLAN P0-3)의 원인. 계약 변경이 아니라 계약대로 구현한 것 | 원본 반영 가치 있음(계약과 구현의 불일치 수정). 재동기화 때 원본에 같은 GET 이 생기면 이 델타를 버린다 |
 | `build.gradle.kts` | `version` 에 `+openclaw.2` | 8절 표기 규칙 | 해당 없음 |
 
 ## 7. 설계 불변식 4개와 포크의 준수 상태
@@ -166,3 +167,9 @@ version = "0.1.0-SNAPSHOT+openclaw.1"
 | Gradle | 9.5.0 (wrapper 가 받는다) |
 
 **커밋하지 않는다.** `.gitignore` 가 막는다. 배포는 `docker/Dockerfile` 로 이미지를 만들어 쓴다.
+
+## 용어 설명
+
+- **토큰** - 로그인한 사람이 누구인지 증명하는 짧은 문자열. 서버가 서명해 발급하고 요청마다 함께 보낸다.
+- **게이트웨이** - 브라우저의 모든 요청이 먼저 닿는 앞단 서버. 이 포크에서는 OpenClaw Gateway 를 가리킨다.
+- **홉** - 요청이 목적지까지 가는 동안 거치는 중간 서버 한 단계.
