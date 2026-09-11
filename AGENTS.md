@@ -1,5 +1,55 @@
 # AGENTS.MD
 
+## Fork Session Index
+
+This checkout is `necromman/openclaw`, the Chris Agent fork for Jinbiotech, based on upstream `v2026.9.2`. Use this index to recover context; detailed policies and progress stay in their existing owners below.
+
+### Resume a session
+
+1. Inspect `git status -sb`, `git branch --show-current`, and `git log -5 --oneline`. Preserve unrelated changes.
+2. Read [FORK.md](FORK.md), especially section 3, then [chris-local/HANDOFF.md](chris-local/HANDOFF.md) and [chris-local/DELIVERY-PLAN.md](chris-local/DELIVERY-PLAN.md). Section 4 owns decisions; section 5 owns progress. Compare dated entries with current code before treating historical completion or deployment claims as current.
+3. Read the relevant topic below and every scoped `AGENTS.md` along the target path. Discover guides with `rg --files --hidden -g AGENTS.md -g '!node_modules' -g '!.git'`; exclude fixtures from instruction scope.
+4. Before handoff, record changed behavior, decisions, exact validation/results, unresolved work, and the next action in the existing delivery log; update HANDOFF when its summary changes. Keep secrets and transient logs out of this index.
+
+### Fork rules and precedence
+
+- This index routes existing fork decisions, not new approvals. Current user instructions govern; for fork-specific branch, deployment, branding, and validation workflows, consult FORK section 3 before applying the upstream defaults below. Other architecture/security gates still apply.
+- Work on `chris/main`; `main` is the upstream release baseline. No new branches/worktrees. Push triggers deployment; follow the task's authorized scope.
+- Fork routine validation: Actions plus deployed behavior, per FORK section 3. Do not run Windows Vitest/check or routine WSL check/test/format/compose verification. Historical WSL setup instructions are not the current routine workflow. Docs-only sanity: `pnpm docs:list`, reference checks, `git diff --check`.
+- Brand source: `src/brand.ts`; UI styling: `ui/src/styles/fork-style.css`. Preserve internal identifiers and license notices. Fork commits use Korean summaries; fork-authored text avoids U+2014, U+00A7, U+3161.
+- Root [CLAUDE.md](CLAUDE.md) is intentionally a regular fork guide, not an AGENTS symlink; preserve it. Its dated status and `.claude/PROMPT.md` are summaries. The latter's `chris-local/FORK.md` reference is stale: use root `FORK.md`. HANDOFF records later work than their D-K summary.
+
+### Task-to-source map
+
+| Task | Read first / implementation entry |
+| --- | --- |
+| Architecture, commands | `chris-local/CODEBASE.md`; `package.json`, `pnpm-workspace.yaml`; CLI `openclaw.mjs`, `src/entry.ts`, `src/cli/` |
+| Gateway, agent, UI | `src/gateway/AGENTS.md`, `src/agents/AGENTS.md`, `ui/AGENTS.md`; `packages/gateway-protocol/`; `docs/agent-runtime-architecture.md` |
+| Identity, roles, departments | `chris-local/AUTH-IXAUTH.md`, `chris-local/AUTH-USERS.md`, `chris-local/AUTH-DEPARTMENTS.md`, `chris-local/AUTH-SIGNUP.md`; `src/auth/ix-auth/` |
+| Vendored identity service | `ix-auth/MODULE.md`, `ix-auth/VENDOR.md`, `ix-auth/docs/contract/`; distinguish IX-Auth's database from OpenClaw SQLite |
+| Audit, storage | `chris-local/AUTH-AUDIT.md`, `docs/reference/database-schemas.md`; `src/state/` |
+| NAS access, knowledge, preview | `chris-local/NAS-FOLDER-ACL.md`, `chris-local/KNOWLEDGE.md`, `chris-local/FILE-PREVIEW.md` |
+| Enterprise identity / NAS improvement plan | `chris-local/ENTERPRISE-ACCESS-PLAN.md`: 2026-09-11 live NAS/site observations, source findings, ownership and phased rollout. Proposed policy changes are not implementation approvals. Private evidence stays in `chris-server`. |
+| Deployment, operator usage | `chris-local/DEPLOY.md`, `chris-local/nas/README.md`, `chris-local/MANUAL.md`; `chris-local/docker-compose.ixauth.yml`, `chris-local/ixauth-gateway-config/` |
+| Plugins, SDK, channels | `extensions/AGENTS.md`, `src/plugins/AGENTS.md`, `src/plugin-sdk/AGENTS.md`, `src/channels/AGENTS.md`; inspect deeper guides |
+| Docs, tools, tests | `docs/AGENTS.md`, `scripts/AGENTS.md`, `test/AGENTS.md`; `.agents/skills/technical-documentation/SKILL.md`, `.agents/skills/openclaw-testing/SKILL.md`, `.agents/skills/test-audit/SKILL.md` |
+| Infrastructure credentials | `chris-local/infra/README.md` routes to private `chris-server`; do not copy credentials or access details into this public fork |
+
+### Hooks and automated checks
+
+| Surface | Owner and activation |
+| --- | --- |
+| Agent setup/guard | `.claude/settings.json`: SessionStart runs frozen install with `--ignore-scripts`; PreToolUse calls `.claude/hooks/main-only-guard.py` for `Bash|PowerShell`. Inspect its matcher before assuming coverage in another tool host. |
+| Git commit hook | `package.json` prepare -> `scripts/prepare-git-hooks.mjs` -> `core.hooksPath=git-hooks`; `git-hooks/pre-commit` -> `scripts/pre-commit/guard-staged-content.mjs`. `--ignore-scripts` does not run prepare. Check `git config --get core.hooksPath`; file presence alone is not activation. |
+| Optional commit scanners | `.pre-commit-config.yaml` defines the separate prek setup. `CONTRIBUTING.md` documents the private `hooks.blockedLiteralsFile` guard. Never print its contents. |
+| Lint/format/type routing | `.oxlintrc.json`, `.oxfmtrc.jsonc`, `config/`, `tsconfig*.json`; `scripts/check-changed.mjs`, `scripts/changed-lanes.mjs`; select commands from `package.json` under the applicable validation policy. |
+| Fork CI / deployment | `.github/workflows/chris-check.yml` is independent and nonblocking for `.github/workflows/chris-deliver-images.yml`. A successful image build does not prove checks passed. Inspect skipped paths and selected tests in chris-check. |
+| Product hooks / skills | `docs/automation/hooks.md`, `src/hooks/`, `src/agents/agent-hooks/`; product skills in `skills/`, contributor workflows in `.agents/skills/`. These are separate from development-tool hooks. |
+
+Recheck environment facts each session: `node --version`, `pnpm --version`, `package.json` engines/packageManager, Git hook config. Index inspection on 2026-09-11 found Node `24.12.0` below the declared Node 24 floor (`24.15.0`) and no `core.hooksPath` value; this does not establish other machines' or running services' state.
+
+## Upstream Repository Rules
+
 Telegraph style. Root rules only. Read scoped `AGENTS.md` before subtree work.
 Skills own workflows; root owns hard policy and routing. Product direction and merge scope: `VISION.md`.
 
