@@ -816,7 +816,9 @@ describe("bulk import", () => {
             created: 1,
             failed: 0,
             invited: 1,
-            results: [{ line: 1, email: "someone-else@example.test", status: "CREATED", userId: 9009 }],
+            results: [
+              { line: 1, email: "someone-else@example.test", status: "CREATED", userId: 9009 },
+            ],
           },
         }),
     });

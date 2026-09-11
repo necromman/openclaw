@@ -63,11 +63,7 @@ async function handleListUsers(params: {
     // error, which is the identity server's own contract for this filter.
     role: role && /^[A-Z][A-Z0-9_]*$/u.test(role) ? role : undefined,
   };
-  const pageIndex = readPositiveInteger(
-    url.searchParams.get("page"),
-    0,
-    Number.MAX_SAFE_INTEGER,
-  );
+  const pageIndex = readPositiveInteger(url.searchParams.get("page"), 0, Number.MAX_SAFE_INTEGER);
   const size = readPositiveInteger(
     url.searchParams.get("size"),
     IX_AUTH_USERS_DEFAULT_PAGE_SIZE,

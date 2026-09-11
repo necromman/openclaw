@@ -836,9 +836,11 @@ describe("department listing", () => {
     });
     expect(answer.status()).toBe(200);
     // The listing carries the fork's own projection alongside each group. The two
-    // decorated fields are zero here because nothing has signed in or been bound.
+    // decorated fields are zero here because nothing has signed in or been bound, and
+    // with no directory stubbed the counts fall back to the sign-in projection and say so.
     expect(JSON.parse(answer.body())).toEqual({
       prefix: "dept-",
+      memberCountSource: "projection",
       departments: [
         {
           code: "dept-rnd",
