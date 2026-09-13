@@ -46,7 +46,7 @@ export type ResolvedTheme =
   | "custom"
   | "custom-light";
 
-const VALID_THEME_NAMES = new Set<ThemeName>([
+const VALID_THEME_NAMES: ReadonlySet<string> = new Set<ThemeName>([
   "claw",
   "knot",
   "dash",
@@ -61,7 +61,15 @@ const VALID_THEME_NAMES = new Set<ThemeName>([
   "custom",
 ]);
 
-const VALID_THEME_MODES = new Set<ThemeMode>(["system", "light", "dark"]);
+const VALID_THEME_MODES: ReadonlySet<string> = new Set<ThemeMode>(["system", "light", "dark"]);
+
+function isThemeName(value: string): value is ThemeName {
+  return VALID_THEME_NAMES.has(value);
+}
+
+function isThemeMode(value: string): value is ThemeMode {
+  return VALID_THEME_MODES.has(value);
+}
 
 /**
  * Prefix of the localStorage key holding UI preferences. The real key carries a
@@ -78,8 +86,8 @@ export function parseThemeSelection(
   const theme = typeof themeRaw === "string" ? themeRaw : "";
   const mode = typeof modeRaw === "string" ? modeRaw : "";
 
-  const normalizedTheme = VALID_THEME_NAMES.has(theme as ThemeName) ? (theme as ThemeName) : "claw";
-  const normalizedMode = VALID_THEME_MODES.has(mode as ThemeMode) ? (mode as ThemeMode) : "system";
+  const normalizedTheme = isThemeName(theme) ? theme : "claw";
+  const normalizedMode = isThemeMode(mode) ? mode : "system";
 
   return { theme: normalizedTheme, mode: normalizedMode };
 }
@@ -90,7 +98,7 @@ export function resolveThemeForMode(theme: ThemeName, mode: "light" | "dark"): R
     return mode === "light" ? "light" : "dark";
   }
   const family = theme === "knot" ? "openknot" : theme;
-  return (mode === "light" ? `${family}-light` : family) as ResolvedTheme;
+  return mode === "light" ? `${family}-light` : family;
 }
 
 export function resolvedModeForTheme(resolvedTheme: string): "light" | "dark" {
