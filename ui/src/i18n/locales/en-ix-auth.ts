@@ -345,6 +345,11 @@ const enIxAuth = {
       createSlugPlaceholder: "rnd",
       createSlugHint:
         "Lowercase letters, digits and hyphens. The group code becomes {prefix}{slug}.",
+      createSlugOverride: "Set the short code myself",
+      createSlugHide: "Go back to the short code written from the name",
+      createSlugInvalid:
+        "A short code is lowercase letters, digits and hyphens, starts and ends with a letter or digit, and is at most 32 characters.",
+      createCodePreview: "Group code: {code}",
       createName: "Name",
       createNamePlaceholder: "Research and development",
       createSubmit: "Create",

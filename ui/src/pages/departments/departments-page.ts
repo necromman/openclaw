@@ -48,6 +48,7 @@ import {
   type DepartmentDetailTab,
 } from "./department-detail-dialog.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
+import { autoDepartmentSlug } from "./department-slug.ts";
 import {
   bindDepartmentAgent,
   clearDepartmentAgentAccess,
@@ -87,6 +88,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   @state() private searched = false;
   @state() private createSlug = "";
   @state() private createName = "";
+  // The code follows the name until somebody types a code of their own.
+  @state() private createSlugDirty = false;
+  @state() private createSlugOpened = false;
   @state() private renameDraft = "";
   @state() private deleteArmedSlug: string | undefined;
   @state() private folders: DepartmentsFoldersListResult | undefined;
@@ -186,6 +190,23 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     );
   }
 
+  /**
+   * Every short code the directory already knows, live ones and orphans alike.
+   *
+   * An orphaned code still holds its place on the identity server as far as this screen
+   * can tell, so a guessed code steps around it rather than walking into a 409.
+   */
+  private takenDepartmentSlugs(): string[] {
+    const directory = this.directory;
+    if (!directory) {
+      return [];
+    }
+    return [
+      ...directory.departments.map((department) => department.slug ?? department.code),
+      ...directory.orphans.map((orphan) => orphan.slug),
+    ];
+  }
+
   private async loadMembers(): Promise<void> {
     const generation = ++this.membersGeneration;
     const department = this.selectedDepartment();
@@ -274,6 +295,8 @@ export class DepartmentsPage extends OpenClawLightDomElement {
         this.notice = t("ixAuth.departments.created", { code: created.code });
         this.createSlug = "";
         this.createName = "";
+        this.createSlugDirty = false;
+        this.createSlugOpened = false;
       }
       return created;
     });
@@ -499,11 +522,19 @@ export class DepartmentsPage extends OpenClawLightDomElement {
             slug: this.createSlug,
             name: this.createName,
             busy: this.busy,
+            slugOpened: this.createSlugOpened,
             onSlugInput: (value) => {
               this.createSlug = value;
+              this.createSlugDirty = true;
+            },
+            onSlugToggle: () => {
+              this.createSlugOpened = !this.createSlugOpened;
             },
             onNameInput: (value) => {
               this.createName = value;
+              if (!this.createSlugDirty) {
+                this.createSlug = autoDepartmentSlug(value, this.takenDepartmentSlugs());
+              }
             },
             onSubmit: () => void this.createDepartment(),
           }),

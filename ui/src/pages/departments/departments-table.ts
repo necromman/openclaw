@@ -10,6 +10,7 @@ import type {
   IxAuthOrphanDepartment,
 } from "../../features/ix-auth/ix-auth-admin-api.ts";
 import { t } from "../../i18n/index.ts";
+import { isDepartmentSlug } from "./department-slug.ts";
 
 function renderAgents(agents: readonly string[]): TemplateResult {
   return agents.length === 0
@@ -135,33 +136,35 @@ export function renderOrphanDepartments(
   `;
 }
 
-/** The create form. Slug and name are both required; the Gateway mints the code. */
+/**
+ * The create form. The person types a name; the short code is written for them.
+ *
+ * The code decides who is in the department, so it is not hidden: the group code it will
+ * produce is spelled out under the name field, and one link opens the field to override
+ * it. Only after that override does the code stop following the name, because a code
+ * somebody chose on purpose is not the screen's to overwrite on the next keystroke.
+ */
 export function renderDepartmentCreateForm(params: {
   prefix: string;
   slug: string;
   name: string;
   busy: boolean;
+  slugOpened: boolean;
   onSlugInput: (value: string) => void;
+  onSlugToggle: () => void;
   onNameInput: (value: string) => void;
   onSubmit: () => void;
 }): TemplateResult {
+  const slug = params.slug.trim();
+  const name = params.name.trim();
+  const slugValid = isDepartmentSlug(slug);
   return html`
     <div class="departments-form">
-      <label class="departments-form__field">
-        <span class="departments-form__label">${t("ixAuth.departments.createSlug")}</span>
-        <input
-          class="settings-input"
-          .value=${params.slug}
-          placeholder=${t("ixAuth.departments.createSlugPlaceholder")}
-          @input=${(event: Event) =>
-            // SAFETY: the listener is bound to this input element.
-            params.onSlugInput((event.target as HTMLInputElement).value)}
-        />
-      </label>
       <label class="departments-form__field departments-form__field--grow">
         <span class="departments-form__label">${t("ixAuth.departments.createName")}</span>
         <input
           class="settings-input"
+          data-department-create-name
           .value=${params.name}
           placeholder=${t("ixAuth.departments.createNamePlaceholder")}
           @input=${(event: Event) =>
@@ -171,19 +174,59 @@ export function renderDepartmentCreateForm(params: {
       </label>
       <button
         class="btn"
-        ?disabled=${
-          params.busy || params.slug.trim().length === 0 || params.name.trim().length === 0
-        }
+        ?disabled=${params.busy || name.length === 0 || !slugValid}
         @click=${() => params.onSubmit()}
       >
         ${t("ixAuth.departments.createSubmit")}
       </button>
-      <p class="departments-form__hint">
-        ${t("ixAuth.departments.createSlugHint", {
-          prefix: params.prefix,
-          slug: params.slug.trim() || t("ixAuth.departments.createSlugPlaceholder"),
+      <p class="departments-form__hint" data-department-code-preview>
+        ${t("ixAuth.departments.createCodePreview", {
+          code: `${params.prefix}${slug || t("ixAuth.departments.createSlugPlaceholder")}`,
         })}
       </p>
+      <button
+        class="departments-form__disclosure"
+        type="button"
+        aria-expanded=${params.slugOpened ? "true" : "false"}
+        @click=${() => params.onSlugToggle()}
+      >
+        ${t(
+          params.slugOpened
+            ? "ixAuth.departments.createSlugHide"
+            : "ixAuth.departments.createSlugOverride",
+        )}
+      </button>
+      ${
+        params.slugOpened
+          ? html`
+              <label class="departments-form__field departments-form__field--grow">
+                <span class="departments-form__label">${t("ixAuth.departments.createSlug")}</span>
+                <input
+                  class="settings-input"
+                  data-department-create-slug
+                  .value=${params.slug}
+                  placeholder=${t("ixAuth.departments.createSlugPlaceholder")}
+                  @input=${(event: Event) =>
+                    // SAFETY: the listener is bound to this input element.
+                    params.onSlugInput((event.target as HTMLInputElement).value)}
+                />
+              </label>
+              <p class="departments-form__hint">
+                ${t("ixAuth.departments.createSlugHint", {
+                  prefix: params.prefix,
+                  slug: slug || t("ixAuth.departments.createSlugPlaceholder"),
+                })}
+              </p>
+            `
+          : nothing
+      }
+      ${
+        slug.length > 0 && !slugValid
+          ? html`<p class="departments-form__hint departments-form__hint--error" role="alert">
+              ${t("ixAuth.departments.createSlugInvalid")}
+            </p>`
+          : nothing
+      }
     </div>
   `;
 }

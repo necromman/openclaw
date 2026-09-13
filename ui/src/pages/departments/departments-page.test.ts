@@ -15,8 +15,13 @@ import { renderDepartmentAccessPanel } from "./department-access-panel.ts";
 import { renderDepartmentAgentsTable } from "./department-agents-panel.ts";
 import { renderDepartmentDetailDialog } from "./department-detail-dialog.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
+import { autoDepartmentSlug } from "./department-slug.ts";
 import { buildDepartmentAgentPatch } from "./departments-gateway.ts";
-import { renderDepartmentDeleteForm, renderDepartmentsTable } from "./departments-table.ts";
+import {
+  renderDepartmentCreateForm,
+  renderDepartmentDeleteForm,
+  renderDepartmentsTable,
+} from "./departments-table.ts";
 
 registerIxAuthEnglish();
 vi.mock("../folders/folders-page.ts", () => ({}));
@@ -166,6 +171,95 @@ describe("department detail dialog", () => {
     }
     expect(props.onTab).not.toHaveBeenCalled();
     expect(props.onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("department create form", () => {
+  // The screen's own rule, exercised here as the form exercises it: the code follows the
+  // name until somebody opens the field and types one, and never afterwards.
+  function createForm(taken: readonly string[] = []) {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const state = { name: "", slug: "", dirty: false, opened: false };
+    const paint = (): void => {
+      render(
+        renderDepartmentCreateForm({
+          prefix: "dept-",
+          slug: state.slug,
+          name: state.name,
+          busy: false,
+          slugOpened: state.opened,
+          onSlugInput: (value) => {
+            state.slug = value;
+            state.dirty = true;
+            paint();
+          },
+          onSlugToggle: () => {
+            state.opened = !state.opened;
+            paint();
+          },
+          onNameInput: (value) => {
+            state.name = value;
+            if (!state.dirty) {
+              state.slug = autoDepartmentSlug(value, taken);
+            }
+            paint();
+          },
+          onSubmit: () => {},
+        }),
+        host,
+      );
+    };
+    paint();
+    const type = (selector: string, value: string): void => {
+      const input = host.querySelector<HTMLInputElement>(selector);
+      if (!input) {
+        throw new Error(`no input matched ${selector}`);
+      }
+      input.value = value;
+      input.dispatchEvent(new Event("input"));
+    };
+    return { host, state, type };
+  }
+
+  it("writes the short code from the name as it is typed", () => {
+    const form = createForm();
+    form.type("[data-department-create-name]", "연구개발");
+    expect(form.state.slug).toBe("yeongugaebal");
+    expect(form.host.querySelector("[data-department-code-preview]")?.textContent).toContain(
+      "dept-yeongugaebal",
+    );
+    expect(form.host.querySelector<HTMLButtonElement>(".btn")?.hasAttribute("disabled")).toBe(
+      false,
+    );
+  });
+
+  it("stops following the name once the code has been typed by hand", () => {
+    const form = createForm();
+    form.type("[data-department-create-name]", "품질");
+    expect(form.state.slug).toBe("pumjil");
+    form.host.querySelector<HTMLButtonElement>(".departments-form__disclosure")?.click();
+    form.type("[data-department-create-slug]", "qa");
+    form.type("[data-department-create-name]", "품질관리");
+    expect(form.state.slug).toBe("qa");
+    expect(form.host.querySelector("[data-department-code-preview]")?.textContent).toContain(
+      "dept-qa",
+    );
+  });
+
+  it("refuses to submit a hand-typed code the Gateway would reject", () => {
+    const form = createForm();
+    form.type("[data-department-create-name]", "Quality");
+    form.host.querySelector<HTMLButtonElement>(".departments-form__disclosure")?.click();
+    form.type("[data-department-create-slug]", "Quality Assurance");
+    expect(form.host.querySelector<HTMLButtonElement>(".btn")?.hasAttribute("disabled")).toBe(true);
+    expect(form.host.querySelector(".departments-form__hint--error")).not.toBeNull();
+  });
+
+  it("steps around a short code the directory already holds", () => {
+    const form = createForm(["pumjil"]);
+    form.type("[data-department-create-name]", "품질");
+    expect(form.state.slug).toBe("pumjil-2");
   });
 });
 
