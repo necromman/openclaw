@@ -4,6 +4,7 @@ import { html, render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { IxAuthManagedUser } from "../../features/ix-auth/ix-auth-users-api.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
+import { hasUnsavedUserDetails, reconcileUserDetailDrafts } from "./user-detail-drafts.ts";
 import { assignableRolesFor, renderUserDetailPanel } from "./user-detail-panel.ts";
 import { renderUsersTable } from "./users-table.ts";
 
@@ -162,6 +163,58 @@ describe("assignable roles", () => {
     expect(
       assignableRolesFor({ canGrantSuperAdmin: false, currentRoles: ["SUPERADMIN"] }),
     ).toContain("SUPERADMIN");
+  });
+});
+
+describe("detail draft refresh", () => {
+  const draft = {
+    displayNameDraft: "Unsaved name",
+    selectedRole: "EXECUTIVE",
+    selectedDepartments: ["dept-qa"],
+  };
+
+  it("keeps other edits and the discard warning after saving a role", () => {
+    const next = managedUser({ roles: ["EXECUTIVE"] });
+    const merged = reconcileUserDetailDrafts({
+      previous: managedUser(),
+      next,
+      draft,
+      savedField: "role",
+    });
+    expect(merged).toEqual(draft);
+    expect(hasUnsavedUserDetails(next, merged)).toBe(true);
+  });
+
+  it("retains the requested departments after a partial save for a retry", () => {
+    const next = managedUser({ departments: ["dept-rnd", "dept-qa"] });
+    const merged = reconcileUserDetailDrafts({ previous: managedUser(), next, draft });
+    expect(merged.selectedDepartments).toEqual(["dept-qa"]);
+    expect(hasUnsavedUserDetails(next, merged)).toBe(true);
+    const saved = reconcileUserDetailDrafts({
+      previous: next,
+      next,
+      draft,
+      savedField: "departments",
+    });
+    expect(saved.selectedDepartments).toEqual(next.departments);
+    expect(saved.displayNameDraft).toBe("Unsaved name");
+  });
+
+  it("resets every draft for a new account and refreshes untouched fields", () => {
+    const next = managedUser({ id: "3001", displayName: "Other user", departments: [] });
+    const merged = reconcileUserDetailDrafts({ previous: managedUser(), next, draft });
+    expect(merged).toEqual({
+      displayNameDraft: "Other user",
+      selectedRole: "MEMBER",
+      selectedDepartments: [],
+    });
+    expect(hasUnsavedUserDetails(next, merged)).toBe(false);
+    const refreshed = reconcileUserDetailDrafts({
+      previous: next,
+      next: { ...next, displayName: "Renamed" },
+      draft: merged,
+    });
+    expect(refreshed.displayNameDraft).toBe("Renamed");
   });
 });
 

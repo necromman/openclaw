@@ -40,6 +40,11 @@ import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import { renderUserDetailDialog } from "./user-detail-dialog.ts";
+import {
+  hasUnsavedUserDetails,
+  reconcileUserDetailDrafts,
+  type UserDetailDraftField,
+} from "./user-detail-drafts.ts";
 import { renderUserDetailPanel } from "./user-detail-panel.ts";
 import "./ix-auth-invite-section.ts";
 import "./users-import-panel.ts";
@@ -48,10 +53,8 @@ import "./user-folder-permissions.ts";
 
 registerIxAuthEnglish();
 
-/** Accounts per page. One screenful for a company of the size this fork serves. */
 const IX_AUTH_USERS_PAGE_SIZE = 25;
 
-/** Filter choices, in the order an administrator scans them. */
 const IX_AUTH_STATUS_FILTERS: readonly string[] = Object.freeze([
   "ACTIVE",
   "PENDING",
@@ -60,9 +63,6 @@ const IX_AUTH_STATUS_FILTERS: readonly string[] = Object.freeze([
   "DISABLED",
 ]);
 
-// Every rank the fork maps, so "filter by role" can name the same five the directory
-// column shows. Leaving one out makes its holders unreachable through the filter and
-// looks like the role does not exist.
 const IX_AUTH_ROLE_FILTERS: readonly string[] = Object.freeze([
   "SUPERADMIN",
   "ADMIN",
@@ -128,13 +128,6 @@ export class UsersPage extends OpenClawLightDomElement {
     super.disconnectedCallback();
   }
 
-  private canManage(): boolean {
-    // The shared predicate, so this page and the navigation that leads to it never
-    // disagree. It is a role test, not a console-URL test: the console is superadmin only
-    // while these routes serve admins too.
-    return canManageIxAuthUsers();
-  }
-
   private async load(): Promise<void> {
     const lifecycle = this.lifecycle;
     const session = this.session ?? (await probeIxAuthSession(this.basePath));
@@ -142,8 +135,7 @@ export class UsersPage extends OpenClawLightDomElement {
       return;
     }
     this.session = session;
-    if (!this.canManage()) {
-      // A second probe would not change the answer, and the page says why below.
+    if (!canManageIxAuthUsers()) {
       return;
     }
     const [departments] = await Promise.all([fetchIxAuthDepartments(this.basePath), this.reload()]);
@@ -182,11 +174,23 @@ export class UsersPage extends OpenClawLightDomElement {
     this.total = page.total;
   }
 
-  private async selectUser(userId: string, options?: { keepNotice?: boolean }): Promise<void> {
+  private get detailDraft() {
+    return {
+      displayNameDraft: this.displayNameDraft,
+      selectedRole: this.selectedRole,
+      selectedDepartments: this.selectedDepartments,
+    };
+  }
+
+  private async selectUser(
+    userId: string,
+    options?: { keepNotice?: boolean; savedField?: UserDetailDraftField },
+  ): Promise<void> {
     if (this.busy && !options?.keepNotice) {
       return;
     }
     const request = ++this.detailRequest;
+    const previous = options?.keepNotice ? this.selected?.user : undefined;
     this.detailUserId = userId;
     if (!options?.keepNotice) {
       this.selected = undefined;
@@ -211,15 +215,20 @@ export class UsersPage extends OpenClawLightDomElement {
       return;
     }
     this.selected = detail;
-    this.displayNameDraft = detail.user.displayName;
-    this.selectedRole = detail.user.roles[0] ?? "MEMBER";
-    this.selectedDepartments = [...detail.user.departments];
+    Object.assign(
+      this,
+      reconcileUserDetailDrafts({
+        previous,
+        next: detail.user,
+        draft: this.detailDraft,
+        savedField: options?.savedField,
+      }),
+    );
   }
 
-  /** Run one mutation, then refresh both the row and the list behind it. */
   private async mutate<T>(
     run: () => Promise<T | IxAuthUsersFailure>,
-    onSuccess?: (result: T) => void,
+    onSuccess?: (result: T) => UserDetailDraftField | void,
   ): Promise<void> {
     if (this.busy) {
       return;
@@ -236,11 +245,11 @@ export class UsersPage extends OpenClawLightDomElement {
         this.errorKey = result.errorKey;
         return;
       }
-      onSuccess?.(result);
+      const savedField = onSuccess?.(result) || undefined;
       const userId = this.selected?.user.id;
       await this.reload();
       if (lifecycle === this.lifecycle && userId) {
-        await this.selectUser(userId, { keepNotice: true });
+        await this.selectUser(userId, { keepNotice: true, savedField });
       }
     } finally {
       if (lifecycle === this.lifecycle) {
@@ -263,11 +272,11 @@ export class UsersPage extends OpenClawLightDomElement {
               codes: this.describeDepartments(result.failedDepartments),
             })
           : t("ixAuth.users.departmentsSaved");
+        return result.departmentFailed ? undefined : "departments";
       },
     );
   }
 
-  /** Department names for a list of codes, falling back to the code itself. */
   private describeDepartments(codes: readonly string[]): string {
     return codes
       .map((code) => this.departments.find((item) => item.code === code)?.name ?? code)
@@ -337,7 +346,6 @@ export class UsersPage extends OpenClawLightDomElement {
     `;
   }
 
-  /** Every filter change restarts at the first page: page 3 of a new query is nowhere. */
   private applyFilter(patch: {
     query?: string;
     statusFilter?: string;
@@ -416,8 +424,6 @@ export class UsersPage extends OpenClawLightDomElement {
             ${t("ixAuth.users.importToggle")}
           </button>
           ${
-            // The console runs its own permission model and its own sign-in. It stays
-            // available to the account that owns the deployment, and nobody else needs it.
             this.session?.user?.isSuperAdmin && this.session.adminConsoleUrl
               ? html`<a
                   class="btn"
@@ -486,8 +492,6 @@ export class UsersPage extends OpenClawLightDomElement {
       busy: this.busy,
       canGrantSuperAdmin: this.session?.user?.isSuperAdmin === true,
       canDelete: this.session?.user?.isSuperAdmin === true,
-      // An administrator manages everyone except the rank that could reverse them. The
-      // Gateway enforces the same rule, so this only keeps the screen honest about it.
       protectedTarget: detail.user.isSuperAdmin && this.session?.user?.isSuperAdmin !== true,
       deleteArmed: this.deleteArmed,
       notice: this.notice,
@@ -495,12 +499,14 @@ export class UsersPage extends OpenClawLightDomElement {
         this.displayNameDraft = value;
       },
       onSaveDisplayName: () =>
-        void this.mutate(() =>
-          updateIxAuthUser({
-            basePath: this.basePath,
-            userId: detail.user.id,
-            displayName: this.displayNameDraft.trim(),
-          }),
+        void this.mutate(
+          () =>
+            updateIxAuthUser({
+              basePath: this.basePath,
+              userId: detail.user.id,
+              displayName: this.displayNameDraft.trim(),
+            }),
+          () => "name",
         ),
       onRoleChange: (role) => {
         this.selectedRole = role;
@@ -515,6 +521,7 @@ export class UsersPage extends OpenClawLightDomElement {
             }),
           () => {
             this.notice = t("ixAuth.users.rolesSaved");
+            return "role";
           },
         ),
       onDepartmentToggle: (code, checked) => {
@@ -556,7 +563,7 @@ export class UsersPage extends OpenClawLightDomElement {
         </div>
       </section>
     `;
-    if (!this.canManage()) {
+    if (!canManageIxAuthUsers()) {
       return html`
         ${header}
         ${renderSettingsWorkspace(
@@ -628,13 +635,7 @@ export class UsersPage extends OpenClawLightDomElement {
     if (this.busy || this.foldersBusy) {
       return;
     }
-    const user = this.selected?.user;
-    const dirty =
-      user &&
-      (this.displayNameDraft !== user.displayName ||
-        this.selectedRole !== (user.roles[0] ?? "MEMBER") ||
-        [...this.selectedDepartments].sort().join("\n") !==
-          [...user.departments].sort().join("\n"));
+    const dirty = hasUnsavedUserDetails(this.selected?.user, this.detailDraft);
     if (!discard && (dirty || this.foldersDirty)) {
       this.discardArmed = true;
       return;
@@ -680,7 +681,7 @@ export class UsersPage extends OpenClawLightDomElement {
       onKeepEditing: () => {
         this.discardArmed = false;
       },
-      onRetry: () => void this.selectUser(this.detailUserId!),
+      onRetry: () => void this.selectUser(this.detailUserId!, { keepNotice: true }),
       onTab: (tab) => {
         this.detailTab = tab;
         if (tab === "folders") this.foldersOpened = true;
