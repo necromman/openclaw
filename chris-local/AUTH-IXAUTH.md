@@ -149,6 +149,38 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 - 로그인 화면으로 갈 때 현재 경로를 `sessionStorage` 에 적어 두고 로그인 성공 후 그 주소로 돌려보낸다. 같은 문서 절대경로만 받아들인다(`//` 로 시작하거나 스킴이 붙은 값은 버린다).
 - 프로브가 답을 못 받은 경우(`unavailable`)는 "로그아웃" 으로 기록하지 않는다. 기록하면 재배포 동안 사이드바와 설정 메뉴가 계정 없는 모드로 떨어진다.
 
+### 3.5 유휴 창은 활동으로 민다 (2026-09-13 운영 실측)
+
+3.4 를 배포한 뒤에도 열려 있던 탭이 로그아웃됐다. 실측으로 드러난 것은 **재배포와 무관한 별개의 결함**이었고, 3.4 의 판정 경로(JWKS·refresh)는 한 번도 타지 않았다.
+
+운영 DB 실측(2026-09-13 20:04 조회): `ix_auth_login_sessions` 의 **모든 행**이 `last_seen_at == created_at` 이었다. 즉 유휴 창이 한 번도 밀린 적이 없다. 폐기 사유 집계에서도 `idle-expired` 26건이 최다였고, 문제의 탭은 19:26:15 로그인 -> 유휴 만료 19:56:15 -> 게이트웨이가 19:56:24 에 리스닝을 시작하자마자 19:56:28 에 `idle-expired` 로 폐기됐다. 브라우저가 본 것은 "200 비인증 + 쿠키 삭제" 였고, 그것은 3.4 가 의도한 503 경로가 아니라 **정상적인 유휴 만료 처리**였다.
+
+왜 한 번도 밀리지 않았나. 유휴 창을 미는 것은 세션 해석기의 `touch` 인자 하나인데, 부르는 쪽이 전부 `touch: false` 였다.
+
+| 경로 | touch | 이유 |
+| --- | --- | --- |
+| WS 핸드셰이크(`auth-context.ts`·`auth.ts`) | false | 재연결 루프가 버려진 탭을 살려 두면 안 된다 |
+| 관리 콘솔 프록시(`ix-auth-http-stage.ts`) | false | 별도 문서가 Control UI 의 창을 밀면 안 된다 |
+| `GET /auth/me` | false | 프로브일 뿐이라고 보았다 |
+| `POST /auth/refresh` | **true** | 유일한 토치. 그런데 **Control UI 는 이 경로를 부르지 않는다** |
+
+그래서 사람이 아무리 일해도 세션은 로그인 후 정확히 `idleTimeoutMinutes`(30분) 만에 죽었다. 죽은 것을 알아차리는 순간이 대개 재배포 직후의 첫 프로브라서 "배포가 로그아웃시켰다" 로 보였을 뿐이다.
+
+**지금은 활동이 창을 민다**(`src/auth/ix-auth/ix-auth-session-activity.ts` 의 `noteIxAuthSessionActivity`).
+
+| 신호 | 창을 미는가 | 근거 |
+| --- | --- | --- |
+| 인증된 WS 요청 프레임(`authenticated-request-dispatch.ts`) | 민다 | 사람이 실제로 무언가를 했다는 유일한 증거 |
+| `GET /auth/me` 성공(`ix-auth-http.ts`) | 민다 | 살아 있는 문서가 쿠키를 들고 물었다 |
+| WS 핸드셰이크·관리 콘솔 문서 | 밀지 않는다 | 3.2 의 규칙 그대로 |
+
+- 쓰기는 세션당 **60초에 한 번**으로 조인다(`IX_AUTH_ACTIVITY_TOUCH_INTERVAL_MS`). 인메모리 스로틀이 앞에 있어 대부분의 RPC 는 DB 를 건드리지 않는다.
+- 미는 폭은 설정을 다시 읽지 않고 **행 자신이 들고 있는 창 길이**(`idle_expires_at - last_seen_at`)를 쓴다.
+- **절대 만료는 넘지 않는다.** 활동은 유휴 창을 밀 뿐 세션의 총 수명을 늘리지 않는다.
+- **되살리지 않는다.** 이미 폐기됐거나 만료된 행은 그대로 둔다. 세션을 끝낼 권한은 해석기와 로그아웃에만 있다.
+
+진단: `last_seen_at` 이 `created_at` 과 같은 행만 쌓인다면 이 수정 이전 이미지다.
+
 ## 4. 설정 키
 
 ```json5
@@ -387,6 +419,7 @@ docker compose --env-file chris-local/ixauth.env \
 | 쿠키가 아예 안 저장된다                     | HTTPS 도 루프백도 아닌 접근. `__Host-` 쿠키는 그런 곳에 저장되지 않는다        |
 | 재배포 후 열린 탭이 계속 "다시 연결 중"     | 3.4. `/auth/me` 가 503 이면 정상 대기, 200 비인증이면 로그인 화면으로 바뀌어야 한다 |
 | 재배포 후 새로고침하면 로그인 화면          | 3.4. 세션 행의 `revoke_reason` 을 본다. `identity-token-invalid:jwks_unavailable` 또는 `identity-refresh-failed:IXAUTH_UNAVAILABLE` 이 보이면 이 수정 이전 이미지다 |
+| 30분쯤 쓰다 보면 로그아웃된다               | 3.5. 세션 행이 `idle-expired` 로 폐기되고 `last_seen_at == created_at` 이면 유휴 창이 안 밀리는 이 수정 이전 이미지다 |
 
 ## 8. 되돌리기
 
@@ -427,6 +460,7 @@ docker compose --env-file chris-local/ixauth.env \
 | `src/gateway/ix-auth-principal.ts`                   | 요청·핸드셰이크 -> principal                         |
 | `ui/src/features/ix-auth/ix-auth-session-api.ts`     | Control UI 클라이언트                                |
 | `ui/src/features/ix-auth/ix-auth-reconnect.ts`       | 재연결 거절 분류·복구 판정·로그인 후 복귀 주소 (3.4) |
+| `src/auth/ix-auth/ix-auth-session-activity.ts`        | 활동으로 유휴 창 밀기 (3.5)                          |
 | `ui/src/features/ix-auth/ix-auth-form-state.ts`      | 로그인 폼 상태                                       |
 | `ui/src/components/ix-auth-login.ts`                 | 로그인 화면 (지연 로드)                              |
 | `ui/src/pages/connection/ix-auth-account-section.ts` | 계정 표시·로그아웃·콘솔 링크                         |
@@ -453,6 +487,7 @@ docker compose --env-file chris-local/ixauth.env \
 | `src/gateway/server/ws-connection/connect-device-tokens.ts`          | 기기 토큰 미발급                             |
 | `src/gateway/server/ws-connection/connect-user-profile.ts`           | `boundProfileId`                             |
 | `src/gateway/server/ws-connection/connect-session.ts`                | principal 전달                               |
+| `src/gateway/server/ws-connection/authenticated-request-dispatch.ts` | 요청 프레임 -> 세션 활동 기록 (3.5)          |
 | `src/gateway/server/ws-connection/message-handler-types.ts`          | 상태 필드 2개                                |
 | `packages/gateway-protocol/src/schema/snapshot.ts`                   | `authMode` 유니온                            |
 | `ui/src/app/app-root.ts`                                             | 세션 부트스트랩 + 로그인 화면 분기           |

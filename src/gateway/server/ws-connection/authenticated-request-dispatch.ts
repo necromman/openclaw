@@ -34,6 +34,23 @@ const loadGatewayServerMethods = createLazyPromise(
   () => import("./authenticated-request-dispatch.server-methods.runtime.js"),
 );
 
+// Loaded only once an ix-auth connection actually sends something, so a deployment that
+// never enables the mode keeps the identity tables out of its startup graph.
+const loadIxAuthSessionActivity = createLazyPromise(
+  () => import("../../../auth/ix-auth/ix-auth-session-activity.js"),
+);
+
+/** Record browser activity for one ix-auth login session without delaying the request. */
+function noteIxAuthActivity(loginSessionId: string): void {
+  void loadIxAuthSessionActivity()
+    .then((module) => {
+      module.noteIxAuthSessionActivitySafely(loginSessionId);
+    })
+    .catch(() => {
+      // Bookkeeping only. A failed load must never fail an authorized request.
+    });
+}
+
 const DEVICE_CREDENTIAL_INVALIDATING_METHODS = new Set([
   "device.pair.remove",
   "device.token.rotate",
@@ -98,6 +115,14 @@ export function createGatewayAuthenticatedRequestDispatcher(params: {
       return;
     }
     const req = parsed;
+    // A request frame is the only proof this Gateway gets that a person is still working
+    // in an ix-auth tab: the handshake deliberately does not slide the idle window, and
+    // nothing else writes `last_seen_at`. Without this, every browser session expired a
+    // fixed interval after sign-in however busy it was.
+    const ixAuthLoginSessionId = client.internal?.ixAuthLoginSessionId;
+    if (ixAuthLoginSessionId) {
+      noteIxAuthActivity(ixAuthLoginSessionId);
+    }
     const diagnostics = createGatewayRpcDiagnostics(req.method, getMethodRegistry, extraHandlers);
     logWs("in", "req", { connId, id: req.id, method: req.method });
     const context = buildRequestContext();

@@ -13,6 +13,7 @@ import {
 } from "../auth/ix-auth/ix-auth-client.js";
 import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
 import { projectIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-projection.js";
+import { noteIxAuthSessionActivitySafely } from "../auth/ix-auth/ix-auth-session-activity.js";
 import {
   matchesIxAuthCsrfDigest,
   resolveIxAuthSessionToken,
@@ -383,6 +384,10 @@ async function handleIxAuthSessionProbeRoute(params: {
     return;
   }
   const { principal } = resolution;
+  // The browser asked, with its cookie, from a live document. That is activity, so the
+  // idle window slides even when the Control UI talks over its WebSocket and this route
+  // is the only HTTP request it ever makes.
+  noteIxAuthSessionActivitySafely(principal.loginSessionId);
   // A session that predates the role projection heals here rather than at the next
   // sign-in: the Control UI probes this route before it opens the WebSocket, and the
   // handshake reads the profile row this writes.
