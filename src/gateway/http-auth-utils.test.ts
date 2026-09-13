@@ -1,4 +1,5 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import { IncomingMessage, type ServerResponse } from "node:http";
+import { Socket } from "node:net";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { setDisplayName } from "../state/user-profiles.js";
@@ -136,10 +137,8 @@ describe("HTTP gateway owner profiles", () => {
         "operator.write",
         "operator.questions",
       ]);
-      const declared = {
-        ...req,
-        headers: { "x-openclaw-scopes": "operator.admin,operator.pairing,operator.write" },
-      } as IncomingMessage;
+      const declared = new IncomingMessage(new Socket());
+      declared.headers["x-openclaw-scopes"] = "operator.admin,operator.pairing,operator.write";
       expect(resolveSharedSecretHttpOperatorScopes(declared, result.requestAuth)).toEqual([
         "operator.write",
       ]);
