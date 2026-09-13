@@ -3,6 +3,7 @@
 import {
   IX_AUTH_DEFAULT_DEPARTMENT_CLAIM,
   IX_AUTH_DEFAULT_DEPARTMENT_PREFIX,
+  IX_AUTH_DEFAULT_TITLE_PREFIX,
   type IxAuthRuntimeSettings,
   type IxAuthVerifiedClaims,
 } from "./ix-auth-types.js";
@@ -42,13 +43,14 @@ function readEpochSecondsClaim(
 }
 
 /**
- * Extract department codes from the configured group claim.
+ * Extract the codes one prefix claims out of the configured group claim.
  *
- * IX-Auth deliberately does not model org trees (permission-model.md section 4), so a
- * group only carries a department code by convention: the configured prefix marks it.
- * An empty prefix accepts every group as a department code.
+ * IX-Auth deliberately does not model org trees or job titles (permission-model.md
+ * section 4), so a group only carries one by convention: the configured prefix marks it.
+ * Departments and titles are two such conventions over the same claim, which is why this
+ * takes the prefix rather than owning one. An empty prefix accepts every group.
  */
-export function readIxAuthDepartmentCodes(params: {
+export function readIxAuthPrefixedGroupCodes(params: {
   groups: string[];
   prefix: string;
 }): string[] {
@@ -149,4 +151,9 @@ export function parseIxAuthTokenClaims(params: {
 /** Default department prefix used when configuration leaves it unset. */
 export function resolveIxAuthDepartmentPrefix(configured: string | undefined): string {
   return configured ?? IX_AUTH_DEFAULT_DEPARTMENT_PREFIX;
+}
+
+/** Default title prefix used when configuration leaves it unset. */
+export function resolveIxAuthTitlePrefix(configured: string | undefined): string {
+  return configured ?? IX_AUTH_DEFAULT_TITLE_PREFIX;
 }

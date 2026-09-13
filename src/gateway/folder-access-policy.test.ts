@@ -139,6 +139,46 @@ describe("folder access policy", () => {
     expect(verdict.permission).toBe("hidden");
   });
 
+  it("ranks a title above a role and below a department", () => {
+    const lead: FolderAccessIdentity = { ...staff, titles: ["team-lead"] };
+    const rules = [
+      rule({ path: "00", kind: "role", id: "member", permission: "write" }),
+      rule({ path: "00", kind: "title", id: "team-lead", permission: "read" }),
+    ];
+    // The title is the more particular statement, so it decides over the rank.
+    expect(resolveFolderAccess({ folderPath: "00", identity: lead, rules }).permission).toBe(
+      "read",
+    );
+    // A department rule on the same folder still overrules the title.
+    expect(
+      resolveFolderAccess({
+        folderPath: "00",
+        identity: lead,
+        rules: [
+          ...rules,
+          rule({ path: "00", kind: "department", id: "rnd", permission: "hidden" }),
+        ],
+      }).permission,
+    ).toBe("hidden");
+    // Somebody without the title is decided by their rank, as before.
+    expect(resolveFolderAccess({ folderPath: "00", identity: staff, rules }).permission).toBe(
+      "write",
+    );
+  });
+
+  it("takes the narrower answer when a person holds two titles", () => {
+    const verdict = resolveFolderAccess({
+      folderPath: "00",
+      identity: { ...staff, titles: ["team-lead", "SAFETY"] },
+      rules: [
+        rule({ path: "00", kind: "title", id: "team-lead", permission: "write" }),
+        // Slug case is normalized on both sides, exactly as a department slug is.
+        rule({ path: "00", kind: "title", id: "safety", permission: "read" }),
+      ],
+    });
+    expect(verdict.permission).toBe("read");
+  });
+
   it("hides a path it cannot place and the bookkeeping directories", () => {
     expect(
       resolveFolderAccess({ folderPath: undefined, identity: staff, rules: [] }).permission,
@@ -210,6 +250,17 @@ describe("permission helpers", () => {
     expect(narrowerPermission("write", "read")).toBe("read");
     expect(narrowerPermission("read", "hidden")).toBe("hidden");
     expect(narrowerPermission("write", "write")).toBe("write");
+  });
+
+  it("builds a title identity that matches only that title", () => {
+    const identity = subjectIdentity("title", "team-lead");
+    expect(identity).toEqual({ departments: [], titles: ["team-lead"], isSuperAdmin: false });
+    const rules = [rule({ path: "00", kind: "title", id: "team-lead", permission: "read" })];
+    expect(resolveFolderAccess({ folderPath: "00", identity, rules }).permission).toBe("read");
+    expect(
+      resolveFolderAccess({ folderPath: "00", identity: subjectIdentity("title", "other"), rules })
+        .permission,
+    ).toBe("hidden");
   });
 
   it("builds an identity that matches exactly one subject and no rank", () => {

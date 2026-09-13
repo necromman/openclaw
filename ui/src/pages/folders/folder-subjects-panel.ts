@@ -72,6 +72,14 @@ function folderSubjectTargets(params: {
       hint: department.slug,
     }));
   }
+  if (params.tab === "title") {
+    return subjects.titles.map((title) => ({
+      kind: "title" as const,
+      id: title.slug,
+      label: title.displayName ?? title.slug,
+      hint: title.slug,
+    }));
+  }
   if (params.tab === "role") {
     return subjects.roles.map((role) => ({
       kind: "role" as const,
@@ -107,6 +115,7 @@ function renderTabs(params: {
 }): TemplateResult {
   const tabs: readonly (readonly [FolderRuleTab, string])[] = [
     ["department", "ixAuth.folders.tabDepartments"],
+    ["title", "ixAuth.folders.tabTitles"],
     ["role", "ixAuth.folders.tabRoles"],
     ["user", "ixAuth.folders.tabPeople"],
   ];

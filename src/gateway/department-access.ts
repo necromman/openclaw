@@ -68,6 +68,14 @@ export function isDepartmentScopeEnabled(cfg: OpenClawConfig | undefined): boole
  */
 export type DepartmentIdentity = {
   departments: readonly string[];
+  /**
+   * Job titles proven by the same token.
+   *
+   * They decide no agent boundary; they ride here because the folder rules (R) name a
+   * title as a rule subject, and a rule subject is an authorization input that must come
+   * from the verified bag rather than from the ledger bag next door.
+   */
+  titles?: readonly string[] | undefined;
   isSuperAdmin: boolean;
   profileId?: string | undefined;
   gatewayRole?: string | undefined;
@@ -87,6 +95,7 @@ export function departmentHandshakeFacts(principal: DepartmentIdentity | undefin
     ? {
         ixAuthDepartments: {
           departments: principal.departments,
+          ...(principal.titles ? { titles: principal.titles } : {}),
           isSuperAdmin: principal.isSuperAdmin,
           ...(principal.profileId ? { profileId: principal.profileId } : {}),
           ...(principal.gatewayRole ? { gatewayRole: principal.gatewayRole } : {}),

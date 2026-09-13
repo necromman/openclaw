@@ -163,6 +163,7 @@ export const GatewayConfigSchema = z
             superAdminRoles: z.array(z.string().min(1)).optional(),
             departmentClaim: z.string().min(1).optional(),
             departmentGroupPrefix: z.string().optional(),
+            titleGroupPrefix: z.string().optional(),
             adminConsoleUrl: z.string().min(1).optional(),
             selfSignup: z.boolean().optional(),
             session: z

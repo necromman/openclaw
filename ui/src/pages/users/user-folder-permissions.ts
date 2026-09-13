@@ -1,6 +1,9 @@
 import { html, nothing, type PropertyValues } from "lit";
 import { property, state } from "lit/decorators.js";
-import type { IxAuthDepartmentOption } from "../../features/ix-auth/ix-auth-admin-api.ts";
+import type {
+  IxAuthDepartmentOption,
+  IxAuthTitleOption,
+} from "../../features/ix-auth/ix-auth-admin-api.ts";
 import {
   IX_AUTH_LABELLED_GATEWAY_ROLES,
   ixAuthRoleLabel,
@@ -17,6 +20,7 @@ import "../folders/folders-page.ts";
 class UserFolderPermissions extends OpenClawLightDomElement {
   @property({ attribute: false }) user!: IxAuthManagedUser;
   @property({ attribute: false }) departments: readonly IxAuthDepartmentOption[] = [];
+  @property({ attribute: false }) titles: readonly IxAuthTitleOption[] = [];
   @property() basePath = "";
   @state() private profileId: string | undefined;
   @state() private errorKey: string | undefined;
@@ -78,6 +82,18 @@ class UserFolderPermissions extends OpenClawLightDomElement {
                 kind: "department" as const,
                 id: department.slug,
                 label: department.name,
+              },
+            ]
+          : [],
+      ),
+      ...this.titles.flatMap((title) =>
+        title.slug
+          ? [
+              {
+                key: `title:${title.slug}`,
+                kind: "title" as const,
+                id: title.slug,
+                label: title.name,
               },
             ]
           : [],

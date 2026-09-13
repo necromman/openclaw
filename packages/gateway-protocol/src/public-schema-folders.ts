@@ -7,6 +7,7 @@ export {
   FolderTreeEntrySchema,
   FolderEffectiveRuleSchema,
   FolderSubjectDepartmentSchema,
+  FolderSubjectTitleSchema,
   FolderSubjectUserSchema,
   FolderTreeScanStatusSchema,
   FoldersTreeListParamsSchema,

@@ -1,8 +1,9 @@
-import { readIxAuthDepartmentCodes } from "../auth/ix-auth/ix-auth-claims.js";
+import { readIxAuthPrefixedGroupCodes } from "../auth/ix-auth/ix-auth-claims.js";
 import type { IxAuthTokenBundle } from "../auth/ix-auth/ix-auth-client.js";
 import { syncIxAuthDepartments } from "../auth/ix-auth/ix-auth-departments.js";
 import { projectIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-projection.js";
 import { persistIxAuthLoginSession } from "../auth/ix-auth/ix-auth-sessions.js";
+import { syncIxAuthTitles } from "../auth/ix-auth/ix-auth-titles.js";
 import type { IxAuthRuntimeSettings, IxAuthVerifiedClaims } from "../auth/ix-auth/ix-auth-types.js";
 import { revokeIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { ensureProfileForEmail } from "../state/user-profiles.js";
@@ -17,12 +18,17 @@ export function createIxAuthBrowserSession(params: {
 }) {
   const profileId = ensureProfileForEmail(params.claims.email).id;
   const session = persistIxAuthLoginSession({ ...params, profileId });
-  const departments = readIxAuthDepartmentCodes({
+  const departments = readIxAuthPrefixedGroupCodes({
     groups: params.claims.groups,
     prefix: params.settings.departmentGroupPrefix,
   });
+  const titles = readIxAuthPrefixedGroupCodes({
+    groups: params.claims.groups,
+    prefix: params.settings.titleGroupPrefix,
+  });
   try {
     syncIxAuthDepartments({ profileId, departments, nowMs: params.nowMs });
+    syncIxAuthTitles({ profileId, titles, nowMs: params.nowMs });
     projectIxAuthGatewayRole({ profileId, roles: params.claims.roles, settings: params.settings });
   } catch (error) {
     revokeIxAuthLoginSession({
@@ -32,5 +38,5 @@ export function createIxAuthBrowserSession(params: {
     });
     throw error;
   }
-  return { session, profileId, departments };
+  return { session, profileId, departments, titles };
 }

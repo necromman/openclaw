@@ -10,6 +10,15 @@ export const IX_AUTH_CSRF_HEADER_NAME = "x-openclaw-csrf";
 /** Group codes must carry this prefix to be read as a department code. */
 export const IX_AUTH_DEFAULT_DEPARTMENT_PREFIX = "dept-";
 
+/**
+ * Group codes must carry this prefix to be read as a job title.
+ *
+ * Titles are a second convention over the same group claim departments already use. They
+ * answer a different question: a department is where a person sits, a title is what they
+ * are, and one person carries several of the second while the first stays a placement.
+ */
+export const IX_AUTH_DEFAULT_TITLE_PREFIX = "title-";
+
 /** Claim carrying group codes when `departmentClaim` is unset. */
 export const IX_AUTH_DEFAULT_DEPARTMENT_CLAIM = "ixauth_groups";
 
@@ -68,6 +77,8 @@ export type IxAuthPrincipal = {
   gatewayRole?: string;
   /** Department codes derived from the group claim. */
   departments: string[];
+  /** Title codes derived from the same group claim, by their own prefix. */
+  titles: string[];
   /** True when `gatewayRole` is listed in `superAdminRoles`. */
   isSuperAdmin: boolean;
 };
@@ -84,6 +95,7 @@ export type IxAuthRuntimeSettings = {
   superAdminRoles: string[];
   departmentClaim: string;
   departmentGroupPrefix: string;
+  titleGroupPrefix: string;
   adminConsoleUrl?: string;
   /** True when the Control UI may offer a signup form rather than invitation-only entry. */
   selfSignupEnabled: boolean;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIxAuthTokenClaims, readIxAuthDepartmentCodes } from "./ix-auth-claims.js";
+import { parseIxAuthTokenClaims, readIxAuthPrefixedGroupCodes } from "./ix-auth-claims.js";
 
 const NOW = 1_800_000_000_000;
 
@@ -123,21 +123,21 @@ describe("parseIxAuthTokenClaims", () => {
   });
 });
 
-describe("readIxAuthDepartmentCodes", () => {
+describe("readIxAuthPrefixedGroupCodes", () => {
   it("keeps only prefixed groups and strips the prefix", () => {
     expect(
-      readIxAuthDepartmentCodes({ groups: ["dept-sales", "everyone", "dept-rnd"], prefix: "dept-" }),
+      readIxAuthPrefixedGroupCodes({ groups: ["dept-sales", "everyone", "dept-rnd"], prefix: "dept-" }),
     ).toEqual(["sales", "rnd"]);
   });
 
   it("treats every group as a department when the prefix is empty", () => {
-    expect(readIxAuthDepartmentCodes({ groups: ["sales", "rnd"], prefix: "" })).toEqual([
+    expect(readIxAuthPrefixedGroupCodes({ groups: ["sales", "rnd"], prefix: "" })).toEqual([
       "sales",
       "rnd",
     ]);
   });
 
   it("drops a group that is only the prefix", () => {
-    expect(readIxAuthDepartmentCodes({ groups: ["dept-"], prefix: "dept-" })).toEqual([]);
+    expect(readIxAuthPrefixedGroupCodes({ groups: ["dept-"], prefix: "dept-" })).toEqual([]);
   });
 });

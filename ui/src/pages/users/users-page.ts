@@ -13,7 +13,9 @@ import { renderSettingsWorkspace } from "../../components/settings-workspace.ts"
 import { canManageIxAuthUsers } from "../../features/ix-auth/ix-auth-admin-access.ts";
 import {
   fetchIxAuthDepartments,
+  fetchIxAuthTitleDirectory,
   type IxAuthDepartmentOption,
+  type IxAuthTitleOption,
 } from "../../features/ix-auth/ix-auth-admin-api.ts";
 import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import {
@@ -29,6 +31,7 @@ import {
   isIxAuthUsersFailure,
   replaceIxAuthUserDepartments,
   replaceIxAuthUserRoles,
+  replaceIxAuthUserTitles,
   runIxAuthUserAction,
   updateIxAuthUser,
   type IxAuthManagedUser,
@@ -40,6 +43,7 @@ import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
+import { departmentSaveOutcome, titleSaveOutcome } from "./user-access-saves.ts";
 import { renderUserDetailDialog } from "./user-detail-dialog.ts";
 import {
   hasUnsavedUserDetails,
@@ -47,6 +51,7 @@ import {
   type UserDetailDraftField,
 } from "./user-detail-drafts.ts";
 import { renderUserDetailPanel } from "./user-detail-panel.ts";
+import { renderUsersFilterSelect, renderUsersPager } from "./users-list-controls.ts";
 import "./ix-auth-invite-section.ts";
 import "./users-import-panel.ts";
 import { renderUsersTable } from "./users-table.ts";
@@ -81,6 +86,7 @@ export class UsersPage extends OpenClawLightDomElement {
   @state() private total = 0;
   @state() private pageIndex = 0;
   @state() private departments: IxAuthDepartmentOption[] = [];
+  @state() private titles: IxAuthTitleOption[] = [];
   @state() private query = "";
   @state() private statusFilter = "";
   @state() private roleFilter = "";
@@ -102,6 +108,7 @@ export class UsersPage extends OpenClawLightDomElement {
   @state() private displayNameDraft = "";
   @state() private selectedRole = "";
   @state() private selectedDepartments: string[] = [];
+  @state() private selectedTitles: string[] = [];
   @state() private deleteArmed = false;
 
   private lifecycle = 0;
@@ -139,12 +146,19 @@ export class UsersPage extends OpenClawLightDomElement {
     if (!canManageIxAuthUsers()) {
       return;
     }
-    const [departments] = await Promise.all([fetchIxAuthDepartments(this.basePath), this.reload()]);
+    const [departments, titles] = await Promise.all([
+      fetchIxAuthDepartments(this.basePath),
+      fetchIxAuthTitleDirectory(this.basePath),
+      this.reload(),
+    ]);
     if (lifecycle !== this.lifecycle) {
       return;
     }
     if (Array.isArray(departments)) {
       this.departments = departments;
+    }
+    if (!isIxAuthUsersFailure(titles)) {
+      this.titles = titles.titles;
     }
   }
 
@@ -180,6 +194,7 @@ export class UsersPage extends OpenClawLightDomElement {
       displayNameDraft: this.displayNameDraft,
       selectedRole: this.selectedRole,
       selectedDepartments: this.selectedDepartments,
+      selectedTitles: this.selectedTitles,
     };
   }
 
@@ -268,20 +283,23 @@ export class UsersPage extends OpenClawLightDomElement {
           departments: this.selectedDepartments,
         }),
       (result) => {
-        this.notice = result.departmentFailed
-          ? t("ixAuth.users.departmentsPartiallyApplied", {
-              codes: this.describeDepartments(result.failedDepartments),
-            })
-          : t("ixAuth.users.departmentsSaved");
-        return result.departmentFailed ? undefined : "departments";
+        const outcome = departmentSaveOutcome(result, this.departments);
+        this.notice = outcome.notice;
+        return outcome.savedField;
       },
     );
   }
 
-  private describeDepartments(codes: readonly string[]): string {
-    return codes
-      .map((code) => this.departments.find((item) => item.code === code)?.name ?? code)
-      .join(", ");
+  private async saveTitles(userId: string): Promise<void> {
+    await this.mutate(
+      () =>
+        replaceIxAuthUserTitles({ basePath: this.basePath, userId, titles: this.selectedTitles }),
+      (result) => {
+        const outcome = titleSaveOutcome(result, this.titles);
+        this.notice = outcome.notice;
+        return outcome.savedField;
+      },
+    );
   }
 
   private async runAction(action: IxAuthUserActionName): Promise<void> {
@@ -312,39 +330,6 @@ export class UsersPage extends OpenClawLightDomElement {
       return t("ixAuth.users.revokedSessions", { count: String(result.revoked ?? 0) });
     }
     return undefined;
-  }
-
-  private renderFilterSelect(params: {
-    label: string;
-    value: string;
-    anyLabel: string;
-    options: readonly { value: string; label: string }[];
-    onChange: (value: string) => void;
-  }): TemplateResult {
-    return html`
-      <label class="users-toolbar__field">
-        <span class="users-toolbar__label">${params.label}</span>
-        <select
-          class="settings-select"
-          .value=${params.value}
-          ?disabled=${this.busy}
-          @change=${(event: Event) => {
-            // SAFETY: this listener is bound to the select element on this line.
-            params.onChange((event.target as HTMLSelectElement).value);
-          }}
-        >
-          <option value="">${params.anyLabel}</option>
-          ${params.options.map(
-            (option) => html`<option
-              value=${option.value}
-              ?selected=${option.value === params.value}
-            >
-              ${option.label}
-            </option>`,
-          )}
-        </select>
-      </label>
-    `;
   }
 
   private applyFilter(patch: {
@@ -378,27 +363,30 @@ export class UsersPage extends OpenClawLightDomElement {
             }}
           />
         </label>
-        ${this.renderFilterSelect({
+        ${renderUsersFilterSelect({
           label: t("ixAuth.users.statusLabel"),
           value: this.statusFilter,
           anyLabel: t("ixAuth.users.anyStatus"),
+          busy: this.busy,
           options: IX_AUTH_STATUS_FILTERS.map((value) => ({
             value,
             label: t(`ixAuth.users.status.${value}`),
           })),
           onChange: (value) => this.applyFilter({ statusFilter: value }),
         })}
-        ${this.renderFilterSelect({
+        ${renderUsersFilterSelect({
           label: t("ixAuth.users.roleLabel"),
           value: this.roleFilter,
           anyLabel: t("ixAuth.users.anyRole"),
+          busy: this.busy,
           options: IX_AUTH_ROLE_FILTERS.map((value) => ({ value, label: ixAuthRoleLabel(value) })),
           onChange: (value) => this.applyFilter({ roleFilter: value }),
         })}
-        ${this.renderFilterSelect({
+        ${renderUsersFilterSelect({
           label: t("ixAuth.users.departmentLabel"),
           value: this.departmentFilter,
           anyLabel: t("ixAuth.users.anyDepartment"),
+          busy: this.busy,
           options: this.departments.map((item) => ({ value: item.code, label: item.name })),
           onChange: (value) => this.applyFilter({ departmentFilter: value }),
         })}
@@ -441,35 +429,21 @@ export class UsersPage extends OpenClawLightDomElement {
   }
 
   private renderPager(): TemplateResult {
-    const shown =
-      this.users.length === 0 ? 0 : this.pageIndex * IX_AUTH_USERS_PAGE_SIZE + this.users.length;
-    return html`
-      <div class="users-pager">
-        <button
-          class="btn"
-          ?disabled=${this.pageIndex === 0 || this.loading || this.busy}
-          @click=${() => {
-            this.pageIndex -= 1;
-            void this.reload();
-          }}
-        >
-          ${t("ixAuth.users.previousPage")}
-        </button>
-        <button
-          class="btn"
-          ?disabled=${shown >= this.total || this.loading || this.busy}
-          @click=${() => {
-            this.pageIndex += 1;
-            void this.reload();
-          }}
-        >
-          ${t("ixAuth.users.nextPage")}
-        </button>
-        <span
-          >${t("ixAuth.users.countLabel", { shown: String(shown), total: String(this.total) })}</span
-        >
-      </div>
-    `;
+    return renderUsersPager({
+      shown:
+        this.users.length === 0 ? 0 : this.pageIndex * IX_AUTH_USERS_PAGE_SIZE + this.users.length,
+      total: this.total,
+      pageIndex: this.pageIndex,
+      busy: this.loading || this.busy,
+      onPrevious: () => {
+        this.pageIndex -= 1;
+        void this.reload();
+      },
+      onNext: () => {
+        this.pageIndex += 1;
+        void this.reload();
+      },
+    });
   }
 
   private renderDetail(section: "account" | "access"): unknown {
@@ -487,9 +461,11 @@ export class UsersPage extends OpenClawLightDomElement {
       mfaEnabled: detail.mfaEnabled,
       sessionCount: detail.sessionCount,
       departments: this.departments,
+      titles: this.titles,
       displayNameDraft: this.displayNameDraft,
       selectedRole: this.selectedRole,
       selectedDepartments: this.selectedDepartments,
+      selectedTitles: this.selectedTitles,
       busy: this.busy,
       canGrantSuperAdmin: this.session?.user?.isSuperAdmin === true,
       onImpersonate: () => void this.startImpersonation(),
@@ -531,6 +507,11 @@ export class UsersPage extends OpenClawLightDomElement {
         this.selectedDepartments = checked ? [...remaining, code] : remaining;
       },
       onSaveDepartments: () => void this.saveDepartments(detail.user.id),
+      onTitleToggle: (code, checked) => {
+        const remaining = this.selectedTitles.filter((item) => item !== code);
+        this.selectedTitles = checked ? [...remaining, code] : remaining;
+      },
+      onSaveTitles: () => void this.saveTitles(detail.user.id),
       onToggleStatus: () =>
         void this.mutate(() =>
           updateIxAuthUser({
@@ -704,6 +685,7 @@ export class UsersPage extends OpenClawLightDomElement {
           ? html`<openclaw-user-folder-permissions
               .user=${user}
               .departments=${this.departments}
+              .titles=${this.titles}
               .basePath=${this.basePath}
             ></openclaw-user-folder-permissions>`
           : nothing,

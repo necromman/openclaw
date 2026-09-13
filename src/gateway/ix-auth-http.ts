@@ -396,6 +396,7 @@ async function handleIxAuthSessionProbeRoute(params: {
       groups: principal.claims.groups,
       gatewayRole: principal.gatewayRole,
       departments: principal.departments,
+      titles: principal.titles,
       isSuperAdmin: principal.isSuperAdmin,
       impersonatedBy: principal.claims.impersonatorEmail ?? principal.claims.impersonatorSubject,
     },
@@ -426,6 +427,9 @@ const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> =
   // route refuses a department anybody is still in, which is what keeps a delete from
   // orphaning memberships the way deleting the group in the console does.
   ["admin-departments", new Set(["GET", "POST", "PATCH", "DELETE"])],
+  // Job titles take the same four verbs for the same reasons; DELETE refuses a title
+  // somebody still holds.
+  ["admin-titles", new Set(["GET", "POST", "PATCH", "DELETE"])],
   // GET reads the model policy; PUT replaces it whole, so a stale screen cannot merge
   // half of an older list back in.
   ["admin-models", new Set(["GET", "PUT"])],

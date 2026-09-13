@@ -286,6 +286,7 @@ describe("settings menu for a ranked account", () => {
     "connection",
     "users",
     "departments",
+    "titles",
     "folders",
     "channels",
     "devices",
@@ -324,6 +325,7 @@ describe("settings menu for a ranked account", () => {
       "notifications",
       "users",
       "departments",
+      "titles",
       "folders",
       "talk",
       // The administrator model screen. It is the one Gateway setting this rank
@@ -340,7 +342,15 @@ describe("settings menu for a ranked account", () => {
     setIxAuthAdminAccess(true);
     setIxAuthSuperAdminAccess(true);
     const routes = visibleSettingsNavigationGroups(true).flatMap((group) => group.routes);
-    for (const routeId of ["users", "departments", "audit", "advanced", "debug", "logs"] as const) {
+    for (const routeId of [
+      "users",
+      "departments",
+      "titles",
+      "audit",
+      "advanced",
+      "debug",
+      "logs",
+    ] as const) {
       expect(routes).toContain(routeId);
     }
   });

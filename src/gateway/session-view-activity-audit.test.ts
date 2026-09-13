@@ -25,6 +25,7 @@ function signedInClient(): GatewayClient {
         displayName: "Kim",
         gatewayRole: "member",
         departments: ["dept-rnd"],
+        titles: [],
         isSuperAdmin: false,
       },
     },
@@ -44,6 +45,7 @@ describe("session view recording", () => {
       profileId: "p1",
       gatewayRole: "member",
       departments: ["dept-rnd"],
+      titles: [],
       isSuperAdmin: false,
       claims: {
         subject: "target-1",

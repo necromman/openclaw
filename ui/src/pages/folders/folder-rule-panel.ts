@@ -22,7 +22,7 @@ import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
 import { t } from "../../i18n/index.ts";
 import { folderPermissionLabel } from "./folders-tree.ts";
 
-export type FolderRuleTab = "department" | "role" | "user";
+export type FolderRuleTab = "department" | "title" | "role" | "user";
 
 /** What one row would write if its save button were pressed. */
 export type FolderRuleDraft = {
@@ -57,7 +57,10 @@ function parseFolderSubjectKey(
   }
   const kind = value.slice(0, separator);
   const id = value.slice(separator + 1);
-  if (id.length === 0 || (kind !== "role" && kind !== "department" && kind !== "user")) {
+  if (
+    id.length === 0 ||
+    (kind !== "role" && kind !== "title" && kind !== "department" && kind !== "user")
+  ) {
     return undefined;
   }
   return { kind, id };
@@ -200,6 +203,7 @@ function renderTabs(params: {
 }): TemplateResult {
   const tabs: readonly (readonly [FolderRuleTab, string])[] = [
     ["department", "ixAuth.folders.tabDepartments"],
+    ["title", "ixAuth.folders.tabTitles"],
     ["role", "ixAuth.folders.tabRoles"],
     ["user", "ixAuth.folders.tabPeople"],
   ];
@@ -255,6 +259,14 @@ function renderPreview(params: {
                       </option>`;
                     })}
                   </optgroup>
+                  <optgroup label=${t("ixAuth.folders.tabTitles")}>
+                    ${subjects.titles.map((title) => {
+                      const key = folderSubjectKey("title", title.slug);
+                      return html`<option value=${key} ?selected=${key === value}>
+                        ${title.displayName ?? title.slug}
+                      </option>`;
+                    })}
+                  </optgroup>
                   <optgroup label=${t("ixAuth.folders.tabRoles")}>
                     ${subjects.roles.map((role) => {
                       const key = folderSubjectKey("role", role);
@@ -297,6 +309,14 @@ function subjectRowsForTab(params: {
       id: department.slug,
       label: department.displayName ?? department.slug,
       hint: department.slug,
+    }));
+  }
+  if (params.tab === "title") {
+    return subjects.titles.map((title) => ({
+      kind: "title" as const,
+      id: title.slug,
+      label: title.displayName ?? title.slug,
+      hint: title.slug,
     }));
   }
   if (params.tab === "role") {

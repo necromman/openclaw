@@ -47,6 +47,7 @@ function managedUser(overrides?: Partial<IxAuthManagedUser>): IxAuthManagedUser 
     roles: ["MEMBER"],
     isSuperAdmin: false,
     departments: ["dept-rnd"],
+    titles: [],
     locked: false,
     failedCount: 0,
     self: false,

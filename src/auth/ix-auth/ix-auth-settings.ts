@@ -7,7 +7,10 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import type { GatewayIxAuthConfig } from "../../config/types.gateway.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { resolveConfiguredSecretInputString } from "../../gateway/resolve-configured-secret-input-string.js";
-import { resolveIxAuthDepartmentPrefix } from "./ix-auth-claims.js";
+import {
+  resolveIxAuthDepartmentPrefix,
+  resolveIxAuthTitlePrefix,
+} from "./ix-auth-claims.js";
 import {
   IX_AUTH_DEFAULT_ROLE_MAP,
   IX_AUTH_DEFAULT_SUPER_ADMIN_ROLES,
@@ -92,6 +95,7 @@ export async function resolveIxAuthRuntimeSettings(params: {
     departmentClaim:
       normalizeOptionalString(ixAuth.departmentClaim) ?? IX_AUTH_DEFAULT_DEPARTMENT_CLAIM,
     departmentGroupPrefix: resolveIxAuthDepartmentPrefix(ixAuth.departmentGroupPrefix),
+    titleGroupPrefix: resolveIxAuthTitlePrefix(ixAuth.titleGroupPrefix),
     adminConsoleUrl: normalizeOptionalString(ixAuth.adminConsoleUrl),
     // Defaults closed: an installation that has not said its identity server accepts
     // signups must not advertise a form that would be refused.

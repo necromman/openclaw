@@ -17,7 +17,7 @@ import {
   touchIxAuthLoginSession,
   updateIxAuthSessionTokens,
 } from "../../state/ix-auth-sessions-store.js";
-import { parseIxAuthTokenClaims, readIxAuthDepartmentCodes } from "./ix-auth-claims.js";
+import { parseIxAuthTokenClaims, readIxAuthPrefixedGroupCodes } from "./ix-auth-claims.js";
 import {
   relayIxAuthRefresh,
   type IxAuthRequestMeta,
@@ -191,9 +191,13 @@ function buildPrincipalFromClaims(params: {
     profileId: params.row.profile_id,
     claims: params.claims,
     gatewayRole: role.gatewayRole,
-    departments: readIxAuthDepartmentCodes({
+    departments: readIxAuthPrefixedGroupCodes({
       groups: params.claims.groups,
       prefix: params.settings.departmentGroupPrefix,
+    }),
+    titles: readIxAuthPrefixedGroupCodes({
+      groups: params.claims.groups,
+      prefix: params.settings.titleGroupPrefix,
     }),
     isSuperAdmin: role.isSuperAdmin,
   };

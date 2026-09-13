@@ -49,6 +49,7 @@ const APP_ROUTE_DEFINITIONS = {
   connection: { path: "/settings/connection" },
   users: { path: "/settings/users" },
   departments: { path: "/settings/departments" },
+  titles: { path: "/settings/titles" },
   folders: { path: "/settings/folders" },
   audit: { path: "/settings/audit" },
   config: { path: "/settings/general", aliases: ["/config"] },

@@ -166,6 +166,7 @@ const enIxAuth = {
       folderTargetKinds: {
         user: "Personal exception: {name}",
         department: "Department rules: {name}",
+        title: "Job title rules: {name}",
         role: "Role rules: {name}",
       },
       personalFolderHelp:
@@ -225,6 +226,13 @@ const enIxAuth = {
       departmentsHelp:
         "Choose the person's departments and save. Department membership alone does not grant access to all department documents or conversations.",
       departmentsSaved: "Departments saved.",
+      titleLabel: "Job titles",
+      titlesHelp:
+        "A person may hold several titles. A title grants nothing on its own; folder rules that name it are what it reaches.",
+      titlesEmpty: "No job title has been created yet.",
+      titlesSaved: "Job titles saved.",
+      titlesPartiallyApplied:
+        "Only part of the change was applied. These titles did not take: {codes}. Check the boxes above against what the identity server holds and save again.",
       departmentsPartiallyApplied:
         "Only part of the change was applied. These departments did not take: {codes}. Check the boxes above against what the identity server holds and save again.",
       superAdminProtected:
@@ -312,6 +320,50 @@ const enIxAuth = {
       saved: "Saved. The change is live and will survive a restart.",
       savedNotPersisted:
         "Saved and live, but it could not be written beside the configuration, so a restart will undo it. Tell whoever runs the server.",
+    },
+    titles: {
+      title: "Job titles",
+      description:
+        "A job title says what somebody is, not what they may do. The five permission roles are unchanged; a title exists so a folder rule can name one instead of naming people.",
+      forbidden: "Only an administrator can open this screen.",
+      scopeTitle: "Titles classify people; folder rules decide access",
+      scopeBody:
+        "Giving somebody a title changes nothing by itself. It takes effect where a folder rule names the title, and a department rule on the same folder still wins over it.",
+      loading: "Loading",
+      empty: "No job title has been created yet.",
+      nameColumn: "Name",
+      codeColumn: "Group code",
+      membersColumn: "People",
+      memberCountProjected:
+        "These counts include only people who have signed in here, so a title may hold more people than it shows.",
+      createTitle: "Add a job title",
+      createName: "Name",
+      createNamePlaceholder: "Team lead",
+      createSubmit: "Create",
+      created: "Created {code}.",
+      createSlug: "Short code",
+      createSlugPlaceholder: "team-lead",
+      createSlugOverride: "Set the short code myself",
+      createSlugHide: "Go back to the short code written from the name",
+      createSlugInvalid:
+        "A short code is lowercase letters, digits and hyphens, starts and ends with a letter or digit, and is at most 32 characters.",
+      createCodePreview: "Group code: {code}",
+      editTitle: "Edit {name}",
+      renameSubmit: "Save the name",
+      renamed: "Renamed.",
+      renameHint:
+        "Only the display name changes. The group code stays as it is, because that code is what decides who holds this title.",
+      deleteSubmit: "Delete this job title",
+      deleteConfirm: "Delete {name}? Folder rules that name it stop applying and become orphans.",
+      deleteConfirmSubmit: "Yes, delete it",
+      deleteCancel: "Keep it",
+      deleteHint:
+        "Only a title nobody holds can be deleted. Rules that name it are kept so nothing silently reopens; clear them on the folder screen.",
+      deleteBlocked: "{count} people still hold this title. Remove it from them, then delete it.",
+      deleted: "Deleted {slug}.",
+      orphanTitle: "Not on the identity server",
+      orphanBody:
+        "These titles are still recorded here, but no group answers to them any more. Rules that name one keep being listed; nobody new can be given one until the group exists again.",
     },
     departments: {
       detailDialog: "Department details",
@@ -490,6 +542,7 @@ const enIxAuth = {
       missingPath:
         "This folder is not on the share any more. Its rules are kept until somebody removes them.",
       tabDepartments: "Departments",
+      tabTitles: "Job titles",
       tabRoles: "Roles",
       tabPeople: "People",
       subjectsEmpty: "There is nothing to grant here yet.",
@@ -596,6 +649,9 @@ const enIxAuth = {
       modelNotAllowed: "The default or a fallback is not in the allowed list.",
       modelWriteFailed: "The Gateway could not write the configuration. Try again.",
       departmentHasMembers: "Somebody is still in that department, so it was not deleted.",
+      titleHasMembers: "Somebody still holds that job title, so it was not deleted.",
+      titlesRejected: "The change was refused. Reload the page and try again.",
+      usersUnknownTitle: "That job title is not on the identity server any more.",
       memberCountUnavailable:
         "The identity server could not say whether anyone is still in that department, so it was not deleted. Try again shortly.",
       accountLocked: "This account is locked. Contact an administrator.",

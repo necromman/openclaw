@@ -39,6 +39,10 @@ export type IxAuthAdminActionName =
   | "department-create"
   | "department-rename"
   | "department-delete"
+  | "title-create"
+  | "title-rename"
+  | "title-delete"
+  | "user-titles"
   // The model policy an administrator set from the model screen.
   | "model-policy";
 

@@ -30,6 +30,7 @@ const SETTINGS = {
   superAdminRoles: ["superadmin"],
   departmentClaim: "ixauth_groups",
   departmentGroupPrefix: "dept-",
+  titleGroupPrefix: "title-",
   selfSignupEnabled: false,
   idleTimeoutMs: 1_800_000,
   absoluteTimeoutMs: 43_200_000,

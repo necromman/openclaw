@@ -213,6 +213,13 @@ export type GatewayIxAuthConfig = {
   departmentClaim?: string;
   /** Only group codes with this prefix become departments. Defaults to `dept-`. */
   departmentGroupPrefix?: string;
+  /**
+   * Only group codes with this prefix become job titles. Defaults to `title-`.
+   *
+   * Titles ride the same group claim as departments and are read by their own prefix, so
+   * the two never collide unless an operator points both at the same string.
+   */
+  titleGroupPrefix?: string;
   /** Absolute URL of the IX-Auth admin console, surfaced to admins in the Control UI. */
   adminConsoleUrl?: string;
   /**

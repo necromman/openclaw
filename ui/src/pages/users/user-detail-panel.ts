@@ -52,10 +52,13 @@ export type UserDetailPanelProps = {
   mfaEnabled: boolean;
   sessionCount: number;
   departments: readonly { code: string; name: string }[];
+  /** Every job title this deployment defines, as the title screen lists them. */
+  titles: readonly { code: string; name: string }[];
   /** Draft display name, held by the page so typing survives a re-render. */
   displayNameDraft: string;
   selectedRole: string;
   selectedDepartments: readonly string[];
+  selectedTitles: readonly string[];
   busy: boolean;
   canGrantSuperAdmin: boolean;
   canDelete: boolean;
@@ -75,6 +78,8 @@ export type UserDetailPanelProps = {
   onSaveRole: () => void;
   onDepartmentToggle: (code: string, checked: boolean) => void;
   onSaveDepartments: () => void;
+  onTitleToggle: (code: string, checked: boolean) => void;
+  onSaveTitles: () => void;
   onToggleStatus: () => void;
   onAction: (action: IxAuthUserActionName) => void;
   onArmDelete: (armed: boolean) => void;
@@ -218,6 +223,49 @@ function renderDepartmentRow(props: UserDetailPanelProps): TemplateResult {
   });
 }
 
+/**
+ * The titles one account holds.
+ *
+ * Checkboxes rather than a single choice, because a person is several things at once: a
+ * team lead who is also a safety officer holds both, and a folder rule that names either
+ * one has to reach them.
+ */
+function renderTitleRow(props: UserDetailPanelProps): TemplateResult {
+  const disabled = props.busy || props.user.self || props.protectedTarget;
+  return renderSettingsRow({
+    title: t("ixAuth.users.titleLabel"),
+    description: t("ixAuth.users.titlesHelp"),
+    stacked: true,
+    control:
+      props.titles.length === 0
+        ? html`<span class="muted">${t("ixAuth.users.titlesEmpty")}</span>`
+        : html`
+            <div class="ix-auth-department-list">
+              ${props.titles.map(
+                (item) => html`
+                  <label>
+                    <input
+                      type="checkbox"
+                      ?disabled=${disabled}
+                      .checked=${props.selectedTitles.includes(item.code)}
+                      @change=${(event: Event) => {
+                        // SAFETY: bound to the checkbox on this template line.
+                        const checkbox = event.target as HTMLInputElement;
+                        props.onTitleToggle(item.code, checkbox.checked);
+                      }}
+                    />
+                    <span>${item.name}</span>
+                  </label>
+                `,
+              )}
+            </div>
+            <button class="btn" ?disabled=${disabled} @click=${() => props.onSaveTitles()}>
+              ${t("ixAuth.users.save")}
+            </button>
+          `,
+  });
+}
+
 function renderActionRows(props: UserDetailPanelProps): unknown[] {
   const { user } = props;
   return [
@@ -328,7 +376,7 @@ export function renderUserDetailPanel(props: UserDetailPanelProps): TemplateResu
       : nothing,
     ...(props.section === "account"
       ? [...renderIdentityRows(props), ...renderActionRows(props)]
-      : [renderRoleRow(props), renderDepartmentRow(props)]),
+      : [renderRoleRow(props), renderDepartmentRow(props), renderTitleRow(props)]),
     props.notice
       ? renderSettingsRow({
           title: "",

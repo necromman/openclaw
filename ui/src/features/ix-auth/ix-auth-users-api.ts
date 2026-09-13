@@ -24,6 +24,8 @@ export type IxAuthManagedUser = {
   gatewayRole?: string;
   isSuperAdmin: boolean;
   departments: string[];
+  /** Job-title group codes this account holds. */
+  titles: string[];
   lastLoginAt?: string;
   createdAt?: string;
   locked: boolean;
@@ -97,6 +99,8 @@ function mapUsersErrorToKey(status: number, code: string): string {
       return "usersLastSuperAdmin";
     case "unknown_department":
       return "usersUnknownDepartment";
+    case "unknown_title":
+      return "usersUnknownTitle";
     case "invalid_role":
       return "usersInvalidRole";
     case "too_many_rows":
@@ -205,6 +209,7 @@ function readUser(value: unknown): IxAuthManagedUser | undefined {
     gatewayRole: readStringField(record, "gatewayRole"),
     isSuperAdmin: record.isSuperAdmin === true,
     departments: readStrings(record, "departments"),
+    titles: readStrings(record, "titles"),
     lastLoginAt: readStringField(record, "lastLoginAt"),
     createdAt: readStringField(record, "createdAt"),
     locked: record.locked === true,
@@ -360,6 +365,37 @@ export async function replaceIxAuthUserDepartments(params: {
     departmentFailed: result.body.departmentFailed === true,
     failedDepartments: readStrings(result.body, "failedDepartments"),
     departments: readStrings(result.body, "departments"),
+  };
+}
+
+/**
+ * Replace the whole title set.
+ *
+ * Like the department writer next to it, a 200 is not "done": the Gateway applies the
+ * change one title at a time against the identity server and names the ones that did not
+ * take, so callers show those rather than reporting a plain success.
+ */
+export async function replaceIxAuthUserTitles(params: {
+  basePath: string;
+  userId: string;
+  titles: readonly string[];
+}): Promise<
+  { kind: "ok"; titleFailed: boolean; failedTitles: string[]; titles: string[] } | IxAuthUsersFailure
+> {
+  const result = await callUsersRoute({
+    basePath: params.basePath,
+    path: `/${encodeURIComponent(params.userId)}/titles`,
+    method: "PUT",
+    body: { titles: [...params.titles] },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    kind: "ok",
+    titleFailed: result.body.titleFailed === true,
+    failedTitles: readStrings(result.body, "failedTitles"),
+    titles: readStrings(result.body, "titles"),
   };
 }
 

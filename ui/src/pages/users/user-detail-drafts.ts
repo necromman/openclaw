@@ -1,10 +1,11 @@
 import type { IxAuthManagedUser } from "../../features/ix-auth/ix-auth-users-api.ts";
 
-export type UserDetailDraftField = "name" | "role" | "departments";
+export type UserDetailDraftField = "name" | "role" | "departments" | "titles";
 type UserDetailDrafts = {
   displayNameDraft: string;
   selectedRole: string;
   selectedDepartments: string[];
+  selectedTitles: string[];
 };
 
 function unchangedDepartments(left: readonly string[], right: readonly string[]): boolean {
@@ -19,7 +20,8 @@ export function hasUnsavedUserDetails(
     user &&
     (draft.displayNameDraft !== user.displayName ||
       draft.selectedRole !== (user.roles[0] ?? "MEMBER") ||
-      !unchangedDepartments(draft.selectedDepartments, user.departments)),
+      !unchangedDepartments(draft.selectedDepartments, user.departments) ||
+      !unchangedDepartments(draft.selectedTitles, user.titles)),
   );
 }
 
@@ -47,5 +49,11 @@ export function reconcileUserDetailDrafts(params: {
       unchangedDepartments(draft.selectedDepartments, previous?.departments ?? [])
         ? [...next.departments]
         : draft.selectedDepartments,
+    selectedTitles:
+      !sameUser ||
+      savedField === "titles" ||
+      unchangedDepartments(draft.selectedTitles, previous?.titles ?? [])
+        ? [...next.titles]
+        : draft.selectedTitles,
   };
 }

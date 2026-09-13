@@ -29,6 +29,7 @@ function draw(template: unknown): HTMLElement {
 function subjects(overrides: Partial<FoldersSubjectsListResult> = {}): FoldersSubjectsListResult {
   return {
     roles: ["superadmin", "admin", "executive", "moderator", "member"],
+    titles: [{ slug: "team-lead", displayName: "Team lead" }],
     departments: [{ slug: "rnd", displayName: "Research" }],
     users: [
       { profileId: "u-1", email: "kim@example.test", displayName: "Kim" },

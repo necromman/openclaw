@@ -20,6 +20,7 @@ function managedUser(overrides?: Partial<IxAuthManagedUser>): IxAuthManagedUser 
     gatewayRole: "member",
     isSuperAdmin: false,
     departments: ["dept-rnd"],
+    titles: [],
     lastLoginAt: undefined,
     createdAt: "2026-09-01T00:00:00Z",
     locked: false,
@@ -171,6 +172,7 @@ describe("detail draft refresh", () => {
     displayNameDraft: "Unsaved name",
     selectedRole: "EXECUTIVE",
     selectedDepartments: ["dept-qa"],
+    selectedTitles: [],
   };
 
   it("keeps other edits and the discard warning after saving a role", () => {
@@ -207,6 +209,7 @@ describe("detail draft refresh", () => {
       displayNameDraft: "Other user",
       selectedRole: "MEMBER",
       selectedDepartments: [],
+      selectedTitles: [],
     });
     expect(hasUnsavedUserDetails(next, merged)).toBe(false);
     const refreshed = reconcileUserDetailDrafts({
@@ -230,9 +233,11 @@ describe("detail panel", () => {
         { code: "dept-rnd", name: "R&D" },
         { code: "dept-qa", name: "QA" },
       ],
+      titles: [{ code: "title-team-lead", name: "Team lead" }],
       displayNameDraft: "Member Person",
       selectedRole: "MEMBER",
       selectedDepartments: ["dept-rnd"],
+      selectedTitles: [],
       busy: false,
       canGrantSuperAdmin: true,
       canDelete: true,
@@ -244,6 +249,8 @@ describe("detail panel", () => {
       onSaveRole: () => {},
       onDepartmentToggle: () => {},
       onSaveDepartments: () => {},
+      onTitleToggle: () => {},
+      onSaveTitles: () => {},
       onToggleStatus: () => {},
       onAction: () => {},
       onArmDelete: () => {},

@@ -29,7 +29,9 @@ import {
   validateFoldersRulesSetParams,
   validateFoldersSubjectsListParams,
   type FolderOrphanRule,
+  type FolderRuleSubjectKind,
   type FolderSubjectDepartment,
+  type FolderSubjectTitle,
   type FolderSubjectUser,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { recordUserActivity } from "../../audit/user-activity-audit-recorder.js";
@@ -42,6 +44,7 @@ import {
   listFolderRulesForPaths,
   setFolderRule,
 } from "../../state/folder-access-store.js";
+import { listTitles, normalizeTitleSlug } from "../../state/titles-store.js";
 import { listProfiles } from "../../state/user-profile-list.js";
 import { readClientDepartmentIdentity } from "../department-access.js";
 import {
@@ -96,6 +99,7 @@ export function callerIdentity(client: GatewayClient | null): FolderAccessIdenti
   }
   return {
     departments: identity.departments,
+    ...(identity.titles === undefined ? {} : { titles: identity.titles }),
     isSuperAdmin: identity.isSuperAdmin,
     ...(identity.profileId === undefined ? {} : { profileId: identity.profileId }),
     ...(identity.gatewayRole === undefined ? {} : { gatewayRole: identity.gatewayRole }),
@@ -130,7 +134,7 @@ export function mayManageFolderRules(client: GatewayClient | null): boolean {
 export function viewingIdentity(params: {
   client: GatewayClient | null;
   manage: boolean;
-  previewSubjectKind?: "role" | "department" | "user";
+  previewSubjectKind?: FolderRuleSubjectKind;
   previewSubjectId?: string;
 }): FolderAccessIdentity {
   if (
@@ -373,7 +377,15 @@ export const folderRulesHandlers: GatewayRequestHandlers = {
       }
       departments.push(entry);
     }
-    respond(true, { roles, departments, users });
+    const titles: FolderSubjectTitle[] = [];
+    for (const title of listTitles()) {
+      const entry: FolderSubjectTitle = { slug: title.slug };
+      if (title.display_name) {
+        entry.displayName = title.display_name;
+      }
+      titles.push(entry);
+    }
+    respond(true, { roles, titles, departments, users });
   },
 };
 
@@ -402,6 +414,7 @@ async function collectOrphanRules(roleMap: Record<string, string> | undefined): 
   }
   const roles = new Set(Object.values(roleMap ?? IX_AUTH_DEFAULT_ROLE_MAP));
   const departments = new Set(listDepartments().map((row) => normalizeDepartmentSlug(row.slug)));
+  const titles = new Set(listTitles().map((row) => normalizeTitleSlug(row.slug)));
   const profiles = new Set(
     listProfiles()
       .filter((profile) => !profile.mergedInto)
@@ -419,9 +432,11 @@ async function collectOrphanRules(roleMap: Record<string, string> | undefined): 
     const subjectExists =
       rule.subjectKind === "role"
         ? roles.has(rule.subjectId)
-        : rule.subjectKind === "department"
-          ? departments.has(normalizeDepartmentSlug(rule.subjectId))
-          : profiles.has(rule.subjectId);
+        : rule.subjectKind === "title"
+          ? titles.has(normalizeTitleSlug(rule.subjectId))
+          : rule.subjectKind === "department"
+            ? departments.has(normalizeDepartmentSlug(rule.subjectId))
+            : profiles.has(rule.subjectId);
     if (exists && subjectExists) {
       continue;
     }

@@ -39,6 +39,7 @@ import {
   rejectSuperAdminTarget,
   IX_AUTH_MANAGEABLE_ROLE_CODES,
 } from "./ix-auth-admin-users-guard.js";
+import { handleIxAuthReplaceTitles } from "./ix-auth-admin-users-titles.js";
 import { projectIxAuthUser } from "./ix-auth-admin-users-view.js";
 import type { IxAuthAdminUsersTarget } from "./ix-auth-http-paths.js";
 import { readIxAuthJsonBody, type IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
@@ -500,6 +501,7 @@ async function handleFolderSubject(params: ActionParams): Promise<void> {
 const IX_AUTH_USER_ACTION_METHODS: ReadonlyMap<string, string> = new Map([
   ["roles", "PUT"],
   ["departments", "PUT"],
+  ["titles", "PUT"],
   ["folder-subject", "POST"],
   ["password-reset", "POST"],
   ["invite", "POST"],
@@ -548,6 +550,9 @@ export async function handleIxAuthAdminUserAction(params: {
       return;
     case "departments":
       await handleReplaceDepartments(action);
+      return;
+    case "titles":
+      await handleIxAuthReplaceTitles(action);
       return;
     case "password-reset":
       await handlePasswordReset(action);

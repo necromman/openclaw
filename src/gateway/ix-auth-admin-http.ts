@@ -330,6 +330,13 @@ export async function handleIxAuthAdminHttpRequest(params: {
     await departmentsModule.handleIxAuthAdminDepartmentsRequest({ ...params, admin });
     return;
   }
+  if (params.route === "admin-titles") {
+    // Loaded on demand for the same reason the department surface is: only the title
+    // screen and the folder-rule subject picker read it.
+    const titlesModule = await import("./ix-auth-admin-titles-http.js");
+    await titlesModule.handleIxAuthAdminTitlesRequest({ ...params, admin });
+    return;
+  }
   if (params.route === "admin-models") {
     // Loaded on demand: only the model screen reads or writes this surface, and it pulls
     // the configuration mutation machinery with it.

@@ -88,7 +88,11 @@ export type AuthorizedGatewayHttpRequest = {
   operatorRolePolicy?: GatewayOperatorRoleDefinition;
   operatorRoleActor?: { kind: "system" };
   /** Verified IX-Auth department facts; absent outside ix-auth mode. */
-  ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+  ixAuthDepartments?: {
+    departments: readonly string[];
+    titles?: readonly string[];
+    isSuperAdmin: boolean;
+  };
   /** Attribution-only identity from the same verified token; never read by authorization. */
   ixAuthAuditActor?: IxAuthAuditActor;
   ixAuthImpersonating?: true;

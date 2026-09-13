@@ -28,6 +28,7 @@ const SETTINGS = {
   superAdminRoles: ["superadmin"],
   departmentClaim: "ixauth_groups",
   departmentGroupPrefix: "dept-",
+  titleGroupPrefix: "title-",
   selfSignupEnabled: false,
   idleTimeoutMs: 60_000,
   absoluteTimeoutMs: 600_000,
@@ -49,6 +50,7 @@ function buildPrincipal(gatewayRole: string | undefined): IxAuthPrincipal {
     },
     ...(gatewayRole === undefined ? {} : { gatewayRole }),
     departments: [],
+    titles: [],
     isSuperAdmin: gatewayRole === "superadmin",
   };
 }

@@ -324,3 +324,12 @@
 - 구현: 화면 전용 변경. 새 유틸이 한글 이름을 초성·중성·종성 표기로 로마자화(연구개발 → yeongugaebal, 품질 → pumjil)한 뒤 서버와 같은 정규식(소문자·숫자·하이픈, 32자)에 맞춰 정리하고, 이미 불러온 부서·고아 목록과 겹치면 -2, -3 접미를 붙인다. 코드 칸은 기본으로 접혀 있고 "코드 직접 지정"을 펼쳐 수정하면 자동 갱신을 멈춘다. 이름 아래에 그룹 코드 미리보기와 형식 오류 문구를 표시한다. 서버·IX-Auth 는 바꾸지 않았다.
 - 검증: tsgo(ui·테스트 샤드), oxlint, oxfmt 통과. 로마자화 기대값은 Node 로 직접 실측했고 vitest 는 CI 에서 돈다.
 - 배포·실측(18:09 KST): NAS 가 manifest sha256:04ce586253d67c294aa2c1627e5ef1e316ebb38ea6eaa96ca6f7733bc09cc4e7 로 교체돼 healthy. 운영 부서 화면에서 이름 "경영지원" 입력 시 그룹 코드 미리보기 dept-gyeongyeongjiwon 이 표시되고 코드 칸은 "짧은 코드를 직접 지정" 링크 뒤에 접혀 있음을 확인했다. 부서는 만들지 않았다.
+
+### AH. 직책 분류 (2026-09-13)
+
+- 사용자 요청: 역할도 부서처럼 화면에서 관리하고 싶다. 조사 결과 5개 역할은 IX-Auth 시스템 역할(삭제 불가)이며 게이트웨이 권한 등급·관리 자격이 그 코드에 고정돼 있어, 사용자 결정으로 권한 등급은 그대로 두고 별도 "직책" 분류를 추가했다.
+- 구조: 부서(dept-)와 대칭인 IX-Auth 그룹 `title-<slug>`. 설정 `gateway.auth.ixAuth.titleGroupPrefix`(기본 title-, 환경 변수 없음). 로그인 시 그룹 클레임에서 직책을 읽어 principal·`/auth/me`·연결 신원에 싣고, 기능 지역 테이블 `titles`·`title_members` 에 투영한다. 직책 자체는 어떤 권한도 주지 않고 폴더 규칙 대상으로만 쓰인다.
+- 서버: `/auth/admin/titles` GET/POST/PATCH/DELETE 와 `PUT /auth/admin/users/{id}/titles`. 부서 라우트와 공통 안전장치(코드 정규식, 중복 409, 구성원 있으면 삭제 거부, 자기 자신·슈퍼관리자 대상 보호)를 `ix-auth-admin-group-helpers.ts` 로 뽑아 둘이 같이 쓴다. 감사 액션 title-create·title-rename·title-delete·user-titles.
+- 폴더 규칙: 대상 종류에 `title` 추가, 우선순위 role < title < department < user. 여러 직책이 겹치면 더 좁은 권한. `folders.subjects.list` 가 직책 목록을 내고 삭제된 직책의 규칙은 고아로 남긴다.
+- 화면: 설정 → 직책 페이지(이름만 입력, 코드 자동 생성, 이름 변경, 삭제, 구성원 수), 사용자 상세 역할·부서 탭의 직책 다중 선택, 폴더별·대상별 패널의 "직책별" 탭, 사용자 상세 폴더 권한 대상 선택에 직책 항목. 초대 화면은 범위 밖.
+- 검증: tsgo(core·ui·테스트 샤드), oxlint(변경 파일), oxfmt, i18n verify, 설정 문서 기준선 통과. 새 시험(정책 3건, 직책 HTTP, 직책 페이지, 대상별 패널 직책 탭)은 CI 에서 돈다. 운영 실측은 배포 후 아래에 기록한다.

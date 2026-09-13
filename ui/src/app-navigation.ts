@@ -7,6 +7,7 @@ import { BRAND_NAME } from "./brand.ts";
 import type { IconName } from "./components/icons.ts";
 import {
   canManageIxAuthDepartments,
+  canManageIxAuthTitles,
   canManageIxAuthUsers,
   isIxAuthAdminOnlyAccount,
   isIxAuthRestrictedAccount,
@@ -209,6 +210,7 @@ const SETTINGS_NAVIGATION_GROUPS = [
       "connection",
       "users",
       "departments",
+      "titles",
       "folders",
       "channels",
       "communications",
@@ -247,7 +249,16 @@ const NON_ADMIN_SETTINGS_NAVIGATION_GROUPS = [
   { labelKey: "nav.settingsGroupDevice", routes: ["device", "device-permissions"] },
   {
     labelKey: "nav.settingsGroupConnections",
-    routes: ["connection", "users", "departments", "folders", "channels", "talk", "devices"],
+    routes: [
+      "connection",
+      "users",
+      "departments",
+      "titles",
+      "folders",
+      "channels",
+      "talk",
+      "devices",
+    ],
   },
   {
     labelKey: "nav.settingsGroupAgents",
@@ -284,6 +295,7 @@ const IX_AUTH_ADMIN_SETTINGS_ROUTES: ReadonlySet<NavigationRouteId> = new Set([
   ...IX_AUTH_MEMBER_SETTINGS_ROUTES,
   "users",
   "departments",
+  "titles",
   "folders",
   "audit",
   "approvals",
@@ -309,6 +321,11 @@ export function isSettingsNavigationRouteVisible(
   // Departments are part of that same job, so the same rank decides them.
   if (routeId === "departments") {
     return canManageIxAuthDepartments();
+  }
+  // Job titles are the second classification over the same identity groups, run by the
+  // same people, so they answer to the same rank.
+  if (routeId === "titles") {
+    return canManageIxAuthTitles();
   }
   // Folder access grants and withdraws what people may read on the share, which is the
   // same job again: whoever runs the accounts runs the folders those accounts reach.
@@ -388,6 +405,7 @@ const NAVIGATION_PRESENTATION: Record<NavigationRouteId, NavigationPresentation>
   connection: ["radio", "tabs.connection", "subtitles.connection"],
   users: ["users", "tabs.users", "subtitles.users"],
   departments: ["shieldCog", "tabs.departments", "subtitles.departments"],
+  titles: ["flag", "tabs.titles", "subtitles.titles"],
   folders: ["folder", "tabs.folders", "subtitles.folders"],
   audit: ["fileText", "tabs.audit", "subtitles.audit"],
   sessions: ["fileText", "tabs.sessions", "subtitles.sessions"],

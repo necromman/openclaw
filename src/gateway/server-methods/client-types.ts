@@ -71,7 +71,11 @@ export type GatewayClient = {
      * params. Absent outside ix-auth mode, which is what keeps every other auth mode on
      * its existing authorization path.
      */
-    ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+    ixAuthDepartments?: {
+      departments: readonly string[];
+      titles?: readonly string[];
+      isSuperAdmin: boolean;
+    };
     /** Verified actor claim; restricts management independently of the target's data access. */
     ixAuthImpersonating?: true;
     /** Exact browser login session, used to retire only its connections. */

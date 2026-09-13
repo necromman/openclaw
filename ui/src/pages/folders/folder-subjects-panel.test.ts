@@ -30,6 +30,7 @@ function draw(template: unknown): HTMLElement {
 function subjects(): FoldersSubjectsListResult {
   return {
     roles: ["superadmin", "member"],
+    titles: [{ slug: "team-lead", displayName: "Team lead" }],
     departments: [
       { slug: "rnd", displayName: "Research" },
       { slug: "sales", displayName: "Sales" },
@@ -120,6 +121,24 @@ describe("folder subjects panel", () => {
     expect(Array.from(names, (node) => node.textContent?.trim())).toEqual(["Research", "Sales"]);
     host.querySelectorAll<HTMLButtonElement>(".folders-bysubject__target")[1]?.click();
     expect(onTarget).toHaveBeenCalledWith(expect.objectContaining({ id: "sales" }));
+  });
+
+  it("offers a job-title tab beside the department one, and its titles", () => {
+    const tabs = draw(panel()).querySelectorAll<HTMLButtonElement>(".folders-tab");
+    expect(Array.from(tabs, (node) => node.textContent?.trim())).toEqual([
+      t("ixAuth.folders.tabDepartments"),
+      t("ixAuth.folders.tabTitles"),
+      t("ixAuth.folders.tabRoles"),
+      t("ixAuth.folders.tabPeople"),
+    ]);
+    const onTarget = vi.fn();
+    const host = draw(panel({ tab: "title", onTarget }));
+    const names = host.querySelectorAll(".folders-bysubject__target-name");
+    expect(Array.from(names, (node) => node.textContent?.trim())).toEqual(["Team lead"]);
+    host.querySelectorAll<HTMLButtonElement>(".folders-bysubject__target")[0]?.click();
+    expect(onTarget).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "title", id: "team-lead" }),
+    );
   });
 
   it("draws a hidden folder and says no rule reaches it", () => {

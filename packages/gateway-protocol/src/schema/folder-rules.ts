@@ -22,6 +22,7 @@ import { NonEmptyString } from "./primitives.js";
 /** Whose rule this is. More specific kinds win over less specific ones. */
 export const FolderRuleSubjectKindSchema = Type.Union([
   Type.Literal("role"),
+  Type.Literal("title"),
   Type.Literal("department"),
   Type.Literal("user"),
 ]);
@@ -39,7 +40,7 @@ export const FolderAccessRuleSchema = closedObject({
   /** Root-relative folder path, `""` at the root. */
   folderPath: Type.String(),
   subjectKind: FolderRuleSubjectKindSchema,
-  /** Role code, department slug, or profile id, per `subjectKind`. */
+  /** Role code, title slug, department slug, or profile id, per `subjectKind`. */
   subjectId: NonEmptyString,
   permission: FolderRulePermissionSchema,
   /** True when the rule also covers everything under the folder. */
@@ -262,6 +263,12 @@ export const FolderSubjectDepartmentSchema = closedObject({
   displayName: Type.Optional(NonEmptyString),
 });
 
+/** One job title a rule may name. Same shape as a department; a different axis. */
+export const FolderSubjectTitleSchema = closedObject({
+  slug: NonEmptyString,
+  displayName: Type.Optional(NonEmptyString),
+});
+
 export const FolderSubjectUserSchema = closedObject({
   profileId: NonEmptyString,
   email: Type.Optional(NonEmptyString),
@@ -273,11 +280,12 @@ export const FoldersSubjectsListParamsSchema = closedObject({});
 
 export const FoldersSubjectsListResultSchema = closedObject({
   roles: Type.Array(NonEmptyString),
+  titles: Type.Array(FolderSubjectTitleSchema),
   departments: Type.Array(FolderSubjectDepartmentSchema),
   users: Type.Array(FolderSubjectUserSchema),
 });
 
-export type FolderRuleSubjectKind = "role" | "department" | "user";
+export type FolderRuleSubjectKind = "role" | "title" | "department" | "user";
 
 export type FolderRulePermission = "hidden" | "read" | "write";
 
@@ -424,6 +432,11 @@ export type FolderSubjectDepartment = {
   displayName?: string;
 };
 
+export type FolderSubjectTitle = {
+  slug: string;
+  displayName?: string;
+};
+
 export type FolderSubjectUser = {
   profileId: string;
   email?: string;
@@ -434,6 +447,7 @@ export type FoldersSubjectsListParams = Record<string, never>;
 
 export type FoldersSubjectsListResult = {
   roles: string[];
+  titles: FolderSubjectTitle[];
   departments: FolderSubjectDepartment[];
   users: FolderSubjectUser[];
 };

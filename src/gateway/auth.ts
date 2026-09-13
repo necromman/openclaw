@@ -56,7 +56,11 @@ export type GatewayAuthResult = {
    * Carried here rather than re-derived downstream so every HTTP surface authorizes
    * from the same verified principal the WebSocket handshake uses.
    */
-  ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+  ixAuthDepartments?: {
+    departments: readonly string[];
+    titles?: readonly string[];
+    isSuperAdmin: boolean;
+  };
   /** Attribution-only identity from the same verified token; never read by authorization. */
   ixAuthAuditActor?: IxAuthAuditActor;
   ixAuthImpersonating?: true;
@@ -564,6 +568,7 @@ async function authorizeGatewayConnectCore(
         user: resolved.principal.claims.email,
         ixAuthDepartments: {
           departments: resolved.principal.departments,
+          titles: resolved.principal.titles,
           isSuperAdmin: resolved.principal.isSuperAdmin,
         },
         ...ixAuthAuditActorFacts(resolved.principal),

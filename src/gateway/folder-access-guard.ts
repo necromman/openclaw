@@ -109,6 +109,7 @@ export async function prepareFolderAccessGate(params: {
   }
   const gateIdentity: FolderAccessIdentity = {
     departments: identity.departments,
+    ...(identity.titles === undefined ? {} : { titles: identity.titles }),
     isSuperAdmin: false,
     ...(identity.profileId === undefined ? {} : { profileId: identity.profileId }),
     ...(identity.gatewayRole === undefined ? {} : { gatewayRole: identity.gatewayRole }),

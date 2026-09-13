@@ -5,8 +5,8 @@
 //   1. Walk the folder and its ancestors from the deepest outward.
 //   2. At the first level that carries a rule for this person, stop.
 //   3. Among the rules at that level, a person rule beats a department rule, which beats
-//      a role rule. Two rules of the same kind (someone in two departments) resolve to
-//      the more restrictive of the two.
+//      a title rule, which beats a role rule. Two rules of the same kind (someone in two
+//      departments, or holding two titles) resolve to the more restrictive of the two.
 //   4. No rule anywhere in the chain means hidden.
 //
 // Subject-first would break the requirement this feature exists for. If a personal rule
@@ -16,7 +16,13 @@
 // statement the deciding one, which is what an operator means when they write it.
 //
 // Two departments never add up to more access, for the same reason the department fence
-// says so: adding a department is not a way to widen a boundary.
+// says so: adding a department is not a way to widen a boundary. Two titles behave the
+// same way, and for the same reason.
+//
+// A title sits between the role and the department because of what each one says. A role
+// is a rank the whole deployment shares, a title is what a person is inside the company,
+// and a department is where they sit; the more particular the statement, the later it is
+// consulted, so a department rule can still close a folder a title opened.
 //
 // The default is hidden because the measured tree is 37,356 folders with a `secure`
 // folder inside every personal share. On a list that size something is always missed,
@@ -29,6 +35,7 @@ import type {
   FolderRuleSubjectKind,
 } from "../../packages/gateway-protocol/src/schema/folder-rules.js";
 import { normalizeDepartmentSlug } from "../state/departments-store.js";
+import { normalizeTitleSlug } from "../state/titles-store.js";
 import { folderRuleAncestry, hasExcludedFolderSegment } from "./folder-access-path.js";
 
 /** Everything a folder verdict is allowed to depend on. */
@@ -36,6 +43,8 @@ export type FolderAccessIdentity = {
   profileId?: string | undefined;
   gatewayRole?: string | undefined;
   departments: readonly string[];
+  /** Title slugs from the same verified token. Absent is the same as none held. */
+  titles?: readonly string[] | undefined;
   isSuperAdmin: boolean;
 };
 
@@ -56,8 +65,9 @@ const PERMISSION_STRENGTH: Record<FolderRulePermission, number> = {
 
 const SUBJECT_PRECEDENCE: Record<FolderRuleSubjectKind, number> = {
   role: 0,
-  department: 1,
-  user: 2,
+  title: 1,
+  department: 2,
+  user: 3,
 };
 
 /** The more restrictive of two permissions. */
@@ -75,6 +85,10 @@ function matchesIdentity(rule: FolderAccessRule, identity: FolderAccessIdentity)
   if (rule.subjectKind === "department") {
     const wanted = normalizeDepartmentSlug(rule.subjectId);
     return identity.departments.some((slug) => normalizeDepartmentSlug(slug) === wanted);
+  }
+  if (rule.subjectKind === "title") {
+    const wanted = normalizeTitleSlug(rule.subjectId);
+    return (identity.titles ?? []).some((slug) => normalizeTitleSlug(slug) === wanted);
   }
   return identity.gatewayRole !== undefined && rule.subjectId === identity.gatewayRole;
 }
@@ -249,6 +263,9 @@ export function subjectIdentity(kind: FolderRuleSubjectKind, id: string): Folder
   }
   if (kind === "department") {
     return { departments: [id], isSuperAdmin: false };
+  }
+  if (kind === "title") {
+    return { departments: [], titles: [id], isSuperAdmin: false };
   }
   return { gatewayRole: id, departments: [], isSuperAdmin: false };
 }

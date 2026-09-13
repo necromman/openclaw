@@ -22,6 +22,7 @@ export type IxAuthHttpRoute =
   | "admin-invites"
   | "admin-approvals"
   | "admin-departments"
+  | "admin-titles"
   | "admin-models"
   | "admin-users"
   | "admin-audit-export"
@@ -42,6 +43,7 @@ const IX_AUTH_ADMIN_ACCOUNT_ROUTES: ReadonlySet<IxAuthHttpRoute> = new Set<IxAut
   "admin-invites",
   "admin-approvals",
   "admin-departments",
+  "admin-titles",
   "admin-models",
   "admin-users",
   "admin-audit-export",
@@ -62,6 +64,7 @@ type IxAuthAdminUserAction =
   | "impersonate"
   | "roles"
   | "departments"
+  | "titles"
   | "folder-subject"
   | "password-reset"
   | "invite"
@@ -73,6 +76,7 @@ const IX_AUTH_ADMIN_USER_ACTIONS: ReadonlySet<string> = new Set([
   "impersonate",
   "roles",
   "departments",
+  "titles",
   "folder-subject",
   "password-reset",
   "invite",
@@ -166,6 +170,10 @@ export function classifyIxAuthHttpPath(pathname: string): IxAuthHttpRoute {
       return "admin-approvals";
     case "/auth/admin/departments":
       return "admin-departments";
+    // Job titles: the same group mechanism under its own prefix. Separate from the
+    // department route because the two must never be able to mint each other's codes.
+    case "/auth/admin/titles":
+      return "admin-titles";
     // The model policy an administrator may set: which model answers, which answers
     // next, and which models chat offers. It is the only Gateway configuration this
     // namespace writes, and it writes four named leaves rather than a document.

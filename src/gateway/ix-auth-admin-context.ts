@@ -128,16 +128,44 @@ export async function resolveIxAuthAdminContext(params: {
   };
 }
 
-/** Department codes carry the configured prefix; everything else is an ordinary group. */
-function isDepartmentGroupCode(code: string, prefix: string): boolean {
+/** A classified code carries the configured prefix; everything else is an ordinary group. */
+function isPrefixedGroupCode(code: string, prefix: string): boolean {
   return prefix.length > 0 && code.startsWith(prefix);
 }
 
-export type IxAuthDepartmentGroup = { groupId: string; code: string; name: string };
+/** One identity-server group that carries a classification prefix. */
+export type IxAuthPrefixedGroup = { groupId: string; code: string; name: string };
+
+/** Kept as the name the department surfaces already use for the same shape. */
+export type IxAuthDepartmentGroup = IxAuthPrefixedGroup;
+
+export type IxAuthPrefixedGroupListing =
+  | { ok: true; groups: IxAuthPrefixedGroup[] }
+  | { ok: false; failure: IxAuthRelayFailure };
 
 export type IxAuthDepartmentListing =
   | { ok: true; departments: IxAuthDepartmentGroup[] }
   | { ok: false; failure: IxAuthRelayFailure };
+
+/**
+ * The groups one classification prefix claims, in one relay call.
+ *
+ * Departments and job titles are two prefixes over the same group list, so both read it
+ * through here and neither can end up looking at a different set than the other.
+ */
+export async function listIxAuthPrefixedGroups(params: {
+  admin: IxAuthAdminContext;
+  prefix: string;
+}): Promise<IxAuthPrefixedGroupListing> {
+  const groups = await listIxAuthGroups(params.admin.call);
+  if (!groups.ok) {
+    return { ok: false, failure: groups };
+  }
+  return {
+    ok: true,
+    groups: groups.groups.filter((group) => isPrefixedGroupCode(group.code, params.prefix)),
+  };
+}
 
 /**
  * The departments the identity server knows about, in one relay call.
@@ -149,15 +177,11 @@ export async function listIxAuthDepartmentGroups(params: {
   deps: IxAuthHttpDependencies;
   admin: IxAuthAdminContext;
 }): Promise<IxAuthDepartmentListing> {
-  const groups = await listIxAuthGroups(params.admin.call);
-  if (!groups.ok) {
-    return { ok: false, failure: groups };
-  }
-  const prefix = params.deps.settings.departmentGroupPrefix;
-  return {
-    ok: true,
-    departments: groups.groups.filter((group) => isDepartmentGroupCode(group.code, prefix)),
-  };
+  const listing = await listIxAuthPrefixedGroups({
+    admin: params.admin,
+    prefix: params.deps.settings.departmentGroupPrefix,
+  });
+  return listing.ok ? { ok: true, departments: listing.groups } : listing;
 }
 
 /** Keep only the codes that name a real department, dropping duplicates and blanks. */

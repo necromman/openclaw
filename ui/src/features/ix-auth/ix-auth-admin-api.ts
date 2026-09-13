@@ -29,6 +29,35 @@ export type IxAuthDepartmentOption = {
   agents?: string[];
 };
 
+/**
+ * One job title the identity server knows about.
+ *
+ * Same two halves a department has: `code` is what the token carries and never changes,
+ * `name` is what people read. A title binds no agent, so there is no agent list here.
+ */
+export type IxAuthTitleOption = {
+  code: string;
+  name: string;
+  /** Code with the title prefix removed, which is what a folder rule names. */
+  slug?: string;
+  /** The identity server's own group name, before any local rename. */
+  identityName?: string;
+  /** People the identity server places in this title. */
+  memberCount?: number;
+};
+
+/** A title the fork still holds but the identity server no longer lists. */
+export type IxAuthOrphanTitle = { slug: string; name: string; memberCount: number };
+
+/** Everything the title screen reads in one call. */
+export type IxAuthTitleDirectory = {
+  /** Group-code prefix that marks a title, `"title-"` by default. */
+  prefix: string;
+  memberCountSource: "identity" | "projection";
+  titles: IxAuthTitleOption[];
+  orphans: IxAuthOrphanTitle[];
+};
+
 /** A department the fork still holds but the identity server no longer lists. */
 export type IxAuthOrphanDepartment = {
   slug: string;
@@ -91,6 +120,8 @@ function mapAdminErrorToKey(status: number, code: string): string {
       return "adminConflict";
     case "department_has_members":
       return "departmentHasMembers";
+    case "title_has_members":
+      return "titleHasMembers";
     case "member_count_unavailable":
       return "memberCountUnavailable";
     case "identity_unavailable":
@@ -297,6 +328,115 @@ export async function deleteIxAuthDepartment(params: {
     slug: fieldText(result.body, "slug") ?? params.slug,
     unboundAgents: readStringListField(result.body, "unboundAgents"),
   };
+}
+
+/** Titles, their projection, and any the identity server no longer lists. */
+export async function fetchIxAuthTitleDirectory(
+  basePath: string,
+): Promise<IxAuthTitleDirectory | IxAuthAdminFailure> {
+  const result = await callAdminRoute({ basePath, route: "titles", method: "GET" });
+  if (result.kind === "failed") {
+    return result;
+  }
+  const raw = Array.isArray(result.body.titles) ? result.body.titles : [];
+  const titles: IxAuthTitleOption[] = [];
+  for (const entry of raw) {
+    const code = fieldText(entry, "code");
+    if (!code) {
+      continue;
+    }
+    titles.push({
+      code,
+      name: fieldText(entry, "name") ?? code,
+      slug: fieldText(entry, "slug"),
+      identityName: fieldText(entry, "identityName"),
+      memberCount: readCountField(entry, "memberCount"),
+    });
+  }
+  const rawOrphans = Array.isArray(result.body.orphans) ? result.body.orphans : [];
+  const orphans: IxAuthOrphanTitle[] = [];
+  for (const entry of rawOrphans) {
+    const slug = fieldText(entry, "slug");
+    if (slug) {
+      orphans.push({
+        slug,
+        name: fieldText(entry, "name") ?? slug,
+        memberCount: readCountField(entry, "memberCount"),
+      });
+    }
+  }
+  return {
+    prefix: fieldText(result.body, "prefix") ?? "",
+    memberCountSource:
+      fieldText(result.body, "memberCountSource") === "projection" ? "projection" : "identity",
+    titles,
+    orphans,
+  };
+}
+
+/**
+ * Create one title.
+ *
+ * The Gateway mints the group code from the slug, so a caller cannot name a group outside
+ * the title prefix and quietly create an ordinary one.
+ */
+export async function createIxAuthTitle(params: {
+  basePath: string;
+  slug: string;
+  name: string;
+}): Promise<{ code: string; slug: string; name: string } | IxAuthAdminFailure> {
+  const result = await callAdminRoute({
+    basePath: params.basePath,
+    route: "titles",
+    method: "POST",
+    body: { slug: params.slug, name: params.name },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    code: fieldText(result.body, "code") ?? "",
+    slug: fieldText(result.body, "slug") ?? params.slug,
+    name: fieldText(result.body, "name") ?? params.name,
+  };
+}
+
+/** Rename one title. Only the display name moves; the group code decides membership. */
+export async function renameIxAuthTitle(params: {
+  basePath: string;
+  slug: string;
+  name: string;
+}): Promise<{ slug: string; name: string } | IxAuthAdminFailure> {
+  const result = await callAdminRoute({
+    basePath: params.basePath,
+    route: "titles",
+    method: "PATCH",
+    body: { slug: params.slug, name: params.name },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return {
+    slug: fieldText(result.body, "slug") ?? params.slug,
+    name: fieldText(result.body, "name") ?? params.name,
+  };
+}
+
+/** Delete one title. Refused by the Gateway while anybody still holds it. */
+export async function deleteIxAuthTitle(params: {
+  basePath: string;
+  slug: string;
+}): Promise<{ slug: string } | IxAuthAdminFailure> {
+  const result = await callAdminRoute({
+    basePath: params.basePath,
+    route: "titles",
+    method: "DELETE",
+    body: { slug: params.slug },
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  return { slug: fieldText(result.body, "slug") ?? params.slug };
 }
 
 /** Create one invited account and, when there is no mail server, get its link back. */

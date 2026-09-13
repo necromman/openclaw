@@ -30,6 +30,8 @@ export type IxAuthSessionUser = {
   groups: string[];
   gatewayRole?: string;
   departments?: string[];
+  /** Job titles from the same verified token. A person may hold several. */
+  titles?: string[];
   isSuperAdmin?: boolean;
   impersonatedBy?: string;
 };
@@ -130,6 +132,9 @@ function readSessionUser(body: Record<string, unknown>): IxAuthSessionUser | und
     gatewayRole: typeof record.gatewayRole === "string" ? record.gatewayRole : undefined,
     departments: Array.isArray(record.departments)
       ? record.departments.filter((d) => typeof d === "string")
+      : undefined,
+    titles: Array.isArray(record.titles)
+      ? record.titles.filter((entry) => typeof entry === "string")
       : undefined,
     isSuperAdmin: record.isSuperAdmin === true,
     impersonatedBy: typeof record.impersonatedBy === "string" ? record.impersonatedBy : undefined,

@@ -24,6 +24,7 @@ export function projectIxAuthUser(params: {
     settings: params.settings,
   });
   const prefix = params.settings.departmentGroupPrefix;
+  const titlePrefix = params.settings.titleGroupPrefix;
   return {
     id: params.user.id,
     email: params.user.email,
@@ -33,6 +34,11 @@ export function projectIxAuthUser(params: {
     gatewayRole: role.gatewayRole,
     isSuperAdmin: role.isSuperAdmin,
     departments: params.user.groups.filter((code) => prefix.length > 0 && code.startsWith(prefix)),
+    // Job titles ride the same group list under their own prefix. Projected here so one
+    // row answers both questions and no screen has to re-derive either from raw groups.
+    titles: params.user.groups.filter(
+      (code) => titlePrefix.length > 0 && code.startsWith(titlePrefix),
+    ),
     lastLoginAt: params.user.lastLoginAt,
     createdAt: params.user.createdAt,
     // `LOCKED` is the automatic lockout; the expiry is what tells an administrator

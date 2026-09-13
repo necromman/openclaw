@@ -79,6 +79,17 @@ export function canManageIxAuthDepartments(): boolean {
 }
 
 /**
+ * True when the signed-in account may open the job-title screen.
+ *
+ * The same rank as departments, and for the same reason: a title is a classification the
+ * company runs, not a knob on the deployment. The title routes agree
+ * (`src/gateway/ix-auth-admin-titles-http.ts`).
+ */
+export function canManageIxAuthTitles(): boolean {
+  return ixAuthAdminAccess;
+}
+
+/**
  * True when the settings menu must shrink to the entries that belong to the account.
  *
  * A staff member, a moderator and an executive all configure nothing on this deployment:

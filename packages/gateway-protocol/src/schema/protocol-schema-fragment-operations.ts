@@ -49,6 +49,7 @@ export const OperationsProtocolSchemas = {
   FolderTreeEntry: folderRules.FolderTreeEntrySchema,
   FolderEffectiveRule: folderRules.FolderEffectiveRuleSchema,
   FolderSubjectDepartment: folderRules.FolderSubjectDepartmentSchema,
+  FolderSubjectTitle: folderRules.FolderSubjectTitleSchema,
   FolderSubjectUser: folderRules.FolderSubjectUserSchema,
   FolderTreeScanStatus: folderRules.FolderTreeScanStatusSchema,
   FoldersTreeListParams: folderRules.FoldersTreeListParamsSchema,

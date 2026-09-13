@@ -27,11 +27,7 @@
 // be deleted. Creating an empty department grants its creator nothing.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
-import {
-  countIxAuthGroupMembers,
-  createIxAuthGroup,
-  deleteIxAuthGroup,
-} from "../auth/ix-auth/ix-auth-admin-client.js";
+import { createIxAuthGroup, deleteIxAuthGroup } from "../auth/ix-auth/ix-auth-admin-client.js";
 import {
   deleteDepartment,
   listDepartmentMembers,
@@ -43,19 +39,19 @@ import {
 import { sendJson } from "./http-common.js";
 import {
   listIxAuthDepartmentGroups,
-  scanIxAuthDirectory,
   sendRelayFailure,
   type IxAuthAdminContext,
   type IxAuthDepartmentGroup,
 } from "./ix-auth-admin-context.js";
+import {
+  countIxAuthGroupMembership,
+  countIxAuthIdentityMembersByCode,
+  readIxAuthGroupBody,
+  slugForPrefixedGroupCode,
+  IX_AUTH_GROUP_SLUG_PATTERN,
+} from "./ix-auth-admin-group-helpers.js";
 import { recordIxAuthAdminAction } from "./ix-auth-admin-ledger.js";
 import { readIxAuthJsonBody, type IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
-
-/** A department slug: lowercase, digits and inner hyphens, short enough to read. */
-const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/u;
-
-/** Longest display name a department may carry. Long enough for a full team name. */
-const DEPARTMENT_NAME_MAX_LENGTH = 80;
 
 type DepartmentsRouteParams = {
   req: IncomingMessage;
@@ -63,15 +59,6 @@ type DepartmentsRouteParams = {
   deps: IxAuthHttpDependencies;
   admin: IxAuthAdminContext;
 };
-
-/** The slug behind one group code, or undefined when the code is not a department. */
-function slugForGroupCode(code: string, prefix: string): string | undefined {
-  if (prefix.length === 0 || !code.startsWith(prefix)) {
-    return undefined;
-  }
-  const slug = normalizeDepartmentSlug(code.slice(prefix.length));
-  return slug.length > 0 ? slug : undefined;
-}
 
 /**
  * Merge the identity server's groups with the fork's own projection.
@@ -98,7 +85,7 @@ function projectDepartments(params: {
   const seen = new Set<string>();
   const departments: Record<string, unknown>[] = [];
   for (const group of params.groups) {
-    const slug = slugForGroupCode(group.code, params.prefix);
+    const slug = slugForPrefixedGroupCode(group.code, params.prefix);
     if (!slug) {
       continue;
     }
@@ -145,7 +132,7 @@ async function handleList(params: DepartmentsRouteParams): Promise<void> {
     return;
   }
   const prefix = params.deps.settings.departmentGroupPrefix;
-  const counted = await countIdentityMembers({ admin: params.admin, prefix });
+  const counted = await countIxAuthIdentityMembersByCode({ admin: params.admin, prefix });
   const projected = projectDepartments({
     groups: listing.departments,
     prefix,
@@ -158,78 +145,12 @@ async function handleList(params: DepartmentsRouteParams): Promise<void> {
   });
 }
 
-/**
- * Members per department code, read from the identity server's own directory.
- *
- * Undefined when the directory could not be read, so the caller can fall back to the
- * sign-in projection and say so, rather than showing every department as empty.
- */
-async function countIdentityMembers(params: {
-  admin: IxAuthAdminContext;
-  prefix: string;
-}): Promise<Map<string, number> | undefined> {
-  const scan = await scanIxAuthDirectory({ admin: params.admin });
-  if (!scan.ok) {
-    return undefined;
-  }
-  const counts = new Map<string, number>();
-  for (const user of scan.users) {
-    for (const code of user.groups) {
-      if (params.prefix.length > 0 && code.startsWith(params.prefix)) {
-        counts.set(code, (counts.get(code) ?? 0) + 1);
-      }
-    }
-  }
-  return counts;
-}
-
-/**
- * How many people the identity server still places in one group.
- *
- * The group-membership read is asked first, as the contract documents it; the deployed
- * server answers it with 405, so the directory walk is the working path. Neither answer
- * is ever replaced by the local projection: that only knows who has signed in here, and
- * "nobody has signed in yet" is not "nobody is in it".
- */
-async function countGroupMembers(params: {
-  admin: IxAuthAdminContext;
-  group: IxAuthDepartmentGroup;
-}): Promise<number | undefined> {
-  const members = await countIxAuthGroupMembers({
-    ...params.admin.call,
-    groupId: params.group.groupId,
-  });
-  if (members.ok) {
-    return members.count;
-  }
-  const scan = await scanIxAuthDirectory({ admin: params.admin });
-  if (!scan.ok) {
-    return undefined;
-  }
-  return scan.users.filter((user) => user.groups.includes(params.group.code)).length;
-}
-
-/** Read and check the `{ slug, name }` body both writers take. */
-function readDepartmentBody(
-  body: Record<string, unknown>,
-): { ok: true; slug: string; name: string } | { ok: false } {
-  const slug = normalizeDepartmentSlug(normalizeOptionalString(body.slug) ?? "");
-  const name = normalizeOptionalString(body.name) ?? "";
-  if (!DEPARTMENT_SLUG_PATTERN.test(slug)) {
-    return { ok: false };
-  }
-  if (name.length === 0 || name.length > DEPARTMENT_NAME_MAX_LENGTH) {
-    return { ok: false };
-  }
-  return { ok: true, slug, name };
-}
-
 async function handleCreate(params: DepartmentsRouteParams): Promise<void> {
   const body = await readIxAuthJsonBody(params.req, params.res);
   if (!body) {
     return;
   }
-  const read = readDepartmentBody(body);
+  const read = readIxAuthGroupBody(body);
   if (!read.ok) {
     sendJson(params.res, 400, { error: "invalid_body" });
     return;
@@ -274,7 +195,7 @@ async function handleRename(params: DepartmentsRouteParams): Promise<void> {
   if (!body) {
     return;
   }
-  const read = readDepartmentBody(body);
+  const read = readIxAuthGroupBody(body);
   if (!read.ok) {
     sendJson(params.res, 400, { error: "invalid_body" });
     return;
@@ -286,7 +207,7 @@ async function handleRename(params: DepartmentsRouteParams): Promise<void> {
   }
   const prefix = params.deps.settings.departmentGroupPrefix;
   const known = listing.departments.some(
-    (group) => slugForGroupCode(group.code, prefix) === read.slug,
+    (group) => slugForPrefixedGroupCode(group.code, prefix) === read.slug,
   );
   if (!known) {
     sendJson(params.res, 404, { error: "not_found" });
@@ -322,7 +243,7 @@ async function handleDelete(params: DepartmentsRouteParams): Promise<void> {
     return;
   }
   const slug = normalizeDepartmentSlug(normalizeOptionalString(body.slug) ?? "");
-  if (!DEPARTMENT_SLUG_PATTERN.test(slug)) {
+  if (!IX_AUTH_GROUP_SLUG_PATTERN.test(slug)) {
     sendJson(params.res, 400, { error: "invalid_body" });
     return;
   }
@@ -332,11 +253,13 @@ async function handleDelete(params: DepartmentsRouteParams): Promise<void> {
     return;
   }
   const prefix = params.deps.settings.departmentGroupPrefix;
-  const group = listing.departments.find((entry) => slugForGroupCode(entry.code, prefix) === slug);
+  const group = listing.departments.find(
+    (entry) => slugForPrefixedGroupCode(entry.code, prefix) === slug,
+  );
   // A department the identity server no longer lists is an orphan row: there is no group
   // to delete, and clearing the projection is the whole job.
   if (group) {
-    const occupied = await countGroupMembers({ admin: params.admin, group });
+    const occupied = await countIxAuthGroupMembership({ admin: params.admin, group });
     // A count the identity server would not give is not proof of emptiness. The delete
     // waits for an answer rather than proceeding on the sign-in projection, which cannot
     // see a person who was placed in the department and has not signed in yet.
