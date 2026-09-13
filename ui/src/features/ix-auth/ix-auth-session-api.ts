@@ -3,6 +3,7 @@
 // The browser never sees an identity-server token: it posts credentials here and the
 // Gateway returns only a session cookie. Everything below therefore uses
 // `credentials: "same-origin"` and carries no bearer token of its own.
+import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import {
   isIxAuthAdminRole,
   setIxAuthAdminAccess,
@@ -102,10 +103,7 @@ function mapErrorBodyToKey(status: number, body: Record<string, unknown>): strin
 async function readJsonResponse(response: Response): Promise<Record<string, unknown>> {
   try {
     const parsed: unknown = await response.json();
-    return parsed !== null && typeof parsed === "object"
-      ? // SAFETY: the preceding typeof guard proves parsed is a non-null object.
-        (parsed as Record<string, unknown>)
-      : {};
+    return asOptionalRecord(parsed) ?? {};
   } catch {
     return {};
   }

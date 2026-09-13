@@ -5,7 +5,7 @@
 // not manage users is refused by the Gateway, and the screen only decides what is worth
 // drawing.
 import { asFiniteNumber } from "@openclaw/normalization-core/number-coercion";
-import { readStringField } from "@openclaw/normalization-core/record-coerce";
+import { asOptionalRecord, readStringField } from "@openclaw/normalization-core/record-coerce";
 import { readIxAuthCsrfToken } from "./ix-auth-session-api.ts";
 
 /** Header the Gateway expects the session CSRF token in on mutating requests. */
@@ -154,11 +154,7 @@ async function callUsersRoute(params: {
   } catch {
     parsed = {};
   }
-  const body =
-    parsed !== null && typeof parsed === "object"
-      ? // SAFETY: the null and typeof guard directly above proves this is an object.
-        (parsed as Record<string, unknown>)
-      : {};
+  const body = asOptionalRecord(parsed) ?? {};
   if (!response.ok) {
     return {
       kind: "failed",

@@ -7,6 +7,7 @@
 // The service key never leaves this process, and end-user IP and user agent are
 // forwarded explicitly because the identity server sits behind the Gateway and cannot
 // observe the real visitor (ix-auth/docs/guides/client-ip.md).
+import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import type { IxAuthRuntimeSettings } from "./ix-auth-types.js";
 
 /** Identity-server calls are user-blocking; fail fast rather than hang a login form. */
@@ -75,19 +76,9 @@ function buildIxAuthHeaders(params: {
 }
 
 function readRelayFailure(status: number, body: unknown): IxAuthRelayFailure {
-  const envelope =
-    // SAFETY: guarded by the typeof check on this line; JSON objects index by string.
-    body !== null && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  const error =
-    envelope.error !== null && typeof envelope.error === "object"
-      ? // SAFETY: the preceding typeof guard proves error is a non-null object.
-        (envelope.error as Record<string, unknown>)
-      : {};
-  const meta =
-    error.meta !== null && typeof error.meta === "object"
-      ? // SAFETY: the preceding typeof guard proves meta is a non-null object.
-        (error.meta as Record<string, unknown>)
-      : {};
+  const envelope = asOptionalRecord(body) ?? {};
+  const error = asOptionalRecord(envelope.error) ?? {};
+  const meta = asOptionalRecord(error.meta) ?? {};
   const lockedUntil = typeof meta.lockedUntil === "string" ? Date.parse(meta.lockedUntil) : NaN;
   return {
     ok: false,
@@ -183,11 +174,7 @@ export async function callIxAuthEndpoint(params: {
     // shape so a caller cannot read array indices as if they were named fields.
     return { ok: true, status: response.status, data: {}, items: envelope.data };
   }
-  const data =
-    envelope.data !== null && typeof envelope.data === "object"
-      ? // SAFETY: the preceding typeof guard proves data is a non-null object.
-        (envelope.data as Record<string, unknown>)
-      : {};
+  const data = asOptionalRecord(envelope.data) ?? {};
   return { ok: true, status: response.status, data };
 }
 
