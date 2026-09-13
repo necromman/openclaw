@@ -1,4 +1,4 @@
-// Pure pose model shared by the mascot animator and canvas renderer.
+// Pure pose model used by the mascot animator.
 
 export type MascotMood =
   | "idle"
@@ -36,24 +36,6 @@ export type MascotPose = {
   dizzyPhase: number;
   effect: MascotEffect;
   effectPhase: number;
-};
-
-export type MascotPalette = {
-  gradientTop: string;
-  gradientBottom: string;
-  antenna: string;
-};
-
-const DARK_PALETTE: MascotPalette = {
-  gradientTop: "#ff4d4d",
-  gradientBottom: "#991b1b",
-  antenna: "#ff4d4d",
-};
-
-const LIGHT_PALETTE: MascotPalette = {
-  gradientTop: "#ff7079",
-  gradientBottom: "#ea4c59",
-  antenna: "#ef4b58",
 };
 
 export function createMascotPose(): MascotPose {
@@ -155,8 +137,4 @@ export function staticMascotPose(mood: MascotMood): MascotPose {
       break;
   }
   return pose;
-}
-
-export function mascotPalette(light: boolean): MascotPalette {
-  return light ? LIGHT_PALETTE : DARK_PALETTE;
 }

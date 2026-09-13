@@ -494,7 +494,7 @@ export class AppSidebarSessionNavigationElement extends AppSidebarBase {
     }
     this.clearSessionSelection();
     this.sessionProjection.resetMembership();
-    this.sessionData.visibleSessionLimits.clear();
+    this.sessionData.visibleSessionLimits = new Map();
     context.agentSelection.set(nextAgentId);
   };
 

@@ -518,7 +518,7 @@ export class SessionDataController implements ReactiveController, SessionCatalog
     this.sessionsAgentId = null;
     this.sessionResultsByAgent = {};
     this.resetChildSessionState();
-    this.visibleSessionLimits.clear();
+    this.visibleSessionLimits = new Map();
     this.notify();
   }
 
@@ -560,10 +560,11 @@ export class SessionDataController implements ReactiveController, SessionCatalog
   }
 
   async loadMoreSidebarSessions(onLoaded?: () => void): Promise<void> {
-    const generation = this.childSessionGeneration;
+    const limits = this.visibleSessionLimits;
     const connection = this.sessionScopeGeneration;
     await refreshSidebarSessionList(this, this.sessionsAgentId, true);
-    if (generation === this.childSessionGeneration && connection === this.sessionScopeGeneration) {
+    // A new filter replaces its local page; appending rows keeps that page alive.
+    if (limits === this.visibleSessionLimits && connection === this.sessionScopeGeneration) {
       onLoaded?.();
     }
   }
@@ -699,7 +700,7 @@ export class SessionDataController implements ReactiveController, SessionCatalog
   resetSessionList(): void {
     this.retireFilteredSessions();
     this.sessionsLoading = false;
-    this.visibleSessionLimits.clear();
+    this.visibleSessionLimits = new Map();
     // A filter transition owns a new child/lineage generation; otherwise a
     // pending request from the retired view can repopulate its cleared rows.
     this.resetChildSessionState();

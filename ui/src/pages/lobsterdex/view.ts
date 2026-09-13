@@ -20,7 +20,7 @@ type LobsterdexViewEntry = {
 
 type LobsterdexViewEntries = ReadonlyMap<string, LobsterdexViewEntry>;
 
-export type LobsterdexCopyFeedback = {
+type LobsterdexCopyFeedback = {
   paletteId: LobsterPetPaletteId;
   status: "copied" | "error";
 };

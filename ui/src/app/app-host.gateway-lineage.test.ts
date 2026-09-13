@@ -10,6 +10,7 @@ import type { AgentsListResult } from "../api/types.ts";
 // These direct-render fixtures exercise Gateway lineage without the app lifecycle.
 // Browser tests cover deferred login loading and recovery.
 import "../components/login-gate.ts";
+import type { IxAuthSessionState } from "../features/ix-auth/ix-auth-session-api.ts";
 import { captureChatOutboxAdmission } from "../lib/chat/outbox-store.ts";
 import {
   createTestSessionCapability,
@@ -103,10 +104,13 @@ function renderGatewaySurface(
   }
   try {
     const app = document.createElement("openclaw-app") as unknown as {
+      ixAuth: { session: IxAuthSessionState };
       runtime: Pick<ApplicationRuntime, "context" | "documentMode">;
       render: () => { strings: readonly string[] };
       synchronizeGateway: (gateway: ApplicationGateway) => void;
     };
+    // Direct rendering bypasses the lifecycle probe; this Gateway uses shared-token auth.
+    app.ixAuth.session = { authenticated: false };
     app.runtime = {
       documentMode: null,
       context: {
@@ -308,10 +312,12 @@ describe("Control UI Gateway target lineage", () => {
     gateway.connect({ token: "old-token", password: "old-password" });
     clients[0]?.opts.onClose?.({ code: 1006, reason: "login required", willRetry: true });
     const app = document.createElement("openclaw-app") as unknown as {
+      ixAuth: { session: IxAuthSessionState };
       runtime: Pick<ApplicationRuntime, "context" | "documentMode">;
       render: () => { strings: readonly string[] };
       synchronizeGateway: (gateway: ApplicationGateway) => void;
     };
+    app.ixAuth.session = { authenticated: false };
     app.runtime = {
       documentMode: null,
       context: {
@@ -372,10 +378,12 @@ describe("Control UI Gateway target lineage", () => {
       willRetry: true,
     });
     const app = document.createElement("openclaw-app") as unknown as {
+      ixAuth: { session: IxAuthSessionState };
       runtime: Pick<ApplicationRuntime, "context" | "documentMode">;
       render: () => { strings: readonly string[] };
       synchronizeGateway: (gateway: ApplicationGateway) => void;
     };
+    app.ixAuth.session = { authenticated: false };
     app.runtime = {
       documentMode: null,
       context: {

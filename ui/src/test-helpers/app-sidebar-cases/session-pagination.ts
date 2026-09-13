@@ -461,6 +461,9 @@ describe("AppSidebar gateway session pagination", () => {
       'button[aria-label="Load more sessions"]',
     );
     expect(loadMore).not.toBeNull();
+    expect(
+      sidebar.querySelectorAll(".sidebar-recent-sessions__list > .sidebar-session-tree"),
+    ).toHaveLength(50);
     loadMore?.click();
     await sidebar.updateComplete;
 

@@ -367,10 +367,11 @@ flowchart LR
 | 높음     | 사용자별 문서 검색·원문·인용 인가 | 동일 질문을 권한이 다른 직원으로 실행해 검색 조각과 원문을 모두 차단하고, 권한 철회 후 재질의까지 검증 |
 | 높음     | 실제 직원 기대 권한표             | NAS 계정·앱 계정·조직 소속·공용/민감 자료를 연결하고 기대 결과 승인                                    |
 | 중간     | 실제 사용자 전체 권한 검사        | 단일 주체 미리보기와 별도로 역할·복수 부서·개인 예외를 합산하고 적용 근거 표시                         |
-| 중간     | 첫 로그인 전 개인 권한 설정       | 로그인 프로필 목록 대신 원본 계정 디렉터리와 안정된 식별자를 연결                                      |
 | 중간     | 세션 회수 부분 실패 표시          | 외부 신원 서버 회수 실패를 0건과 구별하고 재시도 대상 표시                                             |
 | 중간     | 기존 로그인 세션 갱신 실패 조사 | 배포 후 일부 기존 검증 세션의 `AUTH_SESSION_REVOKED`·`INTERNAL`·idle 만료를 구분하고, 복수 탭 갱신과 일시 장애 후 재로그인 흐름을 검증 |
 
 소스 근거: `src/gateway/folder-access-policy.ts`의 `subjectIdentity`, `src/gateway/server-methods/folder-rules.ts`의 `folders.subjects.list`, `src/knowledge/folder-rule-filter.ts`, `extensions/memory-core/src/session-search-visibility.ts`, `src/gateway/department-access.ts`, `src/gateway/ix-auth-admin-users-guard.ts`. 공용 검색은 현재 사용자별 문서 경계가 아니므로 이번 화면 개선을 기업 권한 완성으로 평가하지 않는다. NAS 계정·실직원 부서·ACL·공용 색인 범위는 변경하지 않았다.
+
+2026-09-13 AD에서 첫 로그인 전 개인 권한 설정을 구현했다. 사용자 상세의 폴더 권한 탭이 원본 계정을 조회하고 로그인과 같은 프로필 생성 소유자를 사용해 연결한다. 사용자·부서 상세 모달과 개인별 기본 목록도 추가했다. 운영 저장·원복, 계정 보호와 화면 실측 결과는 DELIVERY-PLAN의 AD 기록을 따른다.
 
 검증: 배포 전 브라우저 재현 완료, `git diff --check` 통과, i18n baseline 생성. `test-audit` 기준으로 명시 저장과 조회 실패 편집 차단 회귀를 기존 UI 테스트에 추가했다. Windows/WSL 테스트는 실행하지 않으며 Actions와 배포 후 실측 결과는 DELIVERY-PLAN의 AC 기록에 남긴다. 원본 계정·폴더명이 있는 증적은 private 작업 경로에만 보관한다.

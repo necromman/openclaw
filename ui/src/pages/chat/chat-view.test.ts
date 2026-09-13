@@ -3806,7 +3806,7 @@ describe("chat voice controls", () => {
   it.each([
     ["connecting", "Connecting voice input..."],
     ["listening", "Listening..."],
-    ["thinking", "Asking OpenClaw..."],
+    ["thinking", "Asking Chris Agent..."],
   ] as const)("renders %s voice activity with the appropriate status region", (status, label) => {
     const inputLevel = new RealtimeTalkLevelSignal();
     inputLevel.set(0.64);
@@ -7956,7 +7956,7 @@ describe("chat model controls", () => {
     );
 
     expect(modelOption?.querySelector(".chat-controls__model-option-meta")?.textContent).toBe(
-      "1M active · 1M max · OpenClaw",
+      "1M active · 1M max · Chris Agent",
     );
     expect(modelOption?.textContent).not.toContain("700k");
     expect(getChatModelSelect(container).querySelector(".chat-controls__trigger-meta")).toBeNull();
@@ -8183,7 +8183,7 @@ describe("chat model controls", () => {
         `[data-chat-model-option="${value}"] .chat-controls__model-option-meta`,
       )?.textContent;
 
-    expect(metaFor("openai/gpt-5.6")).toBe("1M · OpenClaw");
+    expect(metaFor("openai/gpt-5.6")).toBe("1M · Chris Agent");
     expect(metaFor("openai/gpt-5.6")).not.toContain("Codex");
     expect(metaFor("openai/gpt-5.6-sol")).toBe("1M · Codex");
     // Known CLI runtime ids map to their product labels, not capitalized ids.

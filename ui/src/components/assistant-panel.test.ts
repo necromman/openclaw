@@ -583,7 +583,12 @@ describe("assistant panel", () => {
   });
 
   it("shows readable progress while the shared assistant is sending", async () => {
-    const { panel, store } = await mountPanel();
+    const { context, panel, request, store } = await mountPanel();
+    store.connect(context, "caretaker");
+    await vi.waitFor(() => {
+      expect(request).toHaveBeenCalledOnce();
+      expect(store.sending).toBe(false);
+    });
     store.messages = [
       { id: 1, role: "user", text: "Check this system", at: 1, question: null, step: null },
     ];
@@ -599,8 +604,8 @@ describe("assistant panel", () => {
       "openclaw-custodian-surface",
     );
     await surface?.updateComplete;
-    expect(surface?.querySelector('[role="status"]')?.textContent).toContain(
-      "답변을 준비하고 있습니다.",
-    );
+    expect(
+      surface?.querySelector('.custodian__thinking-row[role="status"]')?.textContent,
+    ).toContain("답변을 준비하고 있습니다.");
   });
 });

@@ -12,7 +12,6 @@ import {
   type TestSessionMenu,
   TWO_AGENTS,
 } from "../app-sidebar.ts";
-import "./session-pagination.ts";
 import "./session-navigation.ts";
 
 type SidebarSortModeHost = {
