@@ -675,6 +675,10 @@ const CORE_GATEWAY_METHOD_SPECS = [
   ["folders.subjects.list", "folder-rules", "operator.read", "2026.9"],
   ["folders.rules.orphans", "folder-rules", "operator.read", "2026.9"],
   ["folders.rules.orphansClear", "folder-rules", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
+  // The same table read and written from the subject's side. Appended for the same
+  // reason every row above was: this list's order is the advertised method order.
+  ["folders.subject.tree", "folder-rules-subject", "operator.read", "2026.9"],
+  ["folders.rules.setMany", "folder-rules-subject", "operator.read", "2026.9", CONTROL_PLANE_WRITE],
 ] as const satisfies readonly CoreGatewayMethodSpecRow[];
 
 export type CoreGatewayHandlerFamily = Exclude<(typeof CORE_GATEWAY_METHOD_SPECS)[number][1], null>;

@@ -22,6 +22,7 @@ export function isIxAuthImpersonationManagementMethod(method: string): boolean {
   return (
     method.startsWith("folders.rules.") ||
     method === "folders.subjects.list" ||
+    method === "folders.subject.tree" ||
     method === "folders.tree.refresh" ||
     method.startsWith("device.scopes.") ||
     method.startsWith("doctor.") ||

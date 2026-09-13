@@ -437,3 +437,139 @@ export type FoldersSubjectsListResult = {
   departments: FolderSubjectDepartment[];
   users: FolderSubjectUser[];
 };
+
+/**
+ * One folder seen from a subject's side of the table.
+ *
+ * The folder-first editor answers "who may see this folder". This answers the reverse,
+ * "which folders may this subject see", and it has to carry two different facts per row:
+ * what the subject gets today (`effective`, computed by the same policy walk the real
+ * decision uses) and what is written on this exact folder for this exact subject
+ * (`ownRule`, absent when nothing is pinned here). A screen that showed only the first
+ * would make it impossible to tell a rule from its consequence, which is the same reason
+ * the folder-first tree draws an inherited chip differently.
+ */
+export const FolderSubjectTreeEntrySchema = closedObject({
+  name: NonEmptyString,
+  /** Root-relative path, the only form this surface accepts back. */
+  path: NonEmptyString,
+  /** Absolute path, server-built, so an operator can recognize the folder. */
+  absolutePath: NonEmptyString,
+  /** False when the snapshot knows this folder holds no subfolders; absent from a live read. */
+  hasChildren: Type.Optional(Type.Boolean()),
+  /** What this subject gets on this folder today. */
+  effective: FolderRulePermissionSchema,
+  /** The rule pinned to exactly this folder for exactly this subject, when there is one. */
+  ownRule: Type.Optional(
+    closedObject({
+      permission: FolderRulePermissionSchema,
+      inherit: Type.Boolean(),
+    }),
+  ),
+  /** Ancestor folder the verdict came from. Absent when it was decided here or by default. */
+  inheritedFrom: Type.Optional(Type.String()),
+  /** Rules pinned to this folder for any subject, so the row can mark explicit settings. */
+  ownRuleCount: Type.Integer({ minimum: 0 }),
+});
+
+/**
+ * Browse one level of the share as one subject's editable list.
+ *
+ * Unlike `folders.tree.list` this never drops a hidden folder: the whole point is to
+ * un-hide one, and a folder the editor cannot see is a folder the editor cannot open.
+ * The rank check in the handler is what keeps that from being a leak.
+ */
+export const FoldersSubjectTreeParamsSchema = closedObject({
+  subjectKind: FolderRuleSubjectKindSchema,
+  subjectId: NonEmptyString,
+  path: Type.Optional(Type.String()),
+});
+
+export const FoldersSubjectTreeResultSchema = closedObject({
+  root: NonEmptyString,
+  available: Type.Boolean(),
+  path: Type.String(),
+  parent: Type.Optional(Type.String()),
+  entries: Type.Array(FolderSubjectTreeEntrySchema),
+  source: Type.Union([Type.Literal("index"), Type.Literal("live")]),
+  indexedAt: Type.Optional(Type.Integer()),
+});
+
+/** One folder's worth of change. `permission: null` deletes the subject's rule there. */
+export const FoldersRulesSetManyItemSchema = closedObject({
+  path: Type.String(),
+  permission: Type.Union([FolderRulePermissionSchema, Type.Null()]),
+  inherit: Type.Optional(Type.Boolean()),
+  applyToDescendants: Type.Optional(Type.Boolean()),
+});
+
+/**
+ * Write one subject's rules on many folders at once.
+ *
+ * The subject-first screen collects a page of edits before anything is sent, so sending
+ * them one call at a time would leave the operator's list half-applied on the first
+ * refusal with no way to say which half. One call, one result row per folder, and a
+ * folder that fails does not stop the folders after it.
+ *
+ * The 200 ceiling is the visible page rather than an arbitrary number: no level of the
+ * measured share draws more rows than that in one screen.
+ */
+export const FoldersRulesSetManyParamsSchema = closedObject({
+  subjectKind: FolderRuleSubjectKindSchema,
+  subjectId: NonEmptyString,
+  items: Type.Array(FoldersRulesSetManyItemSchema, { minItems: 1, maxItems: 200 }),
+});
+
+export const FoldersRulesSetManyResultSchema = closedObject({
+  results: Type.Array(
+    closedObject({
+      path: Type.String(),
+      ok: Type.Boolean(),
+      error: Type.Optional(Type.String()),
+    }),
+  ),
+});
+
+export type FolderSubjectTreeEntry = {
+  name: string;
+  path: string;
+  absolutePath: string;
+  hasChildren?: boolean;
+  effective: FolderRulePermission;
+  ownRule?: { permission: FolderRulePermission; inherit: boolean };
+  inheritedFrom?: string;
+  ownRuleCount: number;
+};
+
+export type FoldersSubjectTreeParams = {
+  subjectKind: FolderRuleSubjectKind;
+  subjectId: string;
+  path?: string;
+};
+
+export type FoldersSubjectTreeResult = {
+  root: string;
+  available: boolean;
+  path: string;
+  parent?: string;
+  entries: FolderSubjectTreeEntry[];
+  source: "index" | "live";
+  indexedAt?: number;
+};
+
+export type FoldersRulesSetManyItem = {
+  path: string;
+  permission: FolderRulePermission | null;
+  inherit?: boolean;
+  applyToDescendants?: boolean;
+};
+
+export type FoldersRulesSetManyParams = {
+  subjectKind: FolderRuleSubjectKind;
+  subjectId: string;
+  items: FoldersRulesSetManyItem[];
+};
+
+export type FoldersRulesSetManyResult = {
+  results: { path: string; ok: boolean; error?: string }[];
+};

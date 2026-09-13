@@ -57,6 +57,8 @@ describe("gateway method authorization", () => {
     ["config.patch", false],
     ["folders.rules.set", false],
     ["folders.rules.clear", false],
+    ["folders.rules.setMany", false],
+    ["folders.subject.tree", false],
     ["users.setAvatar", false],
     ["device.pair.approve", false],
     ["device.scopes.requestUpgrade", false],

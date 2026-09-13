@@ -1,6 +1,6 @@
 // Gateway calls the folder-access screen makes, in one place.
 //
-// Eight methods, one job: read the share one level at a time, read and write the rules
+// Ten methods, one job: read the share one level at a time, read and write the rules
 // pinned to one folder, read the subjects a rule may name, and list or clear the rules
 // that no longer point at anything. Nothing here decides who may call them; the Gateway
 // refuses every one of them for an account that is not an administrator, and this module
@@ -16,8 +16,11 @@ import type {
   FoldersRulesListResult,
   FoldersRulesOrphansClearResult,
   FoldersRulesOrphansResult,
+  FoldersRulesSetManyItem,
+  FoldersRulesSetManyResult,
   FoldersRulesSetResult,
   FoldersSubjectsListResult,
+  FoldersSubjectTreeResult,
   FoldersTreeListResult,
   FoldersTreeRefreshResult,
 } from "../../../../packages/gateway-protocol/src/schema/folder-rules.js";
@@ -130,4 +133,43 @@ export async function clearFolderOrphans(params: {
     "folders.rules.orphansClear",
     params.paths === undefined ? {} : { paths: params.paths },
   );
+}
+
+/**
+ * One level of the share as one subject's editable list.
+ *
+ * Unlike `fetchFolderTree` this keeps hidden folders in the answer. The subject-first
+ * editor exists to un-hide one, and a row that is not drawn is a row nobody can change.
+ */
+export async function fetchFolderSubjectTree(params: {
+  client: GatewayBrowserClient;
+  subjectKind: FolderRuleSubjectKind;
+  subjectId: string;
+  path?: string;
+}): Promise<FoldersSubjectTreeResult> {
+  return params.client.request<FoldersSubjectTreeResult>("folders.subject.tree", {
+    subjectKind: params.subjectKind,
+    subjectId: params.subjectId,
+    ...(params.path === undefined ? {} : { path: params.path }),
+  });
+}
+
+/**
+ * Write one subject's rules on many folders in one call.
+ *
+ * The answer carries one row per folder rather than a single verdict, because a page of
+ * edits can fail in one place and land everywhere else; the screen marks the failures
+ * against their rows instead of discarding the whole save.
+ */
+export async function setFolderRulesForSubject(params: {
+  client: GatewayBrowserClient;
+  subjectKind: FolderRuleSubjectKind;
+  subjectId: string;
+  items: readonly FoldersRulesSetManyItem[];
+}): Promise<FoldersRulesSetManyResult> {
+  return params.client.request<FoldersRulesSetManyResult>("folders.rules.setMany", {
+    subjectKind: params.subjectKind,
+    subjectId: params.subjectId,
+    items: params.items,
+  });
 }

@@ -12,7 +12,9 @@ import type {
   FoldersRulesOrphansClearParams,
   FoldersRulesOrphansParams,
   FoldersRulesSetParams,
+  FoldersRulesSetManyParams,
   FoldersSubjectsListParams,
+  FoldersSubjectTreeParams,
   FoldersTreeListParams,
   FoldersTreeRefreshParams,
   WebPushSubscribeParams,
@@ -151,6 +153,12 @@ export const validateFoldersRulesOrphansParams = compile<FoldersRulesOrphansPara
 );
 export const validateFoldersRulesOrphansClearParams = compile<FoldersRulesOrphansClearParams>(
   S.FoldersRulesOrphansClearParamsSchema,
+);
+export const validateFoldersSubjectTreeParams = compile<FoldersSubjectTreeParams>(
+  S.FoldersSubjectTreeParamsSchema,
+);
+export const validateFoldersRulesSetManyParams = compile<FoldersRulesSetManyParams>(
+  S.FoldersRulesSetManyParamsSchema,
 );
 export const validateUsersListParams = compile(S.UsersListParamsSchema);
 export const validateUsersMentionableParams = compile(S.UsersMentionableParamsSchema);

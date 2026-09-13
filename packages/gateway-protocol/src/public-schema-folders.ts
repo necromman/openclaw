@@ -27,4 +27,10 @@ export {
   FoldersRulesOrphansClearResultSchema,
   FoldersSubjectsListParamsSchema,
   FoldersSubjectsListResultSchema,
+  FolderSubjectTreeEntrySchema,
+  FoldersSubjectTreeParamsSchema,
+  FoldersSubjectTreeResultSchema,
+  FoldersRulesSetManyItemSchema,
+  FoldersRulesSetManyParamsSchema,
+  FoldersRulesSetManyResultSchema,
 } from "./schema/folder-rules.js";

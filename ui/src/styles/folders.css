@@ -432,3 +432,162 @@
   color: var(--muted);
   font-size: var(--control-ui-text-xs);
 }
+
+/* The two directions through the rule table, and the switch between them. */
+.folders-mode {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.folders-mode__tabs {
+  padding-inline: 0;
+  padding-block: var(--space-2) 0;
+}
+
+/* Subject-first: pick who this is about on the left, rule their folders on the right. */
+.settings-row--stacked > .settings-row__control:has(> .folders-bysubject) {
+  width: 100%;
+}
+
+.folders-bysubject {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 3fr);
+  gap: var(--space-4);
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+/* One column below the layout breakpoint, for the same reason the folder-first layout
+ * collapses there: a picker squeezed next to an editor is two unusable halves. */
+@media (max-width: 900px) {
+  .folders-bysubject {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.folders-bysubject__picker,
+.folders-bysubject__folders {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.folders-bysubject__targets {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.folders-bysubject__target {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: start;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.folders-bysubject__target--active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.folders-bysubject__target-name {
+  font-size: var(--control-ui-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.folders-bysubject__target-hint {
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.folders-bysubject__dirty {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: var(--control-ui-text-sm);
+}
+
+.folders-bysubject__tree {
+  min-width: 0;
+}
+
+.folders-bysubject__list {
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.folders-bysubject__node {
+  min-width: 0;
+}
+
+/* Wraps rather than scrolls: on a 390px screen the three permission buttons drop to
+ * their own line instead of pushing the folder name off the side. */
+.folders-bysubject__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.folders-bysubject__row--changed {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.folders-bysubject__name {
+  font-size: var(--control-ui-text-sm);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.folders-bysubject__changed {
+  color: var(--accent);
+  font-size: var(--control-ui-text-xs);
+}
+
+.folders-bysubject__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+  min-width: 0;
+}
+
+.folders-bysubject__note {
+  margin: 0 0 0 var(--space-4);
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs);
+  overflow-wrap: anywhere;
+}

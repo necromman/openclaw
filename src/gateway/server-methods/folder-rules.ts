@@ -74,13 +74,13 @@ const FOLDER_RULE_MANAGER_ROLES = new Set(["superadmin", "admin"]);
  * Hidden and absent must be indistinguishable, so they share one string. Changing it in
  * one branch and not the other would re-open the enumeration this feature closes.
  */
-const FOLDER_REFUSAL = "path is outside the shared folder root";
+export const FOLDER_REFUSAL = "path is outside the shared folder root";
 
 export function respondRefused(respond: RespondFn): void {
   respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, FOLDER_REFUSAL));
 }
 
-function respondForbidden(respond: RespondFn): void {
+export function respondForbidden(respond: RespondFn): void {
   respond(
     false,
     undefined,
@@ -440,7 +440,7 @@ async function collectOrphanRules(roleMap: Record<string, string> | undefined): 
 }
 
 /** One ledger row per rule change, attributed to whoever made it. */
-function recordFolderRuleAction(params: {
+export function recordFolderRuleAction(params: {
   client: GatewayClient | null;
   action: "folder-rule-set" | "folder-rule-clear";
   folderPath: string;

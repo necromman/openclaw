@@ -604,7 +604,7 @@ ui/src/styles/folders.css
 **표**는 5.1 의 DDL 을 그대로 썼다. 기능 지역이라 정본 스키마 파일에도 스키마 버전에도 넣지 않고
 첫 기록 시점에 만든다.
 
-**RPC 다섯.**
+**RPC 일곱.** 앞 다섯은 폴더를 먼저 고르는 방향이고, 뒤 둘은 대상을 먼저 고르는 방향이다.
 
 | 메서드 | 스코프 | 하는 일 |
 | --- | --- | --- |
@@ -613,6 +613,8 @@ ui/src/styles/folders.css
 | `folders.rules.set` | `operator.admin` | 규칙 하나 쓰기. `applyToDescendants` 로 하위 같은 주체 규칙 삭제 |
 | `folders.rules.clear` | `operator.admin` | 규칙 하나 지우기 |
 | `folders.subjects.list` | `operator.admin` | 역할·부서·사람 목록(편집기 선택지) |
+| `folders.subject.tree` | `operator.read` | 대상 하나 기준으로 한 층. 숨김 폴더도 전부 포함하고 항목마다 유효 권한·자체 규칙·상속 근거 경로를 답한다 |
+| `folders.rules.setMany` | `operator.read` | 대상 하나의 규칙을 여러 폴더에 한 번에 쓰기. `permission: null` 은 삭제, 항목마다 성공 여부를 답하고 실패해도 나머지는 진행 |
 
 스코프는 "이 연결이 이 메서드를 부를 수 있는가" 만 정한다. 이 배포에서는 로그인한 모든 브라우저
 세션이 같은 스코프를 받으므로(`resolveIxAuthConnectionScopes`), **실제 게이트는 핸들러 안의 등급
