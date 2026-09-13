@@ -73,7 +73,17 @@ export function noteIxAuthSessionActivity(loginSessionId: string, nowMs = Date.n
   }
   lastNotedAtBySession.set(loginSessionId, nowMs);
   pruneActivityTracker(nowMs);
-  if (nowMs - row.last_seen_at < IX_AUTH_ACTIVITY_TOUCH_INTERVAL_MS) {
+  // The map above is the whole throttle. A second gate on `last_seen_at` used to sit
+  // here, and it dropped the first minute of every session: the browser's
+  // first `/auth/me` lands seconds after sign-in, when `last_seen_at` is still the
+  // sign-in instant, so nothing was written - and the row that was supposed to prove the
+  // feature works kept reading `last_seen_at == created_at`. A burst of page loads
+  // inside that first minute left the session exactly as it was signed in. Write on the
+  // first activity a process sees for a session instead: at most one row per session per
+  // minute either way, and the operational check becomes unambiguous.
+  if (nowMs <= row.last_seen_at) {
+    // A clock that went backwards, or a write another process just made. Sliding the
+    // window backwards would shorten the session.
     return true;
   }
   // The configured idle timeout is whatever the last writer used, carried in the row

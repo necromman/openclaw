@@ -85,6 +85,21 @@ describe("IX-Auth session activity", () => {
     expect(row?.idle_expires_at).toBeGreaterThan(at);
   });
 
+  it("records the first activity of a freshly signed-in session", () => {
+    const now = Date.now();
+    const id = seedSession({ nowMs: now });
+    // A browser probes `/auth/me` seconds after signing in. This used to write nothing,
+    // because `last_seen_at` was still the sign-in instant, and a burst of page loads
+    // inside the first minute left the row reading `last_seen_at == created_at`.
+    const soon = now + 5_000;
+
+    expect(noteIxAuthSessionActivity(id, soon)).toBe(true);
+
+    const row = readIxAuthLoginSessionById(id);
+    expect(row?.last_seen_at).toBe(soon);
+    expect(row?.idle_expires_at).toBe(soon + IDLE_WINDOW_MS);
+  });
+
   it("writes at most once per throttle interval", () => {
     const now = Date.now();
     const id = seedSession({ nowMs: now });
