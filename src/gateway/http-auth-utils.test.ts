@@ -137,6 +137,7 @@ describe("HTTP gateway owner profiles", () => {
         "operator.questions",
       ]);
       const declared = {
+        ...req,
         headers: { "x-openclaw-scopes": "operator.admin,operator.pairing,operator.write" },
       } as IncomingMessage;
       expect(resolveSharedSecretHttpOperatorScopes(declared, result.requestAuth)).toEqual([
