@@ -141,6 +141,24 @@ const enIxAuth = {
       },
     },
     users: {
+      detailDialog: "User settings",
+      accountTab: "Account",
+      accessTab: "Role and departments",
+      foldersTab: "Folder permissions",
+      close: "Close",
+      discardChanges: "There are unsaved changes. Discard them?",
+      discard: "Discard changes",
+      keepEditing: "Keep editing",
+      folderTarget: "Whose folder rules are you editing?",
+      folderTargetKinds: {
+        user: "Personal exception: {name}",
+        department: "Department rules: {name}",
+        role: "Role rules: {name}",
+      },
+      personalFolderHelp:
+        "Edit this person's exceptions. Department and role rules are managed separately below; this view shows only the selected subject's rules.",
+      sharedFolderHelp:
+        "These are shared rules. Saving changes applies to everyone in the selected department or role, not only this person.",
       title: "User management",
       description:
         "Manage staff accounts, roles and departments. Set document access under Folders.",
@@ -283,6 +301,8 @@ const enIxAuth = {
         "Saved and live, but it could not be written beside the configuration, so a restart will undo it. Tell whoever runs the server.",
     },
     departments: {
+      folderPermissions: "Folder permissions",
+      folderPermissionsTitle: "Folder permissions for {name}",
       title: "Departments",
       description:
         "Create departments, then select a department to manage its members. Set document access under Folders.",
@@ -390,6 +410,11 @@ const enIxAuth = {
       restartScheduled: "Saved. The Gateway is restarting.",
     },
     folders: {
+      subjectTitle: "Access for {name}",
+      subjectTreeHint:
+        "All folders are shown. Select a folder to review and change rules for this subject.",
+      scopeHelp:
+        "Folder rules do not separate the shared assistant's search results by user. NAS permissions remain the upper limit; a read-only mount cannot write even with a write rule.",
       title: "Folder access",
       description:
         "Rules decide who sees which folder on the share. A folder with no rule stays hidden.",

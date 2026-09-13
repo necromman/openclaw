@@ -60,6 +60,7 @@ export type IxAuthAdminUsersTarget =
 type IxAuthAdminUserAction =
   | "roles"
   | "departments"
+  | "folder-subject"
   | "password-reset"
   | "invite"
   | "unlock"
@@ -69,6 +70,7 @@ type IxAuthAdminUserAction =
 const IX_AUTH_ADMIN_USER_ACTIONS: ReadonlySet<string> = new Set([
   "roles",
   "departments",
+  "folder-subject",
   "password-reset",
   "invite",
   "unlock",

@@ -1,7 +1,7 @@
 import "../../styles/folders.css";
 import { consume } from "@lit/context";
-import { html, nothing, type TemplateResult } from "lit";
-import { state } from "lit/decorators.js";
+import { html, nothing, type PropertyValues, type TemplateResult } from "lit";
+import { property, state } from "lit/decorators.js";
 import type {
   FolderRuleSubjectKind,
   FoldersRulesListResult,
@@ -33,6 +33,7 @@ import {
   renderFolderRulePanel,
   type FolderRuleDraft,
   type FolderRuleTab,
+  type FolderSubjectRow,
 } from "./folder-rule-panel.ts";
 import {
   clearFolderOrphans,
@@ -50,19 +51,10 @@ registerIxAuthEnglish();
 
 type FolderPreview = { kind: FolderRuleSubjectKind; id: string };
 
-/** How often the screen asks whether the walk it started has finished. */
 const SCAN_POLL_MS = 3000;
 
-/**
- * How many times it asks before it stops asking.
- *
- * Five minutes at the interval above. A walk of the delivered share was measured in
- * seconds, so a poll that runs out means something is wrong and the operator should press
- * refresh again rather than watch a spinner forever.
- */
 const SCAN_POLL_LIMIT = 100;
 
-/** The parent of one share-relative path. The root's parent is the root itself. */
 function parentFolderPath(path: string): string {
   const cut = path.lastIndexOf("/");
   return cut <= 0 ? "" : path.slice(0, cut);
@@ -71,8 +63,9 @@ function parentFolderPath(path: string): string {
 export class FoldersPage extends OpenClawLightDomElement {
   @consume({ context: applicationContext, subscribe: false })
   context!: ApplicationContext<RouteId>;
+  @property({ type: Boolean }) embedded = false;
+  @property({ attribute: false }) fixedSubject: FolderSubjectRow | undefined;
 
-  /** Path to that path's listing. Replaced wholesale on every change so Lit redraws. */
   @state() private tree: ReadonlyMap<string, FoldersTreeListResult> = new Map();
   @state() private expanded: ReadonlySet<string> = new Set();
   @state() private selectedPath = "";
@@ -101,6 +94,40 @@ export class FoldersPage extends OpenClawLightDomElement {
   private pollsLeft = 0;
   private loadGeneration = 0;
   private rulesGeneration = 0;
+
+  override willUpdate(changed: PropertyValues) {
+    const previous = changed.get("fixedSubject") as FolderSubjectRow | undefined;
+    if (
+      this.hasUpdated &&
+      changed.has("fixedSubject") &&
+      (previous?.kind !== this.fixedSubject?.kind || previous?.id !== this.fixedSubject?.id)
+    ) {
+      this.loadGeneration += 1;
+      this.rulesGeneration += 1;
+      this.selectedPath = "";
+      this.rules = undefined;
+      this.drafts = new Map();
+      this.applyToDescendants = false;
+      this.preview = undefined;
+      this.tree = new Map();
+      this.expanded = new Set();
+      this.notice = undefined;
+      this.errorKey = undefined;
+      if (this.connected) void this.load();
+    }
+  }
+
+  override updated(changed: PropertyValues) {
+    if (changed.has("busy") || changed.has("drafts")) {
+      this.dispatchEvent(
+        new CustomEvent("folders-busy-change", {
+          bubbles: true,
+          composed: true,
+          detail: { busy: this.busy, dirty: this.drafts.size > 0 },
+        }),
+      );
+    }
+  }
 
   override connectedCallback() {
     // The host supplies a shellless loading fallback. Remove that unowned light-DOM
@@ -138,7 +165,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     }
   }
 
-  /** The first read: the share root, the subjects a rule may name, and the root's rules. */
   private async load(): Promise<void> {
     const client = this.client;
     if (!client || !canManageIxAuthUsers()) {
@@ -154,7 +180,7 @@ export class FoldersPage extends OpenClawLightDomElement {
           ...(this.preview ? { previewSubjectKind: this.preview.kind } : {}),
           ...(this.preview ? { previewSubjectId: this.preview.id } : {}),
         }),
-        fetchFolderSubjects(client),
+        this.fixedSubject ? Promise.resolve(undefined) : fetchFolderSubjects(client),
       ]);
       if (generation !== this.loadGeneration || client !== this.client) {
         return;
@@ -171,15 +197,9 @@ export class FoldersPage extends OpenClawLightDomElement {
     }
     this.loading = false;
     await this.loadRules(this.selectedPath);
-    await this.loadOrphans();
+    if (!this.embedded && !this.fixedSubject) await this.loadOrphans();
   }
 
-  /**
-   * Read the rules that point at nothing.
-   *
-   * Kept separate from the tree read: it walks every rule rather than one level, and a
-   * failure here must not stop the screen the operator came for from drawing.
-   */
   private async loadOrphans(): Promise<void> {
     const client = this.client;
     if (!client || !canManageIxAuthUsers()) {
@@ -215,7 +235,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     await this.loadOrphans();
   }
 
-  /** Read one level of the share into the map, leaving the rest untouched. */
   private async loadLevel(path: string): Promise<void> {
     const client = this.client;
     if (!client) {
@@ -240,13 +259,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     }
   }
 
-  /**
-   * Ask the Gateway to walk this branch again, then watch for it to finish.
-   *
-   * The branch is whatever folder is selected, so an operator who just moved files into
-   * one folder pays for that folder rather than for the whole share. With nothing
-   * selected the branch is the root, which is the full walk.
-   */
   private async startRefresh(): Promise<void> {
     const client = this.client;
     if (!client || this.scanning) {
@@ -276,7 +288,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     }, SCAN_POLL_MS);
   }
 
-  /** Read the root level again; while the walk runs that is the only thing that moves. */
   private async pollScan(): Promise<void> {
     const client = this.client;
     if (!client || !this.connected || this.pollsLeft <= 0) {
@@ -308,7 +319,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     await this.reloadOpenLevels();
   }
 
-  /** Redraw every level the operator has open, now that the snapshot moved under them. */
   private async reloadOpenLevels(): Promise<void> {
     // The snapshot is taken before the loop: loadLevel writes back into the same map.
     const openPaths = [...this.tree.keys()];
@@ -395,7 +405,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     this.drafts = new Map([...this.drafts, [folderSubjectKey(kind, id), draft]]);
   }
 
-  /** Run one write, then read back what it could have changed. */
   private async mutate(run: () => Promise<void>): Promise<void> {
     if (this.busy) {
       return;
@@ -446,7 +455,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     );
   }
 
-  /** Inherited permissions can change every open descendant, as well as the folder row. */
   private async refreshLevels(): Promise<void> {
     const parent = parentFolderPath(this.selectedPath);
     for (const path of [...this.tree.keys()]) {
@@ -508,7 +516,6 @@ export class FoldersPage extends OpenClawLightDomElement {
     });
   }
 
-  /** When the stored folder list was written, and the button that rewrites it. */
   private renderIndexLine(): TemplateResult {
     const root = this.tree.get("");
     const scan = root?.scan;
@@ -554,12 +561,14 @@ export class FoldersPage extends OpenClawLightDomElement {
       <div class="folders-layout__tree">
         <h3 class="folders-layout__heading">${t("ixAuth.folders.treeTitle")}</h3>
         ${this.renderIndexLine()}
+        ${this.fixedSubject ? html`<p class="folders-preview__hint">${t("ixAuth.folders.subjectTreeHint")}</p>` : nothing}
         ${renderFoldersTree({
           levels: this.tree,
           expanded: this.expanded,
           selectedPath: this.selectedPath,
           loading: this.loading,
           busy: this.busy,
+          showPermissions: !this.fixedSubject,
           onSelect: (path) => this.select(path),
           onToggle: (path) => this.toggle(path),
         })}
@@ -578,6 +587,7 @@ export class FoldersPage extends OpenClawLightDomElement {
           manage: root?.manage ?? false,
           rules: this.rules,
           rulesLoading: this.rulesLoading,
+          ...(this.fixedSubject ? { fixedSubject: this.fixedSubject } : {}),
           onRetry: () => void this.loadRules(this.selectedPath),
           subjects: this.subjects,
           tab: this.tab,
@@ -611,47 +621,39 @@ export class FoldersPage extends OpenClawLightDomElement {
   }
 
   override render() {
-    const header = html`
+    const error =
+      this.errorKey && canManageIxAuthUsers()
+        ? html`<div class="callout danger" role="alert">
+            ${t(`ixAuth.folders.error.${this.errorKey}`)}
+            <button
+              type="button"
+              class="btn"
+              ?disabled=${this.busy || this.loading}
+              @click=${() => void this.load()}
+            >
+              ${t("ixAuth.folders.retry")}
+            </button>
+          </div>`
+        : nothing;
+    const content = !canManageIxAuthUsers()
+      ? html`<p class="callout danger">${t("ixAuth.folders.forbidden")}</p>`
+      : html`<div class="folders-layout">
+          ${this.renderTreeColumn()} ${this.renderPanelColumn()}
+        </div>`;
+    if (this.embedded) {
+      return html`<div class="folders-embedded">${error}${content}</div>`;
+    }
+    return html`
       <section class="content-header">
         <div>
           <div class="page-title">${titleForRoute("folders")}</div>
           <div class="page-subtitle">${subtitleForRoute("folders")}</div>
         </div>
       </section>
-    `;
-    if (!canManageIxAuthUsers()) {
-      return html`
-        ${header}
-        ${renderSettingsWorkspace(
-          renderSettingsPage([
-            renderSettingsSection({ title: t("ixAuth.folders.title") }, [
-              renderSettingsRow({ title: t("ixAuth.folders.forbidden") }),
-            ]),
-          ]),
-        )}
-      `;
-    }
-    return html`
-      ${header}
       ${renderSettingsWorkspace(
         renderSettingsPage([
-          this.errorKey
-            ? renderSettingsSection({}, [
-                renderSettingsRow({
-                  title: "",
-                  control: html`<div class="callout danger" role="alert">
-                    ${t(`ixAuth.folders.error.${this.errorKey}`)}
-                    <button
-                      type="button"
-                      class="btn"
-                      ?disabled=${this.busy || this.loading}
-                      @click=${() => void this.load()}
-                    >
-                      ${t("ixAuth.folders.retry")}
-                    </button>
-                  </div>`,
-                }),
-              ])
+          error !== nothing
+            ? renderSettingsSection({}, [renderSettingsRow({ title: "", control: error })])
             : nothing,
           renderSettingsSection(
             {
@@ -663,16 +665,10 @@ export class FoldersPage extends OpenClawLightDomElement {
                 title: t("ixAuth.folders.whitelistTitle"),
                 description: t("ixAuth.folders.whitelistBody"),
               }),
-              renderSettingsRow({
-                title: "",
-                stacked: true,
-                control: html`<div class="folders-layout">
-                  ${this.renderTreeColumn()} ${this.renderPanelColumn()}
-                </div>`,
-              }),
+              renderSettingsRow({ title: "", stacked: true, control: content }),
             ],
           ),
-          this.renderOrphansSection(),
+          canManageIxAuthUsers() && !this.fixedSubject ? this.renderOrphansSection() : nothing,
         ]),
       )}
     `;

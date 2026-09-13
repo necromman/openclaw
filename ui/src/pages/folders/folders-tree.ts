@@ -120,6 +120,7 @@ export function renderFoldersTree(params: {
   selectedPath: string;
   loading: boolean;
   busy: boolean;
+  showPermissions?: boolean;
   onSelect: (path: string) => void;
   onToggle: (path: string) => void;
 }): TemplateResult {
@@ -160,8 +161,8 @@ export function renderFoldersTree(params: {
               selected: entry.path === params.selectedPath,
               expandable,
               expanded,
-              chip: renderChip(entry),
-              ownRuleCount: entry.ownRuleCount,
+              chip: params.showPermissions === false ? nothing : renderChip(entry),
+              ownRuleCount: params.showPermissions === false ? 0 : entry.ownRuleCount,
               busy: params.busy,
               onSelect: params.onSelect,
               onToggle: params.onToggle,

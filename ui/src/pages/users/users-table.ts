@@ -71,7 +71,12 @@ function renderRow(params: {
   return html`
     <tr class="users-table__row" aria-selected=${params.selected ? "true" : "false"}>
       <td title=${user.displayName}>
-        <button class="users-table__select" @click=${() => params.onSelect(user.id)}>
+        <button
+          class="users-table__select"
+          data-user-id=${user.id}
+          aria-haspopup="dialog"
+          @click=${() => params.onSelect(user.id)}
+        >
           <span class="users-table__name">
             <span>
               ${user.displayName}

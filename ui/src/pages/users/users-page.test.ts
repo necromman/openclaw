@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { render } from "lit";
+import { html, render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { IxAuthManagedUser } from "../../features/ix-auth/ix-auth-users-api.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
@@ -168,6 +168,7 @@ describe("assignable roles", () => {
 describe("detail panel", () => {
   function panelProps(overrides?: Partial<Parameters<typeof renderUserDetailPanel>[0]>) {
     return {
+      section: "access" as const,
       user: managedUser(),
       emailVerified: true,
       mfaEnabled: false,
@@ -224,6 +225,7 @@ describe("detail panel", () => {
     const host = draw(
       renderUserDetailPanel(
         panelProps({
+          section: "account",
           onArmDelete: (value) => armed.push(value),
         }),
       ),
@@ -238,13 +240,13 @@ describe("detail panel", () => {
   });
 
   it("shows the second step once armed", () => {
-    const host = draw(renderUserDetailPanel(panelProps({ deleteArmed: true })));
+    const host = draw(renderUserDetailPanel(panelProps({ section: "account", deleteArmed: true })));
     expect(host.textContent).toContain("Yes, delete");
     expect(host.textContent).toContain("member@example.test");
   });
 
   it("offers no delete to an ordinary administrator", () => {
-    const host = draw(renderUserDetailPanel(panelProps({ canDelete: false })));
+    const host = draw(renderUserDetailPanel(panelProps({ section: "account", canDelete: false })));
     expect(host.textContent).not.toContain("Delete the account");
   });
 
@@ -262,7 +264,9 @@ describe("detail panel", () => {
   });
 
   it("locks every change on a system administrator the reader does not outrank", () => {
-    const host = draw(renderUserDetailPanel(panelProps({ protectedTarget: true })));
+    const host = draw(
+      html`${renderUserDetailPanel(panelProps({ protectedTarget: true }))}${renderUserDetailPanel(panelProps({ section: "account", protectedTarget: true }))}`,
+    );
     expect(host.textContent).toContain("This is a system administrator account.");
     expect(host.querySelector("select")?.disabled).toBe(true);
     for (const checkbox of host.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
@@ -282,14 +286,16 @@ describe("detail panel", () => {
   });
 
   it("only offers the lockout clearance when there is a lockout", () => {
-    const open = draw(renderUserDetailPanel(panelProps()));
+    const open = draw(renderUserDetailPanel(panelProps({ section: "account" })));
     const unlock = [...open.querySelectorAll("button")].find(
       (button) => button.textContent?.trim() === "Clear the lockout",
     );
     expect(unlock?.disabled).toBe(true);
     document.body.replaceChildren();
     const locked = draw(
-      renderUserDetailPanel(panelProps({ user: managedUser({ locked: true, status: "LOCKED" }) })),
+      renderUserDetailPanel(
+        panelProps({ section: "account", user: managedUser({ locked: true, status: "LOCKED" }) }),
+      ),
     );
     const enabled = [...locked.querySelectorAll("button")].find(
       (button) => button.textContent?.trim() === "Clear the lockout",

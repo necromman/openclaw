@@ -46,6 +46,7 @@ export function assignableRolesFor(params: {
 }
 
 export type UserDetailPanelProps = {
+  section: "account" | "access";
   user: IxAuthManagedUser;
   emailVerified: boolean;
   mfaEnabled: boolean;
@@ -296,19 +297,12 @@ function renderActionRows(props: UserDetailPanelProps): unknown[] {
               </button>`,
         })
       : nothing,
-    props.notice
-      ? renderSettingsRow({
-          title: "",
-          control: html`<div class="callout" role="status">${props.notice}</div>`,
-        })
-      : nothing,
   ];
 }
 
 /** Draw the whole detail panel for one account. */
 export function renderUserDetailPanel(props: UserDetailPanelProps): TemplateResult {
-  return renderSettingsSection({ title: t("ixAuth.users.detailTitle") }, [
-    ...renderIdentityRows(props),
+  return renderSettingsSection({ title: t(`ixAuth.users.${props.section}Tab`) }, [
     // Said once, at the top, rather than repeated on every control it greys out.
     props.protectedTarget
       ? renderSettingsRow({
@@ -318,8 +312,14 @@ export function renderUserDetailPanel(props: UserDetailPanelProps): TemplateResu
           </div>`,
         })
       : nothing,
-    renderRoleRow(props),
-    renderDepartmentRow(props),
-    ...renderActionRows(props),
+    ...(props.section === "account"
+      ? [...renderIdentityRows(props), ...renderActionRows(props)]
+      : [renderRoleRow(props), renderDepartmentRow(props)]),
+    props.notice
+      ? renderSettingsRow({
+          title: "",
+          control: html`<div class="callout" role="status">${props.notice}</div>`,
+        })
+      : nothing,
   ]);
 }

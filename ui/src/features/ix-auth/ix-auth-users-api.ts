@@ -360,6 +360,31 @@ export async function replaceIxAuthUserDepartments(params: {
   };
 }
 
+/** Resolve a directory account to the durable subject used by personal folder rules. */
+export async function prepareIxAuthUserFolderSubject(params: {
+  basePath: string;
+  userId: string;
+}): Promise<
+  | { userId: string; profileId: string; email: string; displayName: string }
+  | IxAuthUsersFailure
+> {
+  const result = await callUsersRoute({
+    basePath: params.basePath,
+    path: `/${encodeURIComponent(params.userId)}/folder-subject`,
+    method: "POST",
+  });
+  if (result.kind === "failed") {
+    return result;
+  }
+  const userId = readStringField(result.body, "userId");
+  const profileId = readStringField(result.body, "profileId");
+  const email = readStringField(result.body, "email");
+  const displayName = readStringField(result.body, "displayName");
+  return userId && profileId && email && displayName
+    ? { userId, profileId, email, displayName }
+    : { kind: "failed", errorKey: "unknown" };
+}
+
 /** The per-account buttons, each one relay call. */
 export type IxAuthUserActionName =
   | "password-reset"

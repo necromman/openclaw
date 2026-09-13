@@ -1,13 +1,3 @@
-// The user-management screen.
-//
-// It answers the question an administrator actually arrives with: who has an account,
-// what may they reach, and how do I change it. The identity server has a console of its
-// own, but reaching it means signing in a second time, so everything an administrator
-// does day to day lives here and the console stays as an advanced escape hatch.
-//
-// No permission decision is made in this file. The Gateway refuses these routes for
-// anyone but a superadmin or admin; the page only decides what is worth drawing, and
-// says so plainly when the answer is nothing.
 import "../../styles/users.css";
 import { consume } from "@lit/context";
 import { html, nothing, type TemplateResult } from "lit";
@@ -49,10 +39,12 @@ import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "../../lib/external-link.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
+import { renderUserDetailDialog } from "./user-detail-dialog.ts";
 import { renderUserDetailPanel } from "./user-detail-panel.ts";
-import { renderUsersTable } from "./users-table.ts";
 import "./ix-auth-invite-section.ts";
 import "./users-import-panel.ts";
+import { renderUsersTable } from "./users-table.ts";
+import "./user-folder-permissions.ts";
 
 registerIxAuthEnglish();
 
@@ -99,6 +91,12 @@ export class UsersPage extends OpenClawLightDomElement {
   @state() private showInvite = false;
   @state() private showImport = false;
   @state() private selected: IxAuthUserDetail | undefined;
+  @state() private detailUserId: string | undefined;
+  @state() private detailTab: "account" | "access" | "folders" = "access";
+  @state() private foldersOpened = false;
+  @state() private foldersBusy = false;
+  @state() private foldersDirty = false;
+  @state() private discardArmed = false;
   @state() private detailLoading = false;
   @state() private displayNameDraft = "";
   @state() private selectedRole = "";
@@ -126,6 +124,7 @@ export class UsersPage extends OpenClawLightDomElement {
     this.busy = false;
     this.detailLoading = false;
     this.selected = undefined;
+    this.detailUserId = undefined;
     super.disconnectedCallback();
   }
 
@@ -183,19 +182,19 @@ export class UsersPage extends OpenClawLightDomElement {
     this.total = page.total;
   }
 
-  /**
-   * Re-read the open account so the panel shows what the server now holds.
-   *
-   * Choosing a row clears the last result; refreshing after an action keeps it, because
-   * the invitation link or the session count that action produced is the one thing the
-   * administrator is looking at, and re-reading the account is not a reason to lose it.
-   */
   private async selectUser(userId: string, options?: { keepNotice?: boolean }): Promise<void> {
     if (this.busy && !options?.keepNotice) {
       return;
     }
     const request = ++this.detailRequest;
-    this.selected = undefined;
+    this.detailUserId = userId;
+    if (!options?.keepNotice) {
+      this.selected = undefined;
+      this.detailTab = "access";
+      this.foldersOpened = false;
+      this.foldersDirty = false;
+      this.discardArmed = false;
+    }
     this.detailLoading = true;
     this.deleteArmed = false;
     if (!options?.keepNotice) {
@@ -250,13 +249,6 @@ export class UsersPage extends OpenClawLightDomElement {
     }
   }
 
-  /**
-   * Save the department set, and say plainly when only part of it took.
-   *
-   * The Gateway answers 200 for a change it could only partly apply, naming the
-   * departments that did not take. Reading that as "saved" is how a person ends up
-   * outside a department their administrator believes they are in.
-   */
   private async saveDepartments(userId: string): Promise<void> {
     await this.mutate(
       () =>
@@ -473,7 +465,7 @@ export class UsersPage extends OpenClawLightDomElement {
     `;
   }
 
-  private renderDetail(): unknown {
+  private renderDetail(section: "account" | "access"): unknown {
     if (this.detailLoading) {
       return html`<p role="status">${t("common.loading")}</p>`;
     }
@@ -482,6 +474,7 @@ export class UsersPage extends OpenClawLightDomElement {
       return nothing;
     }
     return renderUserDetailPanel({
+      section,
       user: detail.user,
       emailVerified: detail.emailVerified,
       mfaEnabled: detail.mfaEnabled,
@@ -547,6 +540,7 @@ export class UsersPage extends OpenClawLightDomElement {
           () => deleteIxAuthUser({ basePath: this.basePath, userId: detail.user.id }),
           () => {
             this.selected = undefined;
+            this.detailUserId = undefined;
           },
         );
       },
@@ -582,7 +576,7 @@ export class UsersPage extends OpenClawLightDomElement {
             { title: t("ixAuth.users.title"), description: t("ixAuth.users.description") },
             [
               renderSettingsRow({ title: "", stacked: true, control: this.renderToolbar() }),
-              this.errorKey
+              this.errorKey && !this.detailUserId
                 ? renderSettingsRow({
                     title: "",
                     control: html`<div class="callout danger" role="alert">
@@ -605,7 +599,6 @@ export class UsersPage extends OpenClawLightDomElement {
               renderSettingsRow({ title: "", stacked: true, control: this.renderPager() }),
             ],
           ),
-          this.renderDetail(),
           this.showInvite
             ? html`<openclaw-ix-auth-invites
                 section="invite"
@@ -627,7 +620,76 @@ export class UsersPage extends OpenClawLightDomElement {
           ></openclaw-ix-auth-invites>`,
         ]),
       )}
+      ${this.renderDetailDialog()}
     `;
+  }
+
+  private closeDetail(discard = false): void {
+    if (this.busy || this.foldersBusy) {
+      return;
+    }
+    const user = this.selected?.user;
+    const dirty =
+      user &&
+      (this.displayNameDraft !== user.displayName ||
+        this.selectedRole !== (user.roles[0] ?? "MEMBER") ||
+        [...this.selectedDepartments].sort().join("\n") !==
+          [...user.departments].sort().join("\n"));
+    if (!discard && (dirty || this.foldersDirty)) {
+      this.discardArmed = true;
+      return;
+    }
+    this.detailRequest += 1;
+    this.querySelector("openclaw-modal-dialog")?.setReturnFocusTarget(
+      this.querySelector<HTMLButtonElement>(
+        `.users-table__select[data-user-id="${CSS.escape(this.detailUserId ?? "")}"]`,
+      ),
+    );
+    this.detailUserId = undefined;
+    this.selected = undefined;
+    this.detailLoading = false;
+    this.foldersOpened = false;
+    this.foldersDirty = false;
+    this.errorKey = undefined;
+  }
+
+  private renderDetailDialog(): unknown {
+    if (!this.detailUserId) {
+      return nothing;
+    }
+    const user = this.selected?.user;
+    const busy = this.busy || this.foldersBusy;
+    return renderUserDetailDialog({
+      user,
+      busy,
+      tab: this.detailTab,
+      errorKey: this.errorKey,
+      folderBlocked: Boolean(user?.isSuperAdmin && !this.session?.user?.isSuperAdmin),
+      discardArmed: this.discardArmed,
+      account: this.renderDetail("account"),
+      access: this.renderDetail("access"),
+      folders:
+        this.foldersOpened && user
+          ? html`<openclaw-user-folder-permissions
+              .user=${user}
+              .departments=${this.departments}
+              .basePath=${this.basePath}
+            ></openclaw-user-folder-permissions>`
+          : nothing,
+      onClose: (discard) => this.closeDetail(discard),
+      onKeepEditing: () => {
+        this.discardArmed = false;
+      },
+      onRetry: () => void this.selectUser(this.detailUserId!),
+      onTab: (tab) => {
+        this.detailTab = tab;
+        if (tab === "folders") this.foldersOpened = true;
+      },
+      onFolderState: ({ busy, dirty }) => {
+        this.foldersBusy = busy;
+        this.foldersDirty = dirty;
+      },
+    });
   }
 }
 

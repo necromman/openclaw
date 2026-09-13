@@ -20,6 +20,7 @@ import {
   IX_AUTH_SETTABLE_USER_STATUSES,
   type IxAuthUserSummary,
 } from "../auth/ix-auth/ix-auth-admin-users-client.js";
+import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { sendJson } from "./http-common.js";
 import {
   grantIxAuthDepartments,
@@ -473,10 +474,33 @@ async function handleRevokeSessions(params: ActionParams): Promise<void> {
   sendJson(params.res, 200, { userId: params.userId, sessions: takedown });
 }
 
+/** Prepare the same email-bound profile that a later verified login resolves. */
+async function handleFolderSubject(params: ActionParams): Promise<void> {
+  const target = await loadTarget(params);
+  if (!target || rejectSuperAdminTarget({ ...params, target })) {
+    return;
+  }
+  const profileId = ensureProfileForEmail(target.email).id;
+  recordIxAuthAdminAction({
+    deps: params.deps,
+    admin: params.admin,
+    action: "user-update",
+    targetUserId: target.id,
+    detail: { operation: "folder-subject", profileId },
+  });
+  sendJson(params.res, 200, {
+    userId: target.id,
+    profileId,
+    email: target.email,
+    displayName: target.name,
+  });
+}
+
 /** Methods each per-account action accepts. */
 const IX_AUTH_USER_ACTION_METHODS: ReadonlyMap<string, string> = new Map([
   ["roles", "PUT"],
   ["departments", "PUT"],
+  ["folder-subject", "POST"],
   ["password-reset", "POST"],
   ["invite", "POST"],
   ["unlock", "POST"],
@@ -516,6 +540,9 @@ export async function handleIxAuthAdminUserAction(params: {
     return;
   }
   switch (target.action) {
+    case "folder-subject":
+      await handleFolderSubject(action);
+      return;
     case "roles":
       await handleReplaceRoles(action);
       return;

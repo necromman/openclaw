@@ -379,6 +379,110 @@ wa-select.settings-select::part(combobox) {
 }
 
 /* Folder administration: readable Korean copy and usable pointer/touch targets. */
+.admin-detail-dialog {
+  display: flex;
+  flex-direction: column;
+  height: min(860px, 85dvh);
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  white-space: normal;
+}
+
+.admin-detail-dialog__header,
+.admin-detail-dialog__footer,
+.admin-detail-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  flex-shrink: 0;
+}
+
+.admin-detail-dialog__header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-detail-dialog__header h2,
+.admin-detail-dialog__header p,
+.admin-detail-dialog__footer p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-detail-dialog__header h2 {
+  font-size: var(--control-ui-text-lg);
+}
+
+.admin-detail-dialog__header p {
+  color: var(--muted);
+}
+
+.admin-detail-tabs .btn[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.admin-detail-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4);
+}
+
+.admin-detail-dialog__body .settings-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.admin-detail-dialog__body .settings-row__control {
+  justify-content: flex-start;
+  max-width: none;
+}
+
+.admin-detail-dialog__footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.admin-detail-dialog__footer p {
+  flex-basis: 100%;
+}
+
+.folders-embedded {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.user-folder-target label {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.user-folder-target .settings-select {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .admin-detail-dialog {
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .admin-detail-dialog .btn {
+    min-height: 44px;
+  }
+}
+
 openclaw-folders-page .folders-layout__heading,
 openclaw-folders-page .folders-panel__path,
 openclaw-folders-page .folders-preview__hint,

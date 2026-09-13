@@ -9,7 +9,11 @@ import type {
 } from "../../../../packages/gateway-protocol/src/schema/folder-rules.js";
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
-import { renderFolderRulePanel, type FolderRuleTab } from "./folder-rule-panel.ts";
+import {
+  renderFolderRulePanel,
+  type FolderRuleTab,
+  type FolderSubjectRow,
+} from "./folder-rule-panel.ts";
 
 // The folder words live in the lazily loaded identity catalog, exactly as the page loads it.
 registerIxAuthEnglish();
@@ -66,6 +70,7 @@ type PanelOverrides = {
   userQuery?: string;
   onPermission?: (kind: string, id: string, value: string) => void;
   onRetry?: () => void;
+  fixedSubject?: FolderSubjectRow;
 };
 
 function panel(overrides: PanelOverrides = {}) {
@@ -82,6 +87,7 @@ function panel(overrides: PanelOverrides = {}) {
     preview: undefined,
     busy: false,
     onRetry: overrides.onRetry ?? (() => undefined),
+    ...(overrides.fixedSubject ? { fixedSubject: overrides.fixedSubject } : {}),
     onTab: () => undefined,
     onPermission: overrides.onPermission ?? (() => undefined),
     onInherit: () => undefined,
@@ -98,6 +104,25 @@ afterEach(() => {
 });
 
 describe("folder rule panel", () => {
+  it.each([
+    { kind: "user", id: "u-2", label: "Lee" },
+    { kind: "department", id: "rnd", label: "Research" },
+    { kind: "role", id: "member", label: "Staff" },
+  ] as const)(
+    "edits only the fixed $kind subject without a separate preview or search",
+    (fixedSubject) => {
+      const onPermission = vi.fn();
+      const host = draw(panel({ fixedSubject, onPermission, tab: "user" }));
+      expect(host.querySelectorAll(".folders-subject")).toHaveLength(1);
+      expect(host.querySelector(".folders-subject__name")?.textContent?.trim()).toBe(
+        fixedSubject.label,
+      );
+      expect(host.querySelector(".folders-preview, .folders-tabs, .folders-search")).toBeNull();
+      host.querySelectorAll<HTMLButtonElement>(".folders-perm__button")[1]?.click();
+      expect(onPermission).toHaveBeenCalledWith(fixedSubject.kind, fixedSubject.id, "read");
+    },
+  );
+
   it("locks editing and offers a retry when folder rules could not be loaded", () => {
     const onRetry = vi.fn();
     const host = draw(panel({ rules: undefined, onRetry }));

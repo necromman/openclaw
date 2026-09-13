@@ -40,6 +40,7 @@
 | DELETE | `/auth/admin/users/{id}`                | **superadmin 만.** 자기 자신 금지                            |
 | PUT    | `/auth/admin/users/{id}/roles`          | 역할 교체. 자기 자신 금지                                    |
 | PUT    | `/auth/admin/users/{id}/departments`    | 부서 집합 교체. 자기 자신 금지                               |
+| POST   | `/auth/admin/users/{id}/folder-subject` | 개인 폴더 규칙에 쓸 프로필 연결. 첫 로그인 전에도 가능       |
 | POST   | `/auth/admin/users/{id}/password-reset` | 재설정 **메일** 발송. 링크는 응답에 담기지 않는다 (5절)      |
 | POST   | `/auth/admin/users/{id}/invite`         | 초대 재발송. 메일 서버가 없으면 링크를 응답에 담는다         |
 | POST   | `/auth/admin/users/{id}/unlock`         | 자동 잠금 해제                                               |
@@ -48,6 +49,16 @@
 | POST   | `/auth/admin/users/bulk`                | CSV 가져오기, 상한 500행 (6절)                               |
 
 목록 행은 IX-Auth 가 주는 것에 게이트웨이 판정 두 가지를 얹는다. `gatewayRole`(역할 코드를 `roleMap` 으로 접은 결과)과 `self`(로그인한 관리자 본인인가). 둘 다 브라우저가 다시 계산하면 게이트웨이의 실제 판정과 어긋날 수 있어서 서버가 정한다.
+
+개인 폴더 규칙의 `subjectId`는 IX-Auth 사용자 ID가 아니라 OpenClaw 프로필 UUID다.
+`POST /auth/admin/users/{id}/folder-subject`는 관리자 세션과 CSRF를 확인하고, IX-Auth에서
+대상 계정을 조회한 다음 그 응답의 이메일로 기존 `ensureProfileForEmail`을 호출한다.
+요청 본문의 이메일이나 프로필 ID는 사용하지 않는다. 응답은
+`{ userId, profileId, email, displayName }`이며, 반복 호출과 이후 로그인은 같은 프로필을 쓴다.
+첫 로그인 전 직원도 개인 폴더 규칙을 준비할 수 있고 사용자 목록 조회만으로 프로필을 만들지는 않는다.
+일반 관리자는 시스템 관리자 계정의 연결을 준비할 수 없다. 자기 계정의 연결은 허용한다.
+이 호출은 역할·부서·폴더 규칙·세션을 변경하지 않는다. 실제 규칙 저장은 기존
+`folders.rules.set`에 `subjectKind: "user"`, 반환된 `profileId`를 `subjectId`로 전달한다.
 
 ### 3.1 게이트웨이가 추가로 막는 것
 
@@ -122,3 +133,7 @@ IX-Auth 자체 원장에는 이미 실제 관리자가 남는다. 중계가 서�
 | **`ADMIN` 이 IX-Auth 콘솔에서는 여전히 무엇이든 할 수 있다** | 3.1 의 보호는 게이트웨이 표면에만 있다. 콘솔은 IX-Auth 자체 권한 모델로 돈다. 콘솔 링크를 superadmin 에게만 보이게 한 이유이기도 하다                                  |
 | **비밀번호 재설정은 메일이 필요하다**                        | 5절. 메일이 없으면 초대 재발송으로 대신한다                                                                                                                            |
 | **잠금 해제 버튼은 잠긴 계정에만 눌린다**                    | IX-Auth 의 자동 잠금은 시간이 지나면 스스로 풀린다. 상세 패널이 만료 시각을 보여 준다                                                                                  |
+
+## 사용자 상세 모달 (2026-09-13)
+
+사용자 목록에서 이름을 누르면 상세 모달이 열린다. 계정 탭에서 이름·상태와 계정 작업, 역할·부서 탭에서 역할 및 다중 부서를 저장한다. 폴더 권한 탭에서는 개인 예외와 부서·역할 공통 규칙을 대상 선택란으로 구분한다. 공통 규칙 변경은 그 대상 전체에 적용된다. 저장하지 않은 변경이 있으면 닫기와 대상 전환 시 변경 버리기를 확인한다. 기존 자기 역할 변경·상위 관리자 보호는 유지한다.

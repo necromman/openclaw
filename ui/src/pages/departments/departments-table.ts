@@ -10,6 +10,7 @@ import type {
   IxAuthOrphanDepartment,
 } from "../../features/ix-auth/ix-auth-admin-api.ts";
 import { t } from "../../i18n/index.ts";
+import "./department-folders-button.ts";
 
 function renderAgents(agents: readonly string[]): TemplateResult {
   return agents.length === 0
@@ -39,6 +40,16 @@ function renderRow(params: {
       <td><code>${department.code}</code></td>
       <td>${department.memberCount ?? 0}</td>
       <td>${renderAgents(department.agents ?? [])}</td>
+      <td>
+        ${
+          department.slug
+            ? html`<openclaw-department-folders-button
+                .department=${department}
+                .busy=${params.busy ?? false}
+              ></openclaw-department-folders-button>`
+            : nothing
+        }
+      </td>
     </tr>
   `;
 }
@@ -71,6 +82,7 @@ export function renderDepartmentsTable(params: {
             <th>${t("ixAuth.departments.codeColumn")}</th>
             <th>${t("ixAuth.departments.membersColumn")}</th>
             <th>${t("ixAuth.departments.agentsColumn")}</th>
+            <th>${t("ixAuth.departments.folderPermissions")}</th>
           </tr>
         </thead>
         <tbody>

@@ -34,7 +34,7 @@ export type FolderRuleDraft = {
 };
 
 /** Who a rule may name, resolved into one row's worth of words. */
-type FolderSubjectRow = {
+export type FolderSubjectRow = {
   kind: FolderRuleSubjectKind;
   id: string;
   label: string;
@@ -370,6 +370,7 @@ export function renderFolderRulePanel(params: {
   notice?: string;
   rulesLoading?: boolean;
   onRetry?: () => void;
+  fixedSubject?: FolderSubjectRow;
   onTab: (tab: FolderRuleTab) => void;
   onPermission: (kind: FolderRuleSubjectKind, id: string, value: FolderRulePermission) => void;
   onInherit: (kind: FolderRuleSubjectKind, id: string, value: boolean) => void;
@@ -381,12 +382,14 @@ export function renderFolderRulePanel(params: {
 }): TemplateResult {
   const absolutePath = params.path.length > 0 ? `${params.root}/${params.path}` : params.root;
   const rows = params.rules
-    ? subjectRowsForTab({
-        tab: params.tab,
-        subjects: params.subjects,
-        rules: params.rules,
-        userQuery: params.userQuery,
-      })
+    ? params.fixedSubject
+      ? [params.fixedSubject]
+      : subjectRowsForTab({
+          tab: params.tab,
+          subjects: params.subjects,
+          rules: params.rules,
+          userQuery: params.userQuery,
+        })
     : [];
   const ownRules = params.rules?.rules ?? [];
   return html`
@@ -405,16 +408,23 @@ export function renderFolderRulePanel(params: {
         }
         ${params.notice ? html`<p class="folders-notice" role="status">${params.notice}</p>` : nothing}
       </div>
-      ${renderPreview({
-        subjects: params.subjects,
-        preview: params.preview,
-        busy: params.busy,
-        onPreview: params.onPreview,
-      })}
-      <p class="folders-preview__hint">${t("ixAuth.folders.editHint")}</p>
-      ${renderTabs({ tab: params.tab, onTab: params.onTab })}
       ${
-        params.tab === "user"
+        params.fixedSubject
+          ? html`<strong
+                >${t("ixAuth.folders.subjectTitle", { name: params.fixedSubject.label })}</strong
+              >
+              <p class="folders-preview__hint">${t("ixAuth.folders.scopeHelp")}</p>`
+          : renderPreview({
+              subjects: params.subjects,
+              preview: params.preview,
+              busy: params.busy,
+              onPreview: params.onPreview,
+            })
+      }
+      <p class="folders-preview__hint">${t("ixAuth.folders.editHint")}</p>
+      ${params.fixedSubject ? nothing : renderTabs({ tab: params.tab, onTab: params.onTab })}
+      ${
+        !params.fixedSubject && params.tab === "user"
           ? renderSearch({
               query: params.userQuery,
               busy: params.busy,

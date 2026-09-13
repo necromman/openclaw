@@ -8,6 +8,7 @@ import { IX_AUTH_DEFAULT_ROLE_MAP } from "../auth/ix-auth/ix-auth-role-map.js";
 import type { IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
 import { insertIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
+import { ensureProfileForEmail, listProfiles } from "../state/user-profiles.js";
 import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
 import { handleIxAuthHttpRequest } from "./ix-auth-http.js";
 import { resetIxAuthInviteLinks } from "./ix-auth-invite-links.js";
@@ -258,6 +259,7 @@ const USER_ROUTES: ReadonlyArray<{ method: string; pathname: string }> = [
   { method: "DELETE", pathname: `/auth/admin/users/${TARGET_USER_ID}` },
   { method: "PUT", pathname: `/auth/admin/users/${TARGET_USER_ID}/roles` },
   { method: "PUT", pathname: `/auth/admin/users/${TARGET_USER_ID}/departments` },
+  { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/folder-subject` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/password-reset` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/invite` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/unlock` },
@@ -298,19 +300,22 @@ describe("user management admission", () => {
     },
   );
 
-  it("refuses a mutating route with no CSRF token", async () => {
-    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
-    const calls = stubIdentityServer({});
-    const answer = await callAdmin({
-      method: "PATCH",
-      pathname: `/auth/admin/users/${TARGET_USER_ID}`,
-      headers: { cookie: session.cookie },
-      body: { name: "New Name" },
-    });
-    expect(answer.status()).toBe(403);
-    expect(JSON.parse(answer.body())).toEqual({ error: "csrf_mismatch" });
-    expect(calls).toHaveLength(0);
-  });
+  it.each(USER_ROUTES.filter((route) => route.method !== "GET"))(
+    "refuses $method $pathname with no CSRF token",
+    async (route) => {
+      const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+      const calls = stubIdentityServer({});
+      const answer = await callAdmin({
+        method: route.method,
+        pathname: route.pathname,
+        headers: { cookie: session.cookie },
+        body: { name: "New Name" },
+      });
+      expect(answer.status()).toBe(403);
+      expect(JSON.parse(answer.body())).toEqual({ error: "csrf_mismatch" });
+      expect(calls).toHaveLength(0);
+    },
+  );
 
   it("answers 404 for a path inside the namespace that names nothing", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
@@ -322,6 +327,65 @@ describe("user management admission", () => {
       body: {},
     });
     expect(answer.status()).toBe(404);
+  });
+});
+
+describe("personal folder subject", () => {
+  it("prepares a pre-login account and reuses its login profile without trusting a supplied email", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    const calls = stubIdentityServer({
+      [`GET /admin/users/${TARGET_USER_ID}`]: () => jsonResponse({ data: userView() }),
+    });
+    expect(listProfiles().some((profile) => profile.emails.includes("member@example.test"))).toBe(
+      false,
+    );
+    const request = {
+      method: "POST",
+      pathname: `/auth/admin/users/${TARGET_USER_ID}/folder-subject`,
+      headers: adminHeaders(session),
+      body: { email: "wrong@example.test", profileId: "profile-1" },
+    };
+    const first = await callAdmin(request);
+    expect(first.status()).toBe(200);
+    const subject = JSON.parse(first.body());
+    expect(subject).toEqual({
+      userId: TARGET_USER_ID,
+      profileId: expect.any(String),
+      email: "member@example.test",
+      displayName: "Member Person",
+    });
+    expect(subject.profileId).not.toBe(TARGET_USER_ID);
+    const second = await callAdmin(request);
+    expect(JSON.parse(second.body())).toEqual(subject);
+    // The verified-login owner resolves this same canonical email binding.
+    expect(ensureProfileForEmail("member@example.test").id).toBe(subject.profileId);
+    expect(
+      listProfiles().filter((profile) => profile.emails.includes("member@example.test")),
+    ).toHaveLength(1);
+    expect(listProfiles().some((profile) => profile.emails.includes("wrong@example.test"))).toBe(
+      false,
+    );
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
+  });
+
+  it.each([
+    { name: "missing", status: 404, response: () => jsonResponse({ error: "not_found" }, 404) },
+    {
+      name: "protected",
+      status: 403,
+      response: () => jsonResponse({ data: userView({ roles: ["SUPERADMIN"] }) }),
+    },
+  ])("does not create a profile for a $name account", async ({ status, response }) => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    stubIdentityServer({ [`GET /admin/users/${TARGET_USER_ID}`]: response });
+    const before = listProfiles();
+    const answer = await callAdmin({
+      method: "POST",
+      pathname: `/auth/admin/users/${TARGET_USER_ID}/folder-subject`,
+      headers: adminHeaders(session),
+    });
+    expect(answer.status()).toBe(status);
+    expect(listProfiles()).toEqual(before);
   });
 });
 
