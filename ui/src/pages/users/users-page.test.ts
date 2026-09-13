@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { render } from "lit";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { IxAuthManagedUser } from "../../features/ix-auth/ix-auth-users-api.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { assignableRolesFor, renderUserDetailPanel } from "./user-detail-panel.ts";
@@ -187,6 +187,7 @@ describe("detail panel", () => {
       onDisplayNameInput: () => {},
       onSaveDisplayName: () => {},
       onRoleChange: () => {},
+      onSaveRole: () => {},
       onDepartmentToggle: () => {},
       onSaveDepartments: () => {},
       onToggleStatus: () => {},
@@ -196,6 +197,27 @@ describe("detail panel", () => {
       ...overrides,
     };
   }
+
+  it("requires an explicit save after selecting a different role", () => {
+    const onSaveRole = vi.fn();
+    const onRoleChange = vi.fn();
+    const props = panelProps({ onRoleChange, onSaveRole });
+    const host = draw(renderUserDetailPanel(props));
+    const saveButton = () =>
+      [...host.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "Save role",
+      );
+    expect(saveButton()?.disabled).toBe(true);
+    const select = host.querySelector("select")!;
+    select.value = "EXECUTIVE";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(onRoleChange).toHaveBeenCalledWith("EXECUTIVE");
+    expect(onSaveRole).not.toHaveBeenCalled();
+    render(renderUserDetailPanel({ ...props, selectedRole: "EXECUTIVE" }), host);
+    expect(saveButton()?.disabled).toBe(false);
+    saveButton()?.click();
+    expect(onSaveRole).toHaveBeenCalledOnce();
+  });
 
   it("asks for confirmation before deleting rather than deleting on the first click", () => {
     const armed: boolean[] = [];
@@ -229,6 +251,11 @@ describe("detail panel", () => {
   it("locks role and department edits on the caller's own account", () => {
     const host = draw(renderUserDetailPanel(panelProps({ user: managedUser({ self: true }) })));
     expect(host.querySelector("select")?.disabled).toBe(true);
+    expect(
+      [...host.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "Save role",
+      )?.disabled,
+    ).toBe(true);
     for (const checkbox of host.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
       expect(checkbox.disabled).toBe(true);
     }
@@ -241,7 +268,12 @@ describe("detail panel", () => {
     for (const checkbox of host.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
       expect(checkbox.disabled).toBe(true);
     }
-    for (const label of ["Deactivate", "Reset two-step verification", "Sign this person out"]) {
+    for (const label of [
+      "Save role",
+      "Deactivate",
+      "Reset two-step verification",
+      "Sign this person out",
+    ]) {
       const button = [...host.querySelectorAll("button")].find(
         (candidate) => candidate.textContent?.trim() === label,
       );

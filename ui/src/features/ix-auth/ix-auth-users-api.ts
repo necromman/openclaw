@@ -55,7 +55,7 @@ export type IxAuthUserDetail = {
 };
 
 /** One row's outcome in a bulk import. */
-export type IxAuthImportRow = {
+type IxAuthImportRow = {
   /** The spreadsheet line, header counted, so the row can be found in the file. */
   line: number;
   email?: string;

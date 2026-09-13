@@ -142,7 +142,8 @@ const enIxAuth = {
     },
     users: {
       title: "User management",
-      description: "Everyone with an account on this deployment.",
+      description:
+        "Manage staff accounts, roles and departments. Set document access under Folders.",
       forbidden: "Only an administrator can manage users.",
       searchLabel: "Search",
       searchPlaceholder: "Name or email",
@@ -186,8 +187,12 @@ const enIxAuth = {
       saved: "Saved",
       activate: "Reactivate",
       deactivate: "Deactivate",
-      rolesHelp: "Changing a role ends that person's sessions right away.",
-      departmentsHelp: "Departments decide whose sessions this person can read.",
+      rolesHelp:
+        "Choose a role, then save. Saving replaces directly assigned roles with the selected role and requires the user to sign in again.",
+      saveRole: "Save role",
+      rolesSaved: "Role saved. The user must sign in again.",
+      departmentsHelp:
+        "Choose the person's departments and save. Department membership alone does not grant access to all department documents or conversations.",
       departmentsSaved: "Departments saved.",
       departmentsPartiallyApplied:
         "Only part of the change was applied. These departments did not take: {codes}. Check the boxes above against what the identity server holds and save again.",
@@ -279,12 +284,13 @@ const enIxAuth = {
     },
     departments: {
       title: "Departments",
-      description: "Departments, the agents bound to them, and the folders those agents may read.",
+      description:
+        "Create departments, then select a department to manage its members. Set document access under Folders.",
       forbidden: "Only a system administrator can open this screen.",
       // The one sentence the whole screen exists to make true.
-      whitelistTitle: "Listed folders only",
+      whitelistTitle: "Departments and document access are separate settings",
       whitelistBody:
-        "An agent reaches exactly one folder: the workspace named below. Everything not named here stays out of reach, so a folder nobody adds is a folder nobody can read.",
+        "Department membership groups staff. It does not automatically isolate the shared assistant's search results. Agent workspaces, search folders and folder access rules must be reviewed separately.",
       loading: "Loading",
       codeColumn: "Group code",
       nameColumn: "Name",
@@ -404,8 +410,13 @@ const enIxAuth = {
       refreshStarted: "Reading the share again.",
       refreshRunning: "A read is already running.",
       loading: "Loading",
-      treeEmpty: "Nothing has been read from the share yet.",
-      folderEmpty: "This folder has no subfolders.",
+      treeEmpty: "The folder list could not be loaded. Try again.",
+      folderEmpty: "No subfolders are visible under these conditions.",
+      rulesLoading: "Loading folder rules...",
+      rulesUnavailable: "Editing is locked because folder rules could not be loaded. Try again.",
+      retry: "Retry",
+      editHint:
+        "Choose a subject and permission, then save that row. Removing a rule may restore access inherited from a parent folder.",
       unavailable: "No shared folder root is mounted here, so there is nothing to set yet.",
       rootLabel: "the share root",
       expand: "Open this folder",
@@ -429,7 +440,8 @@ const enIxAuth = {
       subjectsEmpty: "There is nothing to grant here yet.",
       userSearchLabel: "Find someone",
       userSearchPlaceholder: "Search by name or address",
-      userSearchEmpty: "Search for a name or an address to give one person a rule.",
+      userSearchEmpty:
+        "Search by name or email. Only accounts that have signed in here appear in this list.",
       inheritLabel: "Also below",
       save: "Save",
       clear: "Remove rule",
@@ -442,10 +454,10 @@ const enIxAuth = {
       applyToDescendants: "Apply to this folder and everything below it",
       applyToDescendantsHint:
         "Rules for the same subject on folders below are removed, so this folder decides for the whole branch.",
-      previewLabel: "See the tree as",
+      previewLabel: "Preview one rule subject",
       previewAdmin: "Administrator view (everything)",
       previewHint:
-        "Pick somebody to reload the tree the way they see it. A folder they may not see disappears from the list.",
+        "Shows only the selected subject's rules, not a user's combined role, department and personal permissions. Folder rules do not filter the shared assistant's search results. NAS permissions remain the limit; a write rule cannot make a read-only connection writable.",
       orphanTitle: "Rules that point at nothing",
       orphanBody:
         "A folder renamed or deleted on the share leaves its rules behind, and so does a department or an account that is removed. Nothing can repair these automatically: a rename cannot be told from a deletion, and re-pointing a rule would re-open a folder somebody closed.",

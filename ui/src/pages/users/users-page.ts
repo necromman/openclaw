@@ -457,14 +457,19 @@ export class UsersPage extends OpenClawLightDomElement {
         ),
       onRoleChange: (role) => {
         this.selectedRole = role;
-        void this.mutate(() =>
-          replaceIxAuthUserRoles({
+      },
+      onSaveRole: () =>
+        void this.mutate(async () => {
+          const result = await replaceIxAuthUserRoles({
             basePath: this.basePath,
             userId: detail.user.id,
-            roles: [role],
-          }),
-        );
-      },
+            roles: [this.selectedRole],
+          });
+          if (!isIxAuthUsersFailure(result)) {
+            this.notice = t("ixAuth.users.rolesSaved");
+          }
+          return result;
+        }),
       onDepartmentToggle: (code, checked) => {
         const remaining = this.selectedDepartments.filter((item) => item !== code);
         this.selectedDepartments = checked ? [...remaining, code] : remaining;

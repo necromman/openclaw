@@ -377,3 +377,66 @@ wa-select.settings-select::part(combobox) {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+
+/* Folder administration: readable Korean copy and usable pointer/touch targets. */
+openclaw-folders-page .folders-layout__heading,
+openclaw-folders-page .folders-panel__path,
+openclaw-folders-page .folders-preview__hint,
+openclaw-folders-page .folders-subject__effective,
+openclaw-folders-page .folders-panel__descendants-hint,
+openclaw-folders-page .folders-subject__inherit {
+  font-size: var(--control-ui-text-sm);
+  line-height: 1.6;
+}
+
+openclaw-folders-page .folders-tree__row--selected {
+  background: var(--accent-subtle);
+  outline: 1px solid var(--accent);
+}
+
+openclaw-folders-page .folders-tree__name,
+openclaw-folders-page .folders-tree__toggle,
+openclaw-folders-page .folders-perm__button,
+openclaw-folders-page .folders-index__refresh {
+  min-height: 36px;
+  cursor: default;
+}
+
+openclaw-folders-page .folders-tree__toggle {
+  min-width: 28px;
+}
+
+openclaw-folders-page .folders-notice {
+  color: var(--text);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+@media (max-width: 640px) {
+  openclaw-folders-page .folders-tree {
+    max-height: 40vh;
+  }
+
+  openclaw-folders-page .folders-tree__list {
+    padding-inline-start: var(--space-2);
+  }
+
+  openclaw-folders-page .folders-perm__button,
+  openclaw-folders-page .folders-tab,
+  openclaw-folders-page .folders-tree__name,
+  openclaw-folders-page .folders-subject__controls .btn {
+    min-height: 44px;
+  }
+
+  openclaw-folders-page .folders-orphans__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  openclaw-folders-page .folders-orphans__path,
+  openclaw-folders-page .folders-orphans__subject,
+  openclaw-folders-page .folders-orphans__reason {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

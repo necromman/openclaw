@@ -368,6 +368,8 @@ export function renderFolderRulePanel(params: {
   preview: { kind: FolderRuleSubjectKind; id: string } | undefined;
   busy: boolean;
   notice?: string;
+  rulesLoading?: boolean;
+  onRetry?: () => void;
   onTab: (tab: FolderRuleTab) => void;
   onPermission: (kind: FolderRuleSubjectKind, id: string, value: FolderRulePermission) => void;
   onInherit: (kind: FolderRuleSubjectKind, id: string, value: boolean) => void;
@@ -378,12 +380,14 @@ export function renderFolderRulePanel(params: {
   onPreview: (preview: { kind: FolderRuleSubjectKind; id: string } | undefined) => void;
 }): TemplateResult {
   const absolutePath = params.path.length > 0 ? `${params.root}/${params.path}` : params.root;
-  const rows = subjectRowsForTab({
-    tab: params.tab,
-    subjects: params.subjects,
-    rules: params.rules,
-    userQuery: params.userQuery,
-  });
+  const rows = params.rules
+    ? subjectRowsForTab({
+        tab: params.tab,
+        subjects: params.subjects,
+        rules: params.rules,
+        userQuery: params.userQuery,
+      })
+    : [];
   const ownRules = params.rules?.rules ?? [];
   return html`
     <div class="folders-panel">
@@ -407,6 +411,7 @@ export function renderFolderRulePanel(params: {
         busy: params.busy,
         onPreview: params.onPreview,
       })}
+      <p class="folders-preview__hint">${t("ixAuth.folders.editHint")}</p>
       ${renderTabs({ tab: params.tab, onTab: params.onTab })}
       ${
         params.tab === "user"
@@ -418,47 +423,67 @@ export function renderFolderRulePanel(params: {
           : nothing
       }
       ${
-        rows.length === 0
-          ? html`<p class="muted">
+        !params.rules
+          ? html`<div class="folders-panel__warning" role="status">
               ${t(
-                params.tab === "user"
-                  ? "ixAuth.folders.userSearchEmpty"
-                  : "ixAuth.folders.subjectsEmpty",
+                params.rulesLoading
+                  ? "ixAuth.folders.rulesLoading"
+                  : "ixAuth.folders.rulesUnavailable",
               )}
-            </p>`
-          : html`<ul class="folders-subjects">
-              ${rows.map((subject) => {
-                const key = folderSubjectKey(subject.kind, subject.id);
-                const own = ownRules.find(
-                  (rule) => rule.subjectKind === subject.kind && rule.subjectId === subject.id,
-                );
-                const fallback: FolderRuleDraft = own
-                  ? { permission: own.permission, inherit: own.inherit }
-                  : DEFAULT_DRAFT;
-                return renderSubjectRow({
-                  subject,
-                  draft: params.drafts.get(key) ?? fallback,
-                  hasOwnRule: own !== undefined,
-                  effective: folderEffectiveSentence({
-                    rules: params.rules,
-                    kind: subject.kind,
-                    id: subject.id,
-                  }),
-                  manage: params.manage,
-                  busy: params.busy,
-                  onPermission: params.onPermission,
-                  onInherit: params.onInherit,
-                  onSave: params.onSave,
-                  onClear: params.onClear,
-                });
-              })}
-            </ul>`
+              ${
+                !params.rulesLoading && params.onRetry
+                  ? html`<button
+                      type="button"
+                      class="btn"
+                      ?disabled=${params.busy}
+                      @click=${params.onRetry}
+                    >
+                      ${t("ixAuth.folders.retry")}
+                    </button>`
+                  : nothing
+              }
+            </div>`
+          : rows.length === 0
+            ? html`<p class="muted">
+                ${t(
+                  params.tab === "user"
+                    ? "ixAuth.folders.userSearchEmpty"
+                    : "ixAuth.folders.subjectsEmpty",
+                )}
+              </p>`
+            : html`<ul class="folders-subjects">
+                ${rows.map((subject) => {
+                  const key = folderSubjectKey(subject.kind, subject.id);
+                  const own = ownRules.find(
+                    (rule) => rule.subjectKind === subject.kind && rule.subjectId === subject.id,
+                  );
+                  const fallback: FolderRuleDraft = own
+                    ? { permission: own.permission, inherit: own.inherit }
+                    : DEFAULT_DRAFT;
+                  return renderSubjectRow({
+                    subject,
+                    draft: params.drafts.get(key) ?? fallback,
+                    hasOwnRule: own !== undefined,
+                    effective: folderEffectiveSentence({
+                      rules: params.rules,
+                      kind: subject.kind,
+                      id: subject.id,
+                    }),
+                    manage: params.manage,
+                    busy: params.busy,
+                    onPermission: params.onPermission,
+                    onInherit: params.onInherit,
+                    onSave: params.onSave,
+                    onClear: params.onClear,
+                  });
+                })}
+              </ul>`
       }
       <label class="folders-panel__descendants">
         <input
           type="checkbox"
           .checked=${params.applyToDescendants}
-          ?disabled=${params.busy || !params.manage}
+          ?disabled=${params.busy || !params.manage || !params.rules}
           @change=${(event: Event) =>
             // SAFETY: the listener is bound to this checkbox element.
             params.onApplyToDescendants((event.target as HTMLInputElement).checked)}

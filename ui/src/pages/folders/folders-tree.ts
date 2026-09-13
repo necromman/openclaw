@@ -87,6 +87,7 @@ function renderRow(params: {
       <button
         type="button"
         class="folders-tree__name"
+        title=${params.path || params.name}
         ?disabled=${params.busy}
         @click=${() => params.onSelect(params.path)}
       >

@@ -7,12 +7,13 @@
 #
 # 설치 절차 전체와 되돌리기는 chris-local/DEPLOY.md 13절.
 #
-# chris-local/docker-compose.ixauth.yml 과 형제 파일이다. 다른 점은 셋뿐이다.
+# chris-local/docker-compose.ixauth.yml 과 형제 파일이다. 다른 점은 다음과 같다.
 #   1) build: 가 없다. 이미지는 GitHub Actions 가 굽고 ghcr 에서 받는다.
 #      NAS 는 2코어라 게이트웨이 이미지를 여기서 빌드할 수 없다.
 #   2) mem_limit 로 컨테이너별 상한을 건다. NAS 는 본래 파일 서비스와 기존 컨테이너
 #      7개를 함께 돌리는 기계라, 한 컨테이너가 RAM 을 다 먹으면 그쪽이 먼저 죽는다.
 #   3) mailpit(개발용 수신함) 서비스가 없다. 납품 호스트에서 쓸 일이 없다.
+#   4) 게이트웨이 교체 중 안내 화면을 제공하는 독립 maintenance 프록시가 있다.
 # 그 밖의 값은 전부 같다. 원본을 고치면 이 파일도 같이 고친다.
 #
 # 파일 형식에 version: 을 쓰지 않는다. NAS 의 docker-compose 는 1.28.5 이고, 그
@@ -159,20 +160,41 @@ services:
     mem_limit: 3g
     networks: [ix-auth-internal]
 
+  # 게이트웨이와 수명을 분리한다. gateway에 depends_on을 걸지 않는다.
+  maintenance:
+    image: nginx:1.30.4-alpine
+    restart: unless-stopped
+    user: "101:101"
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    volumes:
+      - ./maintenance/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./maintenance:/usr/share/nginx/html:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/__system-update/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 64m
+    networks:
+      ix-auth-internal:
+        ipv4_address: 172.16.240.11
+
   # 나가는 연결만 쓰는 인그레스. --profile tunnel 일 때만 만들어진다.
-  # 공개 호스트명의 오리진은 대시보드에서 http://gateway:18789 로 잡혀 있다.
+  # 공개 호스트명의 오리진은 대시보드에서 http://maintenance:8080 으로 잡는다.
   # 호스트 포트가 아니라 이 compose 네트워크의 서비스 이름이다.
   cloudflared:
     image: cloudflare/cloudflared:2026.8.3
     profiles: ["tunnel"]
     restart: unless-stopped
-    # 여기만 짧은 형식이다. docker-compose 1.28.5 는 의존 서비스가 아직 healthy 가
-    # 아니면 기다리지 않고 "Container ... is unhealthy" 로 up 전체를 실패시킨다.
-    # 게이트웨이는 첫 기동에 1~3분이 걸리므로 조건을 걸면 첫 배포가 반드시 실패한다
-    # (2026-09-08 NAS 실측). cloudflared 는 원본이 아직 안 뜬 동안 요청에 502 를 내고
-    # 계속 재시도하므로, 순서만 정해 주면 충분하다.
+    # 게이트웨이를 기다리지 않아야 교체 중에도 안내 화면에 접근할 수 있다.
     depends_on:
-      - gateway
+      - maintenance
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}

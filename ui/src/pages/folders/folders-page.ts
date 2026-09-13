@@ -1,18 +1,3 @@
-// Who may see which shared folder.
-//
-// One screen, two halves, one question. The left half is the share as the Gateway
-// reports it, one level at a time; the right half is the rules pinned to whichever
-// folder is selected. They are on the same screen because a rule is meaningless without
-// the folder it lands on, and a folder is meaningless without the verdict it carries.
-//
-// The preview selector is the part that makes the screen trustworthy. Rules that hide a
-// folder are easy to write and hard to believe, so an operator can reload the tree
-// through one subject's eyes and see the hiding actually happen rather than take the
-// rule's word for it.
-//
-// No permission decision is made in this file. The Gateway refuses every method behind it
-// for an account that is not an administrator; the page only declines to ask when the
-// session already says the answer would be no.
 import "../../styles/folders.css";
 import { consume } from "@lit/context";
 import { html, nothing, type TemplateResult } from "lit";
@@ -92,6 +77,7 @@ export class FoldersPage extends OpenClawLightDomElement {
   @state() private expanded: ReadonlySet<string> = new Set();
   @state() private selectedPath = "";
   @state() private rules: FoldersRulesListResult | undefined;
+  @state() private rulesLoading = false;
   @state() private subjects: FoldersSubjectsListResult | undefined;
   @state() private drafts: ReadonlyMap<string, FolderRuleDraft> = new Map();
   @state() private preview: FolderPreview | undefined;
@@ -113,6 +99,8 @@ export class FoldersPage extends OpenClawLightDomElement {
   private started = false;
   private pollTimer: ReturnType<typeof setTimeout> | undefined;
   private pollsLeft = 0;
+  private loadGeneration = 0;
+  private rulesGeneration = 0;
 
   override connectedCallback() {
     // The host supplies a shellless loading fallback. Remove that unowned light-DOM
@@ -133,6 +121,8 @@ export class FoldersPage extends OpenClawLightDomElement {
     this.stopGateway?.();
     this.stopGateway = undefined;
     this.client = null;
+    this.loadGeneration += 1;
+    this.rulesGeneration += 1;
     this.connected = false;
     this.started = false;
     super.disconnectedCallback();
@@ -155,6 +145,7 @@ export class FoldersPage extends OpenClawLightDomElement {
       return;
     }
     this.loading = true;
+    const generation = ++this.loadGeneration;
     try {
       const [root, subjects] = await Promise.all([
         fetchFolderTree({
@@ -165,11 +156,17 @@ export class FoldersPage extends OpenClawLightDomElement {
         }),
         fetchFolderSubjects(client),
       ]);
+      if (generation !== this.loadGeneration || client !== this.client) {
+        return;
+      }
       this.tree = new Map([["", root]]);
       this.expanded = new Set();
       this.subjects = subjects;
       this.errorKey = undefined;
     } catch {
+      if (generation !== this.loadGeneration || client !== this.client) {
+        return;
+      }
       this.errorKey = "loadFailed";
     }
     this.loading = false;
@@ -189,9 +186,17 @@ export class FoldersPage extends OpenClawLightDomElement {
       return;
     }
     this.orphansLoading = true;
+    const generation = this.loadGeneration;
     try {
-      this.orphans = await fetchFolderOrphans(client);
+      const orphans = await fetchFolderOrphans(client);
+      if (generation !== this.loadGeneration || client !== this.client) {
+        return;
+      }
+      this.orphans = orphans;
     } catch {
+      if (generation !== this.loadGeneration || client !== this.client) {
+        return;
+      }
       this.orphans = undefined;
     }
     this.orphansLoading = false;
@@ -216,6 +221,7 @@ export class FoldersPage extends OpenClawLightDomElement {
     if (!client) {
       return;
     }
+    const generation = this.loadGeneration;
     try {
       const level = await fetchFolderTree({
         client,
@@ -223,9 +229,14 @@ export class FoldersPage extends OpenClawLightDomElement {
         ...(this.preview ? { previewSubjectKind: this.preview.kind } : {}),
         ...(this.preview ? { previewSubjectId: this.preview.id } : {}),
       });
+      if (generation !== this.loadGeneration || client !== this.client) {
+        return;
+      }
       this.tree = new Map([...this.tree, [path, level]]);
     } catch {
-      this.errorKey = "loadFailed";
+      if (generation === this.loadGeneration && client === this.client) {
+        this.errorKey = "loadFailed";
+      }
     }
   }
 
@@ -273,6 +284,7 @@ export class FoldersPage extends OpenClawLightDomElement {
       return;
     }
     this.pollsLeft -= 1;
+    const generation = this.loadGeneration;
     try {
       const root = await fetchFolderTree({
         client,
@@ -280,6 +292,10 @@ export class FoldersPage extends OpenClawLightDomElement {
         ...(this.preview ? { previewSubjectKind: this.preview.kind } : {}),
         ...(this.preview ? { previewSubjectId: this.preview.id } : {}),
       });
+      if (generation !== this.loadGeneration || client !== this.client) {
+        this.schedulePoll();
+        return;
+      }
       this.tree = new Map([...this.tree, ["", root]]);
       if (root.scan?.running) {
         this.schedulePoll();
@@ -306,12 +322,20 @@ export class FoldersPage extends OpenClawLightDomElement {
     if (!client || !canManageIxAuthUsers()) {
       return;
     }
+    const generation = ++this.rulesGeneration;
+    this.rules = undefined;
+    this.rulesLoading = true;
     try {
-      this.rules = await fetchFolderRules({ client, path });
-      this.errorKey = undefined;
+      const rules = await fetchFolderRules({ client, path });
+      if (generation === this.rulesGeneration && client === this.client) {
+        this.rules = rules;
+      }
     } catch {
-      this.rules = undefined;
-      this.errorKey = "loadFailed";
+      // The editor presents its own retry state, without hiding tree or orphan errors.
+    } finally {
+      if (generation === this.rulesGeneration && client === this.client) {
+        this.rulesLoading = false;
+      }
     }
   }
 
@@ -330,14 +354,21 @@ export class FoldersPage extends OpenClawLightDomElement {
   }
 
   private select(path: string): void {
+    if (this.busy) {
+      return;
+    }
     this.selectedPath = path;
     this.drafts = new Map();
     this.notice = undefined;
     this.userQuery = "";
+    this.applyToDescendants = false;
     void this.loadRules(path);
   }
 
   private choosePreview(preview: FolderPreview | undefined): void {
+    if (this.busy) {
+      return;
+    }
     this.preview = preview;
     // A preview changes what every already-open level would report, so the tree is read
     // again from the root rather than left as a mix of two viewpoints.
@@ -378,9 +409,9 @@ export class FoldersPage extends OpenClawLightDomElement {
       this.errorKey = String(error).includes("FORBIDDEN") ? "forbidden" : "rejected";
       return;
     }
-    this.busy = false;
     await this.loadRules(this.selectedPath);
     await this.refreshLevels();
+    this.busy = false;
   }
 
   private renderOrphansSection(): TemplateResult {
@@ -398,6 +429,8 @@ export class FoldersPage extends OpenClawLightDomElement {
             ruleCount: this.orphans?.ruleCount ?? 0,
             available: this.orphans?.available ?? true,
             loading: this.orphansLoading,
+            failed: !this.orphans && !this.orphansLoading,
+            onRetry: () => void this.loadOrphans(),
             busy: this.busy,
             confirming: this.orphansConfirming,
             onConfirm: () => {
@@ -413,18 +446,16 @@ export class FoldersPage extends OpenClawLightDomElement {
     );
   }
 
-  /**
-   * Redraw the chips a write could have moved.
-   *
-   * The row for the selected folder lives in its parent's listing, and the rows below it
-   * live in its own, so both are read again. Levels elsewhere in the tree are left alone:
-   * a rule pinned here cannot change a sibling branch, and refetching the whole tree
-   * would undo the point of loading it lazily.
-   */
+  /** Inherited permissions can change every open descendant, as well as the folder row. */
   private async refreshLevels(): Promise<void> {
     const parent = parentFolderPath(this.selectedPath);
-    for (const path of new Set([parent, this.selectedPath])) {
-      if (this.tree.has(path)) {
+    for (const path of [...this.tree.keys()]) {
+      if (
+        path === parent ||
+        path === this.selectedPath ||
+        this.selectedPath === "" ||
+        path.startsWith(`${this.selectedPath}/`)
+      ) {
         await this.loadLevel(path);
       }
     }
@@ -432,7 +463,7 @@ export class FoldersPage extends OpenClawLightDomElement {
 
   private async saveRule(kind: FolderRuleSubjectKind, id: string): Promise<void> {
     const client = this.client;
-    if (!client) {
+    if (!client || !this.connected || this.rules?.path !== this.selectedPath) {
       return;
     }
     const draft = this.draftFor(kind, id);
@@ -452,13 +483,15 @@ export class FoldersPage extends OpenClawLightDomElement {
               count: String(result.removedDescendants),
             })
           : t("ixAuth.folders.saved");
-      this.drafts = new Map();
+      const drafts = new Map(this.drafts);
+      drafts.delete(folderSubjectKey(kind, id));
+      this.drafts = drafts;
     });
   }
 
   private async removeRule(kind: FolderRuleSubjectKind, id: string): Promise<void> {
     const client = this.client;
-    if (!client) {
+    if (!client || !this.connected || this.rules?.path !== this.selectedPath) {
       return;
     }
     await this.mutate(async () => {
@@ -469,7 +502,9 @@ export class FoldersPage extends OpenClawLightDomElement {
         subjectId: id,
       });
       this.notice = t("ixAuth.folders.cleared", { count: String(result.removed) });
-      this.drafts = new Map();
+      const drafts = new Map(this.drafts);
+      drafts.delete(folderSubjectKey(kind, id));
+      this.drafts = drafts;
     });
   }
 
@@ -542,6 +577,8 @@ export class FoldersPage extends OpenClawLightDomElement {
           path: this.selectedPath,
           manage: root?.manage ?? false,
           rules: this.rules,
+          rulesLoading: this.rulesLoading,
+          onRetry: () => void this.loadRules(this.selectedPath),
           subjects: this.subjects,
           tab: this.tab,
           drafts: this.drafts,
@@ -604,6 +641,14 @@ export class FoldersPage extends OpenClawLightDomElement {
                   title: "",
                   control: html`<div class="callout danger" role="alert">
                     ${t(`ixAuth.folders.error.${this.errorKey}`)}
+                    <button
+                      type="button"
+                      class="btn"
+                      ?disabled=${this.busy || this.loading}
+                      @click=${() => void this.load()}
+                    >
+                      ${t("ixAuth.folders.retry")}
+                    </button>
                   </div>`,
                 }),
               ])

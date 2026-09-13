@@ -70,6 +70,7 @@ export type UserDetailPanelProps = {
   onDisplayNameInput: (value: string) => void;
   onSaveDisplayName: () => void;
   onRoleChange: (role: string) => void;
+  onSaveRole: () => void;
   onDepartmentToggle: (code: string, checked: boolean) => void;
   onSaveDepartments: () => void;
   onToggleStatus: () => void;
@@ -140,24 +141,38 @@ function renderRoleRow(props: UserDetailPanelProps): TemplateResult {
     canGrantSuperAdmin: props.canGrantSuperAdmin,
     currentRoles: props.user.roles,
   });
+  const disabled = props.busy || props.user.self || props.protectedTarget;
   return renderSettingsRow({
     title: t("ixAuth.users.roleLabel"),
     description: t("ixAuth.users.rolesHelp"),
     control: html`
-      <select
-        class="settings-select"
-        ?disabled=${props.busy || props.user.self || props.protectedTarget}
-        @change=${(event: Event) => {
-          // SAFETY: this listener is bound to the select element on this line.
-          props.onRoleChange((event.target as HTMLSelectElement).value);
-        }}
-      >
-        ${options.map(
-          (code) => html`<option value=${code} ?selected=${code === props.selectedRole}>
-            ${ixAuthRoleLabel(code)}
-          </option>`,
-        )}
-      </select>
+      <span class="users-actions">
+        <select
+          class="settings-select"
+          .value=${props.selectedRole}
+          ?disabled=${disabled}
+          @change=${(event: Event) => {
+            // SAFETY: this listener is bound to the select element on this line.
+            props.onRoleChange((event.target as HTMLSelectElement).value);
+          }}
+        >
+          ${options.map(
+            (code) => html`<option value=${code} ?selected=${code === props.selectedRole}>
+              ${ixAuthRoleLabel(code)}
+            </option>`,
+          )}
+        </select>
+        <button
+          class="btn"
+          ?disabled=${
+            disabled ||
+            (props.user.roles.length === 1 && props.user.roles[0] === props.selectedRole)
+          }
+          @click=${() => props.onSaveRole()}
+        >
+          ${t("ixAuth.users.saveRole")}
+        </button>
+      </span>
     `,
   });
 }

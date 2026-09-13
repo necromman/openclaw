@@ -65,6 +65,7 @@ type PanelOverrides = {
   rules?: FoldersRulesListResult | undefined;
   userQuery?: string;
   onPermission?: (kind: string, id: string, value: string) => void;
+  onRetry?: () => void;
 };
 
 function panel(overrides: PanelOverrides = {}) {
@@ -80,6 +81,7 @@ function panel(overrides: PanelOverrides = {}) {
     applyToDescendants: false,
     preview: undefined,
     busy: false,
+    onRetry: overrides.onRetry ?? (() => undefined),
     onTab: () => undefined,
     onPermission: overrides.onPermission ?? (() => undefined),
     onInherit: () => undefined,
@@ -96,6 +98,18 @@ afterEach(() => {
 });
 
 describe("folder rule panel", () => {
+  it("locks editing and offers a retry when folder rules could not be loaded", () => {
+    const onRetry = vi.fn();
+    const host = draw(panel({ rules: undefined, onRetry }));
+    expect(host.querySelectorAll(".folders-perm__button")).toHaveLength(0);
+    expect(
+      host.querySelector<HTMLInputElement>(".folders-panel__descendants input")?.disabled,
+    ).toBe(true);
+    expect(host.textContent).not.toContain(t("ixAuth.folders.effectiveNone"));
+    host.querySelector<HTMLButtonElement>(".folders-panel__warning button")?.click();
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
   it("shows the selected folder as one absolute path", () => {
     const host = draw(panel());
     expect(host.querySelector(".folders-panel__path")?.textContent?.trim()).toBe(

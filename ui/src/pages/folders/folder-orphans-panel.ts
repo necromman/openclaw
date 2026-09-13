@@ -21,6 +21,8 @@ export type FolderOrphansPanelProps = {
   ruleCount: number;
   available: boolean;
   loading: boolean;
+  failed?: boolean;
+  onRetry?: () => void;
   busy: boolean;
   /** True once the operator has pressed the button and been asked to confirm. */
   confirming: boolean;
@@ -63,6 +65,14 @@ export function renderFolderOrphansPanel(props: FolderOrphansPanelProps): Templa
   }
   if (props.loading) {
     return html`<p class="folders-orphans__empty">${t("ixAuth.folders.loading")}</p>`;
+  }
+  if (props.failed) {
+    return html`<div class="folders-orphans__empty" role="alert">
+      ${t("ixAuth.folders.error.loadFailed")}
+      <button type="button" class="btn" ?disabled=${props.busy} @click=${props.onRetry}>
+        ${t("ixAuth.folders.retry")}
+      </button>
+    </div>`;
   }
   if (props.orphans.length === 0) {
     return html`<p class="folders-orphans__empty">
