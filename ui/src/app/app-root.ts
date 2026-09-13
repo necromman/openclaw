@@ -573,7 +573,8 @@ export class OpenClawApp extends OpenClawLightDomElement {
       return html`
         <openclaw-tooltip-provider>
           ${
-            this.ixAuth.session?.user?.impersonatedBy
+            this.ixAuth.session?.user?.impersonatedBy ||
+            this.ixAuth.session?.impersonationRestoreAvailable
               ? html`<openclaw-impersonation-banner
                   .basePath=${context.basePath}
                 ></openclaw-impersonation-banner>`
