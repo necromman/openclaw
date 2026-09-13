@@ -56,7 +56,7 @@ export function readIxAuthLoginSessionById(sessionId: string): IxAuthLoginSessio
 
 /** Candidates for identity-owner revocation, including expired tokens awaiting refresh. */
 export function listUnrevokedIxAuthLoginSessions(): IxAuthLoginSessionRow[] {
-  ensureIxAuthSessionsSchema();
+  ensureIxAuthSessionsSchema({});
   const database = openOpenClawStateDatabase();
   return executeSqliteQuerySync(
     database.db,
