@@ -41,6 +41,14 @@ export function recordIxAuthLoginActivity(params: {
     ...(params.claims.displayName ? { displayName: params.claims.displayName } : {}),
     ...(gatewayRole ? { gatewayRole } : {}),
     departments: params.departments,
+    ...(params.claims.impersonatorSubject || params.claims.impersonatorEmail
+      ? {
+          impersonator: {
+            subject: params.claims.impersonatorSubject,
+            email: params.claims.impersonatorEmail,
+          },
+        }
+      : {}),
   };
   recordUserActivity({
     kind: "login",
@@ -56,10 +64,16 @@ export function recordIxAuthLogoutActivity(params: {
   deps: IxAuthHttpDependencies;
   profileId: string;
   email: string;
+  impersonator?: UserActivityAuditActor["impersonator"];
 }): void {
   recordUserActivity({
     kind: "logout",
-    actor: { source: "profile", profileId: params.profileId, email: params.email },
+    actor: {
+      source: "profile",
+      profileId: params.profileId,
+      email: params.email,
+      ...(params.impersonator ? { impersonator: params.impersonator } : {}),
+    },
     ...requestFacts(params.req, params.deps),
   });
 }

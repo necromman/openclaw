@@ -32,6 +32,10 @@ import {
   CONTROL_PLANE_RATE_LIMIT_WINDOW_MS,
 } from "./control-plane-rate-limit.js";
 import {
+  isIxAuthImpersonationManagementMethod,
+  limitIxAuthImpersonationScopes,
+} from "./ix-auth-impersonation-policy.js";
+import {
   ADMIN_SCOPE,
   authorizeOperatorScopesForMethod,
   authorizeOperatorScopesForRequiredScope,
@@ -87,7 +91,14 @@ function authorizeGatewayMethod(
   if (!role) {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${roleRaw}`);
   }
-  const scopes = client.connect.scopes ?? [];
+  const impersonating = client.internal?.ixAuthImpersonating;
+  if (impersonating && isIxAuthImpersonationManagementMethod(method)) {
+    return errorShape(
+      ErrorCodes.FORBIDDEN,
+      "대리접속 중에는 계정 및 시스템 관리를 할 수 없습니다.",
+    );
+  }
+  const scopes = limitIxAuthImpersonationScopes(client.connect.scopes ?? [], impersonating);
   if (!isRoleAuthorizedForMethod(role, method)) {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
   }

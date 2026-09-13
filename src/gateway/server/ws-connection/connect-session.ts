@@ -7,6 +7,7 @@ import {
 } from "../../../../packages/gateway-protocol/src/client-info.js";
 import { ConnectErrorDetailCodes } from "../../../../packages/gateway-protocol/src/connect-error-details.js";
 import { ErrorCodes, PROTOCOL_VERSION } from "../../../../packages/gateway-protocol/src/index.js";
+import { isIxAuthLoginSessionActive } from "../../../auth/ix-auth/ix-auth-sessions.js";
 import { getRuntimeConfig } from "../../../config/io.js";
 import { captureAuthenticatedNodePairingState } from "../../../infra/device-pairing-node-state.js";
 import { upsertPresence } from "../../../infra/system-presence.js";
@@ -27,6 +28,7 @@ import { shouldUseGatewayOwnerProfile } from "../../gateway-owner-profile.js";
 import { createAuthenticatedGitHubIdentitySync } from "../../github-user-identity.js";
 import { ixAuthConnectionFacts } from "../../ix-auth-audit-actor.js";
 import { resolveOperatorConnectionScopes } from "../../ix-auth-connection-scopes.js";
+import { isIxAuthImpersonating } from "../../ix-auth-impersonation-policy.js";
 import {
   attachGatewayLocalUserIngress,
   prepareGatewayLocalUserIngress,
@@ -251,6 +253,7 @@ export async function attachAuthenticatedGatewayConnect(
       : undefined;
   const scopes = resolveOperatorConnectionScopes({
     hasIxAuthPrincipal: ixAuthPrincipal !== undefined,
+    impersonating: isIxAuthImpersonating(ixAuthPrincipal),
     rolePolicy,
     requestedScopes: effectiveScopes.scopes,
   });
@@ -546,6 +549,16 @@ export async function attachAuthenticatedGatewayConnect(
     sendHandshakeErrorResponse(ErrorCodes.UNAVAILABLE, message);
     await releasePendingNodePairingCleanup();
     close(1011, message);
+    return;
+  }
+  if (ixAuthPrincipal && !isIxAuthLoginSessionActive(ixAuthPrincipal.loginSessionId, Date.now())) {
+    const message = "로그인 세션이 종료되었습니다. 다시 로그인해 주세요.";
+    markHandshakeFailure("ix-auth-session-ended", {});
+    sendHandshakeErrorResponse(ErrorCodes.INVALID_REQUEST, message, {
+      details: { code: ConnectErrorDetailCodes.AUTH_REQUIRED },
+    });
+    await releasePendingNodePairingCleanup();
+    close(4001, message);
     return;
   }
   if (!setClient(nextClient)) {

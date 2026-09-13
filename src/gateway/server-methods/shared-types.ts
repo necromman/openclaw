@@ -303,6 +303,7 @@ type GatewayTransportContext = {
   }) => ReadonlySet<string>;
   disconnectClientsForDevice?: (deviceId: string, opts?: { role?: string }) => void;
   disconnectClientsForUserProfile?: (profileId: string) => void;
+  disconnectClientsForIxAuthLoginSession?: (loginSessionId: string) => void;
   invalidateClientsForDevice?: (
     deviceId: string,
     opts?: { role?: string; reason?: string },

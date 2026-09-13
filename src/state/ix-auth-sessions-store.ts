@@ -46,6 +46,32 @@ export function readIxAuthLoginSessionByDigest(
   tokenDigest: Uint8Array,
   options: OpenClawStateDatabaseOptions = {},
 ): IxAuthLoginSessionRow | undefined {
+  return readIxAuthLoginSession("token_digest", tokenDigest, options);
+}
+
+/** Read the authoritative row for a connection that already proved its opaque token. */
+export function readIxAuthLoginSessionById(sessionId: string): IxAuthLoginSessionRow | undefined {
+  return readIxAuthLoginSession("id", sessionId, {});
+}
+
+/** Candidates for identity-owner revocation, including expired tokens awaiting refresh. */
+export function listUnrevokedIxAuthLoginSessions(): IxAuthLoginSessionRow[] {
+  ensureIxAuthSessionsSchema();
+  const database = openOpenClawStateDatabase();
+  return executeSqliteQuerySync(
+    database.db,
+    ixAuthSessionsDb(database.db)
+      .selectFrom("ix_auth_login_sessions")
+      .selectAll()
+      .where("revoked_at", "is", null),
+  ).rows;
+}
+
+function readIxAuthLoginSession(
+  column: "id" | "token_digest",
+  value: string | Uint8Array,
+  options: OpenClawStateDatabaseOptions,
+): IxAuthLoginSessionRow | undefined {
   ensureIxAuthSessionsSchema(options);
   const database = openOpenClawStateDatabase(options);
   return executeSqliteQuerySync(
@@ -53,7 +79,7 @@ export function readIxAuthLoginSessionByDigest(
     ixAuthSessionsDb(database.db)
       .selectFrom("ix_auth_login_sessions")
       .selectAll()
-      .where("token_digest", "=", tokenDigest)
+      .where(column, "=", value)
       .limit(1),
   ).rows[0];
 }

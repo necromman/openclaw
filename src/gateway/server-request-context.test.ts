@@ -896,6 +896,29 @@ describe("createGatewayRequestContext", () => {
     expect(unidentified.socket.close).not.toHaveBeenCalled();
   });
 
+  it("retires only the requested identity session and preserves another login for the same user", () => {
+    const sameUser = {
+      profileId: "profile-ada",
+      displayName: "Ada",
+      hasAvatar: false,
+      updatedAt: 1,
+    };
+    const clients = ["impersonation", "personal-login"].map((loginSessionId) => ({
+      ...makeGatewayClient({ connId: loginSessionId, clientId: GATEWAY_CLIENT_IDS.CONTROL_UI }),
+      authenticatedUserProfile: sameUser,
+      internal: { ixAuthLoginSessionId: loginSessionId },
+      invalidated: false,
+    }));
+    const context = createGatewayRequestContext(
+      makeContextParams({ clients: new Set(clients) as never }),
+    );
+    clients[0]!.socket.close.mockImplementation(() => expect(clients[0]!.invalidated).toBe(true));
+    context.disconnectClientsForIxAuthLoginSession?.("impersonation");
+    expect(clients[0]!.socket.close).toHaveBeenCalledWith(4001, "identity session changed");
+    expect(clients[1]!.invalidated).toBe(false);
+    expect(clients[1]!.socket.close).not.toHaveBeenCalled();
+  });
+
   it("invalidateClientsForDevice filters by role when provided", () => {
     const primary = {
       connId: "conn-primary",

@@ -18,6 +18,10 @@ import {
 } from "../../../infra/diagnostic-trace-context.js";
 import { tryBeginGatewaySuspendAdmission } from "../../../process/gateway-work-admission.js";
 import {
+  insertIxAuthLoginSession,
+  revokeIxAuthLoginSession,
+} from "../../../state/ix-auth-sessions-store.js";
+import {
   ensureProfileForEmail,
   setDisplayName,
   ensureProfileForTailscaleIdentity,
@@ -1780,6 +1784,107 @@ describe("attachGatewayWsMessageHandler post-connect health refresh", () => {
     expect(localUserIngress?.facts.invoker).toBeUndefined();
     expect(ensureProfileForEmailMock).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    "checks current IX-Auth session authority after connect preparation (revoked=%s)",
+    async (revoked) => {
+      await withGatewayTestState({ label: "ix-auth-connect-session-race" }, async () => {
+        const now = Date.now();
+        const profile = ensureProfileForEmail("target@example.test");
+        const sessionId = "login-target";
+        insertIxAuthLoginSession({
+          id: sessionId,
+          token_digest: Buffer.alloc(32, 1),
+          csrf_digest: Buffer.alloc(32, 2),
+          profile_id: profile.id,
+          identity_subject: "42",
+          identity_session_id: "identity-target",
+          identity_email: "target@example.test",
+          access_token: "verified-before-preparation",
+          refresh_token: "refresh-target",
+          access_expires_at: now + 900_000,
+          user_agent_digest: null,
+          created_at: now,
+          last_seen_at: now,
+          idle_expires_at: now + 3_600_000,
+          absolute_expires_at: now + 43_200_000,
+        });
+        resolveConnectAuthStateMock.mockResolvedValueOnce({
+          authResult: { ok: true, method: "ix-auth", user: "target@example.test" },
+          authOk: true,
+          authMethod: "ix-auth",
+          sharedAuthOk: false,
+          ixAuthPrincipal: {
+            kind: "ix-auth",
+            loginSessionId: sessionId,
+            profileId: profile.id,
+            claims: {
+              subject: "42",
+              email: "target@example.test",
+              displayName: "Target",
+              roles: ["MEMBER"],
+              groups: [],
+              identitySessionId: "identity-target",
+              expiresAtMs: now + 900_000,
+              impersonatorSubject: "1",
+            },
+            gatewayRole: "member",
+            departments: [],
+            isSuperAdmin: false,
+          },
+        });
+        const preparationStarted = createDeferred();
+        const releasePreparation = createGatewayHarnessGate();
+        prepareGatewayNodeConnectMock.mockImplementationOnce(async () => {
+          preparationStarted.resolve();
+          await releasePreparation.promise;
+          return true;
+        });
+        const close = createCloseMock();
+        const harness = attachGatewayHarness({
+          connId: "ix-auth-pending",
+          connectNonce: "ix-auth-pending",
+          resolvedAuth: { mode: "ix-auth", allowTailscale: false },
+          close,
+        });
+        harness.sendConnect("connect-ix-auth-pending", {
+          minProtocol: PROTOCOL_VERSION,
+          maxProtocol: PROTOCOL_VERSION,
+          client: { id: "openclaw-control-ui", version: "dev", platform: "test", mode: "ui" },
+          role: "operator",
+          caps: [],
+        });
+        await preparationStarted.promise;
+        if (revoked) {
+          revokeIxAuthLoginSession({
+            sessionId,
+            revokedAt: Date.now(),
+            reason: "impersonation-stopped",
+          });
+        }
+        releasePreparation.resolve();
+        if (revoked) {
+          await waitForFast(() => expect(close).toHaveBeenCalledWith(4001, expect.any(String)));
+          expect(harness.client).toBeNull();
+          expect(harness.socketSend).not.toHaveBeenCalled();
+          expect(harness.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+              ok: false,
+              error: expect.objectContaining({
+                details: { code: ConnectErrorDetailCodes.AUTH_REQUIRED },
+              }),
+            }),
+          );
+        } else {
+          await waitForFast(() => expect(harness.client).not.toBeNull());
+          expect(harness.client).toMatchObject({
+            authenticatedUserProfile: { profileId: profile.id },
+          });
+          expect(close).not.toHaveBeenCalled();
+        }
+      });
+    },
+  );
 
   it("rejects a shared-auth handshake when credentials rotate before session attachment", async () => {
     const oldAuth = {

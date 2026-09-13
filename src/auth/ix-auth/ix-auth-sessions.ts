@@ -5,17 +5,24 @@
 // and suspension immediate: revoking the row kills the session now, rather than waiting
 // out the 15-minute access-token lifetime.
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { generateSecureUuid } from "../../infra/secure-random.js";
+import type { IxAuthLoginSessionRow } from "../../state/ix-auth-sessions-schema.js";
 import {
   insertIxAuthLoginSession,
+  listUnrevokedIxAuthLoginSessions,
   readIxAuthLoginSessionByDigest,
+  readIxAuthLoginSessionById,
   revokeIxAuthLoginSession,
   touchIxAuthLoginSession,
   updateIxAuthSessionTokens,
 } from "../../state/ix-auth-sessions-store.js";
-import type { IxAuthLoginSessionRow } from "../../state/ix-auth-sessions-schema.js";
-import { relayIxAuthRefresh, type IxAuthRequestMeta, type IxAuthTokenBundle } from "./ix-auth-client.js";
 import { parseIxAuthTokenClaims, readIxAuthDepartmentCodes } from "./ix-auth-claims.js";
+import {
+  relayIxAuthRefresh,
+  type IxAuthRequestMeta,
+  type IxAuthTokenBundle,
+} from "./ix-auth-client.js";
 import { verifyIxAuthAccessToken } from "./ix-auth-jwks.js";
 import { resolveIxAuthGatewayRole } from "./ix-auth-role-map.js";
 import {
@@ -31,6 +38,52 @@ const IX_AUTH_TOKEN_BYTES = 32;
 
 function digestSecretToken(token: string): Uint8Array {
   return createHash("sha256").update(token, "utf8").digest();
+}
+
+/** Stored identity binding only; callers must separately resolve authority and check CSRF. */
+export function readIxAuthSessionTokenRow(sessionToken: string): IxAuthLoginSessionRow | undefined {
+  return readIxAuthLoginSessionByDigest(digestSecretToken(sessionToken)) ?? undefined;
+}
+
+/** Stored tokens were verified on insertion/rotation; decoding here can only revoke. */
+export function revokeIxAuthImpersonatedSessionsForActor(params: {
+  subject: string;
+  revokedAt: number;
+  reason: string;
+}): IxAuthLoginSessionRow[] {
+  const revoked: IxAuthLoginSessionRow[] = [];
+  for (const row of listUnrevokedIxAuthLoginSessions()) {
+    let actor;
+    try {
+      const payload = asOptionalRecord(
+        JSON.parse(Buffer.from(row.access_token.split(".")[1] ?? "", "base64url").toString("utf8")),
+      );
+      actor = asOptionalRecord(payload?.act);
+    } catch {
+      continue;
+    }
+    if (actor?.sub !== params.subject) continue;
+    // No asynchronous work separates selection from the store's current-row revoke.
+    revokeIxAuthLoginSession({
+      sessionId: row.id,
+      revokedAt: params.revokedAt,
+      reason: params.reason,
+    });
+    revoked.push(row);
+  }
+  return revoked;
+}
+
+/** Final synchronous admission check after all asynchronous handshake work. */
+export function isIxAuthLoginSessionActive(loginSessionId: string, nowMs: number): boolean {
+  const row = readIxAuthLoginSessionById(loginSessionId);
+  return (
+    !!row &&
+    row.revoked_at === null &&
+    row.idle_expires_at > nowMs &&
+    row.absolute_expires_at > nowMs &&
+    row.access_expires_at > nowMs
+  );
 }
 
 function digestUserAgent(userAgent: string | undefined): Uint8Array | null {
@@ -159,15 +212,46 @@ export type IxAuthSessionResolution =
  * refresh failure is terminal: the row is revoked so the caller tears the connection
  * down rather than continuing on a token the identity server has disowned.
  */
-export async function resolveIxAuthSessionToken(params: {
+type ResolveIxAuthSessionParams = {
   sessionToken: string;
   settings: IxAuthRuntimeSettings;
   meta: IxAuthRequestMeta;
   nowMs: number;
   /** Skip the idle-window write for read-only probes such as a WebSocket handshake. */
   touch?: boolean;
-}): Promise<IxAuthSessionResolution> {
-  const row = readIxAuthLoginSessionByDigest(digestSecretToken(params.sessionToken));
+};
+
+const sessionResolutions = new Map<string, Promise<void>>();
+
+/** Refresh tokens rotate once; concurrent browser probes must share the session's turn. */
+export async function resolveIxAuthSessionToken(
+  params: ResolveIxAuthSessionParams,
+): Promise<IxAuthSessionResolution> {
+  const key = Buffer.from(digestSecretToken(params.sessionToken)).toString("hex");
+  const startedAt = Date.now();
+  const previous = sessionResolutions.get(key) ?? Promise.resolve();
+  const result = previous.then(() =>
+    resolveSession({ ...params, nowMs: params.nowMs + Math.max(0, Date.now() - startedAt) }),
+  );
+  const settled = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  sessionResolutions.set(key, settled);
+  try {
+    return await result;
+  } finally {
+    if (sessionResolutions.get(key) === settled) {
+      sessionResolutions.delete(key);
+    }
+  }
+}
+
+async function resolveSession(
+  params: ResolveIxAuthSessionParams,
+): Promise<IxAuthSessionResolution> {
+  const startedAt = Date.now();
+  const row = readIxAuthSessionTokenRow(params.sessionToken);
   if (!row) {
     return { ok: false, rejection: "unknown-session" };
   }
@@ -245,6 +329,26 @@ export async function resolveIxAuthSessionToken(params: {
     return { ok: false, rejection: "identity-expired" };
   }
 
+  // Logout or an administrator may revoke the row while JWT/refresh I/O was pending.
+  // Authentication must not resurrect the earlier snapshot after those sockets closed.
+  const current = readIxAuthSessionTokenRow(params.sessionToken);
+  const currentTime = params.nowMs + Math.max(0, Date.now() - startedAt);
+  if (!current || current.revoked_at !== null) {
+    return { ok: false, rejection: "revoked" };
+  }
+  if (current.absolute_expires_at <= currentTime || current.idle_expires_at <= currentTime) {
+    return {
+      ok: false,
+      rejection: current.absolute_expires_at <= currentTime ? "absolute-expired" : "idle-expired",
+    };
+  }
+  if (
+    parsed.claims.subject !== current.identity_subject ||
+    parsed.claims.expiresAtMs <= currentTime
+  ) {
+    return { ok: false, rejection: "identity-expired" };
+  }
+
   if (rotated) {
     updateIxAuthSessionTokens({
       sessionId: row.id,
@@ -262,7 +366,7 @@ export async function resolveIxAuthSessionToken(params: {
   }
 
   const currentRow: IxAuthLoginSessionRow = {
-    ...row,
+    ...current,
     access_token: accessToken,
     access_expires_at: parsed.claims.expiresAtMs,
     refresh_token: refreshToken,

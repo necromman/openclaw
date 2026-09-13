@@ -14,9 +14,11 @@
 // definition reads `["operator.admin"]` was landing without it, which disables secret
 // mode and model account selection in the Control UI.
 //
-// So for these sessions the role definition is not the last cap, it is the whole answer.
+// The role definition supplies the grant. Impersonated sessions then lose management
+// scopes without changing the target's durable role or department access.
 import type { GatewayOperatorRoleDefinition } from "../config/types.gateway.js";
 import { roleScopesAllow } from "../shared/operator-scope-compat.js";
+import { limitIxAuthImpersonationScopes } from "./ix-auth-impersonation-policy.js";
 import {
   ADMIN_SCOPE,
   APPROVALS_SCOPE,
@@ -79,6 +81,7 @@ export function resolveIxAuthConnectionScopes(
  */
 export function resolveOperatorConnectionScopes(params: {
   hasIxAuthPrincipal: boolean;
+  impersonating?: boolean;
   rolePolicy: GatewayOperatorRoleDefinition | undefined;
   requestedScopes: string[];
 }): string[] {
@@ -86,13 +89,16 @@ export function resolveOperatorConnectionScopes(params: {
     ? resolveIxAuthConnectionScopes(params.rolePolicy)
     : undefined;
   if (ixAuthScopes) {
-    return ixAuthScopes;
+    return limitIxAuthImpersonationScopes(ixAuthScopes, params.impersonating);
   }
   const allowedScopes = params.rolePolicy?.scopes;
   if (!allowedScopes) {
-    return params.requestedScopes;
+    return limitIxAuthImpersonationScopes(params.requestedScopes, params.impersonating);
   }
-  return params.requestedScopes.filter((scope) =>
-    roleScopesAllow({ role: "operator", requestedScopes: [scope], allowedScopes }),
+  return limitIxAuthImpersonationScopes(
+    params.requestedScopes.filter((scope) =>
+      roleScopesAllow({ role: "operator", requestedScopes: [scope], allowedScopes }),
+    ),
+    params.impersonating,
   );
 }

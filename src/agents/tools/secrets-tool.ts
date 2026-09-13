@@ -228,6 +228,7 @@ function listSecretStoreResult(result: SecretsStoreListResult) {
 /** Creates the metadata-only secret-store tool and its human-entered write flow. */
 export function createSecretsTool(params: {
   config?: OpenClawConfig;
+  senderIsOwner?: boolean;
   agentId?: string;
   sessionKey?: string;
   runId?: string;
@@ -246,7 +247,7 @@ export function createSecretsTool(params: {
   return {
     label: "Secrets",
     name: "secrets",
-    description: describeSecretsTool(),
+    description: `${describeSecretsTool()} Deleting a team secret requires the requesting user's administrator authority.`,
     parameters: SecretsToolSchema,
     execute: async (toolCallId, args, signal) => {
       if (!isRecord(args)) {
@@ -258,6 +259,13 @@ export function createSecretsTool(params: {
         return listSecretStoreResult(await fetchSecretStore(gatewayCall, signal));
       }
       if (action === "delete") {
+        if (params.senderIsOwner !== true) {
+          return jsonResult({
+            ok: false,
+            code: "owner_required",
+            message: "팀 비밀 삭제는 관리자 권한이 필요합니다. 대리접속 중에는 삭제할 수 없습니다.",
+          });
+        }
         const name = readSecretStoreName(input);
         const result = await gatewayCall(
           "secrets.store.delete",

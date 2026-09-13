@@ -123,6 +123,24 @@ function stubUpstream(response: Response): { calls: Array<{ url: string; init: R
 }
 
 describe("handleIxAuthAdminProxyRequest", () => {
+  it.each(["impersonatorSubject", "impersonatorEmail"] as const)(
+    "refuses an impersonated superadmin carrying %s before any upstream call",
+    async (actorClaim) => {
+      const { calls } = stubUpstream(new Response("should not be requested"));
+      const captured = buildResponse();
+      const principal = buildPrincipal("superadmin");
+      principal.claims[actorClaim] = "actual-admin";
+      await handleIxAuthAdminProxyRequest({
+        req: buildRequest({}),
+        res: captured.res,
+        pathname: "/admin/identity/",
+        deps: buildDeps({ principal }),
+      });
+      expect(captured.status()).toBe(403);
+      expect(calls).toHaveLength(0);
+    },
+  );
+
   it("refuses a member session and never reaches the identity server", async () => {
     const { calls } = stubUpstream(new Response("should not be requested"));
     const captured = buildResponse();

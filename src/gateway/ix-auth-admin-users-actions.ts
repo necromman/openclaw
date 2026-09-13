@@ -363,7 +363,7 @@ async function handleReplaceDepartments(params: ActionParams): Promise<void> {
  */
 async function handlePasswordReset(params: ActionParams): Promise<void> {
   const target = await loadTarget(params);
-  if (!target) {
+  if (!target || rejectSuperAdminTarget({ ...params, target })) {
     return;
   }
   const requested = await relayIxAuthPasswordForgot({
@@ -388,7 +388,7 @@ async function handlePasswordReset(params: ActionParams): Promise<void> {
 /** Send the invitation again, and hand back its link where there is no mail server. */
 async function handleResendInvite(params: ActionParams): Promise<void> {
   const target = await loadTarget(params);
-  if (!target) {
+  if (!target || rejectSuperAdminTarget({ ...params, target })) {
     return;
   }
   const resent = await resendIxAuthInvite({ ...params.admin.call, userId: params.userId });

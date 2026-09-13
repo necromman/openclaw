@@ -3,6 +3,7 @@
 // Owns the lazy-load handling for the sign-in element so the application shell keeps a
 // single call at its decision point.
 import { html, type TemplateResult } from "lit";
+import "./impersonation-banner.ts";
 import {
   IX_AUTH_LOGIN_ELEMENT,
   isOptionalElementDefined,
@@ -29,6 +30,7 @@ export type IxAuthGateViewParams = {
   session: IxAuthSessionState | undefined;
   loader: LazyCustomElementRequestController;
   resourceBasePath: string;
+  basePath: string;
   state: IxAuthFormState;
   onChange: (next: IxAuthFormState) => void;
   onSubmit: () => void;
@@ -45,6 +47,11 @@ export type IxAuthGateViewParams = {
 export function renderIxAuthGate(params: IxAuthGateViewParams): TemplateResult {
   if (params.session === undefined) {
     return html`<openclaw-tooltip-provider>${params.renderPending()}</openclaw-tooltip-provider>`;
+  }
+  if (params.session.impersonationRestoreAvailable || params.session.user?.impersonatedBy) {
+    return html`<main class="connect-splash">
+      <openclaw-impersonation-banner .basePath=${params.basePath}></openclaw-impersonation-banner>
+    </main>`;
   }
   if (!isOptionalElementDefined(IX_AUTH_LOGIN_ELEMENT)) {
     const loadState = params.loader.visibleState;

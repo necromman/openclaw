@@ -31,6 +31,8 @@ export type UserActivityAuditActor = {
   displayName?: string;
   gatewayRole?: string;
   departments?: readonly string[];
+  /** Verified administrator acting as this account; stored in the existing event detail. */
+  impersonator?: { subject?: string; email?: string };
 };
 
 export type UserActivityAuditAppend = {
@@ -98,21 +100,26 @@ function boundedText(value: string | undefined): string | null {
  * An oversized detail is replaced rather than truncated mid-string: a half JSON document
  * would fail to parse on read and the whole row would be unreadable.
  */
-function serializeDetail(detail: Record<string, unknown> | undefined): string {
-  if (!detail) {
-    return "{}";
-  }
+function serializeDetail(
+  detail: Record<string, unknown> | undefined,
+  actor: UserActivityAuditActor,
+): string {
+  const attribution = actor.impersonator
+    ? {
+        impersonator: {
+          subject: boundedText(actor.impersonator.subject),
+          email: boundedText(actor.impersonator.email),
+        },
+      }
+    : {};
   let encoded: string;
   try {
-    encoded = JSON.stringify(detail);
+    encoded = JSON.stringify({ ...detail, ...attribution });
   } catch {
-    return JSON.stringify({ error: "detail_not_serializable" });
-  }
-  if (encoded === undefined) {
-    return "{}";
+    return JSON.stringify({ error: "detail_not_serializable", ...attribution });
   }
   return encoded.length > MAX_DETAIL_CHARS
-    ? JSON.stringify({ error: "detail_too_large", bytes: encoded.length })
+    ? JSON.stringify({ error: "detail_too_large", bytes: encoded.length, ...attribution })
     : encoded;
 }
 
@@ -190,7 +197,7 @@ export function appendUserActivityAuditEvent(
             departments: JSON.stringify([...(append.actor.departments ?? [])]),
             session_key: boundedText(append.sessionKey),
             agent_id: boundedText(append.agentId),
-            detail: serializeDetail(append.detail),
+            detail: serializeDetail(append.detail, append.actor),
             remote_ip: boundedText(append.remoteIp),
             user_agent: boundedText(append.userAgent),
             request_id: boundedText(append.requestId),

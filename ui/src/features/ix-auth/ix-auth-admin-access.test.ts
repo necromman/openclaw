@@ -26,15 +26,31 @@ describe("isIxAuthAdminRole", () => {
     expect(isIxAuthAdminRole(role)).toBe(true);
   });
 
-  it.each(["executive", "moderator", "member", "", "ADMIN", undefined])(
-    "refuses %s",
-    (role) => {
-      expect(isIxAuthAdminRole(role)).toBe(false);
-    },
-  );
+  it.each(["executive", "moderator", "member", "", "ADMIN", undefined])("refuses %s", (role) => {
+    expect(isIxAuthAdminRole(role)).toBe(false);
+  });
 });
 
 describe("what the session probe records", () => {
+  it.each(["admin", "superadmin"])(
+    "hides management tools when impersonating %s",
+    async (gatewayRole) => {
+      stubProbeResponse({
+        authMode: "ix-auth",
+        authenticated: true,
+        user: {
+          profileId: "target-profile",
+          email: "target@example.test",
+          gatewayRole,
+          isSuperAdmin: gatewayRole === "superadmin",
+          impersonatedBy: "operator@example.test",
+        },
+      });
+      await probeIxAuthSession("");
+      expect(canManageIxAuthUsers()).toBe(false);
+      expect(canManageIxAuthDepartments()).toBe(false);
+    },
+  );
   // The regression this file exists for. The Gateway sends the console URL to a superadmin
   // and to nobody else, and the flag used to be read from its presence, so an ordinary
   // administrator was shut out of the user and audit screens the Gateway serves them.

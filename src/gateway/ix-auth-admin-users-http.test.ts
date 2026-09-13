@@ -6,7 +6,10 @@ import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { resetIxAuthJwksCache } from "../auth/ix-auth/ix-auth-jwks.js";
 import { IX_AUTH_DEFAULT_ROLE_MAP } from "../auth/ix-auth/ix-auth-role-map.js";
 import type { IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
-import { insertIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
+import {
+  insertIxAuthLoginSession,
+  readIxAuthLoginSessionById,
+} from "../state/ix-auth-sessions-store.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
 import { ensureProfileForEmail, listProfiles } from "../state/user-profiles.js";
 import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
@@ -62,11 +65,19 @@ function digestSecretToken(token: string): Uint8Array {
 type SeededSession = { cookie: string };
 
 /** Write a real login session row and return the cookie that resolves it. */
-function seedSession(params: { roles: string[]; sessionToken: string }): SeededSession {
+function seedSession(params: {
+  roles: string[];
+  sessionToken: string;
+  subject?: string;
+  actor?: string;
+}): SeededSession {
   const nowMs = Date.now();
+  const subject = params.subject ?? ACTOR_USER_ID;
+  const email = params.subject ? `${subject}@example.test` : "admin@example.test";
   const accessToken = signAccessToken({
-    sub: ACTOR_USER_ID,
-    email: "admin@example.test",
+    sub: subject,
+    email,
+    ...(params.actor ? { act: { sub: params.actor } } : {}),
     name: "Admin Person",
     ixauth_roles: params.roles,
     ixauth_groups: ["dept-rnd"],
@@ -79,12 +90,12 @@ function seedSession(params: { roles: string[]; sessionToken: string }): SeededS
     token_digest: digestSecretToken(params.sessionToken),
     csrf_digest: digestSecretToken(CSRF_TOKEN),
     profile_id: "profile-1",
-    identity_subject: ACTOR_USER_ID,
+    identity_subject: subject,
     identity_session_id: "identity-session-1",
-    identity_email: "admin@example.test",
+    identity_email: email,
     access_token: accessToken,
     access_expires_at: nowMs + 900_000,
-    refresh_token: "refresh-1",
+    refresh_token: params.actor ? `refresh-${params.sessionToken}` : "refresh-1",
     user_agent_digest: null,
     created_at: nowMs,
     last_seen_at: nowMs,
@@ -260,6 +271,7 @@ const USER_ROUTES: ReadonlyArray<{ method: string; pathname: string }> = [
   { method: "PUT", pathname: `/auth/admin/users/${TARGET_USER_ID}/roles` },
   { method: "PUT", pathname: `/auth/admin/users/${TARGET_USER_ID}/departments` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/folder-subject` },
+  { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/impersonate` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/password-reset` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/invite` },
   { method: "POST", pathname: `/auth/admin/users/${TARGET_USER_ID}/unlock` },
@@ -322,7 +334,7 @@ describe("user management admission", () => {
     stubIdentityServer({});
     const answer = await callAdmin({
       method: "POST",
-      pathname: `/auth/admin/users/${TARGET_USER_ID}/impersonate`,
+      pathname: `/auth/admin/users/${TARGET_USER_ID}/unknown-action`,
       headers: adminHeaders(session),
       body: {},
     });
@@ -606,30 +618,56 @@ describe("rank protection", () => {
 });
 
 describe("session takedown", () => {
-  it("ends Gateway sessions and closes sockets when an account is disabled", async () => {
-    const session = seedSession({ roles: ["SUPERADMIN"], sessionToken: "super-session" });
-    seedTargetSession();
-    const disconnected: string[] = [];
-    stubIdentityServer({
-      [`GET /admin/users/${TARGET_USER_ID}`]: () => jsonResponse({ data: userView() }),
-      [`PATCH /admin/users/${TARGET_USER_ID}`]: () =>
-        jsonResponse({ data: userView({ status: "DISABLED" }) }),
-      [`DELETE /admin/users/${TARGET_USER_ID}/sessions`]: () =>
-        jsonResponse({ data: { revoked: 1 } }),
-    });
-    const answer = await callAdmin({
-      method: "PATCH",
-      pathname: `/auth/admin/users/${TARGET_USER_ID}`,
-      headers: adminHeaders(session),
-      body: { status: "DISABLED" },
-      deps: buildDeps({
-        disconnectClientsForUserProfile: (profileId) => disconnected.push(profileId),
-      }),
-    });
-    expect(answer.status()).toBe(200);
-    expect(disconnected).toEqual(["profile-target"]);
-    expect(JSON.parse(answer.body()).sessions.gatewaySessions).toBe(1);
-  });
+  it.each([
+    { method: "PATCH", suffix: "", body: { status: "DISABLED" } },
+    { method: "PUT", suffix: "/roles", body: { roles: ["MEMBER"] } },
+  ])(
+    "ends the account and its delegated sessions after $method $suffix",
+    async ({ method, suffix, body }) => {
+      const session = seedSession({ roles: ["SUPERADMIN"], sessionToken: "super-session" });
+      seedTargetSession();
+      for (const [sessionToken, actor] of [
+        ["colleague-self", undefined],
+        ["colleague-delegated", TARGET_USER_ID],
+        ["colleague-other-actor", ACTOR_USER_ID],
+      ] as const) {
+        seedSession({ roles: ["SUPERADMIN"], sessionToken, subject: "colleague", actor });
+      }
+      const disconnected: string[] = [];
+      const exactDisconnect = vi.fn();
+      const calls = stubIdentityServer({
+        [`GET /admin/users/${TARGET_USER_ID}`]: () =>
+          jsonResponse({ data: userView({ roles: ["ADMIN"] }) }),
+        [`${method} /admin/users/${TARGET_USER_ID}${suffix}`]: () =>
+          jsonResponse({ data: userView(body) }),
+        [`DELETE /admin/users/${TARGET_USER_ID}/sessions`]: () =>
+          jsonResponse({ data: { revoked: 1 } }),
+        "POST /auth/logout": () => new Response(null, { status: 204 }),
+      });
+      const answer = await callAdmin({
+        method,
+        pathname: `/auth/admin/users/${TARGET_USER_ID}${suffix}`,
+        headers: adminHeaders(session),
+        body,
+        deps: buildDeps({
+          disconnectClientsForUserProfile: (profileId) => disconnected.push(profileId),
+          disconnectClientsForIxAuthLoginSession: exactDisconnect,
+        }),
+      });
+      expect(answer.status()).toBe(200);
+      expect(disconnected).toEqual(["profile-target"]);
+      expect(JSON.parse(answer.body()).sessions.gatewaySessions).toBe(2);
+      expect(readIxAuthLoginSessionById("session-colleague-delegated")?.revoked_at).not.toBeNull();
+      expect(readIxAuthLoginSessionById("session-colleague-self")?.revoked_at).toBeNull();
+      expect(readIxAuthLoginSessionById("session-colleague-other-actor")?.revoked_at).toBeNull();
+      expect(exactDisconnect.mock.calls).toEqual([["session-colleague-delegated"]]);
+      expect(
+        calls
+          .filter((call) => call.path === "/auth/logout")
+          .map((call) => JSON.parse(call.body).refreshToken),
+      ).toEqual(["refresh-colleague-delegated"]);
+    },
+  );
 
   it("never returns a password-reset link", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
@@ -646,6 +684,24 @@ describe("session takedown", () => {
     expect(answer.status()).toBe(200);
     expect(answer.body()).not.toContain("link");
   });
+
+  it.each(["password-reset", "invite"])(
+    "keeps superadmin credentials protected on %s",
+    async (action) => {
+      const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+      const calls = stubIdentityServer({
+        [`GET /admin/users/${TARGET_USER_ID}`]: () =>
+          jsonResponse({ data: userView({ roles: ["SUPERADMIN"] }) }),
+      });
+      const answer = await callAdmin({
+        method: "POST",
+        pathname: `/auth/admin/users/${TARGET_USER_ID}/${action}`,
+        headers: adminHeaders(session),
+      });
+      expect(answer.status()).toBe(403);
+      expect(calls.every((call) => call.method === "GET")).toBe(true);
+    },
+  );
 });
 
 describe("departments", () => {

@@ -10,6 +10,7 @@ export type IxAuthHttpRoute =
   | "login"
   | "mfa"
   | "logout"
+  | "impersonation-stop"
   | "refresh"
   | "me"
   | "signup"
@@ -58,6 +59,7 @@ export type IxAuthAdminUsersTarget =
 
 /** Per-account operations, each its own path segment. */
 type IxAuthAdminUserAction =
+  | "impersonate"
   | "roles"
   | "departments"
   | "folder-subject"
@@ -68,6 +70,7 @@ type IxAuthAdminUserAction =
   | "sessions";
 
 const IX_AUTH_ADMIN_USER_ACTIONS: ReadonlySet<string> = new Set([
+  "impersonate",
   "roles",
   "departments",
   "folder-subject",
@@ -137,6 +140,8 @@ export function classifyIxAuthHttpPath(pathname: string): IxAuthHttpRoute {
       return "mfa";
     case "/auth/logout":
       return "logout";
+    case "/auth/impersonation/stop":
+      return "impersonation-stop";
     case "/auth/refresh":
       return "refresh";
     case "/auth/me":

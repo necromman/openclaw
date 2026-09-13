@@ -5,36 +5,23 @@
 // opaque session cookie. Access and refresh tokens stay in this process.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
-import { readIxAuthDepartmentCodes } from "../auth/ix-auth/ix-auth-claims.js";
 import {
   relayIxAuthLogin,
   relayIxAuthLogout,
   relayIxAuthMfaVerify,
   type IxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-client.js";
-import { syncIxAuthDepartments } from "../auth/ix-auth/ix-auth-departments.js";
 import { canOpenIxAuthAdminConsole } from "../auth/ix-auth/ix-auth-role-map.js";
 import { projectIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-projection.js";
 import {
   matchesIxAuthCsrfDigest,
-  persistIxAuthLoginSession,
   resolveIxAuthSessionToken,
   verifyIxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-sessions.js";
-import {
-  IX_AUTH_CSRF_HEADER_NAME,
-  type IxAuthRuntimeSettings,
-} from "../auth/ix-auth/ix-auth-types.js";
+import { IX_AUTH_CSRF_HEADER_NAME } from "../auth/ix-auth/ix-auth-types.js";
 import { revokeIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
-import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET } from "./auth-rate-limit.js";
-import {
-  appendGatewayClearCookie,
-  appendGatewaySetCookie,
-  readRequestCookieValue,
-  serializeGatewaySetCookie,
-  type GatewayCookieAttributes,
-} from "./cookie-header.js";
+import { readRequestCookieValue } from "./cookie-header.js";
 import { sendJson } from "./http-common.js";
 import {
   recordIxAuthLoginActivity,
@@ -56,106 +43,22 @@ import {
   rejectDisallowedOrigin,
   type IxAuthHttpDependencies,
 } from "./ix-auth-http-shared.js";
+import { readIxAuthImpersonationReturnBinding } from "./ix-auth-impersonation-http.js";
+import { isIxAuthImpersonating } from "./ix-auth-impersonation-policy.js";
+import {
+  clearIxAuthReturnSession,
+  readIxAuthReturnSession,
+  clearIxAuthSessionCookies,
+  resolveEffectiveCookieName,
+  writeIxAuthSessionCookies,
+} from "./ix-auth-session-cookies.js";
+import { createIxAuthBrowserSession } from "./ix-auth-session-login.js";
 import { withSerializedRateLimitAttempt } from "./rate-limit-attempt-serialization.js";
 
 export { isAllowedIxAuthBrowserOrigin } from "./ix-auth-http-shared.js";
 
 /** Built-in console route, trailing slash included so the page derives its own base. */
 const IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH = `${IX_AUTH_ADMIN_PROXY_BASE_PATH}/`;
-
-function buildSessionCookieAttributes(params: {
-  isSecureContext: boolean;
-  maxAgeSeconds?: number;
-}): GatewayCookieAttributes {
-  return {
-    path: "/",
-    httpOnly: true,
-    // A __Host- cookie requires Secure. Plain-HTTP loopback development therefore falls
-    // back to an unprefixed name; serializeGatewaySetCookie enforces the rest.
-    secure: params.isSecureContext,
-    // Lax keeps top-level navigations working while blocking cross-site form posts. It is
-    // a backstop: the CSRF token below is the actual defense.
-    sameSite: "Lax",
-    maxAgeSeconds: params.maxAgeSeconds,
-  };
-}
-
-/**
- * Resolve the cookie name actually used.
- *
- * `__Host-` prefixed cookies are silently dropped by browsers over plain HTTP, which
- * would make loopback development look like a broken login rather than a policy choice.
- */
-function resolveEffectiveCookieName(settings: IxAuthRuntimeSettings, isSecureContext: boolean) {
-  if (isSecureContext || !settings.cookieName.startsWith("__Host-")) {
-    return settings.cookieName;
-  }
-  return settings.cookieName.slice("__Host-".length);
-}
-
-/**
- * Name of the companion cookie holding the CSRF token.
- *
- * The session cookie is HttpOnly so script cannot read it. The CSRF token must be
- * readable by the Control UI to echo it in a header, so it rides in a separate,
- * script-visible cookie. That is the standard double-submit shape, hardened here by
- * also checking the presented token against a per-session digest on the server, so a
- * forged cookie pair alone is not enough.
- */
-function resolveCsrfCookieName(sessionCookieName: string): string {
-  return `${sessionCookieName}-csrf`;
-}
-
-/** Write the session cookie and its companion CSRF cookie in one place. */
-function writeIxAuthSessionCookies(params: {
-  res: ServerResponse;
-  deps: IxAuthHttpDependencies;
-  session: { sessionToken: string; csrfToken: string };
-}): void {
-  const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
-  const maxAgeSeconds = Math.floor(params.deps.settings.absoluteTimeoutMs / 1000);
-  appendGatewaySetCookie(
-    params.res,
-    serializeGatewaySetCookie({
-      name: cookieName,
-      value: params.session.sessionToken,
-      attributes: buildSessionCookieAttributes({
-        isSecureContext: params.deps.isSecureContext,
-        maxAgeSeconds,
-      }),
-    }),
-  );
-  appendGatewaySetCookie(
-    params.res,
-    serializeGatewaySetCookie({
-      name: resolveCsrfCookieName(cookieName),
-      value: params.session.csrfToken,
-      attributes: {
-        ...buildSessionCookieAttributes({
-          isSecureContext: params.deps.isSecureContext,
-          maxAgeSeconds,
-        }),
-        httpOnly: false,
-      },
-    }),
-  );
-}
-
-/** Expire both cookies so a rejected or ended session leaves nothing behind. */
-function clearIxAuthSessionCookies(params: {
-  res: ServerResponse;
-  deps: IxAuthHttpDependencies;
-}): void {
-  const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
-  const attributes = buildSessionCookieAttributes({
-    isSecureContext: params.deps.isSecureContext,
-  });
-  appendGatewayClearCookie(params.res, { name: cookieName, attributes });
-  appendGatewayClearCookie(params.res, {
-    name: resolveCsrfCookieName(cookieName),
-    attributes: { ...attributes, httpOnly: false },
-  });
-}
 
 async function completeIxAuthLogin(params: {
   req: IncomingMessage;
@@ -184,18 +87,12 @@ async function completeIxAuthLogin(params: {
     return;
   }
 
-  let session;
-  let profileId: string;
+  let created;
   try {
-    // The Gateway profile is keyed off the verified email so display name, avatar, and
-    // operator role continue to live in user_profiles, unchanged by this mode. The
-    // profile is only touched after the token proved genuine.
-    profileId = ensureProfileForEmail(verified.claims.email).id;
-    session = persistIxAuthLoginSession({
+    created = createIxAuthBrowserSession({
       tokens: params.tokens,
       claims: verified.claims,
       settings: deps.settings,
-      profileId,
       userAgent,
       nowMs,
     });
@@ -203,24 +100,8 @@ async function completeIxAuthLogin(params: {
     sendJson(res, 500, { error: "session_persist_failed" });
     return;
   }
-
-  // Projected after the session row exists so a projection failure cannot leave a login
-  // half-finished; the boundary itself reads the token, not this table.
-  const departments = readIxAuthDepartmentCodes({
-    groups: session.claims.groups,
-    prefix: deps.settings.departmentGroupPrefix,
-  });
-  syncIxAuthDepartments({ profileId, departments, nowMs });
-  // The mapped rank has to reach the durable profile too. Everything after the
-  // handshake (operator scopes, the session-others cap, the agent allowlist) reads the
-  // role off `user_profiles`, so leaving it unwritten silently applies the default role
-  // to an administrator.
-  projectIxAuthGatewayRole({
-    profileId,
-    roles: session.claims.roles,
-    settings: deps.settings,
-  });
-
+  const { session, profileId, departments } = created;
+  clearIxAuthReturnSession(res, deps);
   writeIxAuthSessionCookies({ res, deps, session });
   deps.onSecurityEvent?.({
     action: "ix-auth.login.succeeded",
@@ -357,10 +238,16 @@ async function handleIxAuthLogoutRoute(params: {
   res: ServerResponse;
   deps: IxAuthHttpDependencies;
 }): Promise<void> {
+  if (readIxAuthImpersonationReturnBinding(params.req, params.deps)) {
+    const impersonation = await import("./ix-auth-impersonation-http.js");
+    await impersonation.stopIxAuthImpersonation(params, false);
+    return;
+  }
   const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
   const sessionToken = readRequestCookieValue(params.req, cookieName);
-  clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
   if (!sessionToken) {
+    clearIxAuthReturnSession(params.res, params.deps);
+    clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
     sendJson(params.res, 200, { authenticated: false });
     return;
   }
@@ -412,8 +299,18 @@ async function handleIxAuthLogoutRoute(params: {
       deps: params.deps,
       profileId: resolution.row.profile_id,
       email: resolution.principal.claims.email,
+      ...(isIxAuthImpersonating(resolution.principal)
+        ? {
+            impersonator: {
+              subject: resolution.principal.claims.impersonatorSubject,
+              email: resolution.principal.claims.impersonatorEmail,
+            },
+          }
+        : {}),
     });
   }
+  clearIxAuthReturnSession(params.res, params.deps);
+  clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
   sendJson(params.res, 200, { authenticated: false });
 }
 
@@ -423,6 +320,10 @@ async function handleIxAuthSessionProbeRoute(params: {
   deps: IxAuthHttpDependencies;
   refresh: boolean;
 }): Promise<void> {
+  const returnBinding = readIxAuthImpersonationReturnBinding(params.req, params.deps);
+  if (!returnBinding && readIxAuthReturnSession(params.req, params.deps)) {
+    clearIxAuthReturnSession(params.res, params.deps);
+  }
   const cookieName = resolveEffectiveCookieName(params.deps.settings, params.deps.isSecureContext);
   const sessionToken = readRequestCookieValue(params.req, cookieName);
   // Declared once so the unauthenticated body is byte-identical whether the cookie was
@@ -431,6 +332,7 @@ async function handleIxAuthSessionProbeRoute(params: {
     authenticated: false;
     authMode: "ix-auth";
     selfSignupEnabled: boolean;
+    impersonationRestoreAvailable?: boolean;
     adminConsoleUrl?: string;
   } = {
     authenticated: false,
@@ -438,6 +340,7 @@ async function handleIxAuthSessionProbeRoute(params: {
     // Told to every visitor, signed in or not: the sign-in screen needs it before anyone
     // has an identity, and it says nothing about who exists.
     selfSignupEnabled: params.deps.settings.selfSignupEnabled,
+    ...(returnBinding ? { impersonationRestoreAvailable: true } : {}),
   };
   if (!sessionToken) {
     sendJson(params.res, 200, unauthenticated);
@@ -451,7 +354,9 @@ async function handleIxAuthSessionProbeRoute(params: {
     touch: params.refresh,
   });
   if (!resolution.ok) {
-    clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
+    if (!returnBinding) {
+      clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
+    }
     params.deps.onSecurityEvent?.({
       action: "ix-auth.session.rejected",
       outcome: "denied",
@@ -476,12 +381,13 @@ async function handleIxAuthSessionProbeRoute(params: {
     selfSignupEnabled: params.deps.settings.selfSignupEnabled,
     // Withheld from the payload rather than hidden in the browser, so a non-administrator
     // never receives the URL in the first place.
-    adminConsoleUrl: canOpenIxAuthAdminConsole(principal.gatewayRole)
-      ? // The Gateway proxies the console at a route of its own, so the default needs no
-        // configuration and no second host name. `adminConsoleUrl` remains an override
-        // for a deployment that publishes the console separately.
-        (params.deps.settings.adminConsoleUrl ?? IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH)
-      : undefined,
+    adminConsoleUrl:
+      !isIxAuthImpersonating(principal) && canOpenIxAuthAdminConsole(principal.gatewayRole)
+        ? // The Gateway proxies the console at a route of its own, so the default needs no
+          // configuration and no second host name. `adminConsoleUrl` remains an override
+          // for a deployment that publishes the console separately.
+          (params.deps.settings.adminConsoleUrl ?? IX_AUTH_ADMIN_PROXY_BASE_PATH_WITH_SLASH)
+        : undefined,
     user: {
       profileId: principal.profileId,
       email: principal.claims.email,
@@ -491,7 +397,7 @@ async function handleIxAuthSessionProbeRoute(params: {
       gatewayRole: principal.gatewayRole,
       departments: principal.departments,
       isSuperAdmin: principal.isSuperAdmin,
-      impersonatedBy: principal.claims.impersonatorEmail,
+      impersonatedBy: principal.claims.impersonatorEmail ?? principal.claims.impersonatorSubject,
     },
   });
 }
@@ -504,6 +410,7 @@ const IX_AUTH_ROUTE_METHODS: ReadonlyMap<IxAuthHttpRoute, ReadonlySet<string>> =
   ["login", new Set(["POST"])],
   ["mfa", new Set(["POST"])],
   ["logout", new Set(["POST"])],
+  ["impersonation-stop", new Set(["POST"])],
   ["refresh", new Set(["POST"])],
   ["me", new Set(["GET"])],
   ["signup", new Set(["POST"])],
@@ -610,6 +517,11 @@ export async function handleIxAuthHttpRequest(params: {
   }
   if (route === "logout") {
     await handleIxAuthLogoutRoute(params);
+    return true;
+  }
+  if (route === "impersonation-stop") {
+    const impersonation = await import("./ix-auth-impersonation-http.js");
+    await impersonation.stopIxAuthImpersonation(params);
     return true;
   }
   if (isIxAuthAdminAccountRoute(route)) {

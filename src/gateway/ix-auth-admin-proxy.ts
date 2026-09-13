@@ -36,6 +36,7 @@ import {
   resolveIxAuthAdminProxyUpstreamPath,
 } from "./ix-auth-http-paths.js";
 import { isAllowedIxAuthBrowserOrigin } from "./ix-auth-http.js";
+import { isIxAuthImpersonating } from "./ix-auth-impersonation-policy.js";
 
 /** The console posts small JSON. A bulk import is the largest realistic body. */
 const IX_AUTH_ADMIN_PROXY_MAX_REQUEST_BYTES = 4 * 1024 * 1024;
@@ -408,13 +409,15 @@ function rejectDisallowedRequest(params: {
     });
     return true;
   }
-  if (!canOpenIxAuthAdminConsole(principal.gatewayRole)) {
+  if (isIxAuthImpersonating(principal) || !canOpenIxAuthAdminConsole(principal.gatewayRole)) {
     sendIxAuthAdminProxyDenial({
       req: params.req,
       res: params.res,
       status: 403,
       error: "forbidden",
-      message: "이 화면은 시스템 관리자만 열 수 있다.",
+      message: isIxAuthImpersonating(principal)
+        ? "대리접속 중에는 관리자 화면을 열 수 없습니다. 원래 계정으로 돌아간 뒤 이용해 주세요."
+        : "이 화면은 시스템 관리자만 열 수 있다.",
     });
     return true;
   }

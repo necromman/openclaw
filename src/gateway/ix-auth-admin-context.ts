@@ -28,6 +28,7 @@ import {
 import { IX_AUTH_CSRF_HEADER_NAME, type IxAuthPrincipal } from "../auth/ix-auth/ix-auth-types.js";
 import { sendJson } from "./http-common.js";
 import { readRequestMeta, type IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
+import { isIxAuthImpersonating } from "./ix-auth-impersonation-policy.js";
 import { readIxAuthSessionCookie } from "./ix-auth-principal.js";
 
 /** One resolved administrator, ready to act against the identity server. */
@@ -87,6 +88,10 @@ export async function resolveIxAuthAdminContext(params: {
     : undefined;
   if (!resolution?.ok) {
     sendJson(params.res, 401, { error: "unauthenticated" });
+    return undefined;
+  }
+  if (isIxAuthImpersonating(resolution.principal)) {
+    sendJson(params.res, 403, { error: "impersonation_forbidden" });
     return undefined;
   }
   if (!canUseIxAuthAdminApi(resolution.principal.gatewayRole)) {

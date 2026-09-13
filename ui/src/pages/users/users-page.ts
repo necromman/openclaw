@@ -25,6 +25,7 @@ import {
   deleteIxAuthUser,
   fetchIxAuthUserDetail,
   fetchIxAuthUsers,
+  impersonateIxAuthUser,
   isIxAuthUsersFailure,
   replaceIxAuthUserDepartments,
   replaceIxAuthUserRoles,
@@ -491,6 +492,7 @@ export class UsersPage extends OpenClawLightDomElement {
       selectedDepartments: this.selectedDepartments,
       busy: this.busy,
       canGrantSuperAdmin: this.session?.user?.isSuperAdmin === true,
+      onImpersonate: () => void this.startImpersonation(),
       canDelete: this.session?.user?.isSuperAdmin === true,
       protectedTarget: detail.user.isSuperAdmin && this.session?.user?.isSuperAdmin !== true,
       deleteArmed: this.deleteArmed,
@@ -629,6 +631,34 @@ export class UsersPage extends OpenClawLightDomElement {
       )}
       ${this.renderDetailDialog()}
     `;
+  }
+
+  private async startImpersonation(): Promise<void> {
+    const user = this.selected?.user;
+    if (
+      !user ||
+      user.self ||
+      user.status !== "ACTIVE" ||
+      user.locked ||
+      this.busy ||
+      this.foldersBusy ||
+      !canManageIxAuthUsers()
+    ) {
+      return;
+    }
+    if (this.foldersDirty || hasUnsavedUserDetails(user, this.detailDraft)) {
+      this.errorKey = "impersonationUnsaved";
+      return;
+    }
+    this.busy = true;
+    this.errorKey = undefined;
+    const result = await impersonateIxAuthUser({ basePath: this.basePath, userId: user.id });
+    if (result.kind === "failed") {
+      this.busy = false;
+      this.errorKey = result.errorKey;
+      return;
+    }
+    globalThis.location.assign(`${this.basePath.replace(/\/+$/u, "")}/`);
   }
 
   private closeDetail(discard = false): void {

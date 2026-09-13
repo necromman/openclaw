@@ -55,6 +55,7 @@ async function runIxAuthHttpStage(params: {
   clientIp?: string;
   rateLimiter?: AuthRateLimiter;
   disconnectClientsForUserProfile?: (profileId: string) => void;
+  disconnectClientsForIxAuthLoginSession?: (loginSessionId: string) => void;
 }): Promise<boolean> {
   // Read off the same snapshot the caller pinned, rather than asking for it a second time.
   const trustedProxies = params.config.gateway?.trustedProxies ?? [];
@@ -95,6 +96,9 @@ async function runIxAuthHttpStage(params: {
       rateLimiter: params.rateLimiter,
       ...(params.disconnectClientsForUserProfile
         ? { disconnectClientsForUserProfile: params.disconnectClientsForUserProfile }
+        : {}),
+      ...(params.disconnectClientsForIxAuthLoginSession
+        ? { disconnectClientsForIxAuthLoginSession: params.disconnectClientsForIxAuthLoginSession }
         : {}),
     },
   });
@@ -165,10 +169,7 @@ async function runIxAuthAdminProxyStage(params: {
       allowHostHeaderOriginFallback:
         params.config.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback === true,
       clientIp: params.clientIp,
-      isLocalClient: isLocalDirectRequest(
-        params.req,
-        params.config.gateway?.trustedProxies ?? [],
-      ),
+      isLocalClient: isLocalDirectRequest(params.req, params.config.gateway?.trustedProxies ?? []),
     },
   });
 }
@@ -188,7 +189,10 @@ export type IxAuthStageParams = {
    * Gateway epochs, and a stale closure would close nothing.
    */
   getGatewayRequestContext?: () =>
-    | { disconnectClientsForUserProfile?: (profileId: string) => void }
+    | {
+        disconnectClientsForUserProfile?: (profileId: string) => void;
+        disconnectClientsForIxAuthLoginSession?: (loginSessionId: string) => void;
+      }
     | undefined;
 };
 
@@ -198,6 +202,9 @@ function toStageParams(params: IxAuthStageParams) {
     ...rest,
     disconnectClientsForUserProfile: (profileId: string) => {
       getGatewayRequestContext?.()?.disconnectClientsForUserProfile?.(profileId);
+    },
+    disconnectClientsForIxAuthLoginSession: (loginSessionId: string) => {
+      getGatewayRequestContext?.()?.disconnectClientsForIxAuthLoginSession?.(loginSessionId);
     },
   };
 }

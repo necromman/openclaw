@@ -583,3 +583,52 @@ openclaw-folders-page .folders-notice {
     overflow-wrap: anywhere;
   }
 }
+/* Keep impersonation controls outside connection-blocked content. */
+.shell.shell:has(> openclaw-impersonation-banner) {
+  grid-template-rows: auto var(--shell-topbar-height) minmax(0, 1fr);
+  grid-template-areas: "impersonation impersonation" "nav topbar" "nav content";
+}
+
+openclaw-impersonation-banner {
+  grid-area: impersonation;
+  z-index: 270;
+}
+
+.shell:has(> openclaw-impersonation-banner) .shell-chrome-controls {
+  top: calc(var(--impersonation-banner-height, 0px) + 10px);
+}
+
+.ix-auth-impersonation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-bottom: 3px solid var(--accent);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.ix-auth-impersonation-banner p {
+  margin: var(--space-1) 0 0;
+  font-size: var(--control-ui-text-sm);
+}
+
+.ix-auth-impersonation-banner .btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  .shell.shell--mobile-nav:has(> openclaw-impersonation-banner) {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "impersonation" "topbar" "nav" "content";
+  }
+}
+
+@media (max-width: 640px) {
+  .ix-auth-impersonation-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

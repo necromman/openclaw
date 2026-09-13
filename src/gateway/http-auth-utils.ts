@@ -44,6 +44,7 @@ import {
   PROXY_ATTRIBUTION_REQUIRED_REASON,
 } from "./ingress-attribution.js";
 import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
+import { limitIxAuthImpersonationScopes } from "./ix-auth-impersonation-policy.js";
 import {
   ADMIN_SCOPE,
   CLI_DEFAULT_OPERATOR_SCOPES,
@@ -90,6 +91,7 @@ export type AuthorizedGatewayHttpRequest = {
   ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
   /** Attribution-only identity from the same verified token; never read by authorization. */
   ixAuthAuditActor?: IxAuthAuditActor;
+  ixAuthImpersonating?: true;
   controlUiPluginGrants?: ControlUiPluginTabAuthGrant[];
   controlUiPluginGrant?: ControlUiPluginTabAuthGrant;
 };
@@ -225,7 +227,7 @@ function resolveControlUiReadOperatorScopes(
   if (authMethod === "device-token") {
     return applyHttpOperatorRoleScopeCeiling(deviceScopes ?? [], authenticatedRequest);
   }
-  if (authMethod === "trusted-proxy" || authMethod === "tailscale") {
+  if (authMethod === "trusted-proxy" || authMethod === "tailscale" || authMethod === "ix-auth") {
     return resolveTrustedHttpOperatorScopes(req, {
       trustDeclaredOperatorScopes: true,
       ...authenticatedRequest,
@@ -334,11 +336,14 @@ export async function authorizeControlUiReadRequestOrReply(
     const authMethod = resolvedAuthResult.method ?? "none";
     const trustDeclaredOperatorScopes =
       authMethod === "trusted-proxy" || authMethod === "tailscale";
-    const operatorScopes = resolveControlUiReadOperatorScopes(
-      params.req,
-      authMethod,
-      deviceScopes,
-      authenticatedProfile,
+    const operatorScopes = limitIxAuthImpersonationScopes(
+      resolveControlUiReadOperatorScopes(
+        params.req,
+        authMethod,
+        deviceScopes,
+        authenticatedProfile,
+      ),
+      resolvedAuthResult.ixAuthImpersonating,
     );
     params.onPluginFrameGrants?.(
       setControlUiPluginAuthCookieForRequest(
@@ -589,6 +594,7 @@ async function checkGatewayHttpRequestAuthWith(
         : {}),
       ...(authResult.ixAuthDepartments ? { ixAuthDepartments: authResult.ixAuthDepartments } : {}),
       ...(authResult.ixAuthAuditActor ? { ixAuthAuditActor: authResult.ixAuthAuditActor } : {}),
+      ...(authResult.ixAuthImpersonating ? { ixAuthImpersonating: true as const } : {}),
       ...authenticatedProfile,
     },
   };
@@ -655,7 +661,10 @@ export function resolveTrustedHttpOperatorScopes(
   req: IncomingMessage,
   authOrRequest?:
     | SharedSecretGatewayAuth
-    | Pick<AuthorizedGatewayHttpRequest, "trustDeclaredOperatorScopes" | "operatorRolePolicy">,
+    | Pick<
+        AuthorizedGatewayHttpRequest,
+        "trustDeclaredOperatorScopes" | "operatorRolePolicy" | "ixAuthImpersonating"
+      >,
 ): string[] {
   if (!shouldTrustDeclaredHttpOperatorScopes(req, authOrRequest)) {
     // Gateway bearer auth only proves possession of the shared secret. Do not
@@ -672,9 +681,14 @@ export function resolveTrustedHttpOperatorScopes(
           .split(",")
           .map((scope) => scope.trim())
           .filter((scope) => scope.length > 0);
-  return applyHttpOperatorRoleScopeCeiling(
-    scopes,
-    authOrRequest && "trustDeclaredOperatorScopes" in authOrRequest ? authOrRequest : undefined,
+  return limitIxAuthImpersonationScopes(
+    applyHttpOperatorRoleScopeCeiling(
+      scopes,
+      authOrRequest && "trustDeclaredOperatorScopes" in authOrRequest ? authOrRequest : undefined,
+    ),
+    authOrRequest && "ixAuthImpersonating" in authOrRequest
+      ? authOrRequest.ixAuthImpersonating
+      : undefined,
   );
 }
 

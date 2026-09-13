@@ -572,6 +572,13 @@ export class OpenClawApp extends OpenClawLightDomElement {
     if (initialConnectPending) {
       return html`
         <openclaw-tooltip-provider>
+          ${
+            this.ixAuth.session?.user?.impersonatedBy
+              ? html`<openclaw-impersonation-banner
+                  .basePath=${context.basePath}
+                ></openclaw-impersonation-banner>`
+              : nothing
+          }
           ${renderConnectingSplash(gatewayStartupStatus)} ${gatewayUrlConfirmation}
         </openclaw-tooltip-provider>
       `;
@@ -585,6 +592,7 @@ export class OpenClawApp extends OpenClawLightDomElement {
     if (showLoginGate && shouldRenderIxAuthGate(this.ixAuth.session)) {
       const basePath = context.basePath;
       return renderIxAuthGate({
+        basePath,
         session: this.ixAuth.session,
         loader: this.ixAuthLoginLoader,
         resourceBasePath: context.resourceBasePath,

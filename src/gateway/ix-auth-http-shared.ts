@@ -49,6 +49,8 @@ export type IxAuthHttpDependencies = {
    * signed-out browser tab would still be able to drive the Gateway.
    */
   disconnectClientsForUserProfile?: (profileId: string) => void;
+  /** Change this browser's identity without interrupting the target's other devices. */
+  disconnectClientsForIxAuthLoginSession?: (loginSessionId: string) => void;
   onSecurityEvent?: (event: IxAuthSecurityEvent) => void;
 };
 

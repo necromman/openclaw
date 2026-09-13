@@ -21,6 +21,7 @@ import {
 } from "./ingress-attribution.js";
 import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
 import { ixAuthAuditActorFacts } from "./ix-auth-audit-actor.js";
+import { isIxAuthImpersonating } from "./ix-auth-impersonation-policy.js";
 import {
   isLocalDirectRequest,
   isLoopbackAddress,
@@ -58,6 +59,7 @@ export type GatewayAuthResult = {
   ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
   /** Attribution-only identity from the same verified token; never read by authorization. */
   ixAuthAuditActor?: IxAuthAuditActor;
+  ixAuthImpersonating?: true;
   reason?: string;
   /** Present when the request was blocked by the rate limiter. */
   rateLimited?: boolean;
@@ -556,6 +558,9 @@ async function authorizeGatewayConnectCore(
       return {
         ok: true,
         method: "ix-auth",
+        ...(isIxAuthImpersonating(resolved.principal)
+          ? { ixAuthImpersonating: true as const }
+          : {}),
         user: resolved.principal.claims.email,
         ixAuthDepartments: {
           departments: resolved.principal.departments,

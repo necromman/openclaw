@@ -3,6 +3,7 @@ import type { GatewayOperatorRoleDefinition } from "../config/types.gateway.js";
 import {
   IX_AUTH_CONNECTION_SCOPE_CANDIDATES,
   resolveIxAuthConnectionScopes,
+  resolveOperatorConnectionScopes,
 } from "./ix-auth-connection-scopes.js";
 
 /** The five role definitions the delivery template ships (chris-local/AUTH-IXAUTH.md). */
@@ -31,6 +32,31 @@ const ROLE_DEFINITIONS: Record<string, GatewayOperatorRoleDefinition> = {
 };
 
 describe("resolveIxAuthConnectionScopes", () => {
+  it.each(["superadmin", "admin", "member"])(
+    "keeps target work scopes and removes management while impersonating %s",
+    (role) => {
+      expect(
+        resolveOperatorConnectionScopes({
+          hasIxAuthPrincipal: true,
+          impersonating: true,
+          rolePolicy: ROLE_DEFINITIONS[role],
+          requestedScopes: ["operator.admin", "operator.pairing"],
+        }),
+      ).toEqual(["operator.read", "operator.write", "operator.questions"]);
+    },
+  );
+
+  it("never upgrades a read-only target during impersonation", () => {
+    expect(
+      resolveOperatorConnectionScopes({
+        hasIxAuthPrincipal: true,
+        impersonating: true,
+        rolePolicy: { agents: "*", sessions: { others: "view" }, scopes: ["operator.read"] },
+        requestedScopes: ["operator.admin"],
+      }),
+    ).toEqual(["operator.read"]);
+  });
+
   it("gives a system administrator operator.admin", () => {
     // The defect this closes: a superadmin landed without operator.admin, which disables
     // secret mode and model account selection in the Control UI.

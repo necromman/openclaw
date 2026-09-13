@@ -12,12 +12,7 @@ import { readIxAuthCsrfToken } from "./ix-auth-session-api.ts";
 const IX_AUTH_CSRF_HEADER = "x-openclaw-csrf";
 
 /** Account states the identity server uses. */
-export type IxAuthUserStatus =
-  | "ACTIVE"
-  | "LOCKED"
-  | "DISABLED"
-  | "PENDING"
-  | "PENDING_APPROVAL";
+export type IxAuthUserStatus = "ACTIVE" | "LOCKED" | "DISABLED" | "PENDING" | "PENDING_APPROVAL";
 
 /** One account row, as the Gateway projects it. */
 export type IxAuthManagedUser = {
@@ -92,6 +87,10 @@ export function isIxAuthUsersFailure(value: unknown): value is IxAuthUsersFailur
  */
 function mapUsersErrorToKey(status: number, code: string): string {
   switch (code) {
+    case "impersonation_forbidden":
+      return "impersonationForbidden";
+    case "impersonation_self":
+      return "usersSelfForbidden";
     case "self_forbidden":
       return "usersSelfForbidden";
     case "last_super_admin":
@@ -133,16 +132,19 @@ async function callUsersRoute(params: {
   const csrfToken = readIxAuthCsrfToken();
   let response: Response;
   try {
-    response = await fetch(`${params.basePath.replace(/\/+$/u, "")}/auth/admin/users${params.path}`, {
-      method: params.method,
-      credentials: "same-origin",
-      headers: {
-        accept: "application/json",
-        ...(params.method === "GET" ? {} : { "content-type": "application/json" }),
-        ...(csrfToken ? { [IX_AUTH_CSRF_HEADER]: csrfToken } : {}),
+    response = await fetch(
+      `${params.basePath.replace(/\/+$/u, "")}/auth/admin/users${params.path}`,
+      {
+        method: params.method,
+        credentials: "same-origin",
+        headers: {
+          accept: "application/json",
+          ...(params.method === "GET" ? {} : { "content-type": "application/json" }),
+          ...(csrfToken ? { [IX_AUTH_CSRF_HEADER]: csrfToken } : {}),
+        },
+        body: params.method === "GET" ? undefined : JSON.stringify(params.body ?? {}),
       },
-      body: params.method === "GET" ? undefined : JSON.stringify(params.body ?? {}),
-    });
+    );
   } catch {
     return { kind: "failed", errorKey: "network" };
   }
@@ -154,13 +156,16 @@ async function callUsersRoute(params: {
   }
   const body =
     parsed !== null && typeof parsed === "object"
-      // SAFETY: the null and typeof guard directly above proves this is an object.
-      ? (parsed as Record<string, unknown>)
+      ? // SAFETY: the null and typeof guard directly above proves this is an object.
+        (parsed as Record<string, unknown>)
       : {};
   if (!response.ok) {
     return {
       kind: "failed",
-      errorKey: mapUsersErrorToKey(response.status, typeof body.error === "string" ? body.error : ""),
+      errorKey: mapUsersErrorToKey(
+        response.status,
+        typeof body.error === "string" ? body.error : "",
+      ),
       message: typeof body.message === "string" ? body.message : undefined,
     };
   }
@@ -177,7 +182,9 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
 
 function readStrings(record: Record<string, unknown>, key: string): string[] {
   const value = record[key];
-  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 function fieldCount(record: Record<string, unknown>, key: string): number {
@@ -365,8 +372,7 @@ export async function prepareIxAuthUserFolderSubject(params: {
   basePath: string;
   userId: string;
 }): Promise<
-  | { userId: string; profileId: string; email: string; displayName: string }
-  | IxAuthUsersFailure
+  { userId: string; profileId: string; email: string; displayName: string } | IxAuthUsersFailure
 > {
   const result = await callUsersRoute({
     basePath: params.basePath,
@@ -383,6 +389,18 @@ export async function prepareIxAuthUserFolderSubject(params: {
   return userId && profileId && email && displayName
     ? { userId, profileId, email, displayName }
     : { kind: "failed", errorKey: "unknown" };
+}
+
+export async function impersonateIxAuthUser(params: {
+  basePath: string;
+  userId: string;
+}): Promise<{ kind: "ok" } | IxAuthUsersFailure> {
+  const result = await callUsersRoute({
+    basePath: params.basePath,
+    path: `/${encodeURIComponent(params.userId)}/impersonate`,
+    method: "POST",
+  });
+  return result.kind === "failed" ? result : { kind: "ok" };
 }
 
 /** The per-account buttons, each one relay call. */

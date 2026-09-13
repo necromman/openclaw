@@ -42,6 +42,7 @@ export type IxAuthSessionState = {
   adminConsoleUrl?: string;
   /** True when the identity server accepts signups, which decides the signup link. */
   selfSignupEnabled?: boolean;
+  impersonationRestoreAvailable?: boolean;
 };
 
 export type IxAuthLoginResult =
@@ -102,8 +103,8 @@ async function readJsonResponse(response: Response): Promise<Record<string, unkn
   try {
     const parsed: unknown = await response.json();
     return parsed !== null && typeof parsed === "object"
-      // SAFETY: the preceding typeof guard proves parsed is a non-null object.
-      ? (parsed as Record<string, unknown>)
+      ? // SAFETY: the preceding typeof guard proves parsed is a non-null object.
+        (parsed as Record<string, unknown>)
       : {};
   } catch {
     return {};
@@ -177,11 +178,14 @@ function rememberIxAuthSession(session: IxAuthSessionState): IxAuthSessionState 
   setIxAuthAdminAccess(
     session.authMode === "ix-auth" &&
       session.authenticated &&
+      !session.user?.impersonatedBy &&
       isIxAuthAdminRole(session.user?.gatewayRole),
   );
   // The top rank is reported on the account itself, so the department screen never has to
   // read a role code and decide what it outranks.
-  setIxAuthSuperAdminAccess(session.authenticated && session.user?.isSuperAdmin === true);
+  setIxAuthSuperAdminAccess(
+    session.authenticated && !session.user?.impersonatedBy && session.user?.isSuperAdmin === true,
+  );
   // Recorded separately from the ranks above so the settings menu can tell "not an
   // administrator" apart from "no accounts here at all": the shared-token modes must keep
   // the menu they have always had.
@@ -249,6 +253,7 @@ async function runIxAuthSessionProbe(basePath: string): Promise<IxAuthSessionSta
     user: readSessionUser(body),
     adminConsoleUrl: resolveAdminConsoleUrl(basePath, body.adminConsoleUrl),
     selfSignupEnabled: body.selfSignupEnabled === true,
+    impersonationRestoreAvailable: body.impersonationRestoreAvailable === true,
   };
 }
 

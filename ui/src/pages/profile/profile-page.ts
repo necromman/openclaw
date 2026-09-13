@@ -34,7 +34,9 @@ import {
   renderSettingsSection,
 } from "../../components/settings-ui.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
+import { readIxAuthSessionSnapshot } from "../../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../../i18n/index.ts";
+import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { registerModelAccountsEnglish } from "../../i18n/locales/en-model-accounts.ts";
 import { AuthenticatedAvatarRouteLoader } from "../../lib/authenticated-avatar-route.ts";
 import { formatUiError } from "../../lib/format-error.ts";
@@ -49,6 +51,7 @@ import { userProfileAvatarUrl } from "./profile-avatar-url.ts";
 import { renderProfileHero } from "./profile-hero.ts";
 
 registerModelAccountsEnglish();
+registerIxAuthEnglish();
 
 const PROFILE_DOCS_URL = "https://docs.openclaw.ai/concepts/user-model";
 
@@ -461,8 +464,13 @@ export class ProfilePage extends OpenClawLightDomElement {
       return renderSettingsPage(renderSettingsGroup(renderSettingsEmpty(t("profilePage.offline"))));
     }
     return renderSettingsPage(html`
-      ${this.renderHero()} ${this.renderIdentity()} ${this.renderModelAccounts()}
-      <openclaw-github-connections></openclaw-github-connections>
+      ${this.renderHero()}
+      ${
+        readIxAuthSessionSnapshot()?.user?.impersonatedBy
+          ? renderSettingsEmpty(t("ixAuth.impersonation.securityHelp"))
+          : html`${this.renderIdentity()} ${this.renderModelAccounts()}
+              <openclaw-github-connections></openclaw-github-connections>`
+      }
       ${renderSettingsGroup(
         renderSettingsNavRow({
           title: t("profilePage.usageStatistics"),

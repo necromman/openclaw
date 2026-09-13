@@ -1,7 +1,8 @@
 import { html, nothing } from "lit";
+import "../features/ix-auth/impersonation-banner.ts";
 import { isSettingsNavigationRoute } from "../app-navigation.ts";
-import "../plugins/control-ui-contributions.ts";
 import { isSessionRouteId } from "../app-route-paths.ts";
+import "../plugins/control-ui-contributions.ts";
 import { isRouteId, type RouteId } from "../app-routes.ts";
 import { icons } from "../components/icons.ts";
 import { renderLazyElementModal } from "../components/lazy-view-error.ts";
@@ -12,6 +13,7 @@ import {
   type SettingsSidebarModule,
 } from "../components/settings-sidebar-lazy.ts";
 import type { ThemeModeChangeDetail } from "../components/theme-mode-toggle.ts";
+import { readIxAuthSessionSnapshot } from "../features/ix-auth/ix-auth-session-api.ts";
 import { t } from "../i18n/index.ts";
 import { canCallGatewayMethod } from "../lib/gateway-methods.ts";
 import {
@@ -559,6 +561,13 @@ export function renderApplicationShell(host: ShellViewHost) {
                   host.resizeNavigation(event.detail.splitRatio)}
               ></resizable-divider>
             `
+          : nothing
+      }
+      ${
+        readIxAuthSessionSnapshot()?.user?.impersonatedBy
+          ? html`<openclaw-impersonation-banner
+              .basePath=${context.basePath}
+            ></openclaw-impersonation-banner>`
           : nothing
       }
       <main

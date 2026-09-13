@@ -11,4 +11,5 @@ export type IxAuthAuditActor = {
   gatewayRole?: string;
   departments: readonly string[];
   isSuperAdmin: boolean;
+  impersonator?: { subject?: string; email?: string };
 };

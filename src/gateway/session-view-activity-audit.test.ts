@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UserActivityRecordParams } from "../audit/user-activity-audit-recorder.js";
+import { ixAuthConnectionFacts } from "./ix-auth-audit-actor.js";
 import type { GatewayClient } from "./server-methods/client-types.js";
 
 const recorded: UserActivityRecordParams[] = [];
@@ -35,6 +36,40 @@ beforeEach(() => {
 });
 
 describe("session view recording", () => {
+  it("carries a verified acting administrator from the connection to a file-read record", () => {
+    const client = signedInClient();
+    client.internal = ixAuthConnectionFacts({
+      kind: "ix-auth",
+      loginSessionId: "login-1",
+      profileId: "p1",
+      gatewayRole: "member",
+      departments: ["dept-rnd"],
+      isSuperAdmin: false,
+      claims: {
+        subject: "target-1",
+        email: "kim@example.com",
+        displayName: "Kim",
+        roles: ["MEMBER"],
+        groups: ["dept-rnd"],
+        identitySessionId: "identity-1",
+        expiresAtMs: Date.now() + 60_000,
+        impersonatorSubject: "admin-1",
+        impersonatorEmail: "admin@example.com",
+      },
+    });
+    recordFileDownloadActivity({
+      client,
+      sessionKey: "agent:main",
+      agentId: "main",
+      path: "/mnt/nas/spec.pdf",
+      preview: true,
+    });
+    expect(client.internal.ixAuthImpersonating).toBe(true);
+    expect(recorded[0]?.actor).toMatchObject({
+      email: "kim@example.com",
+      impersonator: { subject: "admin-1", email: "admin@example.com" },
+    });
+  });
   it("records a read of someone else's transcript with the person who made it", () => {
     recordSessionViewActivity({
       client: signedInClient(),

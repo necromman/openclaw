@@ -24,6 +24,7 @@ import { isSelfIxAuthUser } from "./ix-auth-admin-users-guard.js";
 import { projectIxAuthUser } from "./ix-auth-admin-users-view.js";
 import { parseIxAuthAdminUsersPath } from "./ix-auth-http-paths.js";
 import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
+import { startIxAuthImpersonation } from "./ix-auth-impersonation-http.js";
 
 /** Accounts per page when the browser does not say. The identity server caps at 100. */
 const IX_AUTH_USERS_DEFAULT_PAGE_SIZE = 25;
@@ -147,6 +148,14 @@ export async function handleIxAuthAdminUsersRequest(params: {
     return;
   }
   const method = params.req.method ?? "GET";
+  if (target.kind === "action" && target.action === "impersonate") {
+    if (method !== "POST") {
+      sendJson(params.res, 405, { error: "method_not_allowed" });
+      return;
+    }
+    await startIxAuthImpersonation({ ...params, userId: target.userId });
+    return;
+  }
   if (target.kind === "collection") {
     if (method !== "GET") {
       sendJson(params.res, 405, { error: "method_not_allowed" });

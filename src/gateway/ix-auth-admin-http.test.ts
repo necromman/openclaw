@@ -315,7 +315,15 @@ describe("administration CSRF", () => {
 
   it("serves a GET with no CSRF token at all", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
-    stubIdentityServer({});
+    stubIdentityServer({
+      "/admin/users": () =>
+        jsonResponse({
+          data: {
+            items: [{ id: 42, email: "invitee@example.test", roles: ["MEMBER"] }],
+            total: 1,
+          },
+        }),
+    });
     captureIxAuthInviteLink({
       email: "invitee@example.test",
       link: "https://gw/invite?token=abc",
@@ -351,6 +359,102 @@ describe("administration CSRF", () => {
 });
 
 describe("issuing an invitation", () => {
+  it.each(["ADMIN", "SUPERADMIN"])("filters cached credential links for %s", async (role) => {
+    const session = seedSession({ roles: [role], sessionToken: "admin-session" });
+    for (const email of ["staff@example.test", "owner@example.test"]) {
+      captureIxAuthInviteLink({
+        email,
+        link: `https://gw/invite?token=${email}`,
+        nowMs: Date.now(),
+      });
+    }
+    stubIdentityServer({
+      "/admin/users": () =>
+        jsonResponse({
+          data: {
+            items: [
+              { id: 41, email: "staff@example.test", roles: ["MEMBER"] },
+              { id: 42, email: "owner@example.test", roles: ["SUPERADMIN"] },
+            ],
+            total: 2,
+          },
+        }),
+    });
+    const answer = await callAdmin({
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+    });
+    expect(answer.status()).toBe(200);
+    const invites = JSON.parse(answer.body()).invites;
+    expect(invites.map((invite: { email: string }) => invite.email).sort()).toEqual(
+      role === "SUPERADMIN" ? ["owner@example.test", "staff@example.test"] : ["staff@example.test"],
+    );
+    if (role === "ADMIN") {
+      expect(answer.body()).not.toContain("owner@example.test");
+    }
+  });
+
+  it("does not return any cached link when the target lookup fails", async () => {
+    const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
+    captureIxAuthInviteLink({
+      email: "owner@example.test",
+      link: "https://gw/invite?token=secret",
+      nowMs: Date.now(),
+    });
+    stubIdentityServer({ "/admin/users": () => jsonResponse({}, 503) });
+    const answer = await callAdmin({
+      pathname: "/auth/admin/invites",
+      headers: adminHeaders(session),
+    });
+    expect(answer.status()).toBe(503);
+    expect(answer.body()).not.toContain("token=secret");
+  });
+
+  it.each([
+    { role: "ADMIN", targetRole: "SUPERADMIN", email: "owner@example.test", status: 403 },
+    { role: "ADMIN", targetRole: "MEMBER", email: "forged@example.test", status: 400 },
+    { role: "ADMIN", targetRole: "MEMBER", email: "owner@example.test", status: 200 },
+    { role: "SUPERADMIN", targetRole: "SUPERADMIN", email: "owner@example.test", status: 200 },
+  ])(
+    "binds invite reissue to the authorized target: %j",
+    async ({ role, targetRole, email, status }) => {
+      const session = seedSession({ roles: [role], sessionToken: "admin-session" });
+      captureIxAuthInviteLink({
+        email: "owner@example.test",
+        link: "https://gw/invite?token=owner",
+        nowMs: Date.now(),
+      });
+      captureIxAuthInviteLink({
+        email: "forged@example.test",
+        link: "https://gw/invite?token=forged",
+        nowMs: Date.now(),
+      });
+      const calls = stubIdentityServer({
+        "/admin/users/42": () =>
+          jsonResponse({ data: { id: 42, email: "owner@example.test", roles: [targetRole] } }),
+        "/admin/users/42/invite": () => jsonResponse({ data: {} }),
+      });
+      const answer = await callAdmin({
+        method: "POST",
+        pathname: "/auth/admin/invites",
+        headers: adminHeaders(session),
+        body: { userId: "42", email },
+      });
+      expect(answer.status()).toBe(status);
+      expect(calls.some((call) => call.path === "/admin/users/42/invite")).toBe(status === 200);
+      expect(answer.body()).not.toContain("token=forged");
+      if (status === 200) {
+        expect(JSON.parse(answer.body())).toMatchObject({
+          email: "owner@example.test",
+          userId: "42",
+          inviteLink: "https://gw/invite?token=owner",
+        });
+      } else {
+        expect(answer.body()).not.toContain("token=owner");
+      }
+    },
+  );
+
   it("creates a pending account as the administrator, with no password", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
     captureIxAuthInviteLink({

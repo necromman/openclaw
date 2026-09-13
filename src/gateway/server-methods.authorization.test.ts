@@ -53,6 +53,64 @@ afterEach(() => {
 });
 
 describe("gateway method authorization", () => {
+  it.each([
+    ["config.patch", false],
+    ["folders.rules.set", false],
+    ["folders.rules.clear", false],
+    ["users.setAvatar", false],
+    ["device.pair.approve", false],
+    ["device.scopes.requestUpgrade", false],
+    ["exec.approval.resolve", false],
+    ["chat.send", true],
+    ["folders.tree.list", true],
+    ["models.list", true],
+    ["users.prefs.set", true],
+  ] as const)(
+    "bounds impersonated %s dispatch without blocking target work",
+    async (method, allowed) => {
+      const handler = vi.fn<GatewayRequestHandler>(({ respond }) => respond(true, { ok: true }));
+      const respond = vi.fn();
+      await handleGatewayRequest({
+        req: { type: "req", id: "impersonated-request", method, params: {} },
+        respond,
+        client: {
+          connId: "impersonated-connection",
+          connect: {
+            role: "operator",
+            scopes: [
+              "operator.admin",
+              "operator.read",
+              "operator.write",
+              "operator.approvals",
+              "operator.pairing",
+              "operator.questions",
+            ],
+            client: { id: "test", version: "1", platform: "test", mode: "test" },
+            minProtocol: 1,
+            maxProtocol: 1,
+          },
+          internal: { ixAuthImpersonating: true },
+        } as Parameters<typeof handleGatewayRequest>[0]["client"],
+        isWebchatConnect: () => false,
+        context: { logGateway: { warn: vi.fn() } } as unknown as Parameters<
+          typeof handleGatewayRequest
+        >[0]["context"],
+        extraHandlers: { [method]: handler },
+      });
+      if (allowed) {
+        expect(handler).toHaveBeenCalledOnce();
+        expect(respond).toHaveBeenCalledWith(true, { ok: true });
+      } else {
+        expect(handler).not.toHaveBeenCalled();
+        expect(respond).toHaveBeenCalledWith(
+          false,
+          undefined,
+          expect.objectContaining({ code: "FORBIDDEN" }),
+        );
+      }
+    },
+  );
+
   async function dispatch(scopes: string[]) {
     const handler: GatewayRequestHandler = ({ respond }) => respond(true, { ok: true });
     const methodRegistry = createGatewayMethodRegistry([

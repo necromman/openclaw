@@ -43,6 +43,29 @@ beforeEach(() => {
 });
 
 describe("identity route recording", () => {
+  it("preserves the acting administrator on login and logout", () => {
+    const impersonator = { subject: "admin-1", email: "admin@example.com" };
+    recordIxAuthLoginActivity({
+      req: request(),
+      deps: deps(),
+      profileId: "p1",
+      claims: {
+        ...claims(),
+        impersonatorSubject: impersonator.subject,
+        impersonatorEmail: impersonator.email,
+      },
+      departments: [],
+      settings: { roleMap: {}, superAdminRoles: [] },
+    });
+    recordIxAuthLogoutActivity({
+      req: request(),
+      deps: deps(),
+      profileId: "p1",
+      email: "kim@example.com",
+      impersonator,
+    });
+    expect(recorded.map((row) => row.actor.impersonator)).toEqual([impersonator, impersonator]);
+  });
   it("records a sign-in with the account, its resolved rank and its departments", () => {
     recordIxAuthLoginActivity({
       req: request(),

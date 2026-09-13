@@ -252,6 +252,30 @@ describe("detail panel", () => {
     };
   }
 
+  it.each([
+    { self: false, status: "ACTIVE" as const, locked: false, visible: true },
+    { self: true, status: "ACTIVE" as const, locked: false, visible: false },
+    { self: false, status: "DISABLED" as const, locked: false, visible: false },
+    { self: false, status: "ACTIVE" as const, locked: true, visible: false },
+  ])("offers impersonation only for an active other account: %j", ({ visible, ...user }) => {
+    const onImpersonate = vi.fn();
+    const host = draw(
+      renderUserDetailPanel(
+        panelProps({
+          section: "account",
+          user: managedUser(user),
+          onImpersonate,
+        }),
+      ),
+    );
+    const button = [...host.querySelectorAll("button")].find(
+      (entry) => entry.textContent?.trim() === "Act as this user",
+    );
+    expect(Boolean(button)).toBe(visible);
+    button?.click();
+    expect(onImpersonate).toHaveBeenCalledTimes(visible ? 1 : 0);
+  });
+
   it("requires an explicit save after selecting a different role", () => {
     const onSaveRole = vi.fn();
     const onRoleChange = vi.fn();
@@ -330,6 +354,8 @@ describe("detail panel", () => {
       "Deactivate",
       "Reset two-step verification",
       "Sign this person out",
+      "Send a password-reset email",
+      "Resend the invitation",
     ]) {
       const button = [...host.querySelectorAll("button")].find(
         (candidate) => candidate.textContent?.trim() === label,

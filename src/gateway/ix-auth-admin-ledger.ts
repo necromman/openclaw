@@ -22,6 +22,8 @@ import type { IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
  * be searched for later, and stage H needs to enumerate the kinds it stores.
  */
 export type IxAuthAdminActionName =
+  | "impersonation-start"
+  | "impersonation-stop"
   | "invite"
   | "invite-resend"
   | "signup-decision"

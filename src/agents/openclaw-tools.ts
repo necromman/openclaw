@@ -523,6 +523,7 @@ export function createOpenClawTools(options?: OpenClawToolsOptions): AnyAgentToo
       ? [
           createSecretsTool({
             config: resolvedConfig,
+            senderIsOwner: options?.senderIsOwner,
             agentId: sessionAgentId,
             sessionKey: options?.runSessionKey ?? options?.agentSessionKey,
             runId: options?.runId,

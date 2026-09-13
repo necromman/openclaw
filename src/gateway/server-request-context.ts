@@ -178,6 +178,25 @@ export function createGatewayRequestContext(
   params: GatewayRequestContextParams,
 ): GatewayRequestContextWithClientLookup {
   const scopeUpgradeCoordinator = new ScopeUpgradeCoordinator();
+  const disconnectIdentityClients = (
+    matches: (client: GatewayWsClient) => boolean,
+    reason: string,
+    closeReason: string,
+  ) => {
+    for (const client of params.clients) {
+      if (!matches(client)) {
+        continue;
+      }
+      // Invalidate before closing so buffered requests cannot retain retired authority.
+      client.invalidated = true;
+      client.invalidatedReason = reason;
+      try {
+        client.socket.close(4001, closeReason);
+      } catch {
+        /* The invalidated connection remains unable to submit requests. */
+      }
+    }
+  };
   const context: GatewayRequestContextWithClientLookup = {
     trackExecution: params.trackExecution,
     deps: params.deps,
@@ -378,19 +397,18 @@ export function createGatewayRequestContext(
       params.disconnectDeviceTransports?.(deviceId, opts);
     },
     disconnectClientsForUserProfile: (profileId: string) => {
-      for (const gatewayClient of params.clients) {
-        if (gatewayClient.authenticatedUserProfile?.profileId !== profileId) {
-          continue;
-        }
-        // Invalidate before closing so buffered requests cannot retain revoked role scopes.
-        gatewayClient.invalidated = true;
-        gatewayClient.invalidatedReason = "operator-role-changed";
-        try {
-          gatewayClient.socket.close(4001, "operator role changed");
-        } catch {
-          /* ignore */
-        }
-      }
+      disconnectIdentityClients(
+        (client) => client.authenticatedUserProfile?.profileId === profileId,
+        "operator-role-changed",
+        "operator role changed",
+      );
+    },
+    disconnectClientsForIxAuthLoginSession: (loginSessionId: string) => {
+      disconnectIdentityClients(
+        (client) => client.internal?.ixAuthLoginSessionId === loginSessionId,
+        "identity-session-changed",
+        "identity session changed",
+      );
     },
     disconnectClientsUsingSharedGatewayAuth: () => {
       disconnectAllSharedGatewayAuthClients(params.clients);

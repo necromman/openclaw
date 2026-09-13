@@ -706,7 +706,10 @@ describe("secrets tool", () => {
   it("requires verified agent runtime identity when deleting a store entry", async () => {
     const gateway = gatewayStub(async () => ({ ok: true, reloaded: false }));
 
-    const result = await createSecretsTool({ gatewayCall: gateway.call }).execute("call-delete", {
+    const result = await createSecretsTool({
+      gatewayCall: gateway.call,
+      senderIsOwner: true,
+    }).execute("call-delete", {
       action: "delete",
       name: "SERVICE_API_KEY",
     });
@@ -719,4 +722,20 @@ describe("secrets tool", () => {
       { requireAgentRuntimeIdentity: true },
     );
   });
+
+  it.each([false, undefined])(
+    "refuses team secret deletion without verified owner authority (%s)",
+    async (senderIsOwner) => {
+      const gateway = gatewayStub(async () => ({ ok: true }));
+      const result = await createSecretsTool({ gatewayCall: gateway.call, senderIsOwner }).execute(
+        "call-delete",
+        {
+          action: "delete",
+          name: "SERVICE_API_KEY",
+        },
+      );
+      expect(result.details).toMatchObject({ ok: false, code: "owner_required" });
+      expect(gateway.mock).not.toHaveBeenCalled();
+    },
+  );
 });

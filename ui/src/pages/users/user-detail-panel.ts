@@ -59,6 +59,7 @@ export type UserDetailPanelProps = {
   busy: boolean;
   canGrantSuperAdmin: boolean;
   canDelete: boolean;
+  onImpersonate?: () => void;
   /**
    * True when this row is a system administrator and the reader is not one.
    *
@@ -220,6 +221,15 @@ function renderDepartmentRow(props: UserDetailPanelProps): TemplateResult {
 function renderActionRows(props: UserDetailPanelProps): unknown[] {
   const { user } = props;
   return [
+    props.onImpersonate && !user.self && user.status === "ACTIVE" && !user.locked
+      ? renderSettingsRow({
+          title: t("ixAuth.impersonation.start"),
+          description: t("ixAuth.impersonation.startHelp"),
+          control: html`<button class="btn" ?disabled=${props.busy} @click=${props.onImpersonate}>
+            ${t("ixAuth.impersonation.start")}
+          </button>`,
+        })
+      : nothing,
     renderSettingsRow({
       title: t("ixAuth.users.actionsTitle"),
       description: t("ixAuth.users.passwordResetHelp"),
@@ -228,12 +238,16 @@ function renderActionRows(props: UserDetailPanelProps): unknown[] {
         <div class="users-actions">
           <button
             class="btn"
-            ?disabled=${props.busy}
+            ?disabled=${props.busy || props.protectedTarget}
             @click=${() => props.onAction("password-reset")}
           >
             ${t("ixAuth.users.passwordReset")}
           </button>
-          <button class="btn" ?disabled=${props.busy} @click=${() => props.onAction("invite")}>
+          <button
+            class="btn"
+            ?disabled=${props.busy || props.protectedTarget}
+            @click=${() => props.onAction("invite")}
+          >
             ${t("ixAuth.users.resendInvite")}
           </button>
           <button

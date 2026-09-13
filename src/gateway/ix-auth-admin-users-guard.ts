@@ -16,7 +16,9 @@ import {
   revokeIxAuthUserSessions,
   type IxAuthUserSummary,
 } from "../auth/ix-auth/ix-auth-admin-users-client.js";
+import { relayIxAuthLogout } from "../auth/ix-auth/ix-auth-client.js";
 import { resolveIxAuthGatewayRole } from "../auth/ix-auth/ix-auth-role-map.js";
+import { revokeIxAuthImpersonatedSessionsForActor } from "../auth/ix-auth/ix-auth-sessions.js";
 import type { IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
 import { revokeIxAuthSessionsForIdentityEmail } from "../state/ix-auth-sessions-store.js";
 import { sendJson } from "./http-common.js";
@@ -168,8 +170,25 @@ export async function endIxAuthUserSessions(params: {
   for (const profileId of profileIds) {
     params.deps.disconnectClientsForUserProfile?.(profileId);
   }
+  const impersonated = revokeIxAuthImpersonatedSessionsForActor({
+    subject: params.target.id,
+    revokedAt: Date.now(),
+    reason: params.reason,
+  });
+  for (const row of impersonated) {
+    params.deps.disconnectClientsForIxAuthLoginSession?.(row.id);
+  }
+  await Promise.all(
+    impersonated.map((row) =>
+      relayIxAuthLogout({
+        settings: params.deps.settings,
+        refreshToken: row.refresh_token,
+        meta: params.admin.call.meta,
+      }),
+    ),
+  );
   return {
     identitySessions: revoked.ok ? revoked.revoked : 0,
-    gatewaySessions: profileIds.length,
+    gatewaySessions: profileIds.length + impersonated.length,
   };
 }

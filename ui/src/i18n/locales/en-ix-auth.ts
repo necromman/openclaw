@@ -29,6 +29,19 @@ const enIxAuth = {
       member: "Staff",
     },
     impersonating: "Viewing as this user. Administrator: {admin}",
+    impersonation: {
+      title: "Acting as another user",
+      start: "Act as this user",
+      startHelp:
+        "Open this user's assistant with their permissions. Actions are recorded as administrator impersonation.",
+      banner: "Acting as {name} ({email})",
+      securityHelp:
+        "Administrator tools and personal password or security changes are unavailable while acting as this user.",
+      stop: "Return to administrator",
+      returning: "Returning…",
+      expired: "This user's session has ended. Return to your administrator account.",
+      stopFailed: "Could not return to the administrator account. Try again.",
+    },
     // Shown in place of a signup link where the identity server refuses signups, so
     // nobody hunts for a form that does not exist.
     inviteOnly: "An invitation is needed to join.",
@@ -515,6 +528,10 @@ const enIxAuth = {
       },
     },
     error: {
+      impersonationUnsaved:
+        "Save your changes, or close this dialog and discard them before acting as this user.",
+      impersonationForbidden:
+        "Return to the administrator account before using administrator tools.",
       // One message for a wrong password and for an unknown account, so the form
       // never reveals which addresses exist.
       invalidCredentials: "The email or password is incorrect.",

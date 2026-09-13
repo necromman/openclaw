@@ -1,10 +1,12 @@
-import type { IncomingMessage } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { setDisplayName } from "../state/user-profiles.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import type { GatewayAuthResult } from "./auth.js";
 import {
+  authorizeControlUiReadRequestOrReply,
+  authorizeControlUiSessionOwnerReadRequestOrReply,
   checkGatewayHttpRequestAuth,
   resolveSharedSecretHttpOperatorScopes,
 } from "./http-auth-utils.js";
@@ -13,6 +15,7 @@ const { authorize, ensureOwner } = vi.hoisted(() => ({ authorize: vi.fn(), ensur
 vi.mock("./auth.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./auth.js")>()),
   authorizeHttpGatewayConnect: authorize,
+  authorizeControlUiReadHttpGatewayConnect: authorize,
 }));
 vi.mock("../infra/host-account-name.js", () => ({
   resolveHostAccountName: async () => "Gateway Person",
@@ -40,6 +43,107 @@ async function authenticate(
 
 describe("HTTP gateway owner profiles", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ["member", false, false],
+    ["admin", false, false],
+    ["superadmin", false, true],
+    ["superadmin", true, false],
+  ] as const)(
+    "caps Control UI HTTP reads for %s (impersonating=%s)",
+    async (role, impersonating, canManage) => {
+      await withOpenClawTestState({ label: "http-control-ui-role" }, async (state) => {
+        await state.writeConfig({
+          gateway: {
+            roles: {
+              default: role,
+              definitions: {
+                member: {
+                  agents: "*",
+                  sessions: { others: "view" },
+                  scopes: ["operator.read", "operator.write", "operator.questions"],
+                },
+                admin: {
+                  agents: "*",
+                  sessions: { others: "write" },
+                  scopes: [
+                    "operator.read",
+                    "operator.write",
+                    "operator.approvals",
+                    "operator.questions",
+                  ],
+                },
+                superadmin: {
+                  agents: "*",
+                  sessions: { others: "write" },
+                  scopes: ["operator.admin"],
+                },
+              },
+            },
+          },
+        });
+        authorize.mockResolvedValue({
+          ok: true,
+          method: "ix-auth",
+          user: "target@example.test",
+          ...(impersonating ? { ixAuthImpersonating: true } : {}),
+        });
+        const res = {
+          statusCode: 200,
+          setHeader: vi.fn(),
+          end: vi.fn(),
+        } as unknown as ServerResponse;
+        const options = { req, res, auth: { mode: "none" as const, allowTailscale: false } };
+        const read = await authorizeControlUiReadRequestOrReply({
+          ...options,
+          requiredOperatorMethod: "models.list",
+        });
+        expect(read?.operatorScopes).toContain("operator.read");
+        expect(read?.operatorScopes.includes("operator.admin")).toBe(canManage);
+        const management = await authorizeControlUiSessionOwnerReadRequestOrReply(options);
+        if (canManage) {
+          expect(management?.operatorScopes).toContain("operator.admin");
+          expect(res.statusCode).toBe(200);
+        } else {
+          expect(management).toBeNull();
+          expect(res.statusCode).toBe(403);
+        }
+      });
+    },
+  );
+
+  it("carries impersonation into HTTP scope resolution without granting management from headers", async () => {
+    await withOpenClawTestState({ label: "http-impersonation" }, async () => {
+      authorize.mockResolvedValueOnce({
+        ok: true,
+        method: "ix-auth",
+        user: "target@example.test",
+        ixAuthImpersonating: true,
+      });
+      const result = await checkGatewayHttpRequestAuth({
+        req,
+        auth: { mode: "none", allowTailscale: false },
+        cfg: {},
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new Error("expected authenticated target");
+      }
+      expect(result.requestAuth.user).toBe("target@example.test");
+      expect(result.requestAuth.ixAuthImpersonating).toBe(true);
+      expect(resolveSharedSecretHttpOperatorScopes(req, result.requestAuth)).toEqual([
+        "operator.read",
+        "operator.write",
+        "operator.questions",
+      ]);
+      const declared = {
+        headers: { "x-openclaw-scopes": "operator.admin,operator.pairing,operator.write" },
+      } as IncomingMessage;
+      expect(resolveSharedSecretHttpOperatorScopes(declared, result.requestAuth)).toEqual([
+        "operator.write",
+      ]);
+    });
+  });
 
   it("shares the durable owner across auth methods and preserves an edited name", async () => {
     await withOpenClawTestState({ label: "http-owner-profile" }, async () => {

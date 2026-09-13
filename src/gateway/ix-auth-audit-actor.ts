@@ -12,6 +12,7 @@ import type { IxAuthPrincipal } from "../auth/ix-auth/ix-auth-types.js";
 import type { UserActivityAuditActor } from "../state/user-activity-audit-store.js";
 import { departmentHandshakeFacts } from "./department-access.js";
 import type { IxAuthAuditActor } from "./ix-auth-audit-actor-type.js";
+import { isIxAuthImpersonating } from "./ix-auth-impersonation-policy.js";
 import type { GatewayClient } from "./server-methods/client-types.js";
 
 export type { IxAuthAuditActor };
@@ -23,7 +24,12 @@ export type { IxAuthAuditActor };
  * one line for both, and so neither can be attached without the other.
  */
 export function ixAuthConnectionFacts(principal: IxAuthPrincipal | undefined) {
-  return { ...departmentHandshakeFacts(principal), ...ixAuthAuditActorFacts(principal) };
+  return {
+    ...departmentHandshakeFacts(principal),
+    ...ixAuthAuditActorFacts(principal),
+    ...(principal ? { ixAuthLoginSessionId: principal.loginSessionId } : {}),
+    ...(isIxAuthImpersonating(principal) ? { ixAuthImpersonating: true as const } : {}),
+  };
 }
 
 /** Project a verified principal into the connection's audit-attribution facts. */
@@ -39,6 +45,14 @@ export function ixAuthAuditActorFacts(principal: IxAuthPrincipal | undefined): {
           ...(principal.gatewayRole ? { gatewayRole: principal.gatewayRole } : {}),
           departments: principal.departments,
           isSuperAdmin: principal.isSuperAdmin,
+          ...(isIxAuthImpersonating(principal)
+            ? {
+                impersonator: {
+                  subject: principal.claims.impersonatorSubject,
+                  email: principal.claims.impersonatorEmail,
+                },
+              }
+            : {}),
         },
       }
     : {};
@@ -53,6 +67,7 @@ function toUserActivityActor(actor: IxAuthAuditActor): UserActivityAuditActor {
     ...(actor.displayName ? { displayName: actor.displayName } : {}),
     ...(actor.gatewayRole ? { gatewayRole: actor.gatewayRole } : {}),
     departments: actor.departments,
+    ...(actor.impersonator ? { impersonator: actor.impersonator } : {}),
   };
 }
 

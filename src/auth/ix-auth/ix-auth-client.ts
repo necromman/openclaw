@@ -60,7 +60,10 @@ function buildIxAuthHeaders(params: {
   if (clientIp && /^[\w.:%[\]-]+$/u.test(clientIp)) {
     headers["x-forwarded-for"] = clientIp;
   }
-  const userAgent = params.meta.userAgent?.replaceAll(/[\r\n]/gu, " ").slice(0, 512).trim();
+  const userAgent = params.meta.userAgent
+    ?.replaceAll(/[\r\n]/gu, " ")
+    .slice(0, 512)
+    .trim();
   if (userAgent) {
     headers["user-agent"] = userAgent;
   }
@@ -77,13 +80,13 @@ function readRelayFailure(status: number, body: unknown): IxAuthRelayFailure {
     body !== null && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const error =
     envelope.error !== null && typeof envelope.error === "object"
-      // SAFETY: the preceding typeof guard proves error is a non-null object.
-      ? (envelope.error as Record<string, unknown>)
+      ? // SAFETY: the preceding typeof guard proves error is a non-null object.
+        (envelope.error as Record<string, unknown>)
       : {};
   const meta =
     error.meta !== null && typeof error.meta === "object"
-      // SAFETY: the preceding typeof guard proves meta is a non-null object.
-      ? (error.meta as Record<string, unknown>)
+      ? // SAFETY: the preceding typeof guard proves meta is a non-null object.
+        (error.meta as Record<string, unknown>)
       : {};
   const lockedUntil = typeof meta.lockedUntil === "string" ? Date.parse(meta.lockedUntil) : NaN;
   return {
@@ -182,8 +185,8 @@ export async function callIxAuthEndpoint(params: {
   }
   const data =
     envelope.data !== null && typeof envelope.data === "object"
-      // SAFETY: the preceding typeof guard proves data is a non-null object.
-      ? (envelope.data as Record<string, unknown>)
+      ? // SAFETY: the preceding typeof guard proves data is a non-null object.
+        (envelope.data as Record<string, unknown>)
       : {};
   return { ok: true, status: response.status, data };
 }
@@ -196,6 +199,34 @@ function readTokenBundle(data: Record<string, unknown>): IxAuthTokenBundle | und
   }
   const expiresIn = typeof data.expiresIn === "number" ? data.expiresIn : 900;
   return { accessToken, refreshToken, expiresInSeconds: expiresIn };
+}
+
+/** The identity server issues a target session carrying the administrator's signed act claim. */
+export async function relayIxAuthImpersonation(params: {
+  settings: IxAuthRuntimeSettings;
+  accessToken: string;
+  userId: string;
+  meta: IxAuthRequestMeta;
+}): Promise<IxAuthRelayResult<{ tokens: IxAuthTokenBundle }>> {
+  const result = await callIxAuthEndpoint({
+    settings: params.settings,
+    path: `admin/users/${encodeURIComponent(params.userId)}/impersonate`,
+    accessToken: params.accessToken,
+    body: { ip: params.meta.clientIp, userAgent: params.meta.userAgent },
+    meta: params.meta,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  const tokens = readTokenBundle(result.data);
+  return tokens
+    ? { ok: true, tokens }
+    : {
+        ok: false,
+        status: 502,
+        code: "IXAUTH_UNAVAILABLE",
+        message: "the identity server returned no tokens",
+      };
 }
 
 /** Relay a password login. Returns tokens, or a failure that never distinguishes accounts. */

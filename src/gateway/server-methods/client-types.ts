@@ -72,6 +72,10 @@ export type GatewayClient = {
      * its existing authorization path.
      */
     ixAuthDepartments?: { departments: readonly string[]; isSuperAdmin: boolean };
+    /** Verified actor claim; restricts management independently of the target's data access. */
+    ixAuthImpersonating?: true;
+    /** Exact browser login session, used to retire only its connections. */
+    ixAuthLoginSessionId?: string;
     /**
      * Who the verified IX-Auth token says this connection is, for the activity ledger.
      *

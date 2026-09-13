@@ -90,6 +90,33 @@ describe("user activity audit store", () => {
     });
   });
 
+  it.each(["opened", "x".repeat(8_000)])(
+    "retains the verified acting administrator when event detail is bounded (%#)",
+    async (text) => {
+      await withOpenClawTestState({ scenario: "minimal" }, async () => {
+        const impersonator = { subject: "admin-1", email: "admin@example.com" };
+        appendUserActivityAuditEvent({
+          at: 1,
+          kind: "prompt",
+          actor: {
+            source: "profile",
+            profileId: "target",
+            email: "target@example.com",
+            impersonator,
+          },
+          detail: { text, impersonator: { subject: "spoofed" } },
+        });
+        const entry = listUserActivityAuditEvents({ limit: 1 }).entries[0];
+        expect(entry).toMatchObject({ email: "target@example.com", detail: { impersonator } });
+        if (text.length > 4_096) {
+          expect(entry?.detail).toMatchObject({ error: "detail_too_large" });
+        } else {
+          expect(entry?.detail.text).toBe(text);
+        }
+      });
+    },
+  );
+
   it("filters by person, kind and time window", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       appendLogin({ at: 10, email: "a@example.com" });

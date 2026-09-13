@@ -12,15 +12,18 @@ import {
   rejectIxAuthSignup,
   resendIxAuthInvite,
 } from "../auth/ix-auth/ix-auth-admin-client.js";
+import { getIxAuthUser } from "../auth/ix-auth/ix-auth-admin-users-client.js";
 import { sendJson } from "./http-common.js";
 import {
   grantIxAuthDepartments,
   readIxAuthDepartmentCodesFromBody,
   resolveIxAuthAdminContext,
+  scanIxAuthDirectory,
   sendRelayFailure,
   type IxAuthAdminContext,
 } from "./ix-auth-admin-context.js";
 import { recordIxAuthAdminAction } from "./ix-auth-admin-ledger.js";
+import { grantsSuperAdmin, rejectSuperAdminTarget } from "./ix-auth-admin-users-guard.js";
 import type { IxAuthHttpRoute } from "./ix-auth-http-paths.js";
 import { readIxAuthJsonBody, type IxAuthHttpDependencies } from "./ix-auth-http-shared.js";
 import {
@@ -152,6 +155,19 @@ async function handleResendInvite(params: {
   userId: string;
   email: string;
 }): Promise<void> {
+  const target = await getIxAuthUser({ ...params.admin.call, userId: params.userId });
+  if (!target.ok) {
+    sendRelayFailure(params.res, target);
+    return;
+  }
+  if (rejectSuperAdminTarget({ ...params, target: target.user })) {
+    return;
+  }
+  if (params.email.trim().toLowerCase() !== target.user.email.trim().toLowerCase()) {
+    sendJson(params.res, 400, { error: "invalid_body" });
+    return;
+  }
+  const email = target.user.email;
   const resent = await resendIxAuthInvite({ ...params.admin.call, userId: params.userId });
   if (!resent.ok) {
     sendRelayFailure(params.res, resent);
@@ -162,11 +178,10 @@ async function handleResendInvite(params: {
     admin: params.admin,
     action: "invite-resend",
     targetUserId: params.userId,
-    detail: { email: params.email },
+    detail: { email },
   });
-  const inviteLink =
-    (await waitForIxAuthInviteLink({ email: params.email, nowMs: Date.now() })) || undefined;
-  sendJson(params.res, 200, { email: params.email, userId: params.userId, inviteLink });
+  const inviteLink = (await waitForIxAuthInviteLink({ email, nowMs: Date.now() })) || undefined;
+  sendJson(params.res, 200, { email, userId: target.user.id, inviteLink });
 }
 
 async function handleInvitesRoute(params: {
@@ -176,7 +191,25 @@ async function handleInvitesRoute(params: {
   admin: IxAuthAdminContext;
 }): Promise<void> {
   if (params.req.method === "GET") {
-    sendJson(params.res, 200, { invites: listIxAuthInviteLinks(Date.now()) });
+    const invites = listIxAuthInviteLinks(Date.now());
+    if (params.admin.principal.isSuperAdmin || invites.length === 0) {
+      sendJson(params.res, 200, { invites });
+      return;
+    }
+    const directory = await scanIxAuthDirectory({ admin: params.admin });
+    if (!directory.ok) {
+      sendRelayFailure(params.res, directory.failure);
+      return;
+    }
+    const usersByEmail = new Map(
+      directory.users.map((user) => [user.email.trim().toLowerCase(), user]),
+    );
+    sendJson(params.res, 200, {
+      invites: invites.filter((invite) => {
+        const target = usersByEmail.get(invite.email);
+        return target && !grantsSuperAdmin({ roles: target.roles, settings: params.deps.settings });
+      }),
+    });
     return;
   }
   if (params.req.method === "DELETE") {
