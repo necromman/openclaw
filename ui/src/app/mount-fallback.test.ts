@@ -158,8 +158,8 @@ describe("Control UI mount fallback", () => {
     );
     expect(fallback.hidden).toBe(false);
     expect([...frameWindow.document.body.classList]).toEqual(["openclaw-mount-fallback-active"]);
-    expect(fallback.querySelector("h1")?.textContent?.trim()).toBe("Control UI did not start");
-    expect(fallback.querySelector("a")?.textContent?.trim()).toBe("Control UI troubleshooting");
+    expect(fallback.querySelector("h1")?.textContent?.trim()).toBe("화면을 불러오지 못했습니다");
+    expect(fallback.querySelector("a")?.textContent?.trim()).toBe("운영 안내");
     expect(frameWindow.document.activeElement).toBeInstanceOf(frameWindow.HTMLElement);
     expect([...(frameWindow.document.activeElement as HTMLElement).classList]).toEqual([
       "mount-fallback__panel",
@@ -269,6 +269,6 @@ describe("Control UI mount fallback", () => {
         "openclaw-mount-fallback-summary",
         frameWindow.HTMLParagraphElement,
       ).textContent,
-    ).toContain("gateway is still unavailable");
+    ).toContain("아직 서버에 연결할 수 없습니다");
   });
 });

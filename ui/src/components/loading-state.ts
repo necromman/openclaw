@@ -1,6 +1,11 @@
 import { html } from "lit";
-import { t } from "../i18n/index.ts";
-import "./openclaw-mascot.ts";
+
+export function renderLoadingIndicator(status = "화면을 불러오는 중입니다.") {
+  return html`<span class="fork-loading-indicator">
+    <span class="fork-loading-indicator__spinner" aria-hidden="true"></span>
+    <span>${status}</span>
+  </span>`;
+}
 
 export function renderLoadingState() {
   return html`
@@ -8,9 +13,9 @@ export function renderLoadingState() {
       class="lazy-view-state lazy-view-state--loading"
       role="status"
       aria-live="polite"
-      aria-label=${t("common.loading")}
+      aria-busy="true"
     >
-      <openclaw-mascot mood="thinking" .size=${120}></openclaw-mascot>
+      ${renderLoadingIndicator()}
     </section>
   `;
 }

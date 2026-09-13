@@ -38,8 +38,15 @@ import {
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
-import { renderDepartmentAccessPanel } from "./department-access-panel.ts";
-import { renderDepartmentAgentsTable } from "./department-agents-panel.ts";
+import {
+  renderDepartmentAgentManagement,
+  isSharedDepartmentWorkspace,
+  isDepartmentAgentDraftDirty,
+} from "./department-agent-management.ts";
+import {
+  renderDepartmentDetailDialog,
+  type DepartmentDetailTab,
+} from "./department-detail-dialog.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
 import {
   bindDepartmentAgent,
@@ -50,8 +57,6 @@ import {
 } from "./departments-gateway.ts";
 import {
   renderDepartmentCreateForm,
-  renderDepartmentDeleteForm,
-  renderDepartmentRenameForm,
   renderDepartmentsTable,
   renderOrphanDepartments,
 } from "./departments-table.ts";
@@ -67,6 +72,11 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   @state() private directory: IxAuthDepartmentDirectory | undefined;
   @state() private agents: DepartmentAgent[] = [];
   @state() private selectedSlug: string | undefined;
+  @state() private detailTab: DepartmentDetailTab = "members";
+  @state() private foldersOpened = false;
+  @state() private foldersBusy = false;
+  @state() private foldersDirty = false;
+  @state() private discardArmed = false;
   @state() private selectedAgentId: string | undefined;
   @state() private members: IxAuthManagedUser[] = [];
   @state() private membersTotal = 0;
@@ -117,6 +127,10 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   }
 
   override disconnectedCallback() {
+    this.selectedSlug = undefined;
+    this.foldersOpened = false;
+    this.foldersBusy = false;
+    this.foldersDirty = false;
     this.stopGateway?.();
     this.stopGateway = undefined;
     this.client = null;
@@ -199,10 +213,19 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     this.membersTotal = page.total;
   }
 
-  private async selectDepartment(slug: string): Promise<void> {
-    if (this.busy) {
+  private async selectDepartment(
+    slug: string,
+    tab: DepartmentDetailTab = "members",
+  ): Promise<void> {
+    if (this.busy || this.foldersBusy || this.selectedSlug) {
       return;
     }
+    this.detailTab = tab;
+    this.foldersOpened = tab === "folders";
+    this.foldersDirty = false;
+    this.discardArmed = false;
+    this.selectedAgentId = undefined;
+    this.errorKey = undefined;
     this.searchGeneration += 1;
     this.selectedSlug = slug;
     this.notice = undefined;
@@ -214,7 +237,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   }
 
   private async mutate(run: () => Promise<unknown>): Promise<void> {
-    if (this.busy) {
+    if (this.busy || this.foldersBusy) {
       return;
     }
     this.busy = true;
@@ -269,6 +292,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
       });
       if (!isIxAuthUsersFailure(renamed)) {
         this.notice = t("ixAuth.departments.renamed");
+        this.renameDraft = renamed.name;
       }
       return renamed;
     });
@@ -406,21 +430,13 @@ export class DepartmentsPage extends OpenClawLightDomElement {
       this.folders = listing;
       this.accessDraft = {
         ...this.accessDraft,
-        workspaceIsShared: this.isSharedWorkspace(this.accessDraft.workspace, listing),
+        workspaceIsShared: isSharedDepartmentWorkspace(this.accessDraft.workspace, listing),
       };
     } catch {
       if (generation === this.foldersGeneration && client === this.client) {
         this.foldersFailed = true;
       }
     }
-  }
-
-  private isSharedWorkspace(
-    workspace: string,
-    listing: DepartmentsFoldersListResult | undefined,
-  ): boolean {
-    const root = listing?.root;
-    return Boolean(root && (workspace === root || workspace.startsWith(`${root}/`)));
   }
 
   private async saveAccess(): Promise<void> {
@@ -455,7 +471,6 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   }
 
   private renderDepartmentsSection(): TemplateResult {
-    const selected = this.selectedDepartment();
     return renderSettingsSection(
       { title: t("ixAuth.departments.title"), description: t("ixAuth.departments.description") },
       [
@@ -473,6 +488,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
             ...(this.selectedSlug ? { selectedSlug: this.selectedSlug } : {}),
             ...(this.directory ? { memberCountSource: this.directory.memberCountSource } : {}),
             onSelect: (slug) => void this.selectDepartment(slug),
+            onFolders: (slug) => void this.selectDepartment(slug, "folders"),
           }),
         }),
         renderSettingsRow({
@@ -492,38 +508,6 @@ export class DepartmentsPage extends OpenClawLightDomElement {
             onSubmit: () => void this.createDepartment(),
           }),
         }),
-        selected
-          ? renderSettingsRow({
-              title: t("ixAuth.departments.renameTitle"),
-              stacked: true,
-              control: renderDepartmentRenameForm({
-                name: this.renameDraft,
-                busy: this.busy,
-                onNameInput: (value) => {
-                  this.renameDraft = value;
-                },
-                onSubmit: () => void this.renameDepartment(),
-              }),
-            })
-          : nothing,
-        selected
-          ? renderSettingsRow({
-              title: t("ixAuth.departments.deleteTitle"),
-              stacked: true,
-              control: renderDepartmentDeleteForm({
-                department: selected,
-                armed: this.deleteArmedSlug === (selected.slug ?? selected.code),
-                busy: this.busy,
-                onArm: () => {
-                  this.deleteArmedSlug = selected.slug ?? selected.code;
-                },
-                onCancel: () => {
-                  this.deleteArmedSlug = undefined;
-                },
-                onConfirm: () => void this.deleteDepartment(),
-              }),
-            })
-          : nothing,
         this.directory && this.directory.orphans.length > 0
           ? renderSettingsRow({
               title: t("ixAuth.departments.orphanTitle"),
@@ -535,101 +519,135 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     );
   }
 
-  private renderMembersSection(): TemplateResult | typeof nothing {
+  private renderMembersSection(): TemplateResult {
+    return renderDepartmentMembersPanel({
+      members: this.members,
+      total: this.membersTotal,
+      query: this.searchQuery,
+      results: this.searchResults,
+      searched: this.searched,
+      busy: this.busy,
+      loading: this.membersLoading,
+      failed: this.membersFailed,
+      onRetry: () => void this.loadMembers(),
+      onQueryInput: (value) => {
+        this.searchGeneration += 1;
+        this.searchQuery = value;
+        this.searchResults = [];
+        this.searched = false;
+      },
+      onSearch: () => void this.searchAccounts(),
+      onAdd: (user) => void this.changeMembership(user, true),
+      onRemove: (user) => void this.changeMembership(user, false),
+    });
+  }
+
+  private closeDetail(discard = false): void {
+    if (this.busy || this.foldersBusy) {
+      return;
+    }
+    const selected = this.selectedDepartment();
+    if (
+      !discard &&
+      (this.renameDraft !== selected?.name ||
+        this.foldersDirty ||
+        isDepartmentAgentDraftDirty(
+          this.agents.find((entry) => entry.agentId === this.selectedAgentId),
+          this.accessDraft,
+        ))
+    ) {
+      this.discardArmed = true;
+      return;
+    }
+    this.querySelector("openclaw-modal-dialog")?.setReturnFocusTarget(
+      this.querySelector<HTMLButtonElement>(
+        `[data-department-slug="${CSS.escape(this.selectedSlug ?? "")}"]`,
+      ),
+    );
+    this.selectedSlug = undefined;
+    this.selectedAgentId = undefined;
+    this.foldersOpened = false;
+    this.foldersDirty = false;
+    this.membersGeneration += 1;
+    this.searchGeneration += 1;
+    this.foldersGeneration += 1;
+  }
+
+  private renderDetailDialog(): unknown {
     const department = this.selectedDepartment();
     if (!department) {
       return nothing;
     }
-    return renderSettingsSection(
-      {
-        title: t("ixAuth.departments.membersTitle", { name: department.name }),
-        description: t("ixAuth.departments.membersDescription"),
+    return renderDepartmentDetailDialog({
+      department,
+      tab: this.detailTab,
+      busy: this.busy || this.foldersBusy,
+      foldersOpened: this.foldersOpened,
+      discardArmed: this.discardArmed,
+      deleteArmed: this.deleteArmedSlug === this.selectedSlug,
+      renameDraft: this.renameDraft,
+      ...(this.errorKey ? { errorKey: this.errorKey } : {}),
+      ...(this.notice ? { notice: this.notice } : {}),
+      members: this.renderMembersSection(),
+      agents: this.renderAgentsSection(),
+      onTab: (tab) => {
+        this.detailTab = tab;
+        if (tab === "folders") {
+          this.foldersOpened = true;
+        }
       },
-      [
-        renderSettingsRow({
-          title: "",
-          stacked: true,
-          control: renderDepartmentMembersPanel({
-            members: this.members,
-            total: this.membersTotal,
-            query: this.searchQuery,
-            results: this.searchResults,
-            searched: this.searched,
-            busy: this.busy,
-            loading: this.membersLoading,
-            failed: this.membersFailed,
-            onRetry: () => void this.loadMembers(),
-            onQueryInput: (value) => {
-              this.searchGeneration += 1;
-              this.searchQuery = value;
-              this.searchResults = [];
-              this.searched = false;
-            },
-            onSearch: () => void this.searchAccounts(),
-            onAdd: (user) => void this.changeMembership(user, true),
-            onRemove: (user) => void this.changeMembership(user, false),
-          }),
-        }),
-      ],
-    );
+      onClose: (discard) => this.closeDetail(discard),
+      onKeepEditing: () => {
+        this.discardArmed = false;
+      },
+      onRenameInput: (name) => {
+        this.renameDraft = name;
+      },
+      onRename: () => void this.renameDepartment(),
+      onDeleteArm: () => {
+        this.deleteArmedSlug = this.selectedSlug;
+      },
+      onDeleteCancel: () => {
+        this.deleteArmedSlug = undefined;
+      },
+      onDelete: () => void this.deleteDepartment(),
+      onFolderState: ({ busy, dirty }) => {
+        this.foldersBusy = busy;
+        this.foldersDirty = dirty;
+      },
+    });
   }
 
   private renderAgentsSection(): TemplateResult {
-    const agent = this.agents.find((entry) => entry.agentId === this.selectedAgentId);
-    return renderSettingsSection(
-      {
-        title: t("ixAuth.departments.agentsTitle"),
-        description: t("ixAuth.departments.agentsDescription"),
+    return renderDepartmentAgentManagement({
+      agents: this.agents,
+      departments: this.directory?.departments ?? [],
+      ...(this.selectedAgentId ? { selectedAgentId: this.selectedAgentId } : {}),
+      draft: this.accessDraft,
+      listing: this.folders,
+      busy: this.busy,
+      failed: this.foldersFailed,
+      onSelect: (agentId) => void this.openAgent(agentId),
+      onBind: (agentId, department) => void this.bindAgent(agentId, department),
+      onOpenFolder: (path) => void this.openFolder(path),
+      onChooseFolder: (workspace) => {
+        this.accessDraft = {
+          ...this.accessDraft,
+          workspace,
+          workspaceIsShared: isSharedDepartmentWorkspace(workspace, this.folders),
+        };
       },
-      [
-        renderSettingsRow({
-          title: "",
-          stacked: true,
-          control: renderDepartmentAgentsTable({
-            agents: this.agents,
-            departments: this.directory?.departments ?? [],
-            ...(this.selectedAgentId ? { selectedAgentId: this.selectedAgentId } : {}),
-            busy: this.busy,
-            onSelect: (agentId) => void this.openAgent(agentId),
-            onBind: (agentId, department) => void this.bindAgent(agentId, department),
-          }),
-        }),
-        agent
-          ? renderSettingsRow({
-              title: t("ixAuth.departments.accessTitle", {
-                agent: agent.name ?? agent.agentId,
-              }),
-              description: t("ixAuth.departments.accessDescription"),
-              stacked: true,
-              control: renderDepartmentAccessPanel({
-                draft: this.accessDraft,
-                listing: this.folders,
-                busy: this.busy || !this.folders,
-                failed: this.foldersFailed,
-                onRetry: () => void this.openFolder(""),
-                onOpenFolder: (path) => void this.openFolder(path),
-                onChooseFolder: (absolutePath) => {
-                  this.accessDraft = {
-                    ...this.accessDraft,
-                    workspace: absolutePath,
-                    workspaceIsShared: this.isSharedWorkspace(absolutePath, this.folders),
-                  };
-                },
-                onToggleReadonlyTools: (value) => {
-                  this.accessDraft = { ...this.accessDraft, readonlyTools: value };
-                },
-                onToggleReadonlySessions: (value) => {
-                  this.accessDraft = { ...this.accessDraft, readonlySessions: value };
-                },
-                onIndexInput: (value) => {
-                  this.accessDraft = { ...this.accessDraft, indexText: value };
-                },
-                onSave: () => void this.saveAccess(),
-              }),
-            })
-          : nothing,
-      ],
-    );
+      onToggleReadonlyTools: (readonlyTools) => {
+        this.accessDraft = { ...this.accessDraft, readonlyTools };
+      },
+      onToggleReadonlySessions: (readonlySessions) => {
+        this.accessDraft = { ...this.accessDraft, readonlySessions };
+      },
+      onIndexInput: (indexText) => {
+        this.accessDraft = { ...this.accessDraft, indexText };
+      },
+      onSave: () => void this.saveAccess(),
+    });
   }
 
   override render() {
@@ -657,7 +675,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
       ${header}
       ${renderSettingsWorkspace(
         renderSettingsPage([
-          this.errorKey
+          this.errorKey && !this.selectedSlug
             ? renderSettingsSection({}, [
                 renderSettingsRow({
                   title: "",
@@ -667,7 +685,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
                 }),
               ])
             : nothing,
-          this.notice
+          this.notice && !this.selectedSlug
             ? renderSettingsSection({}, [
                 renderSettingsRow({
                   title: "",
@@ -676,10 +694,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
               ])
             : nothing,
           this.renderDepartmentsSection(),
-          this.renderMembersSection(),
-          this.renderAgentsSection(),
         ]),
       )}
+      ${this.renderDetailDialog()}
     `;
   }
 }

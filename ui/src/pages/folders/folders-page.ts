@@ -481,7 +481,7 @@ export class FoldersPage extends OpenClawLightDomElement {
 
   private async refreshLevels(): Promise<void> {
     const parent = parentFolderPath(this.selectedPath);
-    for (const path of [...this.tree.keys()]) {
+    for (const path of this.tree.keys()) {
       if (
         path === parent ||
         path === this.selectedPath ||

@@ -10,7 +10,6 @@ import type {
   IxAuthOrphanDepartment,
 } from "../../features/ix-auth/ix-auth-admin-api.ts";
 import { t } from "../../i18n/index.ts";
-import "./department-folders-button.ts";
 
 function renderAgents(agents: readonly string[]): TemplateResult {
   return agents.length === 0
@@ -23,6 +22,7 @@ function renderRow(params: {
   selected: boolean;
   busy?: boolean;
   onSelect: (slug: string) => void;
+  onFolders?: (slug: string) => void;
 }): TemplateResult {
   const { department } = params;
   const slug = department.slug ?? department.code;
@@ -31,6 +31,7 @@ function renderRow(params: {
       <td>
         <button
           class="departments-table__select"
+          data-department-slug=${slug}
           ?disabled=${params.busy}
           @click=${() => params.onSelect(slug)}
         >
@@ -42,11 +43,14 @@ function renderRow(params: {
       <td>${renderAgents(department.agents ?? [])}</td>
       <td>
         ${
-          department.slug
-            ? html`<openclaw-department-folders-button
-                .department=${department}
-                .busy=${params.busy ?? false}
-              ></openclaw-department-folders-button>`
+          department.slug && params.onFolders
+            ? html`<button
+                class="btn"
+                ?disabled=${params.busy}
+                @click=${() => params.onFolders?.(slug)}
+              >
+                ${t("ixAuth.departments.folderPermissions")}
+              </button>`
             : nothing
         }
       </td>
@@ -67,6 +71,7 @@ export function renderDepartmentsTable(params: {
    */
   memberCountSource?: "identity" | "projection";
   onSelect: (slug: string) => void;
+  onFolders?: (slug: string) => void;
 }): TemplateResult {
   if (params.departments.length === 0) {
     return html`<span class="muted"
@@ -92,6 +97,7 @@ export function renderDepartmentsTable(params: {
               selected: (department.slug ?? department.code) === params.selectedSlug,
               busy: params.busy ?? false,
               onSelect: params.onSelect,
+              ...(params.onFolders ? { onFolders: params.onFolders } : {}),
             }),
           )}
         </tbody>

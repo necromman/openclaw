@@ -61,8 +61,6 @@ describe("custodian page", () => {
         .querySelector<HTMLImageElement>("img.chat-avatar.assistant")
         ?.getAttribute("src"),
     ).toBe("/favicon.svg");
-    // Onboarding strips the header identity; the thread avatar is the only mascot.
-    expect(page.querySelector(".custodian__mark openclaw-mascot")).toBeNull();
     const card = page.querySelector("openclaw-option-card")!;
     await card.updateComplete;
     expect(page.querySelector(".option-card__choice--recommended")?.textContent).toContain(

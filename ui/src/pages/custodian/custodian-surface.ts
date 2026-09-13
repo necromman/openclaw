@@ -4,11 +4,11 @@ import { property } from "lit/decorators.js";
 import { applicationContext, type ApplicationContext } from "../../app/context.ts";
 import { controlUiPublicAssetPath } from "../../app/public-assets.ts";
 import { icons } from "../../components/icons.ts";
+import { renderLoadingIndicator } from "../../components/loading-state.ts";
 import { markdownBlocks } from "../../components/markdown-blocks.ts";
 import { handleMarkdownCodeBlockClick } from "../../components/markdown-code-blocks.ts";
 import { handleMarkdownTableInteraction } from "../../components/markdown-tables.ts";
 import { renderPanelRefreshStatus } from "../../components/panel-refresh-status.ts";
-import "../../components/openclaw-mascot.ts";
 import { t } from "../../i18n/index.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import "../../styles/chat/grouped.css";
@@ -131,7 +131,6 @@ class CustodianSurface extends OpenClawLightDomElement {
         >
           ${alertCard}
           <div class="custodian__setup-state" role="alert">
-            <openclaw-mascot mood="idle" .size=${this.compact ? 72 : 96}></openclaw-mascot>
             <h2>${t("modelSetup.required.title")}</h2>
             <p>${t("modelSetup.required.body")}</p>
             <div class="custodian__setup-actions">
@@ -217,13 +216,7 @@ class CustodianSurface extends OpenClawLightDomElement {
           ${
             store.sending
               ? html`<div class="chat-group assistant custodian__thinking-row" role="status">
-                  <div class="chat-avatar assistant custodian__mascot-avatar" aria-hidden="true">
-                    <openclaw-mascot mood="thinking" .size=${26}></openclaw-mascot>
-                  </div>
-                  <div class="chat-group-messages custodian__thinking">
-                    <span></span><span></span><span></span>
-                    <span class="sr-only">${t("custodian.thinking")}</span>
-                  </div>
+                  ${renderLoadingIndicator("답변을 준비하고 있습니다.")}
                 </div>`
               : nothing
           }

@@ -2,7 +2,6 @@ import { consume } from "@lit/context";
 import { asNullableRecord } from "@openclaw/normalization-core/record-coerce";
 import { html, nothing, type PropertyValues } from "lit";
 import { property, state } from "lit/decorators.js";
-import "./openclaw-mascot.ts";
 import type { RouteId } from "../app-route-paths.ts";
 import { chatInputOwnerForContext } from "../app/chat-input-owner.ts";
 import { applicationContext, type ApplicationContext } from "../app/context.ts";
@@ -426,10 +425,6 @@ export class OpenClawAssistantPanel extends OpenClawLightDomElement {
         ${this.dockLayout.renderResizer("assistant-panel", t("assistantPanel.resize"))}
         <header class="rail-header assistant-panel-header" @mousedown=${beginNativeWindowDrag}>
           <div class="assistant-panel-title">
-            <openclaw-mascot
-              .mood=${this.destination === "custodian" && this.store.sending ? "thinking" : "idle"}
-              .size=${16}
-            ></openclaw-mascot>
             ${(["home", "custodian"] as const).map((destination) =>
               (destination === "home" ? this.homeAvailable : this.custodianAvailable)
                 ? html`<button

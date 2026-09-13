@@ -7,8 +7,8 @@ import type { GatewayBrowserClient } from "../api/gateway.ts";
 import type { RouteId } from "../app-routes.ts";
 import "../components/gateway-url-confirmation.ts";
 import "../components/github-link-hovercard-registration.ts";
-import "../components/openclaw-mascot.ts";
 import { renderLazyElementState, renderLazyViewError } from "../components/lazy-view-error.ts";
+import { renderLoadingIndicator } from "../components/loading-state.ts";
 import { installTitleTooltips } from "../components/tooltip-title.ts";
 import { renderIxAuthGate, shouldRenderIxAuthGate } from "../features/ix-auth/ix-auth-gate-view.ts";
 import { IxAuthSessionController } from "../features/ix-auth/ix-auth-session-controller.ts";
@@ -54,14 +54,8 @@ function isRouteNotFound(result: ChatRouteData | RouteNotFound): result is Route
 
 function renderConnectingSplash(status?: string) {
   return html`
-    <main
-      class="connect-splash"
-      role="status"
-      aria-live="polite"
-      aria-label=${status ?? t("common.loading")}
-    >
-      <openclaw-mascot mood="thinking" .size=${120}></openclaw-mascot>
-      ${status ? html`<span class="connect-splash__status">${status}</span>` : nothing}
+    <main class="connect-splash" role="status" aria-live="polite" aria-busy="true">
+      ${renderLoadingIndicator(status)}
     </main>
   `;
 }
@@ -459,12 +453,12 @@ export class OpenClawApp extends OpenClawLightDomElement {
     const context = this.context;
     const runtime = this.runtime;
     if (!context || !runtime) {
-      return html`<main class="app-shell app-shell--booting" aria-busy="true"></main>`;
+      return renderConnectingSplash();
     }
     const gatewaySnapshot = context.gateway.snapshot;
     const gatewayConnected = gatewaySnapshot.phase === "connected";
     const gatewayStartupStatus =
-      gatewaySnapshot.phase === "starting" ? t("common.gatewayStarting") : undefined;
+      gatewaySnapshot.phase === "starting" ? "서버 연결을 준비하고 있습니다." : undefined;
     const gatewayUrlConfirmation = this.pendingGatewayUrl
       ? html`
           <openclaw-gateway-url-confirmation

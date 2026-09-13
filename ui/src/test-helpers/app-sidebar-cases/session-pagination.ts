@@ -14,6 +14,134 @@ import { waitForFast } from "../wait-for.ts";
 import "../../components/app-sidebar.ts";
 
 describe("AppSidebar gateway session pagination", () => {
+  it("fills the measured viewport, resizes and resets local pages without fetching more", async () => {
+    const observers: { notify: () => void; elements: Set<Element> }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        private readonly observed: { notify: () => void; elements: Set<Element> };
+        constructor(notify: () => void) {
+          this.observed = { notify, elements: new Set() };
+          observers.push(this.observed);
+        }
+        observe(element: Element) {
+          this.observed.elements.add(element);
+        }
+        disconnect() {
+          this.observed.elements.clear();
+        }
+        unobserve(element: Element) {
+          this.observed.elements.delete(element);
+        }
+      },
+    );
+    try {
+      const keys = Array.from({ length: 60 }, (_, index) => `agent:main:viewport-${index}`);
+      const harness = createSessionsHarness("main", keys);
+      const { sidebar, provider } = await mountSidebar(
+        createGateway({} as GatewayBrowserClient),
+        harness.sessions,
+      );
+      const scroller = sidebar.querySelector<HTMLElement>(".sidebar-shell__body")!;
+      sidebar.querySelector<HTMLElement>(".sidebar-recent-sessions__list")!.style.rowGap = "0px";
+      let height = 1_000;
+      Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => height });
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+        function (this: HTMLElement) {
+          const top = this.matches(".sidebar-recent-sessions__list") ? 200 - scroller.scrollTop : 0;
+          const rowHeight = this.matches(".sidebar-recent-session") ? 40 : 0;
+          return {
+            x: 0,
+            y: top,
+            top,
+            left: 0,
+            right: 0,
+            bottom: top + rowHeight,
+            width: 0,
+            height: rowHeight,
+            toJSON: () => ({}),
+          };
+        },
+      );
+      const countRows = () =>
+        sidebar.querySelectorAll(".sidebar-recent-sessions__list > .sidebar-session-tree").length;
+      const resize = async () => {
+        for (const observer of observers) {
+          if (observer.elements.has(scroller)) {
+            observer.notify();
+          }
+        }
+        await sidebar.updateComplete;
+      };
+      harness.refresh.mockClear();
+      harness.list.mockClear();
+      await resize();
+      expect(countRows()).toBe(30);
+
+      height = 600;
+      await resize();
+      expect(countRows()).toBe(15);
+      scroller.scrollTop = 200;
+      scroller.dispatchEvent(new Event("scroll"));
+      await sidebar.updateComplete;
+      await resize();
+      expect(countRows()).toBe(15);
+      sidebar.querySelector<HTMLButtonElement>('button[aria-label="Show more"]')!.click();
+      await sidebar.updateComplete;
+      expect(countRows()).toBe(25);
+      expect(harness.refresh).not.toHaveBeenCalled();
+      expect(harness.list).not.toHaveBeenCalled();
+
+      (sidebar as unknown as { sessionsStatusFilter: "all" }).sessionsStatusFilter = "all";
+      sidebar.sessionData.resetSessionList();
+      await sidebar.sessionData.refreshSidebarSessions("main");
+      await sidebar.updateComplete;
+      expect(countRows()).toBe(15);
+      harness.list.mockResolvedValue(createSessionState("main", keys.slice(0, 3)).result!);
+      await sidebar.sessionData.refreshSidebarSessions("main");
+      await sidebar.updateComplete;
+      expect(countRows()).toBe(3);
+      expect(sidebar.querySelector('button[aria-label="Show more"]')).toBeNull();
+      provider.remove();
+      expect(observers.every((observer) => observer.elements.size === 0)).toBe(true);
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not expand a new filter when the previous roster load finishes", async () => {
+    const keys = Array.from({ length: 30 }, (_, index) => `agent:main:scope-${index}`);
+    const harness = createSessionsHarness("main", keys);
+    harness.publishList({
+      agentId: "main",
+      result: { ...harness.sessions.state.result!, hasMore: true, nextOffset: 30 },
+    });
+    const { sidebar } = await mountSidebar(
+      createGateway({} as GatewayBrowserClient),
+      harness.sessions,
+    );
+    const pending = deferred<void>();
+    harness.refresh.mockImplementation(() => pending.promise);
+    const loadMore = vi.spyOn(
+      sidebar as unknown as { loadMoreSidebarSessions(): Promise<void> },
+      "loadMoreSidebarSessions",
+    );
+    sidebar.querySelector<HTMLButtonElement>('button[aria-label="Load more sessions"]')!.click();
+    expect(loadMore).toHaveBeenCalledOnce();
+    (sidebar as unknown as { sessionsStatusFilter: "all" }).sessionsStatusFilter = "all";
+    sidebar.sessionData.resetSessionList();
+    await sidebar.sessionData.refreshSidebarSessions("main");
+    await sidebar.updateComplete;
+    const countRows = () =>
+      sidebar.querySelectorAll(".sidebar-recent-sessions__list > .sidebar-session-tree").length;
+    expect(countRows()).toBe(10);
+    pending.resolve();
+    await loadMore.mock.results[0]?.value;
+    await sidebar.updateComplete;
+    expect(countRows()).toBe(10);
+  });
+
   it.each(["archived", "all"] as const)(
     "refreshes the %s sidebar once when another client changes sessions",
     async (statusFilter) => {

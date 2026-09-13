@@ -559,8 +559,13 @@ export class SessionDataController implements ReactiveController, SessionCatalog
     return refreshSidebarSessionList(this, agentId);
   }
 
-  loadMoreSidebarSessions(): Promise<void> {
-    return refreshSidebarSessionList(this, this.sessionsAgentId, true);
+  async loadMoreSidebarSessions(onLoaded?: () => void): Promise<void> {
+    const generation = this.childSessionGeneration;
+    const connection = this.sessionScopeGeneration;
+    await refreshSidebarSessionList(this, this.sessionsAgentId, true);
+    if (generation === this.childSessionGeneration && connection === this.sessionScopeGeneration) {
+      onLoaded?.();
+    }
   }
 
   async loadChildSessions(parentKey: string): Promise<void> {

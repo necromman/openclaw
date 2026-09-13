@@ -33,6 +33,7 @@ type SidebarProjectionInput = {
   collapsedSections: ReadonlySet<string>;
   hideEmptyGroups: boolean;
   visibleSessionLimits: ReadonlyMap<string, number>;
+  defaultVisibleSessionLimit?: number;
   sortMode: SidebarSessionSortMode;
   statusFilter: SidebarSessionStatusFilter;
   agentId: string;
@@ -230,14 +231,18 @@ export class SidebarSessionProjection {
       const totalRowCount = section.rows.length;
       const renderHeader = section.id !== "ungrouped" || ungroupedHasPeerHeader;
       const collapsed = renderHeader && input.collapsedSections.has(section.id);
-      const visibleLimit = input.visibleSessionLimits.get(section.id) ?? SIDEBAR_SESSION_PAGE_SIZE;
+      const pageSize = input.defaultVisibleSessionLimit ?? SIDEBAR_SESSION_PAGE_SIZE;
+      const visibleLimit = Math.max(
+        input.visibleSessionLimits.get(section.id) ?? pageSize,
+        pageSize,
+      );
       const requiredRowCount = section.rows.reduce(
         (count, row) => count + Number(row.active || row.pinned),
         0,
       );
       const collapsedVisibleRowCount = Math.max(
         requiredRowCount,
-        Math.min(totalRowCount, SIDEBAR_SESSION_PAGE_SIZE),
+        Math.min(totalRowCount, pageSize),
       );
       let visibleRowCount = 0;
       if (!collapsed) {

@@ -301,11 +301,20 @@ const enIxAuth = {
         "Saved and live, but it could not be written beside the configuration, so a restart will undo it. Tell whoever runs the server.",
     },
     departments: {
+      detailDialog: "Department details",
+      agentDraftHint:
+        "Save this agent's changes, or close this dialog and discard them before selecting another agent.",
+      detailTabs: {
+        general: "General",
+        members: "Members",
+        folders: "Folder permissions",
+        agents: "Agent connections",
+      },
       folderPermissions: "Folder permissions",
       folderPermissionsTitle: "Folder permissions for {name}",
       title: "Departments",
       description:
-        "Create departments, then select a department to manage its members. Set document access under Folders.",
+        "Select a department to manage its name, members, folder permissions and agent connections in one place.",
       forbidden: "Only a system administrator can open this screen.",
       // The one sentence the whole screen exists to make true.
       whitelistTitle: "Departments and document access are separate settings",
@@ -469,7 +478,7 @@ const enIxAuth = {
       userSearchLabel: "Find someone",
       userSearchPlaceholder: "Search by name or address",
       userSearchEmpty:
-        "Search by name or email. Only accounts that have signed in here appear in this list.",
+        "No matching users. For accounts that have not signed in, open Folder permissions in User settings.",
       inheritLabel: "Also below",
       save: "Save",
       clear: "Remove rule",

@@ -582,7 +582,7 @@ describe("assistant panel", () => {
     expect(panel.textContent).toContain("Continue setup");
   });
 
-  it("updates the panel mascot mood with shared sending state", async () => {
+  it("shows readable progress while the shared assistant is sending", async () => {
     const { panel, store } = await mountPanel();
     store.messages = [
       { id: 1, role: "user", text: "Check this system", at: 1, question: null, step: null },
@@ -595,12 +595,12 @@ describe("assistant panel", () => {
     store.setInput("status");
     await panel.updateComplete;
 
-    expect(
-      (
-        panel.querySelector(".assistant-panel-title openclaw-mascot") as HTMLElement & {
-          mood: string;
-        }
-      ).mood,
-    ).toBe("thinking");
+    const surface = panel.querySelector<HTMLElement & { updateComplete: Promise<boolean> }>(
+      "openclaw-custodian-surface",
+    );
+    await surface?.updateComplete;
+    expect(surface?.querySelector('[role="status"]')?.textContent).toContain(
+      "답변을 준비하고 있습니다.",
+    );
   });
 });

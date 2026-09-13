@@ -83,12 +83,16 @@ import type { SessionOrganizerController } from "./session-organizer-controller.
 import type { SessionOwnerOption } from "./session-owner-chip.ts";
 import { SessionOwnerFilterController } from "./session-owner-filter-controller.ts";
 import type { SidebarMenusController } from "./sidebar-menus-controller.ts";
+import { SidebarSessionViewportController } from "./sidebar-session-viewport-controller.ts";
 
 /** Session-row projection, selection, sorting, and agent scope navigation. */
 export class AppSidebarSessionNavigationElement extends AppSidebarBase {
   @state() sessionSortMode: SidebarSessionSortMode = loadStoredSidebarSessionSortMode();
 
   readonly sessionProjection = new SidebarSessionProjection();
+  readonly sessionViewport = new SidebarSessionViewportController(this, () =>
+    this.sessionProjection.resetMembership(),
+  );
   readonly sessionData = new SessionDataController(this);
   readonly sessionPullRequests = new SessionPullRequestIndicatorsController(this, {
     getConnected: () => this.connected,
@@ -366,6 +370,7 @@ export class AppSidebarSessionNavigationElement extends AppSidebarBase {
       collapsedSections: this.collapsedSessionSections,
       hideEmptyGroups: this.sessionsHideEmptyGroups || this.sessionOwnerFilterActive,
       visibleSessionLimits: this.sessionData.visibleSessionLimits,
+      defaultVisibleSessionLimit: this.sessionViewport.pageSize,
       sortMode: this.effectiveSessionSortMode(),
       statusFilter: this.sessionsStatusFilter,
       agentId: this.expandedAgentId(),

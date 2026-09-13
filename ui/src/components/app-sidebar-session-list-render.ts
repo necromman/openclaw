@@ -343,13 +343,10 @@ function renderSessionSection(params: {
   `;
 }
 
-/** Fetching a page is useless if the new rows land behind a section's local cap,
- *  so an explicit roster load reveals a page in every section too -- otherwise
- *  the click can look like nothing happened. */
 function renderRosterLoadMore(
   host: SidebarSessionListHost,
-  sections: RenderableSessionSection[],
   hasMore: boolean | undefined,
+  loading: boolean,
 ) {
   if (!hasMore) {
     return nothing;
@@ -360,18 +357,11 @@ function renderRosterLoadMore(
         type="button"
         class="sidebar-session-pagination__button"
         aria-label=${t("chat.selectors.loadMoreRosterSessions")}
-        @click=${() => {
-          void host.loadMoreSidebarSessions().then(() => {
-            for (const section of sections) {
-              host.setVisibleSessionLimit(
-                section.id,
-                section.visibleLimit + SIDEBAR_SESSION_PAGE_SIZE,
-              );
-            }
-          });
-        }}
+        ?disabled=${loading}
+        aria-busy=${String(loading)}
+        @click=${() => void host.loadMoreSidebarSessions()}
       >
-        ${t("chat.selectors.loadMoreRosterSessions")}
+        ${loading ? t("common.loading") : t("chat.selectors.loadMoreRosterSessions")}
       </button>
     </div>
   `;
@@ -419,7 +409,7 @@ function renderSessionPagination(params: {
               aria-label=${t("usage.details.collapse")}
               @click=${() => {
                 host.clearSessionSelection();
-                host.setVisibleSessionLimit(section.id, SIDEBAR_SESSION_PAGE_SIZE);
+                host.setVisibleSessionLimit(section.id, section.collapsedVisibleRowCount);
               }}
             >
               ${t("usage.details.collapse")}
@@ -604,6 +594,7 @@ export function renderSessionList(params: {
   empty: boolean;
   sections: RenderableSessionSection[];
   nativeSessionsHaveMore: boolean;
+  nativeSessionsLoading?: boolean;
   catalogs: SessionCatalogRenderSnapshot;
   catalogRenderer: SessionCatalogGroupsRenderer | null;
 }) {
@@ -651,7 +642,11 @@ export function renderSessionList(params: {
           catalogs: params.catalogs,
           catalogRenderer: params.catalogRenderer,
         })}
-        ${renderRosterLoadMore(host, params.sections, params.nativeSessionsHaveMore)}
+        ${renderRosterLoadMore(
+          host,
+          params.nativeSessionsHaveMore,
+          params.nativeSessionsLoading === true,
+        )}
         ${
           host.sessionsStatusFilter === "archived" && params.empty
             ? html`<span class="sidebar-session-empty-hint"

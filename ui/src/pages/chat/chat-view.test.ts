@@ -6013,7 +6013,9 @@ describe("chat attachment picker", () => {
         Object.defineProperty(drop, "dataTransfer", {
           value: { files: [file], types: ["Files"] },
         });
-        requireElement(container, "section.card.chat", "chat drop target").dispatchEvent(drop);
+        requireElement(container, ".agent-chat__welcome", "welcome drop target").dispatchEvent(
+          drop,
+        );
       }
 
       expect(readers).toHaveLength(1);
@@ -6777,7 +6779,7 @@ describe("chat welcome", () => {
     return container;
   }
 
-  it("renders configured assistant avatars and the animated Clawd fallback", () => {
+  it("renders configured assistant avatars and a readable name without a default character", () => {
     let container = renderWelcome({ assistantAvatar: "VC", assistantAvatarUrl: null });
 
     const avatar = container.querySelector<HTMLElement>(".agent-chat__avatar");
@@ -6796,10 +6798,8 @@ describe("chat welcome", () => {
 
     container = renderWelcome({ assistantAvatar: null, assistantAvatarUrl: null });
 
-    const clawd = container.querySelector(".agent-chat__welcome-clawd");
-    expect(clawd).not.toBeNull();
-    expect(clawd?.querySelector("openclaw-mascot")?.getAttribute("mood")).toBe("idle");
-    expect(container.querySelector(".agent-chat__badge")).toBeNull();
+    expect(container.querySelector(".agent-chat__welcome-identity h2")?.textContent).toBe("Val");
+    expect(container.querySelector("openclaw-mascot")).toBeNull();
   });
 
   it("replaces sendable welcome actions with model setup", () => {
@@ -6831,24 +6831,6 @@ describe("chat welcome", () => {
 
     expect(container.querySelector(".agent-chat__welcome--setup")).not.toBeNull();
     expect(container.querySelector(".agent-chat__composer-shell")).toBeNull();
-  });
-
-  it("teases and catches file drags with the welcome mascot", () => {
-    const container = renderWelcome({ assistantAvatar: null, assistantAvatarUrl: null });
-    const welcome = requireElement(container, ".agent-chat__welcome", "welcome screen");
-    const mascot = requireElement(
-      container,
-      ".agent-chat__welcome-clawd openclaw-mascot",
-      "welcome mascot",
-    ) as HTMLElement & { tease: boolean; catchOnce: () => void };
-    const catchOnce = vi.spyOn(mascot, "catchOnce");
-
-    welcome.dispatchEvent(createDragEvent("dragenter"));
-    expect(mascot.tease).toBe(true);
-
-    welcome.dispatchEvent(createDragEvent("drop"));
-    expect(mascot.tease).toBe(false);
-    expect(catchOnce).toHaveBeenCalledOnce();
   });
 
   it("renders welcome text from the active locale", async () => {

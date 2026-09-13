@@ -174,26 +174,29 @@ describeControlUiE2e("Control UI initial connect splash E2E", () => {
     await gateway.waitForRequest("connect");
     const splash = page.locator(".connect-splash");
     await splash.waitFor();
-    const mascot = splash.locator('openclaw-mascot[mood="thinking"]');
-    await mascot.waitFor();
-    const mascotBounds = await mascot.boundingBox();
-    expect(mascotBounds).not.toBeNull();
+    const indicator = splash.locator(".fork-loading-indicator");
+    await indicator.waitFor();
+    const indicatorBounds = await indicator.boundingBox();
+    expect(indicatorBounds).not.toBeNull();
     expect(
-      Math.abs((mascotBounds?.x ?? 0) + (mascotBounds?.width ?? 0) / 2 - viewport.width / 2),
+      Math.abs((indicatorBounds?.x ?? 0) + (indicatorBounds?.width ?? 0) / 2 - viewport.width / 2),
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((mascotBounds?.y ?? 0) + (mascotBounds?.height ?? 0) / 2 - viewport.height / 2),
+      Math.abs(
+        (indicatorBounds?.y ?? 0) + (indicatorBounds?.height ?? 0) / 2 - viewport.height / 2,
+      ),
     ).toBeLessThanOrEqual(1);
     expect(await page.getByText("Loading panel", { exact: true }).count()).toBe(0);
     expect(await page.locator("openclaw-app-sidebar").count()).toBe(0);
     expect(await page.locator("openclaw-login-gate").count()).toBe(0);
-    // Inspect the compositor output, not the mascot's already-painted backing canvas.
+    expect(await splash.textContent()).toContain("화면을 불러오는 중입니다.");
+    expect(await splash.getAttribute("role")).toBe("status");
+    expect(await splash.locator("openclaw-mascot").count()).toBe(0);
+    // Confirm the user can actually see the progress text in the compositor output.
     // This regression runs in memory even when optional artifact retention is off.
-    const proof = await takeProofScreenshot(page, "01-centered-connecting-mascot", [
-      mascot.locator("canvas"),
-    ]);
-    const painted = await proofContentPainted(page, proof, mascot);
-    expect(painted, "connecting proof must contain the centered mascot").toBe(true);
+    const proof = await takeProofScreenshot(page, "01-centered-connecting-text", [indicator]);
+    const painted = await proofContentPainted(page, proof, indicator);
+    expect(painted, "connecting proof must contain the centered loading text").toBe(true);
 
     await gateway.resolveDeferred("connect");
     await page.locator("openclaw-app-shell").waitFor();
@@ -206,7 +209,7 @@ describeControlUiE2e("Control UI initial connect splash E2E", () => {
     ]);
   });
 
-  it("centers the animated mascot until the chat route finishes loading", async () => {
+  it("shows centered readable progress until the chat route finishes loading", async () => {
     const page = await createPage();
     let chatModuleRequested = false;
     let releaseChatModule!: () => void;
@@ -232,33 +235,35 @@ describeControlUiE2e("Control UI initial connect splash E2E", () => {
       const loadingState = page.locator(".lazy-view-state--loading");
       await loadingState.waitFor();
       expect(await loadingState.getAttribute("role")).toBe("status");
-      expect(await loadingState.getAttribute("aria-label")).toBe("Loading…");
-      expect((await loadingState.textContent())?.trim()).toBe("");
+      expect(await loadingState.getAttribute("aria-live")).toBe("polite");
+      expect(await loadingState.getAttribute("aria-busy")).toBe("true");
+      expect(await loadingState.textContent()).toContain("화면을 불러오는 중입니다.");
+      expect(await loadingState.locator("openclaw-mascot").count()).toBe(0);
       expect(await page.getByText("Loading panel", { exact: true }).count()).toBe(0);
 
-      const mascot = loadingState.locator('openclaw-mascot[mood="thinking"]');
-      await mascot.waitFor();
-      const [loadingBounds, mascotBounds] = await Promise.all([
+      const indicator = loadingState.locator(".fork-loading-indicator");
+      await indicator.waitFor();
+      const [loadingBounds, indicatorBounds] = await Promise.all([
         loadingState.boundingBox(),
-        mascot.boundingBox(),
+        indicator.boundingBox(),
       ]);
       expect(loadingBounds).not.toBeNull();
-      expect(mascotBounds).not.toBeNull();
+      expect(indicatorBounds).not.toBeNull();
       expect(
         Math.abs(
-          (mascotBounds?.x ?? 0) +
-            (mascotBounds?.width ?? 0) / 2 -
+          (indicatorBounds?.x ?? 0) +
+            (indicatorBounds?.width ?? 0) / 2 -
             ((loadingBounds?.x ?? 0) + (loadingBounds?.width ?? 0) / 2),
         ),
       ).toBeLessThanOrEqual(1);
       expect(
         Math.abs(
-          (mascotBounds?.y ?? 0) +
-            (mascotBounds?.height ?? 0) / 2 -
+          (indicatorBounds?.y ?? 0) +
+            (indicatorBounds?.height ?? 0) / 2 -
             ((loadingBounds?.y ?? 0) + (loadingBounds?.height ?? 0) / 2),
         ),
       ).toBeLessThanOrEqual(1);
-      await captureProof(page, "03-centered-pending-chat-mascot", [mascot.locator("canvas")]);
+      await captureProof(page, "03-centered-pending-chat-text", [indicator]);
 
       releaseChatModule();
       await page.locator("openclaw-chat-page").waitFor();
@@ -282,8 +287,8 @@ describeControlUiE2e("Control UI initial connect splash E2E", () => {
     await page.locator(".connect-splash").waitFor();
     expect(await page.locator("openclaw-login-gate").count()).toBe(0);
     expect(await loginGateMounted()).toBe(false);
-    await captureProof(page, "05-credentialless-connecting-mascot", [
-      page.locator(".connect-splash openclaw-mascot canvas"),
+    await captureProof(page, "05-credentialless-connecting-text", [
+      page.locator(".connect-splash .fork-loading-indicator"),
     ]);
 
     await gateway.resolveDeferred("connect");
@@ -792,14 +797,14 @@ describeControlUiE2e("Control UI initial connect splash E2E", () => {
     });
 
     const splash = page.locator(".connect-splash");
-    await splash.getByText("Gateway starting…", { exact: true }).waitFor();
+    await splash.getByText("서버 연결을 준비하고 있습니다.", { exact: true }).waitFor();
     expect(await page.locator("openclaw-login-gate").count()).toBe(0);
     expect(await loginGateMounted()).toBe(false);
     await expect
       .poll(async () => await splash.evaluate((element) => getComputedStyle(element).opacity))
       .toBe("1");
     await captureProof(page, "06-gateway-starting-progress", [
-      splash.locator("openclaw-mascot canvas"),
+      splash.locator(".fork-loading-indicator"),
     ]);
 
     await expect

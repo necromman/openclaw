@@ -122,7 +122,7 @@ describe("openclaw-router-outlet", () => {
     router.stop();
   });
 
-  it("replaces the centered loading mascot with the resolved route", async () => {
+  it("replaces accessible loading text with the resolved route", async () => {
     vi.useFakeTimers();
     const routeModule = deferred<TestModule>();
     const context = { label: "loaded" };
@@ -146,9 +146,10 @@ describe("openclaw-router-outlet", () => {
     await settleOutlet(outlet);
 
     const loadingState = outlet.querySelector('[role="status"]');
-    expect(loadingState?.getAttribute("aria-label")).toBe("Loading…");
-    expect(loadingState?.querySelector("openclaw-mascot")?.getAttribute("mood")).toBe("thinking");
-    expect(loadingState?.textContent?.trim()).toBe("");
+    expect(loadingState?.getAttribute("aria-live")).toBe("polite");
+    expect(loadingState?.getAttribute("aria-busy")).toBe("true");
+    expect(loadingState?.textContent).toContain("화면을 불러오는 중입니다.");
+    expect(loadingState?.querySelector("openclaw-mascot")).toBeNull();
     expect(outlet.textContent).not.toContain("Loading panel");
 
     routeModule.resolve({
@@ -159,7 +160,6 @@ describe("openclaw-router-outlet", () => {
 
     expect(outlet.querySelector('[data-testid="route-page"]')?.textContent).toBe("loaded");
     expect(outlet.querySelector('[role="status"]')).toBeNull();
-    expect(outlet.querySelector("openclaw-mascot")).toBeNull();
     outlet.remove();
     router.stop();
   });

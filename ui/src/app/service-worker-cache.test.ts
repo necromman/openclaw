@@ -572,6 +572,14 @@ describe("Control UI service worker notification scope", () => {
     },
   );
 
+  it("uses a Korean notification title when the sender provides no title", async () => {
+    const worker = createNotificationServiceWorker(nestedScope, []);
+    const notification = await worker.dispatchPush({ title: "", body: "처리가 완료되었습니다." });
+
+    expect(notification.title).toBe("업무 알림");
+    expect(notification.options.body).toBe("처리가 완료되었습니다.");
+  });
+
   it("preserves a quiet shared tag for approval terminal replacements", async () => {
     const worker = createNotificationServiceWorker(nestedScope, []);
     const tag = "openclaw-approval-exec:replacement";

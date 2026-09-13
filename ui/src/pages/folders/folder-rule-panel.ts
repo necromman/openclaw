@@ -1,10 +1,7 @@
 // The rules pinned to one folder, and what they add up to.
 //
-// Three tabs because a rule names one of three kinds of subject, and the three are not
-// browsed the same way. Departments and roles are short, closed lists, so both are drawn
-// whole. People are not: a company has more accounts than a screen has rows, so that tab
-// starts empty and fills from a search, plus whoever already holds a rule here so an
-// existing grant is never invisible.
+// All three tabs show their subjects immediately. Search narrows people while keeping
+// existing grants visible so an administrator can always find and remove them.
 //
 // Every row says twice what it means: the three buttons are what would be written, and
 // the sentence under them is what the Gateway currently answers, naming the folder the
@@ -66,7 +63,7 @@ function parseFolderSubjectKey(
   return { kind, id };
 }
 
-/** The account rows worth drawing on the people tab: search hits, plus anyone already ruled. */
+/** Show everyone by default; search retains existing grants alongside matching people. */
 function matchFolderUsers(params: {
   users: readonly FolderSubjectUser[];
   query: string;
@@ -75,11 +72,8 @@ function matchFolderUsers(params: {
   const query = params.query.trim().toLowerCase();
   const ruled = new Set(params.ruledIds);
   return params.users.filter((user) => {
-    if (ruled.has(user.profileId)) {
+    if (query.length === 0 || ruled.has(user.profileId)) {
       return true;
-    }
-    if (query.length === 0) {
-      return false;
     }
     return (
       (user.email ?? "").toLowerCase().includes(query) ||

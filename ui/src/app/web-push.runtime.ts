@@ -3,6 +3,7 @@ import type {
   WebPushNotificationPreferences,
 } from "../../../packages/gateway-protocol/src/schema/push.ts";
 import type { GatewayBrowserClient } from "../api/gateway.ts";
+import { BRAND_NAME } from "../brand.ts";
 import { formatUiError } from "../lib/format-error.ts";
 import type { ConnectionBootstrapCoordinator } from "./connection-bootstrap.ts";
 import type { ApplicationGateway } from "./gateway.ts";
@@ -72,7 +73,7 @@ function requirePushManager(registration: ServiceWorkerRegistration): PushManage
   const manager = pushManagerFor(registration);
   if (!manager || typeof manager.subscribe !== "function") {
     throw new Error(
-      "Web Push is unavailable in this browser. On iPhone or iPad, add OpenClaw to the Home Screen and open the installed app.",
+      `이 브라우저에서는 웹 알림을 사용할 수 없습니다. iPhone이나 iPad에서는 ${BRAND_NAME}를 홈 화면에 추가한 뒤 설치된 앱에서 열어 주세요.`,
     );
   }
   return manager;

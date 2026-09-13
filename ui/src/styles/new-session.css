@@ -1148,10 +1148,6 @@ wa-popover.new-session-page__project-popover::part(body) {
     margin-block: auto;
   }
 
-  .new-session-page .agent-chat__welcome-clawd {
-    margin-bottom: 0;
-  }
-
   .new-session-page__draft {
     flex: 0 0 auto;
     justify-content: flex-end;

@@ -9,7 +9,6 @@ import { repeat } from "lit/directives/repeat.js";
 import { icons } from "../../components/icons.ts";
 import { renderMcpServerForm, type McpServerForm } from "../../components/mcp-server-form.ts";
 import "../../components/modal-dialog.ts";
-import "../../components/openclaw-mascot.ts";
 import { renderReasonedDisabledControl } from "../../components/reasoned-disabled-control.ts";
 import {
   renderSettingsEmpty,
@@ -880,7 +879,6 @@ function renderInstalled(props: PluginsViewProps) {
         ? renderEmpty(
             filtered ? t("pluginsPage.noInstalledMatchTitle") : t("pluginsPage.noInstalledTitle"),
             filtered ? t("pluginsPage.noMatchBody") : t("pluginsPage.noInstalledBody"),
-            filtered ? "curious" : "sleepy",
           )
         : groups.map((group) =>
             renderSettingsSection(
@@ -1116,11 +1114,7 @@ function renderDiscover(props: PluginsViewProps) {
     return html`
       ${
         clawHub === nothing
-          ? renderEmpty(
-              t("pluginsPage.noDiscoverMatchTitle"),
-              t("pluginsPage.noMatchBody"),
-              "curious",
-            )
+          ? renderEmpty(t("pluginsPage.noDiscoverMatchTitle"), t("pluginsPage.noMatchBody"))
           : nothing
       }
       ${clawHub}
@@ -1314,19 +1308,10 @@ function renderDetailOverlay(props: PluginsViewProps) {
 
 /* ---------------------------------- page shell ---------------------------------- */
 
-function renderEmpty(title: string, body: string, mood?: "sleepy" | "curious") {
+function renderEmpty(title: string, body: string) {
   return html`
     <div class="plugins-empty">
-      <!-- Sleepy marks truly empty inventory; curious marks a filter/search miss. -->
-      ${
-        mood
-          ? html`<openclaw-mascot
-              class="plugins-empty__mascot"
-              .mood=${mood}
-              .size=${84}
-            ></openclaw-mascot>`
-          : html`<span class="plugins-empty__icon" aria-hidden="true">${icons.puzzle}</span>`
-      }
+      <span class="plugins-empty__icon" aria-hidden="true">${icons.puzzle}</span>
       <h2>${title}</h2>
       <p>${body}</p>
     </div>

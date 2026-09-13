@@ -105,9 +105,9 @@ registeredElementSuite.define(() => {
         await waitForRecoveryDocument(page);
         await page.clock.runFor(12_001);
 
-        await page.getByRole("heading", { name: "Control UI did not start" }).waitFor();
-        expect(await page.getByRole("button", { name: "Try again" }).isVisible()).toBe(true);
-        expect(await page.getByRole("button", { name: "Keep waiting" }).isVisible()).toBe(true);
+        await page.getByRole("heading", { name: "화면을 불러오지 못했습니다" }).waitFor();
+        expect(await page.getByRole("button", { name: "다시 시도" }).isVisible()).toBe(true);
+        expect(await page.getByRole("button", { name: "계속 기다리기" }).isVisible()).toBe(true);
         expect(
           await page.evaluate((key) => sessionStorage.getItem(key), renderCountKey),
         ).toBeNull();
@@ -115,7 +115,7 @@ registeredElementSuite.define(() => {
         syntheticModuleRenders = true;
         await Promise.all([
           page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-          page.getByRole("button", { name: "Try again" }).click(),
+          page.getByRole("button", { name: "다시 시도" }).click(),
         ]);
         await page.getByText("Application rendered", { exact: true }).waitFor();
         await page.clock.runFor(12_001);
@@ -159,7 +159,7 @@ runtimeFailureSuite.define(() => {
         await waitForRecoveryDocument(page);
         await page.clock.runFor(12_001);
 
-        await page.getByRole("heading", { name: "Control UI did not start" }).waitFor();
+        await page.getByRole("heading", { name: "화면을 불러오지 못했습니다" }).waitFor();
         expect(
           await page.evaluate((key) => sessionStorage.getItem(key), renderCountKey),
         ).toBeNull();

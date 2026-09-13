@@ -663,12 +663,8 @@ h3.plugins-subheader {
   text-align: center;
 }
 
-.plugins-empty__icon,
-.plugins-empty__mascot {
-  margin-bottom: var(--space-3);
-}
-
 .plugins-empty__icon {
+  margin-bottom: var(--space-3);
   width: 32px;
   height: 32px;
   color: var(--border-hover);

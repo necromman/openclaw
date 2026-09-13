@@ -20,7 +20,7 @@ export const BRAND_NAME = "Chris Agent";
 export const BRAND_SHORT_NAME = "Chris";
 
 /** One-line product description shown on the About page and in onboarding. */
-export const BRAND_TAGLINE = "Your personal AI assistant, running on your own devices.";
+export const BRAND_TAGLINE = "사용자와 부서의 권한에 맞춰 회사 업무를 돕는 AI 비서";
 
 /**
  * Decorative emoji in front of the CLI banner title. Empty string means the

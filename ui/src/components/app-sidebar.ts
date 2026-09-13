@@ -66,18 +66,10 @@ import {
   isCommunityInviteEligible,
 } from "./community-invite-state.ts";
 import { icons } from "./icons.ts";
-import {
-  lobsterPetSeed,
-  resolveLobsterPetMode,
-  resolveLobsterRunOutcome,
-} from "./lobster-pet-contract.ts";
 import { renderPanelRefreshStatus } from "./panel-refresh-status.ts";
 import { SessionOrganizerController } from "./session-organizer-controller.ts";
 import { SidebarMenusController } from "./sidebar-menus-controller.ts";
 import { SidebarPeopleController } from "./sidebar-people-controller.ts";
-// The shared loader retries transient chunk failures online; a deploy-pruned
-// chunk still stays off until reload when that retry fails, by design.
-const lobsterPetImport = createIdleImport(() => import("./lobster-pet.runtime.ts"));
 
 class AppSidebar extends AppSidebarSessionNavigationElement implements SessionListHost {
   @state() override sidebarNarrationLines: ReadonlyMap<string, string> = new Map();
@@ -162,7 +154,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
       (plugins, notify) => plugins.subscribe(notify),
     );
   private readonly nativeGatewaysChanged = () => this.sidebarMenus.closeSessionMenu();
-  private readonly refreshAppearanceSettings = () => this.context?.theme.refresh();
   private readonly hiddenSessionCatalogsChanged = () => {
     this.hiddenSessionCatalogIds = loadStoredHiddenSessionCatalogIds();
   };
@@ -332,9 +323,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
     );
     window.addEventListener("storage", this.communityInviteStorageChanged);
     this.syncCommunityInviteState();
-    // The decorative pet's large module stays out of startup and upgrades in place.
-    // Its first visit is at least 15 seconds after load, so idle loading cannot miss one.
-    lobsterPetImport.schedule();
     this.catalogRendererImport.schedule();
   }
 
@@ -438,7 +426,7 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
 
   setVisibleSessionLimit(sectionId: string, limit: number): void {
     const previousLimit =
-      this.sessionData.visibleSessionLimits.get(sectionId) ?? SIDEBAR_SESSION_PAGE_SIZE;
+      this.sessionData.visibleSessionLimits.get(sectionId) ?? this.sessionViewport.pageSize;
     if (limit < previousLimit) {
       this.sessionProjection.resetMembership(sectionId);
     }
@@ -446,7 +434,14 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
   }
 
   loadMoreSidebarSessions(): Promise<void> {
-    return this.sessionData.loadMoreSidebarSessions();
+    const { sections } = this.zonedVisibleSections(
+      this.selectedAgentSessionRows(this.getSessionNavigationState()),
+    );
+    return this.sessionData.loadMoreSidebarSessions(() => {
+      for (const section of sections) {
+        this.setVisibleSessionLimit(section.id, section.visibleLimit + SIDEBAR_SESSION_PAGE_SIZE);
+      }
+    });
   }
 
   dismissSessionMutationError(): void {
@@ -546,6 +541,7 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
         empty: visibleSessions.length === 0,
         sections,
         nativeSessionsHaveMore: this.sessionData.sessionsResult?.hasMore === true,
+        nativeSessionsLoading: this.sessionData.sessionsLoading,
         catalogRenderer: this.catalogRenderer,
         catalogs: {
           catalogs,
@@ -643,18 +639,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
           </div>
           <div class="sidebar-shell__invite">
             ${this.communityInvitePresentation === "shown" ? renderCommunityInviteCard(this.dismissCommunityInvite) : nothing}
-            <openclaw-lobster-pet
-              .seed=${lobsterPetSeed(this.sessionKey)}
-              .mode=${resolveLobsterPetMode(
-                !this.offline,
-                this.sessionData.sessionsResult?.sessions,
-              )}
-              .runOutcome=${resolveLobsterRunOutcome(this.sessionData.sessionsResult?.sessions)}
-              .visitsEnabled=${this.lobsterPetVisits}
-              .soundsEnabled=${this.lobsterPetSounds}
-              .gatewayVersion=${this.gatewayVersion}
-              .onVisitsDisabled=${this.refreshAppearanceSettings}
-            ></openclaw-lobster-pet>
           </div>
           <div class="sidebar-shell__footer">
             ${

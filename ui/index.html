@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <title>Control</title>
+    <title>회사 업무 비서</title>
     <meta name="color-scheme" content="dark light" />
     <!-- These mirror the claw theme's --bg tokens for first paint; runtime theme application keeps them synchronized. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf9f7" />
@@ -364,23 +364,23 @@
       hidden
     >
       <div class="mount-fallback__panel" tabindex="-1">
-        <p class="mount-fallback__eyebrow">Control UI</p>
-        <h1 id="openclaw-mount-fallback-title">Control UI did not start</h1>
+        <p class="mount-fallback__eyebrow">연결 상태 확인</p>
+        <h1 id="openclaw-mount-fallback-title">화면을 불러오지 못했습니다</h1>
         <p id="openclaw-mount-fallback-summary">
-          The browser loaded the static page, but the app bundle did not start. The gateway may be
-          restarting, or this page may reference assets from a different app version.
+          화면을 시작하지 못했습니다. 시스템 반영이나 재시작 중일 수 있습니다. 연결 상태를 자동으로
+          다시 확인합니다.
         </p>
         <ul>
-          <li>The app bundle is retried automatically.</li>
-          <li>If this persists, reload or try a clean browser profile.</li>
+          <li>연결 상태를 자동으로 다시 확인합니다.</li>
+          <li>오래 지속되면 새로고침하거나 관리자에게 문의해 주세요.</li>
           <li>
-            See
+            자세한 내용은
             <a
               href="https://github.com/necromman/openclaw/blob/chris/main/FORK.md"
               target="_blank"
               rel="noopener noreferrer"
-              >the fork notes</a
-            >.
+              >운영 안내</a
+            >를 확인해 주세요.
           </li>
         </ul>
         <div class="mount-fallback__actions">
@@ -389,10 +389,10 @@
             id="openclaw-mount-retry"
             class="mount-fallback__button mount-fallback__button--primary"
           >
-            Try again
+            다시 시도
           </button>
           <button type="button" id="openclaw-mount-wait" class="mount-fallback__button">
-            Keep waiting
+            계속 기다리기
           </button>
         </div>
       </div>
@@ -447,11 +447,11 @@
           if (appStarted) return;
           if (recoveryAttempt >= maxRecoveryAttempts) {
             setSummary(
-              "The gateway is still unavailable. Try again, then check the troubleshooting guide if the problem persists.",
+              "아직 서버에 연결할 수 없습니다. 다시 시도해 주시고, 문제가 계속되면 관리자에게 문의해 주세요.",
             );
             return;
           }
-          setSummary("The gateway is not reachable yet. Retrying while it restarts.");
+          setSummary("서버가 연결을 준비하고 있습니다. 잠시 후 자동으로 다시 확인합니다.");
           scheduleRecovery();
         }
 
@@ -482,7 +482,7 @@
           var documentUrl = new URL(window.location.href);
           if (recoveryNavigation) {
             setSummary(
-              "A fresh page still could not start the Control UI. Try again, then check the troubleshooting guide if the problem persists.",
+              "새 화면을 아직 열 수 없습니다. 다시 시도해 주시고, 문제가 계속되면 관리자에게 문의해 주세요.",
             );
             return;
           }

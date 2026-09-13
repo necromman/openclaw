@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { render } from "lit";
+import { html, render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DepartmentAgent } from "../../../../packages/gateway-protocol/src/schema/departments.js";
 import {
@@ -13,11 +13,13 @@ import type { IxAuthManagedUser } from "../../features/ix-auth/ix-auth-users-api
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
 import { renderDepartmentAccessPanel } from "./department-access-panel.ts";
 import { renderDepartmentAgentsTable } from "./department-agents-panel.ts";
+import { renderDepartmentDetailDialog } from "./department-detail-dialog.ts";
 import { renderDepartmentMembersPanel } from "./department-members-panel.ts";
 import { buildDepartmentAgentPatch } from "./departments-gateway.ts";
 import { renderDepartmentDeleteForm, renderDepartmentsTable } from "./departments-table.ts";
 
 registerIxAuthEnglish();
+vi.mock("../folders/folders-page.ts", () => ({}));
 
 function draw(template: unknown): HTMLElement {
   const host = document.createElement("div");
@@ -76,6 +78,7 @@ describe("department screen access", () => {
 
 describe("department table", () => {
   it("shows the group code beside the name, with counts and bound agents", () => {
+    const onFolders = vi.fn();
     const host = draw(
       renderDepartmentsTable({
         departments: [
@@ -89,6 +92,7 @@ describe("department table", () => {
         ],
         loading: false,
         onSelect: () => {},
+        onFolders,
       }),
     );
     expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
@@ -96,6 +100,8 @@ describe("department table", () => {
     expect(host.textContent).toContain("dept-rnd");
     expect(host.textContent).toContain("3");
     expect(host.textContent).toContain("rnd-bot");
+    host.querySelector<HTMLButtonElement>("tbody .btn")?.click();
+    expect(onFolders).toHaveBeenCalledWith("rnd");
   });
 
   it("says so when no department exists yet", () => {
@@ -103,6 +109,63 @@ describe("department table", () => {
       renderDepartmentsTable({ departments: [], loading: false, onSelect: () => {} }),
     );
     expect(host.textContent).toContain("No department has been created yet.");
+  });
+});
+
+describe("department detail dialog", () => {
+  function options(): Parameters<typeof renderDepartmentDetailDialog>[0] {
+    return {
+      department: { code: "dept-rnd", slug: "rnd", name: "Research" },
+      tab: "folders",
+      busy: false,
+      foldersOpened: true,
+      discardArmed: false,
+      deleteArmed: false,
+      renameDraft: "Research",
+      members: html`<p>Members</p>`,
+      agents: html`<p>Agents</p>`,
+      onTab: vi.fn(),
+      onClose: vi.fn(),
+      onKeepEditing: vi.fn(),
+      onRenameInput: vi.fn(),
+      onRename: vi.fn(),
+      onDeleteArm: vi.fn(),
+      onDeleteCancel: vi.fn(),
+      onDelete: vi.fn(),
+      onFolderState: vi.fn(),
+    };
+  }
+
+  it("keeps the same folder editor mounted across tabs and forwards save state", () => {
+    const props = options();
+    const host = draw(renderDepartmentDetailDialog(props));
+    const editor = host.querySelector("openclaw-folders-page");
+    expect(editor).not.toBeNull();
+    render(renderDepartmentDetailDialog({ ...props, tab: "members" }), host);
+    expect(host.querySelector("openclaw-folders-page")).toBe(editor);
+    expect(editor?.parentElement?.hidden).toBe(true);
+    editor?.dispatchEvent(
+      new CustomEvent("folders-busy-change", {
+        bubbles: true,
+        detail: { busy: true, dirty: true },
+      }),
+    );
+    expect(props.onFolderState).toHaveBeenCalledWith({ busy: true, dirty: true });
+  });
+
+  it("locks tabs and close while a save is pending", () => {
+    const props = options();
+    const host = draw(renderDepartmentDetailDialog({ ...props, busy: true }));
+    const controls = host.querySelectorAll<HTMLButtonElement>(
+      ".admin-detail-tabs button, .admin-detail-dialog__header button",
+    );
+    expect(controls).toHaveLength(5);
+    for (const button of controls) {
+      expect(button.disabled).toBe(true);
+      button.click();
+    }
+    expect(props.onTab).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 });
 

@@ -359,7 +359,7 @@ describe("Control UI Gateway target lineage", () => {
 
     expect(gateway.snapshot.phase).toBe("starting");
     expect(surface).toContain('class="connect-splash"');
-    expect(surface).toContain("Gateway starting…");
+    expect(surface).toContain("서버 연결을 준비하고 있습니다.");
     expect(surface).not.toContain("<openclaw-login-gate");
   });
 
@@ -408,7 +408,7 @@ describe("Control UI Gateway target lineage", () => {
     });
     render(app.render(), container);
 
-    expect(container.innerHTML).toContain("Gateway starting…");
+    expect(container.innerHTML).toContain("서버 연결을 준비하고 있습니다.");
     expect(container.innerHTML).not.toContain("<openclaw-login-gate");
 
     clients[1]?.opts.onHello?.(HELLO);
@@ -437,7 +437,7 @@ describe("Control UI Gateway target lineage", () => {
       const surface = renderGatewaySurface(gateway, documentView);
 
       expect(surface).toContain('class="connect-splash"');
-      expect(surface).toContain("Gateway starting…");
+      expect(surface).toContain("서버 연결을 준비하고 있습니다.");
     },
   );
 

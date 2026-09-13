@@ -18,6 +18,39 @@
  * follows; do not hardcode a page width or a radius in a page stylesheet.
  */
 
+.fork-loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--text);
+  font-size: var(--control-ui-text-sm);
+  line-height: 1.6;
+}
+
+.fork-loading-indicator__spinner {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--muted);
+  border-radius: var(--radius-full);
+  animation: fork-loading-spin 1s linear infinite;
+}
+
+@keyframes fork-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fork-loading-indicator__spinner {
+    animation: none;
+  }
+}
+
 :root {
   /* Detail-page content width. `none` means "use the window".
      Set a length here (e.g. 1440px) to reintroduce a cap. */
@@ -491,6 +524,12 @@ openclaw-folders-page .folders-panel__descendants-hint,
 openclaw-folders-page .folders-subject__inherit {
   font-size: var(--control-ui-text-sm);
   line-height: 1.6;
+}
+
+openclaw-folders-page .folders-subjects {
+  max-height: 60dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 openclaw-folders-page .folders-tree__row--selected {

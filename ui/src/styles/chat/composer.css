@@ -4284,16 +4284,6 @@
   object-fit: cover;
 }
 
-/* The 120x120 Clawd canvas stays centered in the existing hero slot. */
-.agent-chat__welcome-clawd {
-  width: 128px;
-  height: 112px;
-  margin-bottom: 2px;
-  display: grid;
-  place-items: center;
-  overflow: visible;
-}
-
 /* Phones (and short landscape): scale the welcome hero down so the composer
    and recent chats fit the first screenful on the start screen and /new. */
 @media (max-width: 768px), (max-width: 932px) and (max-height: 500px) and (orientation: landscape) {
@@ -4311,22 +4301,12 @@
     height: 64px;
   }
 
-  .agent-chat__welcome-clawd {
-    width: 88px;
-    height: 77px;
-  }
-
   .agent-chat__welcome-identity {
     gap: 12px;
   }
 
   .agent-chat__welcome-identity-copy {
     gap: 6px;
-  }
-
-  .agent-chat__welcome-clawd openclaw-mascot {
-    width: 77px;
-    height: 77px;
   }
 
   .agent-chat__welcome .agent-chat__avatar--text {

@@ -181,10 +181,11 @@ describe("folder rule panel", () => {
     expect(host.textContent).toContain(t("ixAuth.folders.clear"));
   });
 
-  it("lists nobody on the people tab until something is searched for", () => {
+  it("lists all available people immediately without requiring a search", () => {
     const host = draw(panel({ tab: "user" }));
-    expect(host.querySelectorAll(".folders-subject")).toHaveLength(0);
-    expect(host.textContent).toContain(t("ixAuth.folders.userSearchEmpty"));
+    const rows = host.querySelectorAll(".folders-subject__name");
+    expect(Array.from(rows, (row) => row.textContent?.trim())).toEqual(["Kim", "Lee"]);
+    expect(host.textContent).not.toContain(t("ixAuth.folders.userSearchEmpty"));
   });
 
   it("lists the accounts a search matched, and nobody else", () => {
@@ -193,17 +194,18 @@ describe("folder rule panel", () => {
     expect(Array.from(rows, (row) => row.textContent?.trim())).toEqual(["Kim"]);
   });
 
-  it("keeps a person who already holds a rule here visible without a search", () => {
+  it("keeps existing grants visible alongside search results", () => {
     const host = draw(
       panel({
         tab: "user",
+        userQuery: "kim@",
         rules: rulesResult({
           rules: [rule({ subjectKind: "user", subjectId: "u-2", permission: "read" })],
         }),
       }),
     );
     const rows = host.querySelectorAll(".folders-subject__name");
-    expect(Array.from(rows, (row) => row.textContent?.trim())).toEqual(["Lee"]);
+    expect(Array.from(rows, (row) => row.textContent?.trim())).toEqual(["Kim", "Lee"]);
   });
 
   it("reports the permission a button was pressed for", () => {

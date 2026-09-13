@@ -1,8 +1,8 @@
 // Control UI chat module implements chat welcome behavior.
 import { html, nothing } from "lit";
 import type { GatewaySessionRow, SessionsListResult } from "../../../api/types.ts";
+import { BRAND_NAME } from "../../../brand.ts";
 import { identityAvatarImage } from "../../../components/identity-avatar-view.ts";
-import "../../../components/openclaw-mascot.ts";
 import { t } from "../../../i18n/index.ts";
 import { resolveAssistantTextAvatar, resolveChatAvatarRenderUrl } from "../../../lib/avatar.ts";
 import { formatRelativeTimestamp } from "../../../lib/format.ts";
@@ -40,8 +40,6 @@ type ChatWelcomeProps = {
   onSend: () => void;
   onOpenSession?: (sessionKey: string) => void;
 };
-
-type WelcomeMascot = HTMLElement & { tease: boolean; catchOnce: () => void };
 
 const WELCOME_SUGGESTION_KEYS = [
   "chat.welcome.suggestions.whatCanYouDo",
@@ -100,14 +98,6 @@ function selectWelcomeRecentSessions(
   );
 }
 
-function renderWelcomeClawd() {
-  return html`
-    <div class="agent-chat__welcome-clawd" aria-hidden="true">
-      <openclaw-mascot mood="idle" .size=${112}></openclaw-mascot>
-    </div>
-  `;
-}
-
 function renderWelcomeRecentSessions(
   rows: GatewaySessionRow[],
   onOpenSession: ((sessionKey: string) => void) | undefined,
@@ -158,7 +148,7 @@ function renderWelcomeHero(
     hint: unknown;
   },
 ) {
-  const name = props.assistantName || "Assistant";
+  const name = props.assistantName || BRAND_NAME;
   const avatar = resolveAssistantAvatarUrl(props);
   const avatarText = avatar ? null : resolveAssistantTextAvatar(props.assistantAvatar);
   return html`
@@ -174,7 +164,7 @@ function renderWelcomeHero(
             ? html`<div class="agent-chat__avatar agent-chat__avatar--text" aria-label=${name}>
                 ${avatarText}
               </div>`
-            : renderWelcomeClawd()
+            : nothing
       }
       <div class="agent-chat__welcome-identity-copy">
         <h2>${name}</h2>
@@ -189,7 +179,6 @@ export function renderWelcomeState(props: ChatWelcomeProps) {
   if (props.modelSetupRequired) {
     return html`
       <div class="agent-chat__welcome agent-chat__welcome--setup" role="alert">
-        ${renderWelcomeClawd()}
         <h2>${t("modelSetup.required.title")}</h2>
         <p class="agent-chat__hint">${t("modelSetup.required.body")}</p>
         <button class="btn primary" type="button" @click=${props.onModelSetup}>
@@ -199,47 +188,8 @@ export function renderWelcomeState(props: ChatWelcomeProps) {
     `;
   }
   const recentSessions = selectWelcomeRecentSessions(props);
-  let fileDragDepth = 0;
-  const mascotFor = (event: DragEvent): WelcomeMascot | null => {
-    const target = event.currentTarget;
-    return target instanceof HTMLElement
-      ? target.querySelector<WelcomeMascot>(".agent-chat__welcome-clawd openclaw-mascot")
-      : null;
-  };
-
   return html`
-    <div
-      class="agent-chat__welcome"
-      style="--agent-color: var(--accent)"
-      @dragenter=${(event: DragEvent) => {
-        if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
-          return;
-        }
-        fileDragDepth += 1;
-        const mascot = mascotFor(event);
-        if (mascot) {
-          mascot.tease = true;
-        }
-      }}
-      @dragleave=${(event: DragEvent) => {
-        fileDragDepth = Math.max(0, fileDragDepth - 1);
-        const mascot = mascotFor(event);
-        if (mascot && fileDragDepth === 0) {
-          mascot.tease = false;
-        }
-      }}
-      @drop=${(event: DragEvent) => {
-        if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
-          return;
-        }
-        fileDragDepth = 0;
-        const mascot = mascotFor(event);
-        if (mascot) {
-          mascot.tease = false;
-          mascot.catchOnce();
-        }
-      }}
-    >
+    <div class="agent-chat__welcome" style="--agent-color: var(--accent)">
       ${renderWelcomeHero({
         assistantName: props.assistantName,
         assistantAvatar: props.assistantAvatar,

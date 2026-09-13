@@ -419,7 +419,6 @@ suite.define(() => {
       await page.goto(`${suite.server.baseUrl}chat/main`);
       await page.locator(".sidebar-shell__footer").waitFor();
       const card = page.locator(".community-invite-card");
-      await page.waitForFunction(() => Boolean(customElements.get("openclaw-lobster-pet")));
       await settleSidebarIdleWork(page);
       expect(await card.count()).toBe(0);
       expect(await mountedInvites()).toBe(0);
@@ -434,15 +433,6 @@ suite.define(() => {
       expect(await mountedInvites()).toBe(0);
       expect(imageRequests).toEqual([]);
       expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
-      const pet = page.locator("openclaw-lobster-pet");
-      const footer = page.locator(".sidebar-shell__footer");
-      const petBox = await pet.boundingBox();
-      const footerBox = await footer.boundingBox();
-      if (!petBox || !footerBox) {
-        throw new Error("Sidebar pet and footer must have rendered bounds");
-      }
-      expect(petBox.height).toBe(52);
-      expect(Math.abs(petBox.y + petBox.height - footerBox.y - 3)).toBeLessThan(0.5);
       await page.screenshot({ path: path.join(artifactDir, "02-disabled.png") });
 
       communityInvite = true;

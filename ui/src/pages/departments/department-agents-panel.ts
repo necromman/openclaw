@@ -37,7 +37,11 @@ function renderRow(params: {
   return html`
     <tr class="departments-table__row" aria-selected=${params.selected ? "true" : "false"}>
       <td>
-        <button class="departments-table__select" @click=${() => params.onSelect(agent.agentId)}>
+        <button
+          class="departments-table__select"
+          ?disabled=${params.busy}
+          @click=${() => params.onSelect(agent.agentId)}
+        >
           ${agent.name ?? agent.agentId}
         </button>
       </td>

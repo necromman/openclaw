@@ -5,6 +5,7 @@ import { isSessionRouteId } from "../app-route-paths.ts";
 import { isRouteId, type RouteId } from "../app-routes.ts";
 import { icons } from "../components/icons.ts";
 import { renderLazyElementModal } from "../components/lazy-view-error.ts";
+import { renderLoadingIndicator } from "../components/loading-state.ts";
 import { renderNewSessionLink } from "../components/new-session-link.ts";
 import {
   renderLazySettingsSidebar,
@@ -172,8 +173,8 @@ export function renderApplicationShell(host: ShellViewHost) {
     return nothing;
   }
   if (host.routeState.routeId === undefined) {
-    return html`<main class="connect-splash" role="status" aria-label=${t("common.loading")}>
-      <openclaw-mascot mood="thinking" .size=${120}></openclaw-mascot>
+    return html`<main class="connect-splash" role="status" aria-live="polite" aria-busy="true">
+      ${renderLoadingIndicator()}
     </main>`;
   }
   const gatewaySnapshot = context.gateway.snapshot;
