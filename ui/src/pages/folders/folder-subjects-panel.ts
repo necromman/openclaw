@@ -42,7 +42,7 @@ export type FolderSubjectRowDraft = {
 };
 
 /** Path to that path's listing. The root's own path is the empty string. */
-export type FolderSubjectLevels = ReadonlyMap<string, FoldersSubjectTreeResult>;
+type FolderSubjectLevels = ReadonlyMap<string, FoldersSubjectTreeResult>;
 
 const FOLDER_PERMISSIONS: readonly FolderRulePermission[] = ["hidden", "read", "write"];
 
@@ -55,7 +55,7 @@ const FOLDER_PERMISSIONS: readonly FolderRulePermission[] = ["hidden", "read", "
 const MAX_TREE_DEPTH = 32;
 
 /** The roles, departments or people one tab offers, narrowed by the search box. */
-export function folderSubjectTargets(params: {
+function folderSubjectTargets(params: {
   tab: FolderRuleTab;
   subjects: FoldersSubjectsListResult | undefined;
   userQuery: string;
