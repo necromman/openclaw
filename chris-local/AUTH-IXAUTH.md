@@ -119,6 +119,36 @@ POST /auth/logout  (Origin 검사 + CSRF 헤더 필수)
 
 **즉시성이 여기서 나온다.** access token 은 15분짜리라 로컬 검증만으로는 무효화할 수 없다. 게이트웨이가 세션 행을 갖고 있기 때문에 로그아웃·정지가 다음 요청부터 바로 먹는다.
 
+### 3.4 재배포·재기동 (2026-09-13)
+
+**세션은 재배포에 살아남는다.** 세션 행은 상태 SQLite(`ix_auth_login_sessions`)에 있고 그 파일은 컨테이너가 아니라 볼륨(`/home/node/.openclaw`)에 있다. 쿠키 대조는 서명이 아니라 sha256 다이제스트라 기동마다 만들어지는 키가 없다. 즉 저장소는 처음부터 영속이었고, 재배포 후 로그아웃되던 원인은 저장이 아니라 **판정**이었다.
+
+판정의 결함은 하나였다. 세션 확인은 두 군데에서 신원 서버에 의존한다 - JWKS 공개키 적재와 refresh 회전 - 그런데 **그 둘이 실패하면 토큰 위조와 똑같이 취급해 세션 행을 영구 폐기**했다. 게이트웨이가 새 이미지로 뜨면 JWKS 캐시는 비어 있고 신원 컨테이너도 같이 교체되는 중이라, 열려 있던 탭들이 한꺼번에 재연결하는 그 순간이 실패 확률이 가장 높다. 한 번 폐기된 행은 되살아나지 않으므로 새로고침하면 로그인 화면이었다.
+
+지금은 **"답이 없었다" 와 "거절당했다" 를 가른다**(`isTransientIxAuthRelayFailure`, `IX_AUTH_JWKS_UNAVAILABLE_REASON`).
+
+| 상황 | 이전 | 지금 |
+| --- | --- | --- |
+| JWKS 를 못 받음 | 행 폐기 + 쿠키 삭제 | `identity-unavailable`. 행·쿠키 그대로, 다시 물으면 통과 |
+| refresh 가 신원 서버에 닿지 못함(연결 실패·타임아웃·5xx·429) | 행 폐기 | `identity-unavailable`. 저장된 refresh 토큰도 그대로라 다음 시도가 정상 회전이 된다 |
+| refresh 를 신원 서버가 거절(401·재사용 탐지 등) | 행 폐기 | 그대로 행 폐기 |
+| 서명 불일치·발급자 위조 | 행 폐기 | 그대로 행 폐기 |
+
+- `GET /auth/me` 와 `/auth/refresh` 는 이 경우 **503 `identity_unavailable`** 을 내고 **쿠키를 지우지 않는다.** 예전에는 어떤 실패든 쿠키를 지워서, 재배포와 겹친 프로브 한 번이 그 브라우저의 유일한 자격증명을 없앴다.
+- WS 핸드셰이크도 `gateway_auth_required` 가 아니라 `identity_unavailable`(`AUTH_IDENTITY_UNAVAILABLE`, retryable)로 거절한다.
+
+**열려 있던 탭의 재연결.** 재연결 감독자는 "그만두라" 는 말을 듣지 않는 한 계속 재시도하므로, 진짜로 끝난 세션은 영원히 재시도되고 화면은 "오프라인 - 다시 연결 중" 에 머물렀다. 이제 ix-auth 모드에서는 거절 하나마다 한 번 판정한다(`ui/src/features/ix-auth/ix-auth-reconnect.ts`).
+
+| 거절 | 탭의 동작 |
+| --- | --- |
+| `identity_unavailable`(배포 중·신원 서버 기동 중) | 아무것도 판정하지 않고 기존 지수 백오프로 기다린다 |
+| 비인증(`AUTH_REQUIRED`/`AUTH_UNAUTHORIZED`)이고 `/auth/me` 가 "로그인됨" | 새 소켓을 바로 연다(최대 3회, 그 다음은 백오프) |
+| 비인증이고 `/auth/me` 가 "로그아웃됨" | 재시도를 멈추고 로그인 화면으로 바꾼다 |
+| 비인증이고 `/auth/me` 가 답하지 않음(503·네트워크) | 판정 보류. 백오프로 기다린다 |
+
+- 로그인 화면으로 갈 때 현재 경로를 `sessionStorage` 에 적어 두고 로그인 성공 후 그 주소로 돌려보낸다. 같은 문서 절대경로만 받아들인다(`//` 로 시작하거나 스킴이 붙은 값은 버린다).
+- 프로브가 답을 못 받은 경우(`unavailable`)는 "로그아웃" 으로 기록하지 않는다. 기록하면 재배포 동안 사이드바와 설정 메뉴가 계정 없는 모드로 떨어진다.
+
 ## 4. 설정 키
 
 ```json5
@@ -355,6 +385,8 @@ docker compose --env-file chris-local/ixauth.env \
 | 로그인은 되는데 WS 가 안 붙는다             | `gateway.controlUi.allowedOrigins` 와 실제 Origin                              |
 | 반복 실패 후 계속 429                       | 게이트웨이 IP 리미터(기본 5분) 또는 IX-Auth 분당 10회 리미터                   |
 | 쿠키가 아예 안 저장된다                     | HTTPS 도 루프백도 아닌 접근. `__Host-` 쿠키는 그런 곳에 저장되지 않는다        |
+| 재배포 후 열린 탭이 계속 "다시 연결 중"     | 3.4. `/auth/me` 가 503 이면 정상 대기, 200 비인증이면 로그인 화면으로 바뀌어야 한다 |
+| 재배포 후 새로고침하면 로그인 화면          | 3.4. 세션 행의 `revoke_reason` 을 본다. `identity-token-invalid:jwks_unavailable` 또는 `identity-refresh-failed:IXAUTH_UNAVAILABLE` 이 보이면 이 수정 이전 이미지다 |
 
 ## 8. 되돌리기
 
@@ -394,6 +426,7 @@ docker compose --env-file chris-local/ixauth.env \
 | `src/gateway/ix-auth-http-paths.ts`                  | 경로 분류                                            |
 | `src/gateway/ix-auth-principal.ts`                   | 요청·핸드셰이크 -> principal                         |
 | `ui/src/features/ix-auth/ix-auth-session-api.ts`     | Control UI 클라이언트                                |
+| `ui/src/features/ix-auth/ix-auth-reconnect.ts`       | 재연결 거절 분류·복구 판정·로그인 후 복귀 주소 (3.4) |
 | `ui/src/features/ix-auth/ix-auth-form-state.ts`      | 로그인 폼 상태                                       |
 | `ui/src/components/ix-auth-login.ts`                 | 로그인 화면 (지연 로드)                              |
 | `ui/src/pages/connection/ix-auth-account-section.ts` | 계정 표시·로그아웃·콘솔 링크                         |

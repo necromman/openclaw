@@ -23,7 +23,7 @@ import {
   type IxAuthRequestMeta,
   type IxAuthTokenBundle,
 } from "./ix-auth-client.js";
-import { verifyIxAuthAccessToken } from "./ix-auth-jwks.js";
+import { IX_AUTH_JWKS_UNAVAILABLE_REASON, verifyIxAuthAccessToken } from "./ix-auth-jwks.js";
 import { resolveIxAuthGatewayRole } from "./ix-auth-role-map.js";
 import {
   IX_AUTH_REFRESH_LEAD_MS,
@@ -38,6 +38,21 @@ const IX_AUTH_TOKEN_BYTES = 32;
 
 function digestSecretToken(token: string): Uint8Array {
   return createHash("sha256").update(token, "utf8").digest();
+}
+
+/**
+ * True when a relay failure means the identity server could not answer, not that it
+ * refused. Only the second kind may end a session.
+ *
+ * `IXAUTH_UNAVAILABLE` covers an unreachable host, a timeout, and an unreadable body.
+ * A 5xx is the same class from a host that did answer, and a 429 is a request to come
+ * back later. Everything else - 400, 401, 403, token reuse - is a real refusal.
+ */
+export function isTransientIxAuthRelayFailure(failure: {
+  status: number;
+  code: string;
+}): boolean {
+  return failure.code === "IXAUTH_UNAVAILABLE" || failure.status >= 500 || failure.status === 429;
 }
 
 /** Stored identity binding only; callers must separately resolve authority and check CSRF. */
@@ -289,6 +304,12 @@ async function resolveSession(
       meta: params.meta,
     });
     if (!refreshed.ok) {
+      // A restart, a rolling redeploy, or a momentary network fault is not a verdict on
+      // this session. Revoking here is irreversible, so an unreachable or erroring
+      // identity server must leave the row alone and let the caller retry.
+      if (isTransientIxAuthRelayFailure(refreshed)) {
+        return { ok: false, rejection: "identity-unavailable" };
+      }
       // Reuse detection, revocation, and account suspension all land here. The identity
       // server has ended this session, so the Gateway must not keep serving it.
       revokeIxAuthLoginSession({
@@ -312,6 +333,13 @@ async function resolveSession(
     nowMs: params.nowMs,
   });
   if (!verified.ok) {
+    // The key set lives on the identity server and the cache is empty after a restart,
+    // so the first verification of a redeployed Gateway can fail for the one reason that
+    // says nothing about the token: the document could not be fetched. Every other
+    // reason here is a real forgery signal and still ends the session.
+    if (verified.reason === IX_AUTH_JWKS_UNAVAILABLE_REASON) {
+      return { ok: false, rejection: "identity-unavailable" };
+    }
     revokeIxAuthLoginSession({
       sessionId: row.id,
       revokedAt: params.nowMs,

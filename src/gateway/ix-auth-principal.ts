@@ -6,7 +6,11 @@
 import type { IncomingMessage } from "node:http";
 import { resolveIxAuthSessionToken } from "../auth/ix-auth/ix-auth-sessions.js";
 import { resolveIxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-settings.js";
-import type { IxAuthPrincipal, IxAuthRuntimeSettings } from "../auth/ix-auth/ix-auth-types.js";
+import type {
+  IxAuthPrincipal,
+  IxAuthRuntimeSettings,
+  IxAuthSessionRejection,
+} from "../auth/ix-auth/ix-auth-types.js";
 import { getRuntimeConfig } from "../config/io.js";
 import { readRequestCookieValue } from "./cookie-header.js";
 import { resolveRequestClientIpFromHeaders } from "./net.js";
@@ -61,13 +65,35 @@ export async function resolveIxAuthRequestPrincipal(params: {
   allowRealIpFallback?: boolean;
   touch?: boolean;
 }): Promise<{ principal: IxAuthPrincipal; settings: IxAuthRuntimeSettings } | undefined> {
+  const resolved = await resolveIxAuthRequestSession(params);
+  return resolved.ok ? { principal: resolved.principal, settings: resolved.settings } : undefined;
+}
+
+/** What a cookie resolution produced, including why it failed. */
+export type IxAuthRequestSessionResolution =
+  | { ok: true; principal: IxAuthPrincipal; settings: IxAuthRuntimeSettings }
+  | { ok: false; rejection: IxAuthSessionRejection };
+
+/**
+ * Same resolution as above, with the rejection kept.
+ *
+ * Callers that answer a browser need it: "the identity server did not answer" has to
+ * become a retry, while "this session is finished" becomes the sign-in screen. Folding
+ * both into `undefined` is what turned a restart into a forced sign-out.
+ */
+export async function resolveIxAuthRequestSession(params: {
+  req: IncomingMessage;
+  trustedProxies?: string[];
+  allowRealIpFallback?: boolean;
+  touch?: boolean;
+}): Promise<IxAuthRequestSessionResolution> {
   const settings = await loadIxAuthGatewaySettings();
   if (!settings) {
-    return undefined;
+    return { ok: false, rejection: "no-cookie" };
   }
   const sessionToken = readIxAuthSessionCookie({ req: params.req, settings });
   if (!sessionToken) {
-    return undefined;
+    return { ok: false, rejection: "no-cookie" };
   }
   const clientIp =
     resolveRequestClientIpFromHeaders(
@@ -86,5 +112,7 @@ export async function resolveIxAuthRequestPrincipal(params: {
     nowMs: Date.now(),
     touch: params.touch ?? false,
   });
-  return resolution.ok ? { principal: resolution.principal, settings } : undefined;
+  return resolution.ok
+    ? { ok: true, principal: resolution.principal, settings }
+    : { ok: false, rejection: resolution.rejection };
 }

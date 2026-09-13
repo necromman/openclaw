@@ -168,3 +168,97 @@ describe("IX-Auth session authority during asynchronous verification", () => {
     expect(readIxAuthSessionTokenRow(session.sessionToken)?.refresh_token).toBe("refresh-rotated");
   });
 });
+
+// A redeploy restarts the Gateway and the identity server side by side. Every open tab
+// reconnects at once, so the first resolutions a fresh process performs are the ones most
+// likely to find the identity server still starting. Those must be answered with "ask
+// again", because a revoke here is permanent and would sign out everyone who was working.
+describe("IX-Auth sessions across an identity-server restart", () => {
+  it("keeps the session when the key set cannot be fetched, and admits it once it can", async () => {
+    const now = Date.now();
+    const session = persistIxAuthLoginSession({
+      ...tokenBundle(now + 900_000, "refresh-original"),
+      settings,
+      nowMs: now,
+      profileId: ensureProfileForEmail("target@example.test").id,
+    });
+    let identityUp = false;
+    vi.stubGlobal("fetch", async () => {
+      if (!identityUp) {
+        throw new Error("connect ECONNREFUSED");
+      }
+      return jwksResponse();
+    });
+    const request = {
+      sessionToken: session.sessionToken,
+      settings,
+      meta: {},
+      nowMs: now,
+      touch: false,
+    };
+    await expect(resolveIxAuthSessionToken(request)).resolves.toEqual({
+      ok: false,
+      rejection: "identity-unavailable",
+    });
+    expect(readIxAuthSessionTokenRow(session.sessionToken)?.revoked_at).toBeNull();
+
+    identityUp = true;
+    await expect(resolveIxAuthSessionToken(request)).resolves.toMatchObject({ ok: true });
+  });
+
+  it("keeps the session when the refresh call cannot reach the identity server", async () => {
+    const now = Date.now();
+    const session = persistIxAuthLoginSession({
+      ...tokenBundle(now + 30_000, "refresh-original"),
+      settings,
+      nowMs: now,
+      profileId: ensureProfileForEmail("target@example.test").id,
+    });
+    vi.stubGlobal("fetch", async (url: string | URL) => {
+      if (new URL(String(url)).pathname === "/.well-known/jwks.json") {
+        return jwksResponse();
+      }
+      throw new Error("connect ECONNREFUSED");
+    });
+    await expect(
+      resolveIxAuthSessionToken({
+        sessionToken: session.sessionToken,
+        settings,
+        meta: {},
+        nowMs: now,
+        touch: false,
+      }),
+    ).resolves.toEqual({ ok: false, rejection: "identity-unavailable" });
+    const row = readIxAuthSessionTokenRow(session.sessionToken);
+    expect(row?.revoked_at).toBeNull();
+    // The stored token is still the one the identity server knows about, so the next
+    // attempt is an ordinary rotation rather than a replay it would read as theft.
+    expect(row?.refresh_token).toBe("refresh-original");
+  });
+
+  it("still ends the session when the identity server refuses the refresh token", async () => {
+    const now = Date.now();
+    const session = persistIxAuthLoginSession({
+      ...tokenBundle(now + 30_000, "refresh-original"),
+      settings,
+      nowMs: now,
+      profileId: ensureProfileForEmail("target@example.test").id,
+    });
+    vi.stubGlobal("fetch", async (url: string | URL) => {
+      if (new URL(String(url)).pathname === "/.well-known/jwks.json") {
+        return jwksResponse();
+      }
+      return Response.json({ error: { code: "AUTH_REFRESH_INVALID" } }, { status: 401 });
+    });
+    await expect(
+      resolveIxAuthSessionToken({
+        sessionToken: session.sessionToken,
+        settings,
+        meta: {},
+        nowMs: now,
+        touch: false,
+      }),
+    ).resolves.toEqual({ ok: false, rejection: "identity-expired" });
+    expect(readIxAuthSessionTokenRow(session.sessionToken)?.revoked_at).toBe(now);
+  });
+});

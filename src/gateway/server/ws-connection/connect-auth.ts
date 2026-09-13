@@ -235,7 +235,7 @@ async function authenticateGatewayConnectCore(
       );
     }
     sendHandshakeErrorResponse(ErrorCodes.INVALID_REQUEST, authMessage, {
-      ...(failedAuth.rateLimited === true
+      ...(failedAuth.rateLimited === true || failedAuth.retryable === true
         ? {
             retryable: true,
             ...(failedAuth.retryAfterMs !== undefined

@@ -5,6 +5,10 @@ import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
 } from "@openclaw/normalization-core/string-coerce";
+import {
+  IX_AUTH_IDENTITY_RETRY_AFTER_MS,
+  IX_AUTH_IDENTITY_UNAVAILABLE_REASON,
+} from "../auth/ix-auth/ix-auth-types.js";
 import type { GatewayAuthConfig, GatewayTrustedProxyConfig } from "../config/types.gateway.js";
 import { safeEqualSecret } from "../security/secret-equal.js";
 import {
@@ -67,7 +71,14 @@ export type GatewayAuthResult = {
   reason?: string;
   /** Present when the request was blocked by the rate limiter. */
   rateLimited?: boolean;
-  /** Milliseconds the client should wait before retrying (when rate-limited). */
+  /**
+   * The failure is temporary and the same credentials may work shortly.
+   *
+   * Set where a dependency was unavailable rather than where a credential was refused,
+   * so a client retries instead of discarding what it holds.
+   */
+  retryable?: boolean;
+  /** Milliseconds the client should wait before retrying (when rate-limited or retryable). */
   retryAfterMs?: number;
 };
 
@@ -539,16 +550,29 @@ async function authorizeGatewayConnectCore(
   if (auth.mode === "ix-auth") {
     // The Control UI proves identity with the Gateway's own session cookie, verified
     // against the identity server's public key without any outbound call.
-    const resolved = req
+    const resolution = req
       ? await (
           await import("./ix-auth-principal.js")
-        ).resolveIxAuthRequestPrincipal({
+        ).resolveIxAuthRequestSession({
           req,
           trustedProxies,
           allowRealIpFallback: params.allowRealIpFallback === true,
           touch: false,
         })
       : undefined;
+    // "The identity server did not answer" is not "you are not signed in". Saying the
+    // second would send a browser that still holds a good session to the sign-in screen
+    // every time the identity container restarts, so it is reported as a retry instead
+    // and the cookie stays untouched.
+    if (resolution && !resolution.ok && resolution.rejection === "identity-unavailable") {
+      return {
+        ok: false,
+        reason: IX_AUTH_IDENTITY_UNAVAILABLE_REASON,
+        retryable: true,
+        retryAfterMs: IX_AUTH_IDENTITY_RETRY_AFTER_MS,
+      };
+    }
+    const resolved = resolution?.ok ? resolution : undefined;
     if (resolved) {
       const originResult = authorizeHttpBrowserOrigin({
         authSurface,

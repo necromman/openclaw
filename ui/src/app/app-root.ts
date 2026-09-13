@@ -208,6 +208,19 @@ export class OpenClawApp extends OpenClawLightDomElement {
     if (snapshot.phase === "connected") {
       this.loginGatePinned = false;
     }
+    // A refused handshake in identity-server mode is the controller's to judge: the shell
+    // would otherwise retry a session that has ended until someone reloaded the page.
+    const basePath = this.context?.basePath;
+    if (basePath !== undefined) {
+      this.ixAuth.recoverAfterConnectFailure({
+        basePath,
+        code: snapshot.lastErrorCode,
+        authReason: snapshot.lastErrorAuthReason,
+        connected: snapshot.phase === "connected",
+        reconnect: () =>
+          gateway.connect({ gatewayUrl: this.loginGatewayUrl, token: "", password: "" }),
+      });
+    }
   }
 
   private syncLoginConnection(gateway = this.context?.gateway) {
@@ -584,8 +597,11 @@ export class OpenClawApp extends OpenClawLightDomElement {
         </openclaw-tooltip-provider>
       `;
     }
+    // A tab whose account session ended must reach the sign-in screen even though the
+    // shell would normally hold on to reconnection.
     const shellOwnsRecovery =
-      gatewaySnapshot.phase === "reconnecting" || gatewaySnapshot.phase === "reload-required";
+      !this.ixAuth.sessionLost &&
+      (gatewaySnapshot.phase === "reconnecting" || gatewaySnapshot.phase === "reload-required");
     const showLoginGate = !gatewayConnected && !shellOwnsRecovery;
     // Identity-server mode owns the pre-connection screen. A person signs in with an
     // account; the Gateway URL and shared token are not theirs to enter, and falling

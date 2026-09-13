@@ -111,4 +111,29 @@ export type IxAuthSessionRejection =
   | "idle-expired"
   | "absolute-expired"
   | "identity-expired"
+  // The identity server could not be reached or its key set could not be fetched. The
+  // session is untouched: this says "ask again", never "this browser is signed out".
+  // Treating it as a rejection is what used to revoke every live session whenever the
+  // identity container restarted beside the Gateway.
+  | "identity-unavailable"
   | "profile-missing";
+
+/**
+ * Auth failure reason for "the identity server could not answer".
+ *
+ * Distinct from `gateway_auth_required` on purpose: the Control UI reads this one as
+ * "wait and try again", and the other as "show the sign-in screen".
+ */
+export const IX_AUTH_IDENTITY_UNAVAILABLE_REASON = "identity_unavailable";
+
+/**
+ * How long a browser is told to wait before probing again while the identity server is
+ * unreachable. Short enough that a redeploy is over in one or two tries, long enough that
+ * a roomful of open tabs does not hammer a container that is still starting.
+ */
+export const IX_AUTH_IDENTITY_RETRY_AFTER_MS = 3_000;
+
+/** True when a rejection means "retry later" rather than "this session is finished". */
+export function isTransientIxAuthRejection(rejection: IxAuthSessionRejection): boolean {
+  return rejection === "identity-unavailable";
+}

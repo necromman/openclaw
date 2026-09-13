@@ -35,6 +35,10 @@ export const ConnectErrorDetailCodes = {
   AUTH_DEVICE_TOKEN_MISMATCH: "AUTH_DEVICE_TOKEN_MISMATCH",
   AUTH_SCOPE_MISMATCH: "AUTH_SCOPE_MISMATCH",
   AUTH_RATE_LIMITED: "AUTH_RATE_LIMITED",
+  // The identity provider could not be reached. Distinct from every other AUTH_ code
+  // here: nothing about the presented credential was refused, so a client keeps it and
+  // retries rather than sending the person back to a sign-in screen.
+  AUTH_IDENTITY_UNAVAILABLE: "AUTH_IDENTITY_UNAVAILABLE",
   AUTH_TAILSCALE_IDENTITY_MISSING: "AUTH_TAILSCALE_IDENTITY_MISSING",
   AUTH_TAILSCALE_PROXY_MISSING: "AUTH_TAILSCALE_PROXY_MISSING",
   AUTH_TAILSCALE_WHOIS_FAILED: "AUTH_TAILSCALE_WHOIS_FAILED",
@@ -197,6 +201,8 @@ export function resolveAuthConnectErrorDetailCode(
       return ConnectErrorDetailCodes.AUTH_TAILSCALE_IDENTITY_MISMATCH;
     case "rate_limited":
       return ConnectErrorDetailCodes.AUTH_RATE_LIMITED;
+    case "identity_unavailable":
+      return ConnectErrorDetailCodes.AUTH_IDENTITY_UNAVAILABLE;
     case "device_token_mismatch":
       return ConnectErrorDetailCodes.AUTH_DEVICE_TOKEN_MISMATCH;
     case "scope_mismatch":

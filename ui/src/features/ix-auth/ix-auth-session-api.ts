@@ -46,6 +46,14 @@ export type IxAuthSessionState = {
   /** True when the identity server accepts signups, which decides the signup link. */
   selfSignupEnabled?: boolean;
   impersonationRestoreAvailable?: boolean;
+  /**
+   * The probe could not reach a Gateway that would answer: a network fault, a timeout,
+   * or a 5xx from the maintenance page that stands in during a redeploy.
+   *
+   * It is not the same as "signed out" and must never be rendered as one. A tab that
+   * reads this waits and asks again with the cookie it still holds.
+   */
+  unavailable?: boolean;
 };
 
 export type IxAuthLoginResult =
@@ -228,7 +236,11 @@ export function readIxAuthSessionSnapshot(): IxAuthSessionState | undefined {
  * ix-auth mode, so the caller can fall through to the existing connection screen.
  */
 export async function probeIxAuthSession(basePath: string): Promise<IxAuthSessionState> {
-  return rememberIxAuthSession(await runIxAuthSessionProbe(basePath));
+  const session = await runIxAuthSessionProbe(basePath);
+  // An unreachable Gateway is not an answer, so it must not overwrite the ranks the last
+  // real answer recorded. Remembering it would drop the sidebar and the settings menu to
+  // "no account here" for the length of a redeploy.
+  return session.unavailable === true ? session : rememberIxAuthSession(session);
 }
 
 async function runIxAuthSessionProbe(basePath: string): Promise<IxAuthSessionState> {
@@ -241,7 +253,12 @@ async function runIxAuthSessionProbe(basePath: string): Promise<IxAuthSessionSta
       signal: AbortSignal.timeout(IX_AUTH_PROBE_TIMEOUT_MS),
     });
   } catch {
-    return { authenticated: false };
+    // Reaching nobody says nothing about the session. Reporting a sign-out here is what
+    // put an open tab on the sign-in screen every time a deployment swapped the process.
+    return { authenticated: false, unavailable: true };
+  }
+  if (response.status >= 500 || response.status === 429) {
+    return { authenticated: false, unavailable: true };
   }
   if (!response.ok) {
     return { authenticated: false };

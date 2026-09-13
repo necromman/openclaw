@@ -18,7 +18,11 @@ import {
   resolveIxAuthSessionToken,
   verifyIxAuthTokenBundle,
 } from "../auth/ix-auth/ix-auth-sessions.js";
-import { IX_AUTH_CSRF_HEADER_NAME } from "../auth/ix-auth/ix-auth-types.js";
+import {
+  isTransientIxAuthRejection,
+  IX_AUTH_CSRF_HEADER_NAME,
+  IX_AUTH_IDENTITY_RETRY_AFTER_MS,
+} from "../auth/ix-auth/ix-auth-types.js";
 import { revokeIxAuthLoginSession } from "../state/ix-auth-sessions-store.js";
 import { AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET } from "./auth-rate-limit.js";
 import { readRequestCookieValue } from "./cookie-header.js";
@@ -354,6 +358,18 @@ async function handleIxAuthSessionProbeRoute(params: {
     touch: params.refresh,
   });
   if (!resolution.ok) {
+    // The identity server being unreachable is not a sign-out. Clearing the cookie here
+    // would destroy the one credential the browser holds, so a redeploy would end every
+    // session on the first probe that raced the restart. Say "come back" instead, and
+    // leave the cookie exactly as it is.
+    if (isTransientIxAuthRejection(resolution.rejection)) {
+      sendJson(params.res, 503, {
+        error: "identity_unavailable",
+        authMode: "ix-auth",
+        retryAfterMs: IX_AUTH_IDENTITY_RETRY_AFTER_MS,
+      });
+      return;
+    }
     if (!returnBinding) {
       clearIxAuthSessionCookies({ res: params.res, deps: params.deps });
     }

@@ -17,6 +17,15 @@ const IX_AUTH_JWKS_CACHE_TTL_MS = 3_600_000;
 /** An unknown `kid` triggers at most one refetch per this window (token.md section 4). */
 const IX_AUTH_JWKS_REFETCH_COOLDOWN_MS = 60_000;
 
+/**
+ * Reason returned when the key set itself could not be fetched.
+ *
+ * Named rather than spelled out at each site because callers must tell it apart from
+ * every other failure here: this one says nothing about the token and must never end a
+ * session, while the rest are forgery signals.
+ */
+export const IX_AUTH_JWKS_UNAVAILABLE_REASON = "jwks_unavailable";
+
 /** A JWKS document larger than this is treated as hostile and rejected. */
 const IX_AUTH_JWKS_MAX_BYTES = 256 * 1024;
 
@@ -190,7 +199,7 @@ export async function verifyIxAuthAccessToken(params: {
   try {
     key = await resolveIxAuthSigningKey({ jwksUrl: params.jwksUrl, keyId, nowMs: params.nowMs });
   } catch {
-    return { ok: false, reason: "jwks_unavailable" };
+    return { ok: false, reason: IX_AUTH_JWKS_UNAVAILABLE_REASON };
   }
   if (!key) {
     return { ok: false, reason: "unknown_kid" };
