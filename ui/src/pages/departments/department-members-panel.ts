@@ -47,10 +47,27 @@ export function renderDepartmentMembersPanel(params: {
   searched: boolean;
   busy: boolean;
   onQueryInput: (value: string) => void;
+  loading?: boolean;
+  failed?: boolean;
+  onRetry?: () => void;
   onSearch: () => void;
   onAdd: (user: IxAuthManagedUser) => void;
   onRemove: (user: IxAuthManagedUser) => void;
 }): TemplateResult {
+  if (params.loading || params.failed) {
+    return html`<div class="departments-members" role="status">
+      <p class="muted">
+        ${t(params.loading ? "ixAuth.departments.loading" : "ixAuth.departments.membersLoadFailed")}
+      </p>
+      ${
+        params.failed
+          ? html`<button class="btn" ?disabled=${params.busy} @click=${params.onRetry}>
+              ${t("ixAuth.departments.retry")}
+            </button>`
+          : nothing
+      }
+    </div>`;
+  }
   const memberIds = new Set(params.members.map((member) => member.id));
   const candidates = params.results.filter((user) => !memberIds.has(user.id));
   return html`
@@ -91,6 +108,7 @@ export function renderDepartmentMembersPanel(params: {
             class="settings-input"
             type="search"
             .value=${params.query}
+            ?disabled=${params.busy}
             placeholder=${t("ixAuth.departments.memberAddPlaceholder")}
             @input=${(event: Event) =>
               // SAFETY: the listener is bound to this input element.

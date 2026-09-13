@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { render } from "lit";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DepartmentAgent } from "../../../../packages/gateway-protocol/src/schema/departments.js";
 import {
   canManageIxAuthDepartments,
@@ -277,6 +277,34 @@ describe("access panel", () => {
 });
 
 describe("members panel", () => {
+  it.each(["loading", "failed"] as const)(
+    "does not show an empty department while %s",
+    (status) => {
+      const onRetry = vi.fn();
+      const host = draw(
+        renderDepartmentMembersPanel({
+          members: [],
+          total: 0,
+          query: "",
+          results: [],
+          searched: false,
+          busy: false,
+          loading: status === "loading",
+          failed: status === "failed",
+          onRetry,
+          onQueryInput: () => {},
+          onSearch: () => {},
+          onAdd: () => {},
+          onRemove: () => {},
+        }),
+      );
+      expect(host.textContent).not.toContain("Nobody is in this department yet.");
+      expect(host.querySelector("input")).toBeNull();
+      host.querySelector<HTMLButtonElement>("button")?.click();
+      expect(onRetry).toHaveBeenCalledTimes(status === "failed" ? 1 : 0);
+    },
+  );
+
   it("refuses to offer the signed-in administrator their own row", () => {
     const host = draw(
       renderDepartmentMembersPanel({

@@ -43,6 +43,7 @@ import {
   type IxAuthManagedUser,
   type IxAuthUserActionName,
   type IxAuthUserDetail,
+  type IxAuthUsersFailure,
 } from "../../features/ix-auth/ix-auth-users-api.ts";
 import { t } from "../../i18n/index.ts";
 import { registerIxAuthEnglish } from "../../i18n/locales/en-ix-auth.ts";
@@ -98,10 +99,15 @@ export class UsersPage extends OpenClawLightDomElement {
   @state() private showInvite = false;
   @state() private showImport = false;
   @state() private selected: IxAuthUserDetail | undefined;
+  @state() private detailLoading = false;
   @state() private displayNameDraft = "";
   @state() private selectedRole = "";
   @state() private selectedDepartments: string[] = [];
   @state() private deleteArmed = false;
+
+  private lifecycle = 0;
+  private listRequest = 0;
+  private detailRequest = 0;
 
   private get basePath(): string {
     return this.context?.basePath ?? "";
@@ -109,7 +115,18 @@ export class UsersPage extends OpenClawLightDomElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.lifecycle += 1;
     void this.load();
+  }
+
+  override disconnectedCallback(): void {
+    this.lifecycle += 1;
+    this.listRequest += 1;
+    this.detailRequest += 1;
+    this.busy = false;
+    this.detailLoading = false;
+    this.selected = undefined;
+    super.disconnectedCallback();
   }
 
   private canManage(): boolean {
@@ -120,20 +137,31 @@ export class UsersPage extends OpenClawLightDomElement {
   }
 
   private async load(): Promise<void> {
-    this.session ??= await probeIxAuthSession(this.basePath);
+    const lifecycle = this.lifecycle;
+    const session = this.session ?? (await probeIxAuthSession(this.basePath));
+    if (lifecycle !== this.lifecycle) {
+      return;
+    }
+    this.session = session;
     if (!this.canManage()) {
       // A second probe would not change the answer, and the page says why below.
       return;
     }
-    const departments = await fetchIxAuthDepartments(this.basePath);
+    const [departments] = await Promise.all([fetchIxAuthDepartments(this.basePath), this.reload()]);
+    if (lifecycle !== this.lifecycle) {
+      return;
+    }
     if (Array.isArray(departments)) {
       this.departments = departments;
     }
-    await this.reload();
   }
 
   private async reload(): Promise<void> {
+    const request = ++this.listRequest;
     this.loading = true;
+    this.users = [];
+    this.total = 0;
+    this.errorKey = undefined;
     const page = await fetchIxAuthUsers({
       basePath: this.basePath,
       query: this.query.trim() || undefined,
@@ -143,12 +171,14 @@ export class UsersPage extends OpenClawLightDomElement {
       page: this.pageIndex,
       size: IX_AUTH_USERS_PAGE_SIZE,
     });
+    if (request !== this.listRequest) {
+      return;
+    }
     this.loading = false;
     if (isIxAuthUsersFailure(page)) {
       this.errorKey = page.errorKey;
       return;
     }
-    this.errorKey = undefined;
     this.users = page.users;
     this.total = page.total;
   }
@@ -161,11 +191,22 @@ export class UsersPage extends OpenClawLightDomElement {
    * administrator is looking at, and re-reading the account is not a reason to lose it.
    */
   private async selectUser(userId: string, options?: { keepNotice?: boolean }): Promise<void> {
+    if (this.busy && !options?.keepNotice) {
+      return;
+    }
+    const request = ++this.detailRequest;
+    this.selected = undefined;
+    this.detailLoading = true;
     this.deleteArmed = false;
     if (!options?.keepNotice) {
       this.notice = undefined;
+      this.errorKey = undefined;
     }
     const detail = await fetchIxAuthUserDetail({ basePath: this.basePath, userId });
+    if (request !== this.detailRequest) {
+      return;
+    }
+    this.detailLoading = false;
     if (isIxAuthUsersFailure(detail)) {
       this.errorKey = detail.errorKey;
       return;
@@ -177,22 +218,35 @@ export class UsersPage extends OpenClawLightDomElement {
   }
 
   /** Run one mutation, then refresh both the row and the list behind it. */
-  private async mutate(run: () => Promise<unknown>): Promise<void> {
+  private async mutate<T>(
+    run: () => Promise<T | IxAuthUsersFailure>,
+    onSuccess?: (result: T) => void,
+  ): Promise<void> {
     if (this.busy) {
       return;
     }
     this.busy = true;
+    const lifecycle = this.lifecycle;
     this.errorKey = undefined;
-    const result = await run();
-    this.busy = false;
-    if (isIxAuthUsersFailure(result)) {
-      this.errorKey = result.errorKey;
-      return;
-    }
-    const userId = this.selected?.user.id;
-    await this.reload();
-    if (userId) {
-      await this.selectUser(userId, { keepNotice: true });
+    try {
+      const result = await run();
+      if (lifecycle !== this.lifecycle) {
+        return;
+      }
+      if (isIxAuthUsersFailure(result)) {
+        this.errorKey = result.errorKey;
+        return;
+      }
+      onSuccess?.(result);
+      const userId = this.selected?.user.id;
+      await this.reload();
+      if (lifecycle === this.lifecycle && userId) {
+        await this.selectUser(userId, { keepNotice: true });
+      }
+    } finally {
+      if (lifecycle === this.lifecycle) {
+        this.busy = false;
+      }
     }
   }
 
@@ -204,22 +258,21 @@ export class UsersPage extends OpenClawLightDomElement {
    * outside a department their administrator believes they are in.
    */
   private async saveDepartments(userId: string): Promise<void> {
-    await this.mutate(async () => {
-      const result = await replaceIxAuthUserDepartments({
-        basePath: this.basePath,
-        userId,
-        departments: this.selectedDepartments,
-      });
-      if (isIxAuthUsersFailure(result)) {
-        return result;
-      }
-      this.notice = result.departmentFailed
-        ? t("ixAuth.users.departmentsPartiallyApplied", {
-            codes: this.describeDepartments(result.failedDepartments),
-          })
-        : t("ixAuth.users.departmentsSaved");
-      return result;
-    });
+    await this.mutate(
+      () =>
+        replaceIxAuthUserDepartments({
+          basePath: this.basePath,
+          userId,
+          departments: this.selectedDepartments,
+        }),
+      (result) => {
+        this.notice = result.departmentFailed
+          ? t("ixAuth.users.departmentsPartiallyApplied", {
+              codes: this.describeDepartments(result.failedDepartments),
+            })
+          : t("ixAuth.users.departmentsSaved");
+      },
+    );
   }
 
   /** Department names for a list of codes, falling back to the code itself. */
@@ -234,17 +287,12 @@ export class UsersPage extends OpenClawLightDomElement {
     if (!user) {
       return;
     }
-    await this.mutate(async () => {
-      const result = await runIxAuthUserAction({
-        basePath: this.basePath,
-        userId: user.id,
-        action,
-      });
-      if (!isIxAuthUsersFailure(result)) {
+    await this.mutate(
+      () => runIxAuthUserAction({ basePath: this.basePath, userId: user.id, action }),
+      (result) => {
         this.notice = this.describeAction(action, user.email, result);
-      }
-      return result;
-    });
+      },
+    );
   }
 
   private describeAction(
@@ -277,6 +325,7 @@ export class UsersPage extends OpenClawLightDomElement {
         <select
           class="settings-select"
           .value=${params.value}
+          ?disabled=${this.busy}
           @change=${(event: Event) => {
             // SAFETY: this listener is bound to the select element on this line.
             params.onChange((event.target as HTMLSelectElement).value);
@@ -319,6 +368,7 @@ export class UsersPage extends OpenClawLightDomElement {
           <input
             class="settings-input"
             type="search"
+            ?disabled=${this.busy}
             placeholder=${t("ixAuth.users.searchPlaceholder")}
             .value=${this.query}
             @change=${(event: Event) => {
@@ -352,7 +402,7 @@ export class UsersPage extends OpenClawLightDomElement {
           onChange: (value) => this.applyFilter({ departmentFilter: value }),
         })}
         <div class="users-toolbar__actions">
-          <button class="btn" @click=${() => void this.reload()}>
+          <button class="btn" ?disabled=${this.busy} @click=${() => void this.reload()}>
             ${t("ixAuth.users.refresh")}
           </button>
           <button
@@ -392,12 +442,13 @@ export class UsersPage extends OpenClawLightDomElement {
   }
 
   private renderPager(): TemplateResult {
-    const shown = this.pageIndex * IX_AUTH_USERS_PAGE_SIZE + this.users.length;
+    const shown =
+      this.users.length === 0 ? 0 : this.pageIndex * IX_AUTH_USERS_PAGE_SIZE + this.users.length;
     return html`
       <div class="users-pager">
         <button
           class="btn"
-          ?disabled=${this.pageIndex === 0 || this.loading}
+          ?disabled=${this.pageIndex === 0 || this.loading || this.busy}
           @click=${() => {
             this.pageIndex -= 1;
             void this.reload();
@@ -407,7 +458,7 @@ export class UsersPage extends OpenClawLightDomElement {
         </button>
         <button
           class="btn"
-          ?disabled=${shown >= this.total || this.loading}
+          ?disabled=${shown >= this.total || this.loading || this.busy}
           @click=${() => {
             this.pageIndex += 1;
             void this.reload();
@@ -423,6 +474,9 @@ export class UsersPage extends OpenClawLightDomElement {
   }
 
   private renderDetail(): unknown {
+    if (this.detailLoading) {
+      return html`<p role="status">${t("common.loading")}</p>`;
+    }
     const detail = this.selected;
     if (!detail) {
       return nothing;
@@ -459,17 +513,17 @@ export class UsersPage extends OpenClawLightDomElement {
         this.selectedRole = role;
       },
       onSaveRole: () =>
-        void this.mutate(async () => {
-          const result = await replaceIxAuthUserRoles({
-            basePath: this.basePath,
-            userId: detail.user.id,
-            roles: [this.selectedRole],
-          });
-          if (!isIxAuthUsersFailure(result)) {
+        void this.mutate(
+          () =>
+            replaceIxAuthUserRoles({
+              basePath: this.basePath,
+              userId: detail.user.id,
+              roles: [this.selectedRole],
+            }),
+          () => {
             this.notice = t("ixAuth.users.rolesSaved");
-          }
-          return result;
-        }),
+          },
+        ),
       onDepartmentToggle: (code, checked) => {
         const remaining = this.selectedDepartments.filter((item) => item !== code);
         this.selectedDepartments = checked ? [...remaining, code] : remaining;
@@ -489,16 +543,12 @@ export class UsersPage extends OpenClawLightDomElement {
       },
       onDelete: () => {
         this.deleteArmed = false;
-        void this.mutate(async () => {
-          const result = await deleteIxAuthUser({
-            basePath: this.basePath,
-            userId: detail.user.id,
-          });
-          if (!isIxAuthUsersFailure(result)) {
+        void this.mutate(
+          () => deleteIxAuthUser({ basePath: this.basePath, userId: detail.user.id }),
+          () => {
             this.selected = undefined;
-          }
-          return result;
-        });
+          },
+        );
       },
     });
   }
@@ -547,6 +597,7 @@ export class UsersPage extends OpenClawLightDomElement {
                   users: this.users,
                   departments: this.departments,
                   loading: this.loading,
+                  busy: this.busy,
                   selectedId: this.selected?.user.id,
                   onSelect: (userId) => void this.selectUser(userId),
                 }),

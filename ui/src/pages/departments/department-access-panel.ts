@@ -104,6 +104,8 @@ export function renderDepartmentAccessPanel(params: {
   listing: DepartmentsFoldersListResult | undefined;
   busy: boolean;
   notice?: string;
+  failed?: boolean;
+  onRetry?: () => void;
   onOpenFolder: (path: string) => void;
   onChooseFolder: (absolutePath: string) => void;
   onToggleReadonlyTools: (value: boolean) => void;
@@ -129,12 +131,19 @@ export function renderDepartmentAccessPanel(params: {
             </p>`
           : nothing
       }
-      ${renderBrowser({
-        listing: params.listing,
-        busy: params.busy,
-        onOpen: params.onOpenFolder,
-        onChoose: params.onChooseFolder,
-      })}
+      ${
+        params.failed
+          ? html`<div role="status">
+              <p class="muted">${t("ixAuth.departments.browseLoadFailed")}</p>
+              <button class="btn" @click=${params.onRetry}>${t("ixAuth.departments.retry")}</button>
+            </div>`
+          : renderBrowser({
+              listing: params.listing,
+              busy: params.busy,
+              onOpen: params.onOpenFolder,
+              onChoose: params.onChooseFolder,
+            })
+      }
       ${renderToggle({
         label: t("ixAuth.departments.readonlyLabel"),
         hint: t("ixAuth.departments.readonlyHint"),
@@ -155,6 +164,7 @@ export function renderDepartmentAccessPanel(params: {
           class="settings-input"
           rows="3"
           .value=${params.draft.indexText}
+          ?disabled=${params.busy}
           placeholder=${t("ixAuth.departments.indexPlaceholder")}
           @input=${(event: Event) =>
             // SAFETY: the listener is bound to this textarea element.

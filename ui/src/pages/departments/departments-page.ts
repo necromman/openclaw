@@ -1,13 +1,3 @@
-// The department screen.
-//
-// Three questions in one place, in the order an operator asks them: which departments
-// exist, who is in them, and which agent (and which folder) each department reaches. They
-// share a screen because they are one decision: a department that nobody is in and no
-// agent serves is not yet a department.
-//
-// No permission decision is made in this file. The Gateway refuses every route and method
-// behind it for anyone but a system administrator; the page only decides what is worth
-// drawing, and says so plainly when the answer is nothing.
 import "../../styles/departments.css";
 import { consume } from "@lit/context";
 import { html, nothing, type TemplateResult } from "lit";
@@ -68,24 +58,7 @@ import {
 
 registerIxAuthEnglish();
 
-/** Accounts fetched per member or search listing. One screenful for one department. */
 const DEPARTMENT_MEMBER_PAGE_SIZE = 100;
-
-/**
- * One failure test for both clients on this page.
- *
- * It matches on `kind: "failed"` rather than on the presence of `kind`, because the user
- * routes answer success as `{ kind: "ok" }` and a presence test would read every
- * successful membership change as an error with no message.
- */
-function isFailure(value: unknown): value is { kind: "failed"; errorKey: string } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    // SAFETY: the null and typeof guard directly above proves this is an object.
-    (value as { kind?: unknown }).kind === "failed"
-  );
-}
 
 export class DepartmentsPage extends OpenClawLightDomElement {
   @consume({ context: applicationContext, subscribe: false })
@@ -96,17 +69,18 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   @state() private selectedSlug: string | undefined;
   @state() private selectedAgentId: string | undefined;
   @state() private members: IxAuthManagedUser[] = [];
-  /** How many people the department holds, which can exceed the rows fetched. */
   @state() private membersTotal = 0;
+  @state() private membersLoading = false;
+  @state() private membersFailed = false;
   @state() private searchQuery = "";
   @state() private searchResults: IxAuthManagedUser[] = [];
   @state() private searched = false;
   @state() private createSlug = "";
   @state() private createName = "";
   @state() private renameDraft = "";
-  /** Slug whose delete button has been armed once. Cleared on any other action. */
   @state() private deleteArmedSlug: string | undefined;
   @state() private folders: DepartmentsFoldersListResult | undefined;
+  @state() private foldersFailed = false;
   @state() private accessDraft = {
     workspace: "",
     workspaceIsShared: false,
@@ -122,6 +96,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   private client: GatewayBrowserClient | null = null;
   private stopGateway: (() => void) | undefined;
   private connected = false;
+  private membersGeneration = 0;
+  private searchGeneration = 0;
+  private foldersGeneration = 0;
 
   private get basePath(): string {
     return this.context?.basePath ?? "";
@@ -144,6 +121,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     this.stopGateway = undefined;
     this.client = null;
     this.connected = false;
+    this.membersGeneration += 1;
+    this.searchGeneration += 1;
+    this.foldersGeneration += 1;
     super.disconnectedCallback();
   }
 
@@ -163,15 +143,12 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     this.loading = true;
     const directory = await fetchIxAuthDepartmentDirectory(this.basePath);
     this.loading = false;
-    if (isFailure(directory)) {
+    if (isIxAuthUsersFailure(directory)) {
       this.errorKey = directory.errorKey;
       return;
     }
     this.errorKey = undefined;
     this.directory = directory;
-    if (this.selectedSlug) {
-      await this.loadMembers();
-    }
   }
 
   private async loadAgents(): Promise<void> {
@@ -196,10 +173,13 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   }
 
   private async loadMembers(): Promise<void> {
+    const generation = ++this.membersGeneration;
     const department = this.selectedDepartment();
+    this.members = [];
+    this.membersTotal = 0;
+    this.membersFailed = false;
+    this.membersLoading = Boolean(department);
     if (!department) {
-      this.members = [];
-      this.membersTotal = 0;
       return;
     }
     const page = await fetchIxAuthUsers({
@@ -207,8 +187,12 @@ export class DepartmentsPage extends OpenClawLightDomElement {
       department: department.code,
       size: DEPARTMENT_MEMBER_PAGE_SIZE,
     });
+    if (generation !== this.membersGeneration) {
+      return;
+    }
+    this.membersLoading = false;
     if (isIxAuthUsersFailure(page)) {
-      this.errorKey = page.errorKey;
+      this.membersFailed = true;
       return;
     }
     this.members = page.users;
@@ -216,6 +200,10 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   }
 
   private async selectDepartment(slug: string): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.searchGeneration += 1;
     this.selectedSlug = slug;
     this.notice = undefined;
     this.deleteArmedSlug = undefined;
@@ -225,14 +213,6 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     await this.loadMembers();
   }
 
-  /**
-   * Run one mutation, then refresh what it could have changed.
-   *
-   * Two failure shapes arrive here. The HTTP clients answer with a failure object, and
-   * the Gateway methods reject; both end as one message rather than as a silent no-op,
-   * because a button that does nothing and says nothing is the worst outcome on a screen
-   * that changes who can reach what.
-   */
   private async mutate(run: () => Promise<unknown>): Promise<void> {
     if (this.busy) {
       return;
@@ -249,13 +229,15 @@ export class DepartmentsPage extends OpenClawLightDomElement {
         : "departmentsRejected";
       return;
     }
-    this.busy = false;
-    if (isFailure(result)) {
+    if (isIxAuthUsersFailure(result)) {
+      this.busy = false;
       this.errorKey = result.errorKey;
       return;
     }
     await this.loadDirectory();
+    await this.loadMembers();
     await this.loadAgents();
+    this.busy = false;
   }
 
   private async createDepartment(): Promise<void> {
@@ -265,7 +247,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
         slug: this.createSlug.trim(),
         name: this.createName.trim(),
       });
-      if (!isFailure(created)) {
+      if (!isIxAuthUsersFailure(created)) {
         this.notice = t("ixAuth.departments.created", { code: created.code });
         this.createSlug = "";
         this.createName = "";
@@ -285,22 +267,13 @@ export class DepartmentsPage extends OpenClawLightDomElement {
         slug,
         name: this.renameDraft.trim(),
       });
-      if (!isFailure(renamed)) {
+      if (!isIxAuthUsersFailure(renamed)) {
         this.notice = t("ixAuth.departments.renamed");
       }
       return renamed;
     });
   }
 
-  /**
-   * Delete the selected department, then take back what it had handed out.
-   *
-   * The Gateway removes the group and the projection; it cannot touch the configuration,
-   * so the agents it names still have this department's folder as their workspace and its
-   * index paths in their search. Clearing those here is the part that actually closes the
-   * access, and it runs one agent at a time because each is a separate config write with
-   * its own base hash.
-   */
   private async deleteDepartment(): Promise<void> {
     const slug = this.selectedSlug;
     const client = this.client;
@@ -309,7 +282,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     }
     await this.mutate(async () => {
       const removed = await deleteIxAuthDepartment({ basePath: this.basePath, slug });
-      if (isFailure(removed)) {
+      if (isIxAuthUsersFailure(removed)) {
         return removed;
       }
       if (client) {
@@ -327,6 +300,10 @@ export class DepartmentsPage extends OpenClawLightDomElement {
   }
 
   private async searchAccounts(): Promise<void> {
+    if (this.busy || this.membersLoading || this.membersFailed) {
+      return;
+    }
+    const generation = ++this.searchGeneration;
     const query = this.searchQuery.trim();
     if (query.length === 0) {
       this.searchResults = [];
@@ -338,6 +315,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
       query,
       size: DEPARTMENT_MEMBER_PAGE_SIZE,
     });
+    if (generation !== this.searchGeneration) {
+      return;
+    }
     this.searched = true;
     if (isIxAuthUsersFailure(page)) {
       this.errorKey = page.errorKey;
@@ -347,10 +327,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     this.searchResults = page.users;
   }
 
-  /** Add or remove one code from one account's whole department set. */
   private async changeMembership(user: IxAuthManagedUser, join: boolean): Promise<void> {
     const department = this.selectedDepartment();
-    if (!department) {
+    if (!department || this.membersLoading || this.membersFailed) {
       return;
     }
     const remaining = user.departments.filter((code) => code !== department.code);
@@ -372,7 +351,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
               email: user.email,
               name: department.name,
             });
-        await this.loadMembers();
+        this.searchGeneration += 1;
         this.searchResults = [];
         this.searched = false;
       }
@@ -396,7 +375,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
 
   private async openAgent(agentId: string): Promise<void> {
     const agent = this.agents.find((entry) => entry.agentId === agentId);
-    if (!agent) {
+    if (!agent || this.busy) {
       return;
     }
     this.selectedAgentId = agentId;
@@ -413,18 +392,26 @@ export class DepartmentsPage extends OpenClawLightDomElement {
 
   private async openFolder(path: string): Promise<void> {
     const client = this.client;
-    if (!client) {
+    if (!client || this.busy) {
       return;
     }
+    const generation = ++this.foldersGeneration;
+    this.folders = undefined;
+    this.foldersFailed = false;
     try {
       const listing = await fetchDepartmentFolders({ client, path });
+      if (generation !== this.foldersGeneration || client !== this.client) {
+        return;
+      }
       this.folders = listing;
       this.accessDraft = {
         ...this.accessDraft,
         workspaceIsShared: this.isSharedWorkspace(this.accessDraft.workspace, listing),
       };
     } catch {
-      this.folders = undefined;
+      if (generation === this.foldersGeneration && client === this.client) {
+        this.foldersFailed = true;
+      }
     }
   }
 
@@ -433,13 +420,13 @@ export class DepartmentsPage extends OpenClawLightDomElement {
     listing: DepartmentsFoldersListResult | undefined,
   ): boolean {
     const root = listing?.root;
-    return Boolean(root && workspace.length > 0 && workspace.startsWith(root));
+    return Boolean(root && (workspace === root || workspace.startsWith(`${root}/`)));
   }
 
   private async saveAccess(): Promise<void> {
     const client = this.client;
     const agentId = this.selectedAgentId;
-    if (!client || !agentId) {
+    if (!client || !agentId || !this.folders) {
       return;
     }
     await this.mutate(async () => {
@@ -482,6 +469,7 @@ export class DepartmentsPage extends OpenClawLightDomElement {
           control: renderDepartmentsTable({
             departments: this.directory?.departments ?? [],
             loading: this.loading,
+            busy: this.busy,
             ...(this.selectedSlug ? { selectedSlug: this.selectedSlug } : {}),
             ...(this.directory ? { memberCountSource: this.directory.memberCountSource } : {}),
             onSelect: (slug) => void this.selectDepartment(slug),
@@ -568,8 +556,14 @@ export class DepartmentsPage extends OpenClawLightDomElement {
             results: this.searchResults,
             searched: this.searched,
             busy: this.busy,
+            loading: this.membersLoading,
+            failed: this.membersFailed,
+            onRetry: () => void this.loadMembers(),
             onQueryInput: (value) => {
+              this.searchGeneration += 1;
               this.searchQuery = value;
+              this.searchResults = [];
+              this.searched = false;
             },
             onSearch: () => void this.searchAccounts(),
             onAdd: (user) => void this.changeMembership(user, true),
@@ -610,7 +604,9 @@ export class DepartmentsPage extends OpenClawLightDomElement {
               control: renderDepartmentAccessPanel({
                 draft: this.accessDraft,
                 listing: this.folders,
-                busy: this.busy,
+                busy: this.busy || !this.folders,
+                failed: this.foldersFailed,
+                onRetry: () => void this.openFolder(""),
                 onOpenFolder: (path) => void this.openFolder(path),
                 onChooseFolder: (absolutePath) => {
                   this.accessDraft = {

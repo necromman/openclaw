@@ -20,6 +20,7 @@ function renderAgents(agents: readonly string[]): TemplateResult {
 function renderRow(params: {
   department: IxAuthDepartmentOption;
   selected: boolean;
+  busy?: boolean;
   onSelect: (slug: string) => void;
 }): TemplateResult {
   const { department } = params;
@@ -27,7 +28,11 @@ function renderRow(params: {
   return html`
     <tr class="departments-table__row" aria-selected=${params.selected ? "true" : "false"}>
       <td>
-        <button class="departments-table__select" @click=${() => params.onSelect(slug)}>
+        <button
+          class="departments-table__select"
+          ?disabled=${params.busy}
+          @click=${() => params.onSelect(slug)}
+        >
           ${department.name}
         </button>
       </td>
@@ -42,6 +47,7 @@ function renderRow(params: {
 export function renderDepartmentsTable(params: {
   departments: readonly IxAuthDepartmentOption[];
   loading: boolean;
+  busy?: boolean;
   selectedSlug?: string;
   /**
    * Where the member counts came from. Counts that only know who has signed in are not
@@ -72,6 +78,7 @@ export function renderDepartmentsTable(params: {
             renderRow({
               department,
               selected: (department.slug ?? department.code) === params.selectedSlug,
+              busy: params.busy ?? false,
               onSelect: params.onSelect,
             }),
           )}

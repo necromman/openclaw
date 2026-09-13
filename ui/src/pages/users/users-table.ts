@@ -106,6 +106,7 @@ export function renderUsersTable(params: {
   /** The directory the Gateway answered with. Empty until it arrives, or if it failed. */
   departments?: readonly IxAuthDepartmentOption[];
   loading: boolean;
+  busy?: boolean;
   selectedId?: string;
   onSelect: (userId: string) => void;
 }): TemplateResult {
@@ -117,7 +118,7 @@ export function renderUsersTable(params: {
     </p>`;
   }
   return html`
-    <div class="users-table-scroll">
+    <div class="users-table-scroll" ?inert=${params.busy}>
       <table class="users-table">
         <thead>
           <tr>
