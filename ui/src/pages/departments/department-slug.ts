@@ -8,10 +8,10 @@
 // worth more here than one that reads well out loud.
 
 /** The short code shape the Gateway accepts (see ix-auth-admin-departments-http.ts). */
-export const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/u;
+const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/u;
 
 /** The longest short code the Gateway accepts. */
-export const DEPARTMENT_SLUG_MAX_LENGTH = 32;
+const DEPARTMENT_SLUG_MAX_LENGTH = 32;
 
 /** The code used when a name romanizes to nothing a code can be made of. */
 const FALLBACK_SLUG = "dept";
@@ -46,7 +46,7 @@ const JONGSEONG = [
  * Everything that is not a precomposed Hangul syllable is passed through untouched, so a
  * mixed name keeps its Latin and digits.
  */
-export function romanizeHangul(text: string): string {
+function romanizeHangul(text: string): string {
   let out = "";
   for (const character of text) {
     const code = character.codePointAt(0) ?? 0;
@@ -108,7 +108,7 @@ function withCounter(base: string, counter: number): string {
  * usable behind falls back to a generic code rather than to an empty field, so the form
  * stays submittable and the person can override it.
  */
-export function suggestDepartmentSlug(name: string, taken: Iterable<string> = []): string {
+function suggestDepartmentSlug(name: string, taken: Iterable<string> = []): string {
   const used = new Set<string>();
   for (const entry of taken) {
     used.add(entry.trim().toLowerCase());
