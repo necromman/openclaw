@@ -13,6 +13,7 @@ import {
   type UiPreferences,
   type UiSettings,
 } from "./settings.ts";
+import { resolvedModeForTheme, waClassForMode } from "./theme-boot.ts";
 import { startThemeTransition } from "./theme-transition.ts";
 import { resolveTheme, syncThemePaletteStylesheet, type ThemeMode } from "./theme.ts";
 import {
@@ -28,14 +29,16 @@ function applyThemePresentation(settings: UiPreferences): void {
   }
   const root = document.documentElement;
   const resolvedTheme = resolveTheme(settings.theme, settings.themeMode);
+  const resolvedMode = resolvedModeForTheme(resolvedTheme);
   root.dataset.theme = resolvedTheme;
-  root.dataset.themeMode = resolvedTheme.endsWith("light") ? "light" : "dark";
+  root.dataset.themeMode = resolvedMode;
   // Carapace CSS (openclaw/carapace) selects on [data-theme-resolved]; keep it
   // in lockstep with data-theme-mode so its stylesheets work unmodified here.
-  root.dataset.themeResolved = root.dataset.themeMode;
-  root.classList.toggle("wa-light", root.dataset.themeMode === "light");
-  root.classList.toggle("wa-dark", root.dataset.themeMode === "dark");
-  root.style.colorScheme = root.dataset.themeMode;
+  root.dataset.themeResolved = resolvedMode;
+  const waClass = waClassForMode(resolvedMode);
+  root.classList.toggle("wa-light", waClass === "wa-light");
+  root.classList.toggle("wa-dark", waClass === "wa-dark");
+  root.style.colorScheme = resolvedMode;
   root.style.setProperty("--control-ui-text-scale", `${(settings.textScale ?? 100) / 100}`);
   const typefaces = resolveTypefaces(settings.theme, settings.fontUi, settings.fontChat);
   syncTypefaceStylesheets(typefaces);

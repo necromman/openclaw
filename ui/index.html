@@ -20,6 +20,9 @@
       globalThis.__zod_globalConfig ??= {};
       globalThis.__zod_globalConfig.jitless = true;
 
+      // First-paint theme. This duplicates app/theme-boot.ts by hand because it
+      // has to run before the module bundle; app/theme-boot.test.ts evaluates
+      // this very block and asserts the two agree on every stored value.
       (function () {
         var THEMES = {
           claw: 1,
@@ -33,17 +36,12 @@
           manuscript: 1,
           rose: 1,
           miami: 1,
+          custom: 1,
         };
         var MODES = { system: 1, light: 1, dark: 1 };
-        var LEGACY = {
-          dark: "claw:dark",
-          light: "claw:light",
-          openknot: "knot:dark",
-          fieldmanual: "dash:dark",
-          clawdash: "dash:light",
-          system: "claw:system",
-        };
         try {
+          // Key prefix mirrors THEME_SETTINGS_KEY_PREFIX in app/theme-boot.ts;
+          // the stored key carries a gateway-origin scope suffix.
           var keys = Object.keys(localStorage);
           var raw;
           for (var i = 0; i < keys.length; i++) {
@@ -57,9 +55,8 @@
           var m = s && s.themeMode;
           if (typeof t !== "string") t = "";
           if (typeof m !== "string") m = "";
-          var legacy = LEGACY[t];
-          var theme = THEMES[t] ? t : legacy ? legacy.split(":")[0] : "claw";
-          var mode = MODES[m] ? m : legacy ? legacy.split(":")[1] : "system";
+          var theme = THEMES[t] ? t : "claw";
+          var mode = MODES[m] ? m : "system";
           if (mode === "system") {
             mode = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
           }
@@ -76,6 +73,9 @@
             manuscript: ["manuscript", "manuscript-light"],
             rose: ["rose", "rose-light"],
             miami: ["miami", "miami-light"],
+            // Imported themes resolve like a family but carry no palette file;
+            // the bundle injects their CSS from settings as a style tag.
+            custom: ["custom", "custom-light"],
           };
           var pair = FAMILIES[theme];
           var resolved = pair
@@ -83,7 +83,7 @@
             : mode === "light"
               ? "light"
               : "dark";
-          if (pair) {
+          if (pair && theme !== "custom") {
             // Script-created links need explicit render blocking before first paint.
             // The gateway stamps the mount prefix and asset version before this runs.
             var base =
@@ -102,11 +102,18 @@
             palette.href = base + "/themes/" + theme + ".css" + version;
             document.head.appendChild(palette);
           }
-          document.documentElement.setAttribute("data-theme", resolved);
-          var resolvedMode = resolved.includes("light") ? "light" : "dark";
-          document.documentElement.setAttribute("data-theme-mode", resolvedMode);
+          var root = document.documentElement;
+          root.setAttribute("data-theme", resolved);
+          var resolvedMode = resolved.endsWith("light") ? "light" : "dark";
+          root.setAttribute("data-theme-mode", resolvedMode);
           // Carapace CSS selects on [data-theme-resolved]; keep in lockstep.
-          document.documentElement.setAttribute("data-theme-resolved", resolvedMode);
+          root.setAttribute("data-theme-resolved", resolvedMode);
+          // Web Awesome puts its light tokens on bare :root and selects dark
+          // through this class, so without it every Web Awesome surface paints
+          // light until the bundle runs applyThemePresentation().
+          root.classList.remove(resolvedMode === "light" ? "wa-dark" : "wa-light");
+          root.classList.add(resolvedMode === "light" ? "wa-light" : "wa-dark");
+          root.style.colorScheme = resolvedMode;
         } catch (e) {}
       })();
     </script>

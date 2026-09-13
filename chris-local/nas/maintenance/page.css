@@ -1,18 +1,62 @@
+/* 다크가 기본값이고, boot-theme.js 가 저장된 테마를 읽어 html[data-theme-mode]
+   를 붙이면 그 값이 우선한다. 스크립트가 못 돌았을 때만 시스템 설정을 쓴다.
+   배경값은 ui/index.html 의 첫 페인트 배경(#0e1015 / #faf9f7)과 맞춘다. */
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
+  --bg: #0e1015;
+  --fg: #edf0f5;
+  --muted: #bbc3d1;
+  --button-bg: #26375e;
+  --button-bg-hover: #344b80;
+  --button-border: #6d86db;
+  --button-fg: #fff;
+  --focus: #bccbff;
+  --spinner-track: #35415b;
+  --spinner-head: #9db5ff;
   font-family:
     system-ui,
     -apple-system,
     "Malgun Gothic",
     sans-serif;
 }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme-mode="dark"]) {
+    color-scheme: light;
+    --bg: #faf9f7;
+    --fg: #1b1f24;
+    --muted: #4b5963;
+    --button-bg: #2b4a8c;
+    --button-bg-hover: #233d75;
+    --button-border: #2b4a8c;
+    --button-fg: #fff;
+    --focus: #0369a1;
+    --spinner-track: #d7dde5;
+    --spinner-head: #2b4a8c;
+  }
+}
+:root[data-theme-mode="light"] {
+  color-scheme: light;
+  --bg: #faf9f7;
+  --fg: #1b1f24;
+  --muted: #4b5963;
+  --button-bg: #2b4a8c;
+  --button-bg-hover: #233d75;
+  --button-border: #2b4a8c;
+  --button-fg: #fff;
+  --focus: #0369a1;
+  --spinner-track: #d7dde5;
+  --spinner-head: #2b4a8c;
+}
+html {
+  background: var(--bg);
+}
 body {
   margin: 0;
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: #111318;
-  color: #edf0f5;
+  background: var(--bg);
+  color: var(--fg);
 }
 main {
   width: min(520px, calc(100% - 48px));
@@ -25,30 +69,30 @@ h1 {
   line-height: 1.4;
 }
 p {
-  color: #bbc3d1;
+  color: var(--muted);
   line-height: 1.8;
   word-break: keep-all;
 }
 #status {
   min-height: 3.6em;
   margin-top: 28px;
-  color: #edf0f5;
+  color: var(--fg);
 }
 button {
   min-height: 44px;
   padding: 10px 22px;
-  border: 1px solid #6d86db;
+  border: 1px solid var(--button-border);
   border-radius: 5px;
-  background: #26375e;
-  color: #fff;
+  background: var(--button-bg);
+  color: var(--button-fg);
   font: inherit;
   cursor: pointer;
 }
 button:hover {
-  background: #344b80;
+  background: var(--button-bg-hover);
 }
 button:focus-visible {
-  outline: 3px solid #bccbff;
+  outline: 3px solid var(--focus);
   outline-offset: 4px;
 }
 button:disabled {
@@ -62,8 +106,8 @@ button:disabled {
   width: 40px;
   height: 40px;
   margin: 0 auto;
-  border: 3px solid #35415b;
-  border-top-color: #9db5ff;
+  border: 3px solid var(--spinner-track);
+  border-top-color: var(--spinner-head);
   border-radius: 50%;
   animation: spin 1.2s linear infinite;
 }
