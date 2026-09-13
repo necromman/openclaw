@@ -1833,10 +1833,8 @@ describe("attachGatewayWsMessageHandler post-connect health refresh", () => {
             isSuperAdmin: false,
           },
         });
-        const preparationStarted = createDeferred();
         const releasePreparation = createGatewayHarnessGate();
         prepareGatewayNodeConnectMock.mockImplementationOnce(async () => {
-          preparationStarted.resolve();
           await releasePreparation.promise;
           return true;
         });
@@ -1844,6 +1842,7 @@ describe("attachGatewayWsMessageHandler post-connect health refresh", () => {
         const harness = attachGatewayHarness({
           connId: "ix-auth-pending",
           connectNonce: "ix-auth-pending",
+          requestOrigin: "http://127.0.0.1:19001",
           resolvedAuth: { mode: "ix-auth", allowTailscale: false },
           close,
         });
@@ -1854,7 +1853,10 @@ describe("attachGatewayWsMessageHandler post-connect health refresh", () => {
           role: "operator",
           caps: [],
         });
-        await preparationStarted.promise;
+        await waitForFast(() => {
+          expect(close).not.toHaveBeenCalled();
+          expect(prepareGatewayNodeConnectMock).toHaveBeenCalled();
+        });
         if (revoked) {
           revokeIxAuthLoginSession({
             sessionId,
