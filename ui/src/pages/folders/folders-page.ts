@@ -116,7 +116,9 @@ export class FoldersPage extends OpenClawLightDomElement {
       this.expanded = new Set();
       this.notice = undefined;
       this.errorKey = undefined;
-      if (this.connected) void this.load();
+      if (this.connected) {
+        void this.load();
+      }
     }
   }
 
@@ -201,7 +203,9 @@ export class FoldersPage extends OpenClawLightDomElement {
     }
     this.loading = false;
     await this.loadRules(this.selectedPath);
-    if (!this.embedded && !this.fixedSubject) await this.loadOrphans();
+    if (!this.embedded && !this.fixedSubject) {
+      await this.loadOrphans();
+    }
   }
 
   private async loadOrphans(): Promise<void> {
@@ -383,7 +387,9 @@ export class FoldersPage extends OpenClawLightDomElement {
         signal: controller.signal,
       });
       this.selectionAbort = undefined;
-      if (!confirmed || generation !== this.loadGeneration || this.busy) return;
+      if (!confirmed || generation !== this.loadGeneration || this.busy) {
+        return;
+      }
     }
     this.selectedPath = path;
     this.drafts = new Map();

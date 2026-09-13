@@ -18,7 +18,9 @@ class DepartmentFoldersButton extends OpenClawLightDomElement {
 
   private async open(): Promise<void> {
     const department = this.department;
-    if (this.busy || this.loading || !department?.slug) return;
+    if (this.busy || this.loading || !department?.slug) {
+      return;
+    }
     this.loading = true;
     this.failed = false;
     try {
@@ -34,7 +36,9 @@ class DepartmentFoldersButton extends OpenClawLightDomElement {
   }
 
   private close(discard = false): void {
-    if (this.saving) return;
+    if (this.saving) {
+      return;
+    }
     if (this.dirty && !discard) {
       this.confirming = true;
       return;

@@ -8,7 +8,7 @@ type UserDetailDrafts = {
 };
 
 function unchangedDepartments(left: readonly string[], right: readonly string[]): boolean {
-  return [...left].sort().join("\n") === [...right].sort().join("\n");
+  return left.toSorted().join("\n") === right.toSorted().join("\n");
 }
 
 export function hasUnsavedUserDetails(

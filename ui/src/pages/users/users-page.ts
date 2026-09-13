@@ -684,11 +684,11 @@ export class UsersPage extends OpenClawLightDomElement {
       onRetry: () => void this.selectUser(this.detailUserId!, { keepNotice: true }),
       onTab: (tab) => {
         this.detailTab = tab;
-        if (tab === "folders") this.foldersOpened = true;
+        this.foldersOpened ||= tab === "folders";
       },
-      onFolderState: ({ busy, dirty }) => {
-        this.foldersBusy = busy;
-        this.foldersDirty = dirty;
+      onFolderState: (folderState) => {
+        this.foldersBusy = folderState.busy;
+        this.foldersDirty = folderState.dirty;
       },
     });
   }
