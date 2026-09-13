@@ -394,19 +394,24 @@ describe("issuing an invitation", () => {
     }
   });
 
-  it("does not return any cached link when the target lookup fails", async () => {
+  it("does not return any cached link when the identity server cannot be reached", async () => {
     const session = seedSession({ roles: ["ADMIN"], sessionToken: "admin-session" });
     captureIxAuthInviteLink({
       email: "owner@example.test",
       link: "https://gw/invite?token=secret",
       nowMs: Date.now(),
     });
-    stubIdentityServer({ "/admin/users": () => jsonResponse({}, 503) });
+    stubIdentityServer({
+      "/admin/users": () => {
+        throw new Error("synthetic identity-server connection failure");
+      },
+    });
     const answer = await callAdmin({
       pathname: "/auth/admin/invites",
       headers: adminHeaders(session),
     });
     expect(answer.status()).toBe(503);
+    expect(JSON.parse(answer.body()).error).toBe("identity_unavailable");
     expect(answer.body()).not.toContain("token=secret");
   });
 
