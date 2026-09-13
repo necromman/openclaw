@@ -17,6 +17,7 @@ import {
   type ApplicationContext,
   type ApplicationGatewaySnapshot,
 } from "../../app/context.ts";
+import { showConfirmDialog } from "../../components/confirm-dialog.ts";
 import {
   renderSettingsPage,
   renderSettingsRow,
@@ -94,14 +95,16 @@ export class FoldersPage extends OpenClawLightDomElement {
   private pollsLeft = 0;
   private loadGeneration = 0;
   private rulesGeneration = 0;
+  private selectionAbort: AbortController | undefined;
 
-  override willUpdate(changed: PropertyValues) {
-    const previous = changed.get("fixedSubject") as FolderSubjectRow | undefined;
+  override willUpdate(changed: PropertyValues<this>) {
+    const previous = changed.get("fixedSubject");
     if (
       this.hasUpdated &&
       changed.has("fixedSubject") &&
       (previous?.kind !== this.fixedSubject?.kind || previous?.id !== this.fixedSubject?.id)
     ) {
+      this.selectionAbort?.abort();
       this.loadGeneration += 1;
       this.rulesGeneration += 1;
       this.selectedPath = "";
@@ -141,6 +144,7 @@ export class FoldersPage extends OpenClawLightDomElement {
   }
 
   override disconnectedCallback() {
+    this.selectionAbort?.abort();
     if (this.pollTimer !== undefined) {
       clearTimeout(this.pollTimer);
       this.pollTimer = undefined;
@@ -363,9 +367,23 @@ export class FoldersPage extends OpenClawLightDomElement {
     }
   }
 
-  private select(path: string): void {
-    if (this.busy) {
+  private async select(path: string): Promise<void> {
+    if (this.busy || path === this.selectedPath || this.selectionAbort) {
       return;
+    }
+    if (this.drafts.size > 0) {
+      const generation = this.loadGeneration;
+      const controller = (this.selectionAbort = new AbortController());
+      const confirmed = await showConfirmDialog({
+        message: t("ixAuth.users.discardChanges"),
+        details: path || this.tree.get("")?.root || t("ixAuth.folders.rootLabel"),
+        confirmLabel: t("ixAuth.users.discard"),
+        cancelLabel: t("ixAuth.users.keepEditing"),
+        danger: true,
+        signal: controller.signal,
+      });
+      this.selectionAbort = undefined;
+      if (!confirmed || generation !== this.loadGeneration || this.busy) return;
     }
     this.selectedPath = path;
     this.drafts = new Map();
@@ -569,7 +587,7 @@ export class FoldersPage extends OpenClawLightDomElement {
           loading: this.loading,
           busy: this.busy,
           showPermissions: !this.fixedSubject,
-          onSelect: (path) => this.select(path),
+          onSelect: (path) => void this.select(path),
           onToggle: (path) => this.toggle(path),
         })}
       </div>

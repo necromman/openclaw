@@ -1,7 +1,10 @@
 import { html, nothing, type PropertyValues } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { IxAuthDepartmentOption } from "../../features/ix-auth/ix-auth-admin-api.ts";
-import { ixAuthRoleLabel } from "../../features/ix-auth/ix-auth-role-labels.ts";
+import {
+  IX_AUTH_LABELLED_GATEWAY_ROLES,
+  ixAuthRoleLabel,
+} from "../../features/ix-auth/ix-auth-role-labels.ts";
 import {
   prepareIxAuthUserFolderSubject,
   isIxAuthUsersFailure,
@@ -79,16 +82,12 @@ class UserFolderPermissions extends OpenClawLightDomElement {
             ]
           : [],
       ),
-      ...(this.user.gatewayRole
-        ? [
-            {
-              key: `role:${this.user.gatewayRole}`,
-              kind: "role" as const,
-              id: this.user.gatewayRole,
-              label: ixAuthRoleLabel(this.user.gatewayRole),
-            },
-          ]
-        : []),
+      ...IX_AUTH_LABELLED_GATEWAY_ROLES.map((role) => ({
+        key: `role:${role}`,
+        kind: "role" as const,
+        id: role,
+        label: ixAuthRoleLabel(role),
+      })),
     ];
     const subject = targets.find((target) => target.key === this.targetKey) ?? targets[0]!;
     return html`
