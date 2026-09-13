@@ -2,12 +2,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  resolveBootTheme,
-  resolvedModeForTheme,
-  THEME_SETTINGS_KEY_PREFIX,
-  waClassForMode,
-} from "./theme-boot.ts";
+import { settingsKeyForGateway } from "./settings.ts";
+import { resolveBootTheme } from "./theme-boot.ts";
+
+// The app's own key, so the inline script cannot drift from what settings.ts writes.
+const storedSettingsKey = settingsKeyForGateway("wss://gateway.example");
+const settingsKeyPrefix = storedSettingsKey.split(":")[0];
 
 const indexHtmlPath = path.resolve(
   process.cwd(),
@@ -103,10 +103,16 @@ describe("resolveBootTheme", () => {
   });
 
   it("maps resolved themes to a mode and a Web Awesome class", () => {
-    expect(resolvedModeForTheme("miami-light")).toBe("light");
-    expect(resolvedModeForTheme("miami")).toBe("dark");
-    expect(waClassForMode("light")).toBe("wa-light");
-    expect(waClassForMode("dark")).toBe("wa-dark");
+    expect(resolveBootTheme("miami", "light", false)).toMatchObject({
+      resolvedTheme: "miami-light",
+      resolvedMode: "light",
+      waClass: "wa-light",
+    });
+    expect(resolveBootTheme("miami", "dark", true)).toMatchObject({
+      resolvedTheme: "miami",
+      resolvedMode: "dark",
+      waClass: "wa-dark",
+    });
   });
 });
 
@@ -157,7 +163,7 @@ describe("index.html startup theme script", () => {
 
   it("reads the settings key prefix the app writes", async () => {
     const html = await readFile(indexHtmlPath, "utf8");
-    expect(html).toContain(`"${THEME_SETTINGS_KEY_PREFIX}"`);
+    expect(html).toContain(`"${settingsKeyPrefix}"`);
   });
 });
 
@@ -195,7 +201,7 @@ function createRootStub(): RootStub {
 function createSandbox(root: RootStub, stored: StoredSettings | null, prefersLight: boolean) {
   const store = new Map<string, string>();
   if (stored) {
-    store.set(`${THEME_SETTINGS_KEY_PREFIX}:wss://gateway.example`, JSON.stringify(stored));
+    store.set(storedSettingsKey, JSON.stringify(stored));
   }
   const localStorage = {
     getItem: (key: string) => store.get(key) ?? null,

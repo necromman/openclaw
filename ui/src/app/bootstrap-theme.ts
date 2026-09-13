@@ -13,9 +13,13 @@ import {
   type UiPreferences,
   type UiSettings,
 } from "./settings.ts";
-import { resolvedModeForTheme, waClassForMode } from "./theme-boot.ts";
 import { startThemeTransition } from "./theme-transition.ts";
-import { resolveTheme, syncThemePaletteStylesheet, type ThemeMode } from "./theme.ts";
+import {
+  resolveTheme,
+  resolveThemePresentation,
+  syncThemePaletteStylesheet,
+  type ThemeMode,
+} from "./theme.ts";
 import {
   applyChatFontSmoothing,
   applyTypefaceOverrides,
@@ -28,14 +32,15 @@ function applyThemePresentation(settings: UiPreferences): void {
     return;
   }
   const root = document.documentElement;
-  const resolvedTheme = resolveTheme(settings.theme, settings.themeMode);
-  const resolvedMode = resolvedModeForTheme(resolvedTheme);
+  const { resolvedTheme, resolvedMode, waClass } = resolveThemePresentation(
+    settings.theme,
+    settings.themeMode,
+  );
   root.dataset.theme = resolvedTheme;
   root.dataset.themeMode = resolvedMode;
   // Carapace CSS (openclaw/carapace) selects on [data-theme-resolved]; keep it
   // in lockstep with data-theme-mode so its stylesheets work unmodified here.
   root.dataset.themeResolved = resolvedMode;
-  const waClass = waClassForMode(resolvedMode);
   root.classList.toggle("wa-light", waClass === "wa-light");
   root.classList.toggle("wa-dark", waClass === "wa-dark");
   root.style.colorScheme = resolvedMode;

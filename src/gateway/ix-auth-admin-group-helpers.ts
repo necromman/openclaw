@@ -19,7 +19,7 @@ import {
 export const IX_AUTH_GROUP_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/u;
 
 /** Longest display name a department or a title may carry. Long enough for a full name. */
-export const IX_AUTH_GROUP_NAME_MAX_LENGTH = 80;
+const IX_AUTH_GROUP_NAME_MAX_LENGTH = 80;
 
 /** The slug behind one group code, or undefined when the code is not of this kind. */
 export function slugForPrefixedGroupCode(code: string, prefix: string): string | undefined {

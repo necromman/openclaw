@@ -13,10 +13,7 @@ type GroupOption = { code: string; name: string };
 export type GroupSaveOutcome = { notice: string; savedField?: UserDetailDraftField };
 
 /** Name the codes a partial save left behind, falling back to the raw code. */
-export function describeGroupNames(
-  codes: readonly string[],
-  options: readonly GroupOption[],
-): string {
+function describeGroupNames(codes: readonly string[], options: readonly GroupOption[]): string {
   return codes.map((code) => options.find((item) => item.code === code)?.name ?? code).join(", ");
 }
 

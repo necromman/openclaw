@@ -48,7 +48,7 @@ function digestSecretToken(token: string): Uint8Array {
  * A 5xx is the same class from a host that did answer, and a 429 is a request to come
  * back later. Everything else - 400, 401, 403, token reuse - is a real refusal.
  */
-export function isTransientIxAuthRelayFailure(failure: {
+function isTransientIxAuthRelayFailure(failure: {
   status: number;
   code: string;
 }): boolean {

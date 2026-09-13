@@ -71,13 +71,6 @@ function isThemeMode(value: string): value is ThemeMode {
   return VALID_THEME_MODES.has(value);
 }
 
-/**
- * Prefix of the localStorage key holding UI preferences. The real key carries a
- * gateway-origin scope suffix (see `settingsKeyForGateway` in settings.ts), so
- * first paint scans for the first key starting with this prefix.
- */
-export const THEME_SETTINGS_KEY_PREFIX = "openclaw.control.settings.v1";
-
 /** Normalize the raw stored values, falling back to the shipped defaults. */
 export function parseThemeSelection(
   themeRaw: unknown,
@@ -93,7 +86,7 @@ export function parseThemeSelection(
 }
 
 /** Map a theme family and an already-resolved light/dark mode to its palette name. */
-export function resolveThemeForMode(theme: ThemeName, mode: "light" | "dark"): ResolvedTheme {
+function resolveThemeForMode(theme: ThemeName, mode: "light" | "dark"): ResolvedTheme {
   if (theme === "claw") {
     return mode === "light" ? "light" : "dark";
   }
@@ -101,12 +94,12 @@ export function resolveThemeForMode(theme: ThemeName, mode: "light" | "dark"): R
   return mode === "light" ? `${family}-light` : family;
 }
 
-export function resolvedModeForTheme(resolvedTheme: string): "light" | "dark" {
+function resolvedModeForTheme(resolvedTheme: string): "light" | "dark" {
   return resolvedTheme.endsWith("light") ? "light" : "dark";
 }
 
 /** Web Awesome ships light tokens on bare `:root`; the class is what selects dark. */
-export function waClassForMode(mode: "light" | "dark"): "wa-light" | "wa-dark" {
+function waClassForMode(mode: "light" | "dark"): "wa-light" | "wa-dark" {
   return mode === "light" ? "wa-light" : "wa-dark";
 }
 

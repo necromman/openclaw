@@ -4,19 +4,13 @@
 // anything that touches the document.
 import { inferControlUiPublicAssetPath } from "./public-assets.ts";
 import {
-  parseThemeSelection,
-  resolveThemeForMode,
+  resolveBootTheme,
+  type BootThemePresentation,
   type ThemeMode,
   type ThemeName,
 } from "./theme-boot.ts";
 
-export {
-  parseThemeSelection,
-  resolvedModeForTheme,
-  resolveThemeForMode,
-  THEME_SETTINGS_KEY_PREFIX,
-  waClassForMode,
-} from "./theme-boot.ts";
+export { parseThemeSelection } from "./theme-boot.ts";
 export type { ResolvedTheme, ThemeMode, ThemeName } from "./theme-boot.ts";
 
 function prefersLightScheme(): boolean {
@@ -26,12 +20,14 @@ function prefersLightScheme(): boolean {
   return globalThis.matchMedia("(prefers-color-scheme: light)").matches;
 }
 
+/** Everything the document needs stamped, resolved against the live system preference. */
+export function resolveThemePresentation(theme: ThemeName, mode: ThemeMode): BootThemePresentation {
+  return resolveBootTheme(theme, mode, prefersLightScheme());
+}
+
 /** Resolve a stored selection against the live system preference. */
 export function resolveTheme(theme: ThemeName, mode: ThemeMode) {
-  const { theme: normalizedTheme, mode: normalizedMode } = parseThemeSelection(theme, mode);
-  const resolvedMode =
-    normalizedMode === "system" ? (prefersLightScheme() ? "light" : "dark") : normalizedMode;
-  return resolveThemeForMode(normalizedTheme, resolvedMode);
+  return resolveThemePresentation(theme, mode).resolvedTheme;
 }
 
 /** Publish theme colors only after their stylesheet is available. */
