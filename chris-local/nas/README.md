@@ -6,6 +6,7 @@
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | `docker-compose.nas.yml` | 빌드하지 않고 ghcr 이미지를 받아 쓰는 compose. `docker-compose.ixauth.yml` 의 형제이고 다른 점은 파일 머리말에 적혀 있다 |
 | `deploy.sh`              | NAS 에서 root cron 이 5분마다 부르는 배포 스크립트. ghcr 태그 다이제스트가 움직였을 때만 pull 하고 다시 띄운다           |
+| [maintenance/](maintenance/README.md) | 게이트웨이 교체 중 한국어 안내를 제공하고 준비 완료 후 원래 화면으로 복귀시키는 독립 nginx |
 
 ## NAS 에 올라가는 것
 
@@ -15,6 +16,7 @@ NAS 에는 git 이 없어 저장소를 클론하지 않는다. `/volume1/docker/
 /volume1/docker/openclaw/
   docker-compose.nas.yml      이 폴더에서 복사
   deploy.sh                   이 폴더에서 복사
+  maintenance/               이 폴더의 maintenance/ 전체 복사
   ixauth-gateway-config/      chris-local/ixauth-gateway-config/ 에서 복사 (openclaw.json, start-gateway.sh)
   nas-sample/                 chris-local/nas-sample/ 에서 복사 (실제 공유 매핑 전까지의 자리표시)
   knowledge-index/rnd, /qa    빈 폴더로 생성

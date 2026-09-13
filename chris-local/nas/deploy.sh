@@ -104,7 +104,7 @@ health_of() {
 }
 
 print_status() {
-  for name in ix-auth-db ix-auth gateway cloudflared; do
+  for name in ix-auth-db ix-auth gateway maintenance cloudflared; do
     container="${PROJECT}_${name}_1"
     echo "  ${name}: $(health_of "$container")"
   done
