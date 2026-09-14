@@ -1,10 +1,8 @@
 // Agents screen facts about default-agent ownership plus gateway error humanization.
 import { t } from "../../i18n/index.ts";
 
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** True when the deployment authors agent ownership explicitly. "Set Default"
@@ -13,7 +11,11 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 export function isExplicitAgentOwnership(
   config: Record<string, unknown> | null | undefined,
 ): boolean {
-  return readRecord(readRecord(config)?.agents)?.ownership === "explicit";
+  if (!isRecord(config)) {
+    return false;
+  }
+  const agents = config.agents;
+  return isRecord(agents) && agents.ownership === "explicit";
 }
 
 /** Known gateway error fragments mapped to a reader-facing sentence. Add a row
