@@ -215,6 +215,8 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
   docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --agent rnd-bot --set rnd
   ```
 
+**AEO/GEO 에이전트(`aeo-geo`)는 부서 에이전트가 아니다.** 마운트도 색인도 따로 쓰지 않고, 부서 바인딩은 노출을 좁히는 용도로만 쓴다. 설계·설치·검증은 [AEO-GEO.md](AEO-GEO.md) 를 참조한다.
+
 ### 3.4 모델 프로바이더
 
 기동 직후에는 **자격증명이 하나도 없다.** 정본 템플릿은 모델 이름만 담고 키도 계정도 담지 않는다.

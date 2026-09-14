@@ -89,11 +89,16 @@
   },
   "tools": {
     "sessions": {
-      "visibility": "self"
+      "visibility": "department"
     },
     "fs": {
       "workspaceOnly": true
     }
+  },
+  "browser": {
+    "enabled": true,
+    "headless": true,
+    "noSandbox": true
   },
   "plugins": {
     "entries": {
@@ -145,8 +150,51 @@
       "main": {
         "name": "공용",
         "description": "회사 공용 AI 비서",
+        "workspace": "/home/node/.openclaw/workspace",
         "identity": {
           "name": "공용"
+        },
+        "tools": {
+          "deny": [
+            "sessions_list",
+            "sessions_history",
+            "sessions_search",
+            "sessions_send"
+          ]
+        },
+        "memory": {
+          "search": {
+            "extraPaths": ["/mnt/knowledge"]
+          }
+        }
+      },
+      "aeo-geo": {
+        "name": "AEO/GEO 비서",
+        "description": "검색 답변엔진(네이버 AI 브리핑, ChatGPT, Gemini) 노출 최적화 전문 비서",
+        "workspace": "/home/node/.openclaw/workspace-aeo-geo",
+        "identity": {
+          "name": "AEO/GEO 비서"
+        },
+        "model": {
+          "primary": "anthropic/claude-opus-5"
+        },
+        "thinkingDefault": "medium",
+        "modelPolicy": {
+          "allow": [
+            "anthropic/claude-opus-5",
+            "anthropic/claude-sonnet-5"
+          ]
+        },
+        "tools": {
+          "profile": "coding",
+          "permissionMode": "workspace",
+          "alsoAllow": ["browser"],
+          "deny": [
+            "sessions_list",
+            "sessions_history",
+            "sessions_search",
+            "sessions_send"
+          ]
         },
         "memory": {
           "search": {

@@ -17,6 +17,10 @@
 # index folders: an unused mount costs nothing and is exactly what a department agent
 # needs back, so taking it away would only make that day harder. Turning the agents back
 # on is DEPLOY.md 3.3-1.
+#
+# A second agent, "aeo-geo", was added later (AEO-GEO.md). It is not a department agent:
+# nothing is mounted for it and its workspace is an ordinary state directory seeded at the
+# bottom of this script, so it needs no placeholder either.
 set -eu
 
 origin="${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}"
@@ -127,5 +131,30 @@ for workspace_dir in /home/node/.openclaw/workspace /home/node/.openclaw/workspa
   chmod 644 "$workspace_dir/IDENTITY.md" "$workspace_dir/SOUL.md"
   rm -f "$workspace_dir/BOOTSTRAP.md"
 done
+
+# The AEO/GEO agent keeps its own workspace, so it gets its own seed. Its identity, its
+# working procedure (AGENTS.md) and the four skills that scope it are all template files,
+# rendered here on every start for the same reason the shared workspace is: this is an
+# appliance and the role is decided once, in the repository, not in a chat.
+#
+# The skills tree is replaced rather than merged. The workspace skill loader reads
+# "<workspace>/skills/<name>/SKILL.md" (src/skills/loading/workspace-skill-loader.ts), so a
+# skill that was renamed or dropped in the template would otherwise keep answering from the
+# volume forever. Removing the directory first is what makes the template authoritative.
+#
+# Every file named here has to exist: "set -eu" is on, so a missing seed file stops the
+# Gateway from starting at all rather than starting it half configured. When this folder is
+# copied to the NAS it is copied whole (DEPLOY.md 13.4-1).
+aeo_workspace="/home/node/.openclaw/workspace-aeo-geo"
+mkdir -p "$aeo_workspace"
+cp /config/workspace-seed/aeo-geo/IDENTITY.md "$aeo_workspace/IDENTITY.md"
+cp /config/workspace-seed/aeo-geo/SOUL.md "$aeo_workspace/SOUL.md"
+cp /config/workspace-seed/aeo-geo/AGENTS.md "$aeo_workspace/AGENTS.md"
+chmod 644 "$aeo_workspace/IDENTITY.md" "$aeo_workspace/SOUL.md" "$aeo_workspace/AGENTS.md"
+rm -f "$aeo_workspace/BOOTSTRAP.md"
+rm -rf "$aeo_workspace/skills"
+cp -R /config/workspace-seed/aeo-geo/skills "$aeo_workspace/skills"
+find "$aeo_workspace/skills" -type d -exec chmod 755 {} +
+find "$aeo_workspace/skills" -type f -exec chmod 644 {} +
 
 exec node dist/index.js gateway --bind lan --port 18789

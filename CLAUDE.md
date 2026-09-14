@@ -17,6 +17,7 @@
 | [chris-local/AUTH-IXAUTH.md](chris-local/AUTH-IXAUTH.md) 외 `AUTH-*.md` | 로그인·역할·부서·초대·사용자 관리·감사 원장 정본 |
 | [chris-local/DEPLOY.md](chris-local/DEPLOY.md) | 납품형 compose 스택 설치·설정·모델·NAS 마운트·사내망 배치 |
 | [chris-local/FILE-PREVIEW.md](chris-local/FILE-PREVIEW.md), [KNOWLEDGE.md](chris-local/KNOWLEDGE.md) | 문서 미리보기, NAS 문서 색인 |
+| [chris-local/AEO-GEO.md](chris-local/AEO-GEO.md) | AEO/GEO 전문 에이전트 `aeo-geo` 설계·부서 노출 제한·스킬·배포 |
 | [.claude/PROMPT.md](.claude/PROMPT.md) | 세션 주입용 요약(이 파일과 같은 내용의 짧은 판) |
 
 ## 2. 실행 환경 (PC 마다 다르다)
