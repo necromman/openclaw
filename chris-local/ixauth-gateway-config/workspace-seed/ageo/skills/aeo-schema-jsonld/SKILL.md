@@ -45,11 +45,11 @@ description: 페이지의 JSON-LD 구조화 데이터를 뽑아 필수 속성을
 ### Organization
 필수: `name`, `url`, `logo`
 권장: `sameAs`(공식 채널 URL 배열), `address`, `telephone`
-- `sameAs` 는 엔티티 통합의 핵심이다. 스마트스토어·인스타그램·블로그·유튜브 공식 계정 URL 을 전부 넣는다.
+- `sameAs` 는 엔티티 통합의 핵심이다. 공식 채널 URL 을 전부 넣는다. 라포르몰은 인스타그램 `@jinbiotech`, 유튜브 채널 "라포르", 카카오 채널, 그룹 사이트 `www.jinbiotech.co.kr` 이 있고 네이버 블로그는 없다(2026-09-14).
 
 ## 4. 템플릿
 
-건강기능식품 상품 페이지 기준이다. `<...>` 를 실제 값으로 바꾸고, 값을 모르면 그 속성을 **지운다**. 빈 문자열이나 추정값을 넣지 않는다.
+라포르몰 베개·마사지기 상품 페이지 기준이다. `<...>` 를 실제 값으로 바꾸고, 값을 모르면 그 속성을 **지운다**. 빈 문자열이나 추정값을 넣지 않는다.
 
 ```json
 {
@@ -65,10 +65,12 @@ description: 페이지의 JSON-LD 구조화 데이터를 뽑아 필수 속성을
       "brand": { "@type": "Brand", "name": "<브랜드명>" },
       "manufacturer": { "@type": "Organization", "name": "<제조사>" },
       "additionalProperty": [
-        { "@type": "PropertyValue", "name": "기능성 원료", "value": "<원료명>" },
-        { "@type": "PropertyValue", "name": "1일 섭취량", "value": "<mg>" },
-        { "@type": "PropertyValue", "name": "총 내용량", "value": "<g / 정>" },
-        { "@type": "PropertyValue", "name": "건강기능식품 인정번호", "value": "<번호>" }
+        { "@type": "PropertyValue", "name": "소재", "value": "<커버 섬유 조성·혼용률 / 충전재>" },
+        { "@type": "PropertyValue", "name": "크기", "value": "<가로 x 세로 x 높이 cm>" },
+        { "@type": "PropertyValue", "name": "높이", "value": "<정자세 Xcm / 측면 Ycm>" },
+        { "@type": "PropertyValue", "name": "경도", "value": "<레귤러 소프트 / 엑스트라 소프트>" },
+        { "@type": "PropertyValue", "name": "세탁방법", "value": "<커버 분리 세탁 가능 여부>" },
+        { "@type": "PropertyValue", "name": "제조국", "value": "<제조국>" }
       ],
       "offers": {
         "@type": "Offer",
@@ -115,7 +117,24 @@ description: 페이지의 JSON-LD 구조화 데이터를 뽑아 필수 속성을
 
 ## 5. 문안 규제
 
-스키마에 들어가는 `description`·FAQ 답변도 표시·광고다. 값을 채우기 전에 `aeo-health-claims-guard` 로 검사한다. 화면에서 걸러 낸 문구가 스키마에 남아 있는 사고가 흔하다.
+스키마에 들어가는 `description`·FAQ 답변도 표시·광고다. 값을 채우기 전에 `ageo-claims-guard` 로 검사한다. 화면에서 걸러 낸 문구가 스키마에 남아 있는 사고가 흔하다.
+
+- `additionalProperty` 에 **KC 인증번호를 넣지 않는다.** 성인용 베개는 KC 대상이 아니다.
+- `description` 에 거북목 교정·목디스크 완화 같은 의료적 효능 표현을 넣지 않는다. 물리 사양과 사용 경험으로 쓴다.
+- `aggregateRating` 은 실제 후기가 있을 때만 넣는다. 라포르몰 바로베개는 2026-09-14 기준 648건이며, "고객만족도 99%" 같은 수치는 실증자료가 확인되기 전에는 쓰지 않는다.
+
+## 5-1. 고도몰5 전 상품 자동 주입 절차
+
+라포르몰은 2026-09-14 기준 JSON-LD 가 0건이다. 상품마다 손으로 넣지 않고 스킨 템플릿 한 곳에 치환코드로 심어 전 상품에 자동 적용한다.
+
+1. 관리자 > 디자인 > 상품상세 템플릿 `goods/goods_view.htm` 을 연다. PC 스킨과 모바일 스킨을 각각 고친다(도메인이 `www` 와 `m` 으로 갈려 있다).
+2. 템플릿 안에 `<script type="application/ld+json">` 블록을 하나 넣고 값은 치환코드로 채운다. 상품명 `{=goodsView['goodsNm']}`, 판매가 `{=goodsView['goodsPrice']}` 처럼 쓴다. 실제 변수명은 스킨 버전마다 다르므로, 템플릿에 이미 쓰여 있는 표기를 그대로 따르고 확인되지 않은 변수명을 추측해 넣지 않는다.
+3. **URL 은 `goods_view.php?goodsNo=N` 형식으로 고정한다.** 고도몰5 의 상품 주소는 이 형태이고 슬러그 주소는 지원 여부가 확인되지 않았다. `@id`·`offers.url`·`BreadcrumbList` 의 마지막 `item` 을 모두 `https://www.cstpillow.com/goods/goods_view.php?goodsNo={=goodsView['goodsNo']}` 형태로 맞춘다.
+4. 가격은 숫자만 남긴다. 치환코드가 `115,000` 처럼 쉼표를 포함해 내려오면 스키마 값이 깨지므로 쉼표를 없앤 변수나 템플릿 필터를 쓴다. 넣은 뒤 Rich Results Test 로 실제 값을 확인한다.
+5. `Organization` 은 상품 템플릿이 아니라 공통 레이아웃(`outline/_header.htm`)에 한 번만 넣는다. 상품 템플릿에 넣으면 상품 수만큼 중복된다.
+6. **canonical 을 함께 켠다.** 설정 > 기본정책 > 검색엔진 최적화의 "대표 URL 사용" 을 켜면 전 페이지 `<head>` 에 canonical 이 자동 삽입된다. 지금은 꺼져 있어서 `www.cstpillow.com` 과 `m.cstpillow.com` 의 같은 상품이 서로 중복 콘텐츠가 되고, JSON-LD 의 `@id` 와 화면 주소가 어긋난 채 두 도메인에 같은 스키마가 실린다. 스키마 주입과 canonical 은 같이 처리한다.
+7. 모바일 스킨의 `@id`·`offers.url` 도 `www` 정본 주소를 가리키게 한다. canonical 과 스키마가 같은 주소를 말해야 인용이 한쪽으로 모인다.
+8. 넣은 뒤 상품 3개 이상을 실제로 열어 값이 상품마다 바뀌는지 확인한다. 템플릿 오류는 전 상품에 동시에 퍼진다.
 
 ## 6. 검증 도구
 

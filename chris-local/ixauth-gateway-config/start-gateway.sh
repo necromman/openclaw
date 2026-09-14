@@ -133,9 +133,10 @@ for workspace_dir in /home/node/.openclaw/workspace /home/node/.openclaw/workspa
 done
 
 # The AGEO agent keeps its own workspace, so it gets its own seed. Its identity, its
-# working procedure (AGENTS.md) and the four skills that scope it are all template files,
-# rendered here on every start for the same reason the shared workspace is: this is an
-# appliance and the role is decided once, in the repository, not in a chat.
+# working procedure (AGENTS.md), the company context it reads first (COMPANY.md) and the
+# four skills that scope it are all template files, rendered here on every start for the
+# same reason the shared workspace is: this is an appliance and the role is decided once,
+# in the repository, not in a chat.
 #
 # The skills tree is replaced rather than merged. The workspace skill loader reads
 # "<workspace>/skills/<name>/SKILL.md" (src/skills/loading/workspace-skill-loader.ts), so a
@@ -150,7 +151,8 @@ mkdir -p "$ageo_workspace"
 cp /config/workspace-seed/ageo/IDENTITY.md "$ageo_workspace/IDENTITY.md"
 cp /config/workspace-seed/ageo/SOUL.md "$ageo_workspace/SOUL.md"
 cp /config/workspace-seed/ageo/AGENTS.md "$ageo_workspace/AGENTS.md"
-chmod 644 "$ageo_workspace/IDENTITY.md" "$ageo_workspace/SOUL.md" "$ageo_workspace/AGENTS.md"
+cp /config/workspace-seed/ageo/COMPANY.md "$ageo_workspace/COMPANY.md"
+chmod 644 "$ageo_workspace/IDENTITY.md" "$ageo_workspace/SOUL.md" "$ageo_workspace/AGENTS.md" "$ageo_workspace/COMPANY.md"
 rm -f "$ageo_workspace/BOOTSTRAP.md"
 rm -rf "$ageo_workspace/skills"
 cp -R /config/workspace-seed/ageo/skills "$ageo_workspace/skills"
