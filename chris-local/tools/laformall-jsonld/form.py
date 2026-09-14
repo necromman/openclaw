@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fields
+import images
 
 GREY = "#909090"
 RED = "#c00000"
@@ -100,7 +101,30 @@ class ProductForm:
         canvas.bind("<Configure>", resize)
 
         def wheel(event):
-            canvas.yview_scroll(-1 * (event.delta // 120), "units")
+            """마우스가 폼 위에 있을 때만 폼을 굴린다.
+
+            전역으로 묶어 두면 결과 텍스트를 굴릴 때 폼까지 함께 움직인다.
+            Text·Treeview·Listbox 위에서는 그 위젯의 기본 동작에 맡긴다.
+            """
+            try:
+                target = event.widget.winfo_containing(event.x_root, event.y_root)
+            except Exception:
+                target = None
+            node = target
+            while node is not None:
+                if node.winfo_class() in ("Text", "Treeview", "Listbox"):
+                    # 그 위젯이 스크롤할 내용이 있으면 맡긴다. 없으면 폼을 굴린다.
+                    try:
+                        span = node.yview()
+                    except Exception:
+                        return None
+                    if tuple(span) != (0.0, 1.0):
+                        return None
+                if node is canvas:
+                    canvas.yview_scroll(-1 * (event.delta // 120), "units")
+                    return "break"
+                node = getattr(node, "master", None)
+            return None
 
         canvas.bind_all("<MouseWheel>", wheel, add="+")
         self.canvas = canvas
@@ -110,26 +134,38 @@ class ProductForm:
         tk, ttk = self.tk, self.ttk
         box = ttk.Frame(self.body)
         box.pack(fill="x", pady=(10, 2), padx=6)
-        tk.Label(box, text=title, font=("Segoe UI", 10, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(box, text=title, font=("맑은 고딕", 12, "bold"), anchor="w").pack(anchor="w")
         tk.Label(box, text=note, fg=HINT, anchor="w", justify="left", wraplength=560).pack(anchor="w")
 
     def _label_row(self, parent, spec: fields.FieldSpec) -> None:
         tk = self.tk
         row = tk.Frame(parent)
         row.pack(fill="x")
+        tk.Label(row, text=spec.label, font=("맑은 고딕", 11, "bold")).pack(side="left")
         if spec.required:
-            tk.Label(row, text="*", fg=RED, font=("Segoe UI", 10, "bold")).pack(side="left")
-            tk.Label(row, text="[필수]", fg=RED, font=("Segoe UI", 8, "bold")).pack(side="left")
-        else:
-            tk.Label(row, text="[선택]", fg=BLUE, font=("Segoe UI", 8)).pack(side="left", padx=(9, 0))
-        tk.Label(row, text=" " + spec.label, font=("Segoe UI", 9, "bold")).pack(side="left")
+            tk.Label(row, text=" *", fg=RED, font=("맑은 고딕", 12, "bold")).pack(side="left")
+        badge_text, badge_bg = ("필수", "#c00000") if spec.required else ("선택", "#5a7fb5")
+        tk.Label(
+            row, text=badge_text, bg=badge_bg, fg="#ffffff",
+            font=("맑은 고딕", 8, "bold"), padx=5, pady=0,
+        ).pack(side="left", padx=(6, 0))
+        if spec.key in fields.MANUAL_ONLY:
+            tk.Label(
+                row, text="직접 입력", bg="#e8e2c8", fg="#5a4a10",
+                font=("맑은 고딕", 8), padx=5,
+            ).pack(side="left", padx=(4, 0))
         if spec.key == "description":
-            self.counter = tk.Label(row, text="0자", fg=HINT, font=("Segoe UI", 8))
+            self.counter = tk.Label(row, text="0자", fg=HINT, font=("맑은 고딕", 9))
             self.counter.pack(side="left", padx=6)
+            for text, delta in (("칸 늘리기", 2), ("칸 줄이기", -2)):
+                self.ttk.Button(
+                    row, text=text, width=8, style="Tiny.TButton",
+                    command=lambda d=delta: self._resize_desc(d),
+                ).pack(side="right", padx=2)
 
     def _hint_row(self, parent, spec: fields.FieldSpec) -> None:
         self.tk.Label(
-            parent, text=spec.hint, fg=HINT, font=("Segoe UI", 8), anchor="w",
+            parent, text=spec.hint, fg=HINT, font=("맑은 고딕", 9), anchor="w",
             justify="left", wraplength=600,
         ).pack(anchor="w", pady=(0, 4))
 
@@ -154,7 +190,7 @@ class ProductForm:
             if spec.kind == "faq":
                 self._build_faq(box, spec)
             elif spec.kind in ("area", "props"):
-                widget = tk.Text(box, height=spec.rows, wrap="word", font=("Segoe UI", 9))
+                widget = tk.Text(box, height=spec.rows, wrap="word", font=("맑은 고딕", 11))
                 widget.pack(fill="x")
                 self.widgets[spec.key] = widget
                 self.holders[spec.key] = Placeholder(widget, spec.placeholder, "area")
@@ -171,15 +207,17 @@ class ProductForm:
                 self.widgets[spec.key] = var
             elif spec.kind in ("auto", "fixed"):
                 var = tk.StringVar(value=spec.placeholder if spec.kind == "fixed" else "")
-                entry = ttk.Entry(box, textvariable=var, width=spec.width, state="readonly")
-                entry.pack(anchor="w", fill="x" if spec.width > 40 else None)
+                entry = ttk.Entry(box, textvariable=var, state="readonly", font=("맑은 고딕", 11))
+                entry.pack(anchor="w", fill="x", expand=True)
                 self.widgets[spec.key] = var
             else:
-                entry = ttk.Entry(box, width=spec.width, font=("Segoe UI", 9))
-                entry.pack(anchor="w", fill="x" if spec.width > 40 else None)
+                entry = ttk.Entry(box, font=("맑은 고딕", 11))
+                entry.pack(anchor="w", fill="x", expand=True)
                 self.widgets[spec.key] = entry
                 self.holders[spec.key] = Placeholder(entry, spec.placeholder, "entry")
                 entry.bind("<FocusOut>", self._changed, add="+")
+                if spec.key == "image":
+                    self._build_image_tools(box)
             self._hint_row(box, spec)
 
     def _build_faq(self, parent, spec: fields.FieldSpec) -> None:
@@ -188,20 +226,78 @@ class ProductForm:
         for index in range(fields.FAQ_ROWS):
             row = ttk.Frame(parent)
             row.pack(fill="x", pady=1)
-            question = ttk.Entry(row, width=30, font=("Segoe UI", 9))
-            question.pack(side="left", fill="x", expand=True)
-            answer = ttk.Entry(row, width=40, font=("Segoe UI", 9))
-            answer.pack(side="left", fill="x", expand=True, padx=(4, 0))
+            question = ttk.Entry(row, font=("맑은 고딕", 11))
+            question.pack(fill="x")
+            answer = tk.Text(row, height=2, wrap="word", font=("맑은 고딕", 11))
+            answer.pack(fill="x", pady=(2, 4))
             sample = example[index] if index < len(example) else ("", "")
             hq = Placeholder(question, sample[0] or "하루 몇 분 사용하나요?", "entry")
-            ha = Placeholder(answer, sample[1] or "1회 10분, 하루 2회를 권장합니다.", "entry")
+            ha = Placeholder(answer, sample[1] or "1회 10분, 하루 2회를 권장합니다.", "area")
             hq.show()
             ha.show()
             question.bind("<FocusOut>", self._changed, add="+")
             answer.bind("<FocusOut>", self._changed, add="+")
             self.faq_rows.append((hq, ha))
 
+
+    # ------------------------------------------------------------------ 이미지
+    def _build_image_tools(self, parent) -> None:
+        tk, ttk = self.tk, self.ttk
+        bar = ttk.Frame(parent)
+        bar.pack(fill="x", pady=(2, 0))
+        ttk.Button(bar, text="이미지 고르기", command=self._pick_image).pack(side="left")
+        self.image_size = tk.Label(bar, text="", fg=HINT, font=("맑은 고딕", 9))
+        self.image_size.pack(side="left", padx=8)
+        self.image_preview = tk.Label(
+            parent, text="(미리보기는 이미지를 고르면 나옵니다)", fg=HINT, font=("맑은 고딕", 9)
+        )
+        self.image_preview.pack(anchor="w", pady=(2, 0))
+
+    def _pick_image(self) -> None:
+        row = self.app.current_row()
+        if not row:
+            self.app.warn("이미지 고르기", "표에서 상품을 먼저 선택하세요.")
+            return
+        self.collect(row)
+        images.pick_dialog(self.app, row, self._set_image)
+
+    def _set_image(self, url: str) -> None:
+        self.holders["image"].set(url)
+        self.show_preview(url)
+        self._changed()
+
+    def show_preview(self, url: str) -> None:
+        """고른 이미지의 작은 미리보기와 크기를 보여 준다."""
+        if not hasattr(self, "image_preview"):
+            return
+        if not url:
+            self.image_preview.configure(image="", text="(미리보기는 이미지를 고르면 나옵니다)")
+            self.image_size.configure(text="")
+            return
+        try:
+            photo = images.thumbnail(url, 160, getattr(self.app, "image_session", None))
+            self.image_preview.configure(image=photo, text="")
+            self.image_preview.image = photo
+        except Exception as exc:
+            self.image_preview.configure(image="", text=f"(미리보기 실패: {str(exc)[:40]})")
+        size = images.known_size(url)
+        if size:
+            note = "구글 권장 1200px 이상" if size[0] < images.GOOGLE_RECOMMEND_WIDTH else "권장 크기 충족"
+            self.image_size.configure(
+                text=f"{size[0]}x{size[1]} / {note}",
+                fg=RED if size[0] < images.GOOGLE_RECOMMEND_WIDTH else "#105010",
+            )
+        else:
+            self.image_size.configure(text="크기 미확인", fg=HINT)
+
     # ------------------------------------------------------------------ 동작
+    def _resize_desc(self, delta: int) -> None:
+        widget = self.widgets.get("description")
+        if widget is None:
+            return
+        height = max(2, min(20, int(widget.cget("height")) + delta))
+        widget.configure(height=height)
+
     def _count(self, _event=None) -> None:
         holder = self.holders.get("description")
         length = len(holder.value()) if holder else 0
@@ -270,6 +366,7 @@ class ProductForm:
                 hq.set("")
                 ha.set("")
         self._count()
+        self.show_preview(prod.image)
 
     def collect(self, prod) -> None:
         """폼 값을 상품에 담는다."""

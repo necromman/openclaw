@@ -11,52 +11,57 @@ import os
 import queue
 import sys
 import threading
+import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
 
+import actions
 import browser
 import claims
 import fetcher
 import fields
 import google_test
 import history
+import images
 import schema
 import settings
+import ui_google
+import ui_help
+import ui_steps
+import ui_table
 import ui_tabs
 import validator
 
 APP_TITLE = "라포르몰 JSON-LD 생성기"
 
-COLUMNS = [
-    ("mark", "", 34),
-    ("goods_no", "goodsNo", 66),
-    ("name", "상품명", 190),
-    ("price", "판매가", 78),
-    ("local", "로컬 판정", 110),
-    ("missing", "부족 항목", 76),
-    ("applied", "적용 확인", 88),
-    ("google", "구글 결과", 150),
-]
-
-
 class App:
     def __init__(self) -> None:
         import tkinter as tk
+        from tkinter import font as tkfont
         from tkinter import ttk
 
-        self.tk, self.ttk = tk, ttk
+        self.tk, self.ttk, self.tkfont = tk, ttk, tkfont
         self.cfg = settings.load()
         self.rows: list[fetcher.Product] = []
         self.snippets: dict[str, str] = {}
         self.verdicts: dict[str, validator.Verdict] = {}
         self.google: dict[str, google_test.GoogleResult] = {}
+        self.image_session = fetcher.Fetcher(self.cfg).session
+        self.live_goods: list[str] = []
+        self.categories: list[str] = []
         self.jobs: queue.Queue = queue.Queue()
         self.busy = False
+        self.step = 1
+        self.step_buttons: dict = {}
+        self.cancel_flag = threading.Event()
+        self.job_total: int | None = None
         self.root = tk.Tk()
         self.root.title(APP_TITLE)
-        self.root.geometry("1380x900")
-        self.root.minsize(1100, 720)
+        self.root.geometry(self.cfg.get("window") or "1460x920")
+        self.root.minsize(1280, 860)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        ui_tabs.apply_style(self)
         self.nb = ttk.Notebook(self.root)
         self.nb.pack(fill="both", expand=True, padx=6, pady=6)
         self.tab_main = ttk.Frame(self.nb)
@@ -74,10 +79,14 @@ class App:
         self._build_main()
         ui_tabs.build_history_tab(self, self.tab_hist)
         ui_tabs.build_settings_tab(self, self.tab_set)
-        ui_tabs.build_help_tab(self, self.tab_help)
-        ttk.Label(self.root, textvariable=self.status, anchor="w", relief="sunken").pack(
-            fill="x", side="bottom"
+        ui_help.build_help_tab(self, self.tab_help)
+        self.status_label = tk.Label(
+            self.root, textvariable=self.status, anchor="w", relief="sunken",
+            font=("맑은 고딕", 10), padx=6, pady=3,
         )
+        self.status_label.pack(fill="x", side="bottom")
+        ui_steps.build_progress_panel(self, self.root)
+        ui_steps.set_step(self, 1, "먼저 상품을 불러오세요")
         self.nb.select(self.tab_help)  # 첫 화면은 도움말
         self.root.after(120, self._drain)
 
@@ -85,6 +94,7 @@ class App:
     def _build_main(self) -> None:
         tk, ttk = self.tk, self.ttk
         frame = self.tab_main
+        ui_steps.build_progress(self, frame)
         pane = ttk.Panedwindow(frame, orient="horizontal")
         pane.pack(fill="both", expand=True)
         left = ttk.Frame(pane)
@@ -92,46 +102,52 @@ class App:
         pane.add(left, weight=3)
         pane.add(right, weight=2)
 
-        top = ttk.LabelFrame(left, text="1. 상품 URL 또는 goodsNo 붙여넣기 (줄·쉼표·공백 구분)")
-        top.pack(fill="x", padx=4, pady=4)
-        self.input = tk.Text(top, height=4, wrap="none")
-        self.input.pack(fill="x", padx=6, pady=(6, 2))
-        self.input.insert("1.0", "https://cstpillow.com/goods/goods_view.php?goodsNo=11")
-        btns = ttk.Frame(top)
-        btns.pack(fill="x", padx=6, pady=(0, 6))
-        for text, cmd in (
-            ("사이트맵에서 전체 상품 불러오기", self.on_sitemap),
-            ("2. 가져오기", self.on_fetch),
-            ("입력 비우기", lambda: self.input.delete("1.0", "end")),
-            ("표 비우기", self.on_clear_rows),
-        ):
-            ttk.Button(btns, text=text, command=cmd).pack(side="left", padx=2)
+        # 왼쪽은 단계 카드가 많아 세로로 스크롤한다. 가운데 경계는 드래그로 조절한다.
+        column = ui_steps.scroll_area(self, left)
+        ui_steps.build_input_panel(self, column)
+        ui_table.build(self, column)
+        ui_steps.build_output_panel(self, column)
+        ui_steps.build_form_panel(self, right)
+        self.root.after(200, lambda: self._place_sash(pane))
 
-        mid = ttk.LabelFrame(left, text="3. 상품 목록 (행을 누르면 오른쪽 폼에 뜹니다)")
-        mid.pack(fill="both", expand=True, padx=4, pady=4)
-        self.tree = ttk.Treeview(
-            mid, columns=[c[0] for c in COLUMNS], show="headings", selectmode="extended"
-        )
-        for key, label, width in COLUMNS:
-            self.tree.heading(key, text=label)
-            self.tree.column(key, width=width, anchor="center" if key == "mark" else "w")
-        vsb = ttk.Scrollbar(mid, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=6)
-        vsb.pack(side="left", fill="y", pady=6)
-        self.tree.bind("<<TreeviewSelect>>", self.on_pick_row)
-        self.tree.bind("<Double-1>", self.on_row_detail)
-        for status, colour in validator.COLOR.items():
-            self.tree.tag_configure(
-                f"v-{status}", background=colour, foreground=validator.FOREGROUND[status]
-            )
-
-        ui_tabs.build_output_panel(self, left)
-        ui_tabs.build_form_panel(self, right)
+    def _place_sash(self, main_pane) -> None:
+        try:
+            main_pane.sashpos(0, int(max(900, self.root.winfo_width()) * 0.62))
+        except Exception:
+            pass
 
     # ---------------------------------------------------------------- 유틸
-    def log(self, text: str) -> None:
-        self.status.set(text)
+    ICONS = {"ok": "✔", "warn": "⚠", "error": "✖", "info": "•"}
+    COLORS = {"ok": "#105010", "warn": "#8a5a00", "error": "#a00000", "info": "#303030"}
+
+    def log(self, text: str, kind: str = "info") -> None:
+        self.status.set(f"{self.ICONS.get(kind, '')} {text}".strip())
+        try:
+            self.status_label.configure(fg=self.COLORS.get(kind, "#303030"))
+        except Exception:
+            pass
+
+    def set_step(self, step: int, note: str = "") -> None:
+        ui_steps.set_step(self, step, note)
+
+    def progress(self, done: int, total: int | None, text: str) -> None:
+        """작업 스레드에서 부른다. 화면 갱신은 주 스레드에서 한다."""
+        self.jobs.put(lambda: ui_steps.progress_update(self, done, total, text))
+
+    def cancelled(self) -> bool:
+        return self.cancel_flag.is_set()
+
+    def on_cancel(self) -> None:
+        self.cancel_flag.set()
+        self.log("취소를 요청했습니다. 지금 하던 항목까지 끝내고 멈춥니다", "warn")
+
+    def _on_close(self) -> None:
+        try:
+            self.cfg["window"] = self.root.geometry()
+            settings.save(self.cfg)
+        except Exception:
+            pass
+        self.root.destroy()
 
     def write_out(self, text: str, bad_terms: list[str] | None = None) -> None:
         self.out.delete("1.0", "end")
@@ -180,11 +196,18 @@ class App:
             pass
         self.root.after(120, self._drain)
 
-    def background(self, work, done) -> None:
+    def background(self, work, done, label: str = "작업 중...", total: int | None = None) -> None:
+        """무거운 작업을 따로 돌린다. 진행 표시줄·취소 버튼·소요 시간을 함께 관리한다."""
         if self.busy:
-            self.warn("작업 중", "앞선 작업이 끝나기를 기다려 주세요.")
+            self.warn("작업 중", "앞선 작업이 끝나기를 기다려 주세요. 멈추려면 취소를 누르세요.")
             return
         self.busy = True
+        self.cancel_flag.clear()
+        self.job_label = label
+        self.job_started = time.time()
+        ui_steps.progress_start(self, label, total)
+        ui_steps.set_buttons_enabled(self, False)
+        self.log(label, "info")
 
         def runner():
             try:
@@ -197,6 +220,16 @@ class App:
 
     def _finish(self, done, result, exc) -> None:
         self.busy = False
+        seconds = time.time() - getattr(self, "job_started", time.time())
+        self.elapsed = seconds
+        ui_steps.set_buttons_enabled(self, True)
+        label = getattr(self, "job_label", "작업")
+        if exc:
+            ui_steps.progress_end(self, f"실패: {exc}")
+        elif self.cancelled():
+            ui_steps.progress_end(self, f"취소했습니다 ({seconds:.1f}초)")
+        else:
+            ui_steps.progress_end(self, f"{label} 완료 ({seconds:.1f}초)")
         done(result, exc)
 
     def fetch_client(self) -> fetcher.Fetcher:
@@ -224,44 +257,8 @@ class App:
         row.local_status = verdict.status
         return verdict
 
-    def _row_tag(self, row: fetcher.Product) -> str:
-        verdict = self.verdicts.get(row.goods_no)
-        google = self.google.get(row.goods_no)
-        if row.error:
-            return f"v-{validator.STATUS_ERROR}"
-        if google and google.status in (google_test.STATUS_ERROR, google_test.STATUS_NONE):
-            return f"v-{validator.STATUS_ERROR}"
-        if not verdict:
-            return f"v-{validator.STATUS_NONE}"
-        if verdict.status == validator.STATUS_PASS and google and google.status == google_test.STATUS_WARN:
-            return f"v-{validator.STATUS_WARN}"
-        return f"v-{verdict.status}"
-
     def refresh_tree(self, keep: str = "") -> None:
-        selection = keep or (list(self.tree.selection()) or [""])[0]
-        self.tree.delete(*self.tree.get_children())
-        for row in self.rows:
-            verdict = self.verdicts.get(row.goods_no)
-            google = self.google.get(row.goods_no)
-            price = f"{int(row.price):,}" if str(row.price).isdigit() else row.price
-            self.tree.insert(
-                "",
-                "end",
-                iid=row.goods_no,
-                values=(
-                    verdict.indicator if verdict else "-",
-                    row.goods_no,
-                    row.name,
-                    price,
-                    verdict.summary() if verdict else "미검증",
-                    str(len(verdict.missing)) if verdict else "",
-                    row.applied or "",
-                    google.summary() if google else "",
-                ),
-                tags=(self._row_tag(row),),
-            )
-        if selection and self.tree.exists(selection):
-            self.tree.selection_set(selection)
+        ui_table.refresh(self, keep)
 
     # ---------------------------------------------------------------- 동작
     def on_clear_rows(self) -> None:
@@ -270,20 +267,52 @@ class App:
         self.write_out("")
         self.log("표를 비웠습니다")
 
+    def on_admin_excel(self) -> None:
+        actions.admin_excel_import(self)
+
+    def on_discover(self) -> None:
+        actions.discover(self)
+
+    def on_make_sitemap(self) -> None:
+        actions.make_sitemap(self)
+
+    def on_make_llms(self) -> None:
+        actions.make_llms(self)
+
     def on_sitemap(self) -> None:
-        self.log("사이트맵을 받는 중")
+        """사이트맵 파일을 받아 기준 날짜와 상품 수를 보여 주고 입력칸을 채운다."""
         client = self.fetch_client()
+
+        def work():
+            import re as _re
+
+            text = client.get(self.cfg.get("sitemap_url", "")).text
+            goods = sorted(set(_re.findall(r"goodsNo=(\d+)", text)), key=int)
+            dates = sorted(_re.findall(r"<lastmod>\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", text))
+            locs = len(_re.findall(r"<loc>", text))
+            return goods, dates[-1] if dates else "", locs
 
         def done(result, exc):
             if exc:
                 self.warn("사이트맵", f"불러오지 못했습니다.\n{exc}")
+                self.log("사이트맵을 불러오지 못했습니다", "error")
                 return
-            urls = [fetcher.product_url(g, self.cfg["domain"]) for g in result]
+            goods, lastmod, locs = result
+            urls = [fetcher.product_url(g, self.cfg["domain"]) for g in goods]
             self.input.delete("1.0", "end")
             self.input.insert("1.0", "\n".join(urls))
-            self.log(f"사이트맵에서 상품 {len(urls)}개를 불러왔습니다")
+            stamp = f"{lastmod} 기준" if lastmod else "날짜 표기 없음"
+            self.write_out(
+                f"사이트맵을 읽었습니다 ({self.cfg.get('sitemap_url')})\n\n"
+                f"{stamp}, URL {locs}개, 상품 {len(goods)}개\n"
+                f"상품 goodsNo: {', '.join(goods)}\n\n"
+                "오래된 파일이면 지금 진열과 다를 수 있습니다. 그때는 "
+                "'판매 중 상품 불러오기' 나 '관리자 엑셀 가져오기' 를 쓰세요."
+            )
+            self.set_step(2, "가져오기를 누르세요")
+            self.log(f"사이트맵 {stamp}, 상품 {len(goods)}개", "ok")
 
-        self.background(client.sitemap_goods, done)
+        self.background(work, done, "사이트맵을 받는 중...")
 
     def on_fetch(self) -> None:
         goods, bad = fetcher.parse_input(self.input.get("1.0", "end"))
@@ -293,7 +322,15 @@ class App:
         if bad:
             self.log("해석하지 못한 입력: " + ", ".join(bad[:5]))
         client = self.fetch_client()
-        self.log(f"상품 {len(goods)}개 수집 중")
+
+        def work():
+            out = []
+            for index, code in enumerate(goods, 1):
+                if self.cancelled():
+                    break
+                self.progress(index, len(goods), f"가져오기 goodsNo={code}")
+                out.append(client.fetch_product(code))
+            return out
 
         def done(result, exc):
             if exc:
@@ -311,6 +348,8 @@ class App:
                             setattr(prod, key, value)
                     if old.faq:
                         prod.faq = old.faq
+                if self.live_goods:
+                    prod.exposed = "노출" if prod.goods_no in self.live_goods else "미노출"
                 keep[prod.goods_no] = prod
                 self.reverdict(prod)
             self.rows = [keep[g] for g in goods] + [r for k, r in keep.items() if k not in goods]
@@ -318,12 +357,24 @@ class App:
             if self.rows:
                 self.tree.selection_set(self.rows[0].goods_no)
             failed = [r for r in result if r.error]
+            filled = [r for r in result if r.filled_from_page]
+            applied = [r for r in result if str(r.applied).startswith("적용됨")]
+            self.set_step(3, "오른쪽 폼에서 필수 항목을 채우세요")
+            note = ""
+            if filled:
+                note = f" 그중 {len(filled)}개는 페이지의 기존 정보표를 읽어 채웠습니다."
+            self.write_out(
+                f"수집 {len(result) - len(failed)}건, 실패 {len(failed)}건\n"
+                f"페이지 적용: 적용됨 {len(applied)}건 / 나머지 미적용·미확인\n"
+                + (note.strip() + "\n" if note else "")
+                + "\n왼쪽 목록에서 행을 누르면 오른쪽 폼에 그 상품이 뜹니다."
+            )
             self.log(
-                f"수집 {len(result) - len(failed)}건, 실패 {len(failed)}건. "
-                "오른쪽 폼의 필수 항목을 채우세요."
+                f"수집 {len(result) - len(failed)}건, 실패 {len(failed)}건." + note,
+                "ok" if not failed else "warn",
             )
 
-        self.background(lambda: [client.fetch_product(g) for g in goods], done)
+        self.background(work, done, f"상품 {len(goods)}개 가져오는 중...", total=len(goods))
 
     def on_pick_row(self, _event=None) -> None:
         row = self.current_row()
@@ -435,11 +486,15 @@ class App:
 
         def work():
             out = []
-            for row in rows:
+            for index, row in enumerate(rows, 1):
+                if self.cancelled():
+                    break
+                self.progress(index, len(rows), f"검증·생성 goodsNo={row.goods_no}")
                 image_ok = client.head_ok(row.image) if (check_head and row.image) else None
-                verdict = validator.check(row, image_ok)
+                size = images.measure(row.image, client.session) if row.image else None
+                verdict = validator.check(row, image_ok, size)
                 data = schema.build_product(row)
-                errors = schema.validate(row, data, image_ok)
+                errors = schema.validate(row, data, image_ok, size)
                 text = schema.full_snippet(row, with_breadcrumb=crumb, domain=domain)
                 out.append((row, text, errors, verdict))
             return out
@@ -470,11 +525,13 @@ class App:
             self.refresh_tree()
             self.write_out("\n\n".join(blocks))
             ui_tabs.reload_history(self)
+            self.set_step(5, "고도몰에 붙여넣고 검증하세요")
             self.log(
-                f"생성 {len(result)}건, 검증 실패 {bad}건. 최종 판정은 구글 테스트로 확인하세요."
+                f"생성 {len(result)}건, 검증 실패 {bad}건. 최종 판정은 구글 테스트입니다.",
+                "warn" if bad else "ok",
             )
 
-        self.background(work, done)
+        self.background(work, done, f"스니펫 {len(rows)}건 만드는 중...", total=len(rows))
 
     def on_copy_one(self) -> None:
         row = self.current_row()
@@ -554,47 +611,19 @@ class App:
             self.write_out("적용 확인 결과\n\n" + "\n".join(lines))
             self.log("적용 확인 완료")
 
-        self.background(lambda: [(r, *client.verify_applied(r.goods_no)) for r in rows], done)
+        def work():
+            out = []
+            for index, row in enumerate(rows, 1):
+                if self.cancelled():
+                    break
+                self.progress(index, len(rows), f"적용 확인 goodsNo={row.goods_no}")
+                out.append((row, *client.verify_applied(row.goods_no)))
+            return out
+
+        self.background(work, done, f"적용 확인 {len(rows)}건...", total=len(rows))
 
     def on_google(self, everything: bool) -> None:
-        rows = self.rows if everything else self.selected_rows()
-        if not rows:
-            self.warn("구글 테스트", "표에 행이 없습니다.")
-            return
-        ok, note = google_test.available()
-        if not ok:
-            self.warn("구글 테스트", note)
-            return
-        pairs = [(r.goods_no, r.url) for r in rows]
-        self.log(f"구글 리치 결과 테스트 {len(pairs)}건 시작(한 건당 최대 90초)")
-
-        def progress(index, total, goods_no):
-            self.jobs.put(
-                lambda: self.log(f"구글 테스트 {index}/{total} 진행 중 (goodsNo={goods_no})")
-            )
-
-        def done(result, exc):
-            if exc:
-                self.warn("구글 테스트", f"실패했습니다.\n{exc}")
-                return
-            lines = []
-            for item in result:
-                self.google[item.goods_no] = item
-                row = self.find_row(item.goods_no)
-                if row:
-                    row.google_status, row.google_at = item.status, item.at
-                history.add_google(item.as_dict())
-                lines.append(f"goodsNo={item.goods_no} {item.summary()} {item.note}".strip())
-            self.refresh_tree()
-            self.write_out(
-                "구글 리치 결과 테스트 결과 (최종 판정)\n\n"
-                + "\n".join(lines)
-                + "\n\n행을 두 번 누르면 원문 결과를 볼 수 있습니다."
-            )
-            ui_tabs.reload_history(self)
-            self.log(f"구글 테스트 {len(result)}건 완료")
-
-        self.background(lambda: google_test.run_many(pairs, progress), done)
+        ui_google.run(self, everything)
 
     def on_google_window(self) -> None:
         """구글 테스트 화면을 프로그램이 직접 띄운다.
@@ -636,7 +665,9 @@ def main(argv: list[str] | None = None) -> int:
         if not ok:
             google_test.open_external(url)
         return 0
-    if any(a in argv for a in ("--cli", "--selftest", "--google-test")):
+    if any(
+        a in argv for a in ("--cli", "--selftest", "--google-test", "--discover", "--sitemap")
+    ):
         import cli
 
         return cli.run_cli(argv)
@@ -646,6 +677,7 @@ def main(argv: list[str] | None = None) -> int:
             "  (옵션 없음)  GUI 실행\n"
             "  --cli --out <폴더> <URL 또는 goodsNo ...> [--desc-file desc.csv]\n"
             "  --selftest --out <폴더>\n"
+            "  --discover [--sitemap] --out <폴더>\n"
             "  --google-test <goodsNo ...> [--out <폴더>]"
         )
         return 0

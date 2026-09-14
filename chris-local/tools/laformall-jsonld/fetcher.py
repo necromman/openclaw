@@ -5,7 +5,7 @@
   판매가   dl.item_price dd (strong 중첩) -> dt 텍스트가 판매가인 dl -> "원" 앞 숫자 정규식
   정가     div.item_detail_list 안에서 dt 가 정가인 dl 의 dd del span
   이미지   og:image -> div.detail_cont img 첫 장 -> div.detail_explain_box img
-  재고     ENP_VAR.soldOut 의 첫 렌더 값(Y/N) -> 구매 영역 품절 배지
+  재고     구매 영역의 품절 마크업(btn_add_soldout) -> ENP_VAR.soldOut 첫 렌더 값
 """
 
 from __future__ import annotations
@@ -56,6 +56,11 @@ class Product:
     faq: list = field(default_factory=list)
     # 상태
     has_ldjson: bool = False
+    exposed: str = ""
+    sale_state: str = ""
+    filled_from_page: bool = False
+    page_state: str = ""
+    image_candidates: list = field(default_factory=list)
     applied: str = ""
     applied_detail: str = ""
     local_status: str = ""
@@ -155,6 +160,7 @@ def product_url(goods_no: str, domain: str) -> str:
 class Fetcher:
     def __init__(self, cfg: dict):
         self.cfg = cfg
+        self.discovered_categories: list[str] = []
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -203,6 +209,64 @@ class Fetcher:
         out.sort(key=lambda x: int(x))
         return out
 
+    # ------------------------------------------------------------------ 판매 중 상품
+    def discover_live_goods(
+        self, max_pages: int = 8, progress=None, should_stop=None
+    ) -> tuple[list[str], dict[str, list[str]]]:
+        """지금 라포르몰에 진열된 상품을 목록 페이지에서 직접 모은다.
+
+        사이트맵은 2020년에 만들어진 파일이라 현재 진열과 다르다. 그래서
+        메인, 빈 검색, 카테고리 목록(페이지네이션 포함)을 실제로 받아 모은다.
+        (goodsNo 목록, {goodsNo: 나온 페이지 목록}) 을 낸다.
+        """
+        base = (self.cfg.get("fetch_domain") or self.cfg.get("domain", "")).rstrip("/")
+        found: dict[str, list[str]] = {}
+        seen_pages: set[str] = set()
+        categories: list[str] = []
+
+        def scan(path: str) -> list[str]:
+            url = path if path.startswith("http") else base + path
+            if url in seen_pages:
+                return []
+            seen_pages.add(url)
+            try:
+                resp = self.get(url)
+            except Exception:
+                return []
+            label = url[len(base) :] or "/"
+            numbers = re.findall(r"goodsNo=(\d+)", resp.text)
+            for number in numbers:
+                found.setdefault(number, [])
+                if label not in found[number]:
+                    found[number].append(label)
+            for code in re.findall(r"cateCd=([0-9a-zA-Z]{3,})", resp.text):
+                if code not in categories:
+                    categories.append(code)
+            return numbers
+
+        if progress:
+            progress(0, None, "메인 페이지 확인")
+        scan("/")
+        if progress:
+            progress(0, None, "전체 검색 결과 확인")
+        scan("/goods/goods_search.php?keyword=")
+        scan("/goods/goods_list.php")
+        index = 0
+        while index < len(categories):
+            if should_stop and should_stop():
+                break
+            code = categories[index]
+            index += 1
+            if progress:
+                progress(index, len(categories), f"카테고리 {code} 확인")
+            for page in range(1, max_pages + 1):
+                numbers = scan(f"/goods/goods_list.php?cateCd={code}&page={page}")
+                if not numbers:
+                    break
+        goods = sorted(found, key=lambda x: int(x))
+        self.discovered_categories = list(categories)
+        return goods, found
+
     # ------------------------------------------------------------------ 상품 수집
     def fetch_product(self, goods_no: str) -> Product:
         out_domain = self.cfg.get("domain", "https://cstpillow.com")
@@ -219,15 +283,30 @@ class Fetcher:
             prod.status = "수집 실패"
             prod.error = str(exc)
             return prod
+        if len(resp.text) < 2000 and "goodsNo" not in resp.text:
+            # 삭제·미노출 상품은 고도몰이 빈 껍데기 페이지를 준다(실측 450바이트).
+            prod.status = "페이지 접근 불가"
+            prod.page_state = "접근 불가"
+            prod.error = "상품 페이지를 열 수 없습니다(삭제되었거나 접근이 막힌 상품)"
+            return prod
         soup = BeautifulSoup(resp.text, "html.parser")
+        prod.page_state = "정상"
         prod.name = _pick_name(soup)
         prod.price = _pick_price(soup, resp.text)
         prod.list_price = _pick_list_price(soup)
-        prod.image = _pick_image(soup, resp.url)
+        og_image = _pick_image(soup, resp.url)
+        import images
+
+        prod.image_candidates = images.candidates(
+            resp.text, resp.url, prod.goods_no, og_image
+        )
+        prod.image = images.default_image(prod.image_candidates, og_image)
         prod.availability = _pick_availability(soup, resp.text)
         prod.manufacturer = _pick_info(soup, ("제조사", "제조원")) or self.cfg.get("seller", "")
         prod.country = _pick_info(soup, ("원산지", "제조국"))
-        prod.has_ldjson = bool(soup.find_all("script", type="application/ld+json"))
+        blocks = soup.find_all("script", type="application/ld+json")
+        prod.has_ldjson = bool(blocks)
+        prod.applied, prod.applied_detail = _apply_existing(prod, blocks)
         prod.status = "수집됨"
         if not prod.name:
             prod.warnings.append("상품명을 찾지 못했습니다")
@@ -235,8 +314,8 @@ class Fetcher:
             prod.warnings.append("판매가를 찾지 못했습니다")
         if not prod.image:
             prod.warnings.append("이미지를 찾지 못했습니다")
-        # 설명은 사이트 meta description 이 전 페이지 공통이라 자동으로 채우지 않는다.
-        prod.description = ""
+        # 설명은 사이트 meta description 이 전 페이지 공통이라 그것으로는 채우지 않는다.
+        # 페이지에 이미 ld+json 정보표가 있으면 그 값은 위에서 가져왔다.
         return prod
 
     # ------------------------------------------------------------------ 적용 확인
@@ -309,6 +388,106 @@ def _pick_price(soup: BeautifulSoup, raw: str) -> str:
     return _digits(m.group(1)) if m else ""
 
 
+def _apply_existing(prod: Product, blocks) -> tuple[str, str]:
+    """페이지에 이미 있는 Product 정보표를 읽어 폼을 채우고 적용 여부를 판정한다."""
+    if not blocks:
+        return "미적용", "페이지에 ld+json 블록이 없습니다"
+    page_price = re.sub(r"[^0-9]", "", str(prod.price or ""))
+    found_product = False
+    schema_price = ""
+    for block in blocks:
+        raw = block.string or block.get_text() or ""
+        try:
+            data = json.loads(raw)
+        except Exception as exc:
+            return "미확인", f"ld+json 파싱 실패: {exc}"
+        for node in _iter_nodes(data):
+            if str(node.get("@type", "")).lower() != "product":
+                continue
+            found_product = True
+            schema_price = _fill_from_product(prod, node) or schema_price
+    if not found_product:
+        return "미확인", "Product 정보표를 찾지 못했습니다(다른 타입일 수 있음)"
+    prod.filled_from_page = True
+    if page_price and schema_price and page_price != schema_price:
+        return "적용됨(가격 불일치)", f"정보표 {schema_price} vs 화면 {page_price}"
+    return "적용됨(가격 일치)", f"블록 {len(blocks)}개, price {schema_price or '없음'}"
+
+
+def _iter_nodes(data):
+    if isinstance(data, dict):
+        if "@graph" in data and isinstance(data["@graph"], list):
+            for item in data["@graph"]:
+                yield from _iter_nodes(item)
+        yield data
+    elif isinstance(data, list):
+        for item in data:
+            yield from _iter_nodes(item)
+
+
+def _text_of(value) -> str:
+    if isinstance(value, dict):
+        return str(value.get("name") or value.get("value") or "").strip()
+    if isinstance(value, list):
+        return _text_of(value[0]) if value else ""
+    return str(value or "").strip()
+
+
+def _fill_from_product(prod: Product, node: dict) -> str:
+    """Product 노드 값을 빈 칸에만 채운다. 사람이 쓴 값을 덮어쓰지 않는다."""
+
+    def put(key: str, value: str) -> None:
+        if value and not str(getattr(prod, key, "") or "").strip():
+            setattr(prod, key, value)
+
+    put("name", _text_of(node.get("name")))
+    put("description", _text_of(node.get("description")))
+    put("image", _text_of(node.get("image")))
+    put("brand", _text_of(node.get("brand")))
+    put("category", _text_of(node.get("category")))
+    put("material", _text_of(node.get("material")))
+    put("size", _text_of(node.get("size")))
+    put("color", _text_of(node.get("color")))
+    put("country", _text_of(node.get("countryOfOrigin")))
+    put("manufacturer", _text_of(node.get("manufacturer")))
+    put("mpn", _text_of(node.get("mpn")))
+    put("gtin13", _text_of(node.get("gtin13")))
+    weight = node.get("weight")
+    if isinstance(weight, dict):
+        unit = "kg" if str(weight.get("unitCode", "")).upper() == "KGM" else "g"
+        put("weight", f"{_text_of(weight.get('value'))}{unit}".strip())
+    else:
+        put("weight", _text_of(weight))
+    rating = node.get("aggregateRating")
+    if isinstance(rating, dict):
+        put("rating_value", _text_of(rating.get("ratingValue")))
+        put("review_count", _text_of(rating.get("reviewCount")))
+    props = node.get("additionalProperty")
+    if isinstance(props, list) and not (prod.extra_props or "").strip():
+        lines = []
+        for item in props:
+            if isinstance(item, dict):
+                name, value = _text_of(item.get("name")), _text_of(item.get("value"))
+                if name and value:
+                    lines.append(f"{name}={value}")
+        if lines:
+            prod.extra_props = "\n".join(lines)
+    offers = node.get("offers")
+    if isinstance(offers, list):
+        offers = offers[0] if offers else {}
+    schema_price = ""
+    if isinstance(offers, dict):
+        schema_price = re.sub(r"[^0-9]", "", _text_of(offers.get("price")))
+        put("price", schema_price)
+        put("seller", _text_of(offers.get("seller")))
+        put("price_valid_until", _text_of(offers.get("priceValidUntil")))
+        avail = _text_of(offers.get("availability"))
+        if avail.startswith("http"):
+            prod.availability = avail
+    put("goods_no", str(_text_of(node.get("sku")) or ""))
+    return schema_price
+
+
 def _pick_info(soup: BeautifulSoup, labels: tuple[str, ...]) -> str:
     """상품 정보 목록에서 dt 라벨에 해당하는 dd 값을 찾는다(제조사·원산지 등)."""
     for dl in soup.select("div.item_detail_list dl, dl"):
@@ -349,7 +528,10 @@ def _pick_image(soup: BeautifulSoup, page_url: str) -> str:
 
 
 def _pick_availability(soup: BeautifulSoup, raw: str) -> str:
-    # 고도몰5 스킨은 ENP_VAR.soldOut 에 렌더된 Y/N 을 남긴다(첫 값이 실제 값).
+    # 품절이면 구매 영역이 재입고 알림 버튼으로 바뀐다(실측 goodsNo 10·16).
+    # ENP_VAR.soldOut 은 goodsNo=16 에서 N 으로 나와 믿을 수 없으므로 이것을 먼저 본다.
+    if "btn_add_soldout" in raw or "btn_restock_box" in raw:
+        return OUT_OF_STOCK
     for m in re.finditer(r"ENP_VAR\.soldOut\s*=\s*'([YyNn])'", raw):
         head = raw[max(0, m.start() - 60) : m.start()]
         if "<!--{" in head:

@@ -23,6 +23,8 @@ $args = @(
   "--onefile", "--windowed", "--name", "laformall-jsonld",
   "--hidden-import", "bs4", "--hidden-import", "requests",
   "--hidden-import", "websocket", "--collect-submodules", "bs4",
+  "--hidden-import", "openpyxl", "--collect-submodules", "openpyxl",
+  "--hidden-import", "PIL", "--hidden-import", "PIL.Image", "--hidden-import", "PIL.ImageTk",
   "--hidden-import", "webview", "--hidden-import", "webview.platforms.winforms",
   "--hidden-import", "webview.platforms.edgechromium", "--collect-data", "webview",
   "--hidden-import", "clr", "--collect-all", "clr_loader", "--collect-all", "pythonnet",
@@ -32,7 +34,7 @@ $args = @(
   "--exclude-module", "cefpython3", "--exclude-module", "webview.platforms.qt",
   "--exclude-module", "webview.platforms.gtk", "--exclude-module", "webview.platforms.android",
   "--exclude-module", "webview.platforms.cocoa",
-  "--exclude-module", "numpy", "--exclude-module", "pandas", "--exclude-module", "PIL",
+  "--exclude-module", "numpy", "--exclude-module", "pandas",
   "--exclude-module", "matplotlib", "--exclude-module", "scipy", "--exclude-module", "lxml",
   "--exclude-module", "IPython", "--exclude-module", "pytest"
 )

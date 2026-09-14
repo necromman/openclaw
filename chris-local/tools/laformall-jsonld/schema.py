@@ -242,7 +242,7 @@ def breadcrumb_snippet(prod, domain: str = "https://cstpillow.com") -> str:
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-def validate(prod, data: dict, image_ok: bool | None = None) -> list[str]:
+def validate(prod, data: dict, image_ok: bool | None = None, image_size: tuple | None = None) -> list[str]:
     """생성 전 검증. 오류 문자열 목록을 낸다(빈 목록이면 통과).
 
     항목별 규칙은 validator 의 규칙표를 그대로 쓰고, 여기서는 직렬화한
@@ -250,7 +250,7 @@ def validate(prod, data: dict, image_ok: bool | None = None) -> list[str]:
     """
     import validator
 
-    errors = list(validator.check(prod, image_ok).errors)
+    errors = list(validator.check(prod, image_ok, image_size).errors)
     try:
         json.loads(dump(data))
     except Exception as exc:

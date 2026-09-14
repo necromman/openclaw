@@ -76,20 +76,37 @@ class Verdict:
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     missing: list = field(default_factory=list)
+    required_missing: list = field(default_factory=list)
 
     @property
     def indicator(self) -> str:
         return INDICATOR.get(self.status, "-")
 
     def summary(self) -> str:
+        """사람 말로 쓴 한 줄. 숫자만 늘어놓지 않는다."""
         if self.status == STATUS_PASS:
-            return "통과"
+            return "모두 입력됨"
         parts = []
-        if self.errors:
-            parts.append(f"오류 {len(self.errors)}")
+        if self.required_missing:
+            parts.append(f"필수 {len(self.required_missing)}개 남음")
+        other = [e for e in self.errors if not any(m in e for m in self.required_missing)]
+        if other:
+            parts.append(f"고칠 것 {len(other)}개")
         if self.warnings:
-            parts.append(f"경고 {len(self.warnings)}")
-        return " / ".join(parts) or self.status
+            parts.append(f"권장 {len(self.warnings)}개")
+        return ", ".join(parts) or self.status
+
+    def tooltip(self) -> str:
+        lines = []
+        if self.required_missing:
+            lines.append("필수로 더 채워야 하는 것: " + ", ".join(self.required_missing))
+        if self.errors:
+            lines.append("고칠 것:")
+            lines += [f"  - {e}" for e in self.errors[:8]]
+        if self.warnings:
+            lines.append("채우면 좋은 것:")
+            lines += [f"  - {w}" for w in self.warnings[:8]]
+        return "\n".join(lines) or "모두 입력됨"
 
     def report(self) -> str:
         lines = [f"로컬 판정: {self.status} ({self.summary()})"]
@@ -118,7 +135,7 @@ def _val(prod, key: str) -> str:
     return str(getattr(prod, key, "") or "").strip()
 
 
-def check(prod, image_ok: bool | None = None) -> Verdict:
+def check(prod, image_ok: bool | None = None, image_size: tuple | None = None) -> Verdict:
     verdict = Verdict()
     errors, warnings, missing = verdict.errors, verdict.warnings, verdict.missing
 
@@ -134,6 +151,10 @@ def check(prod, image_ok: bool | None = None) -> Verdict:
         errors.append("대표 이미지 URL 이 절대 주소가 아닙니다")
     elif image_ok is False:
         errors.append("대표 이미지 URL HEAD 응답이 200 이 아닙니다")
+    if image and image_size:
+        import images
+
+        warnings.extend(images.size_warnings(image_size))
     price = re.sub(r"[^0-9]", "", _val(prod, "price"))
     if not price:
         errors.append("판매가(offers.price)가 숫자가 아닙니다. 구글 필수 속성입니다")
@@ -208,6 +229,7 @@ def check(prod, image_ok: bool | None = None) -> Verdict:
         warnings.append("FAQ 가 없습니다. 질문 그대로의 질의에서 인용받는 가장 강한 포맷입니다")
         missing.append("FAQ")
 
+    verdict.required_missing = fields.missing_required(prod)
     verdict.status = STATUS_ERROR if errors else (STATUS_WARN if warnings else STATUS_PASS)
     return verdict
 

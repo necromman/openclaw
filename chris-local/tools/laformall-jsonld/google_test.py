@@ -28,8 +28,14 @@ STATUS_ERROR = "오류"
 STATUS_NONE = "미감지"
 STATUS_MANUAL = "수동 확인 필요"
 STATUS_SKIP = "미실행"
+STATUS_CANCELLED = "취소됨"
+STATUS_TIMEOUT = "시간 초과"
+STATUS_NOBROWSER = "브라우저 없음"
 
 COLOR = {
+    STATUS_CANCELLED: "#eeeeee",
+    STATUS_TIMEOUT: "#fff0e0",
+    STATUS_NOBROWSER: "#ffe0e0",
     STATUS_VALID: "#e2f4e2",
     STATUS_WARN: "#fff4d0",
     STATUS_ERROR: "#ffe0e0",
@@ -38,6 +44,9 @@ COLOR = {
     STATUS_SKIP: "#eeeeee",
 }
 FOREGROUND = {
+    STATUS_CANCELLED: "#606060",
+    STATUS_TIMEOUT: "#8a5a00",
+    STATUS_NOBROWSER: "#a00000",
     STATUS_VALID: "#105010",
     STATUS_WARN: "#8a5a00",
     STATUS_ERROR: "#a00000",
@@ -143,38 +152,70 @@ def parse_body(text: str) -> tuple[str, int, list[str], list[str], str]:
     return status, count, items, warnings, ""
 
 
-def _read_result(session: browser.Browser) -> str:
+class Cancelled(Exception):
+    pass
+
+
+def _read_result(session: browser.Browser, on_stage=None, should_stop=None) -> str:
     """결과가 나올 때까지 본문 텍스트를 되풀이해 읽는다."""
     deadline = time.time() + TIMEOUT_SEC
     body = ""
+    waited = 0
     while time.time() < deadline:
+        if should_stop and should_stop():
+            raise Cancelled()
         time.sleep(POLL_SEC)
+        waited += POLL_SEC
+        if on_stage:
+            on_stage(f"결과 대기({waited}초)")
         try:
             body = session.body_text()
         except Exception:
             continue
         if any(token in body for token in DONE_TOKENS + BLOCK_TOKENS):
+            if on_stage:
+                on_stage("결과 읽음")
             return body
+    if on_stage:
+        on_stage("시간 초과")
     return body
 
 
-def run_one(goods_no: str, url: str) -> GoogleResult:
+def run_one(goods_no: str, url: str, on_stage=None, should_stop=None) -> GoogleResult:
     result = GoogleResult(goods_no=str(goods_no), url=url)
     result.at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ok, note = available()
     if not ok:
-        result.status = STATUS_MANUAL
+        result.status = STATUS_NOBROWSER
         result.note = note
         return result
     body = ""
     try:
+        if on_stage:
+            on_stage("브라우저 여는 중")
         with browser.Browser(offscreen=True) as session:
+            if should_stop and should_stop():
+                raise Cancelled()
             session.connect()
+            if on_stage:
+                on_stage("페이지 로딩")
             session.navigate(test_url(url))
-            body = _read_result(session)
+            body = _read_result(session, on_stage, should_stop)
+    except Cancelled:
+        result.status = STATUS_CANCELLED
+        result.note = "취소해서 중단했습니다. 브라우저는 닫았습니다."
+        return result
     except Exception as exc:
-        result.status = STATUS_MANUAL
-        result.note = str(exc)
+        message = str(exc)
+        if "브라우저" in message or "디버깅 포트" in message:
+            result.status = STATUS_NOBROWSER
+        else:
+            result.status = STATUS_MANUAL
+        result.note = message
+        return result
+    if not body:
+        result.status = STATUS_TIMEOUT
+        result.note = f"{TIMEOUT_SEC}초 안에 결과가 나오지 않았습니다. 다시 시도하거나 창을 열어 직접 보세요."
         return result
     status, count, items, warns, note = parse_body(body)
     result.status = status
@@ -187,15 +228,17 @@ def run_one(goods_no: str, url: str) -> GoogleResult:
     return result
 
 
-def run_many(pairs: list[tuple[str, str]], progress=None) -> list[GoogleResult]:
+def run_many(pairs: list[tuple[str, str]], progress=None, should_stop=None) -> list[GoogleResult]:
     """[(goodsNo, url)] 을 순차 실행한다. 한 건이 막혀도 멈추지 않는다."""
     out: list[GoogleResult] = []
     total = len(pairs)
     for index, (goods_no, url) in enumerate(pairs, 1):
+        if should_stop and should_stop():
+            break
         if progress:
             progress(index, total, goods_no)
         try:
-            out.append(run_one(goods_no, url))
+            out.append(run_one(goods_no, url, should_stop=should_stop))
         except Exception as exc:
             item = GoogleResult(goods_no=str(goods_no), url=url, status=STATUS_MANUAL)
             item.note = str(exc)

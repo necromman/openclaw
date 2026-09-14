@@ -117,8 +117,10 @@ FIELDS: list[FieldSpec] = [
         "대표 이미지 URL",
         True,
         "entry",
-        "https://godomall.speedycdn.net/.../goods/11/image/detail/11_detail_046.jpg",
-        "이미지가 없으면 리치 결과에 상품 카드가 뜨지 않는다. 절대 주소로 넣는다.",
+        "https://godomall.speedycdn.net/.../goods/11/image/main/11_main.jpg",
+        "상품의 대표 사진(흰 배경 제품 사진) 한 장. 주소가 godomall.speedycdn.net 인 것은 "
+        "고도몰이 이미지를 자체 서버에 두기 때문이며 정상입니다. 구글은 주소가 열리는지만 봅니다. "
+        "아래 '이미지 고르기' 로 이 상품의 사진 중에서 고를 수 있습니다.",
     ),
     FieldSpec(
         "description",
@@ -289,6 +291,17 @@ FIELDS: list[FieldSpec] = [
         "질문 그대로의 질의에서 인용된다. 화면에 보이는 질문·답만 넣는다.",
     ),
 ]
+
+# 페이지에서 자동으로 읽을 수 없어 사람이 직접 넣어야 하는 항목
+MANUAL_ONLY = (
+    "description",
+    "category",
+    "material",
+    "size",
+    "weight",
+    "color",
+    "country",
+)
 
 BY_KEY = {f.key: f for f in FIELDS}
 REQUIRED_KEYS = [f.key for f in FIELDS if f.required]

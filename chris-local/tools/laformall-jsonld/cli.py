@@ -144,7 +144,7 @@ def _parse_args(args: list[str]) -> dict:
     index = 0
     while index < len(args):
         arg = args[index]
-        if arg in ("--cli", "--selftest", "--google-test"):
+        if arg in ("--cli", "--selftest", "--google-test", "--discover", "--sitemap"):
             pass
         elif arg == "--out":
             index += 1
@@ -200,6 +200,61 @@ def run_google(argv: list[str], cfg: dict, out_dir: Path) -> int:
     return 1 if failed else 0
 
 
+def run_discover(cfg: dict, out_dir: Path, make_sitemap: bool) -> int:
+    """판매 중 상품을 모아 result.json 에 기록한다. --sitemap 이면 sitemap.xml 도 만든다."""
+    import sitemap as sitemap_mod
+
+    fetch = fetcher.Fetcher(cfg)
+    live, evidence = fetch.discover_live_goods()
+    try:
+        sitemap_goods = fetch.sitemap_goods()
+        old_xml = fetch.get(cfg.get("sitemap_url", "")).text
+    except Exception:
+        sitemap_goods, old_xml = [], ""
+    rows = [fetch.fetch_product(code) for code in live]
+    for row in rows:
+        row.exposed = "노출"
+    payload = {
+        "mode": "discover",
+        "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "live_count": len(live),
+        "live_goods": live,
+        "sitemap_count": len(sitemap_goods),
+        "sitemap_goods": sitemap_goods,
+        "only_live": [g for g in live if g not in sitemap_goods],
+        "only_sitemap": [g for g in sitemap_goods if g not in live],
+        "categories": list(fetch.discovered_categories),
+        "evidence": evidence,
+        "products": [
+            {
+                "goods_no": r.goods_no,
+                "name": r.name,
+                "price": r.price,
+                "availability": r.availability,
+                "page_state": r.page_state,
+                "image": r.image,
+                "image_candidates": len(r.image_candidates),
+            }
+            for r in rows
+        ],
+    }
+    if make_sitemap:
+        xml, urls, kept = sitemap_mod.build(
+            rows, cfg["domain"], list(fetch.discovered_categories), old_xml=old_xml
+        )
+        (out_dir / "sitemap.xml").write_text(xml, encoding="utf-8")
+        added, removed = sitemap_mod.diff(urls, old_xml)
+        payload["sitemap_file"] = str(out_dir / "sitemap.xml")
+        payload["sitemap_urls"] = urls
+        payload["sitemap_carried_over"] = kept
+        payload["sitemap_added"] = added
+        payload["sitemap_removed"] = removed
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    emit(text)
+    (out_dir / "result.json").write_text(text + "\n", encoding="utf-8")
+    return 0
+
+
 def run_cli(argv: list[str]) -> int:
     ensure_console()
     args = list(argv)
@@ -210,6 +265,8 @@ def run_cli(argv: list[str]) -> int:
 
     if "--google-test" in args:
         return run_google(args, cfg, out_dir)
+    if "--discover" in args or "--sitemap" in args:
+        return run_discover(cfg, out_dir, make_sitemap="--sitemap" in args)
 
     selftest = "--selftest" in args
     if selftest:
@@ -222,6 +279,7 @@ def run_cli(argv: list[str]) -> int:
             emit(
                 "사용법: laformall-jsonld.exe --cli --out <폴더> <URL 또는 goodsNo ...>\n"
                 "        laformall-jsonld.exe --selftest --out <폴더>\n"
+                "        laformall-jsonld.exe --discover [--sitemap] --out <폴더>\n"
                 "        laformall-jsonld.exe --google-test <goodsNo ...>"
             )
             return 2

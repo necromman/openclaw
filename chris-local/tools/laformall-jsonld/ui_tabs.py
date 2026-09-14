@@ -8,7 +8,6 @@ import webbrowser
 from pathlib import Path
 
 import fetcher
-import fields
 import form as form_mod
 import google_test
 import history
@@ -27,71 +26,6 @@ HIST_COLUMNS = [
     ("result", "검증", 80),
     ("saved_path", "저장 파일", 200),
 ]
-
-HELP_TEXT = """비개발자용 절차
-
-1. 상품 URL 을 붙여넣습니다.
-   - 라포르몰 관리자나 브라우저에서 상품 주소를 복사해 왼쪽 위 칸에 줄마다 하나씩 붙입니다.
-   - 숫자만(goodsNo) 붙여도 됩니다. 전체 상품을 한 번에 넣으려면
-     "사이트맵에서 전체 상품 불러오기" 를 누릅니다.
-2. "가져오기" 를 누릅니다.
-   - 상품명·판매가·정가·이미지·재고·제조사·원산지를 사이트에서 읽어 옵니다.
-   - 설명·재질·크기·무게·색상은 페이지에서 읽을 수 없어 사람이 채웁니다.
-3. 표에서 행을 누르면 오른쪽 폼에 그 상품이 뜹니다. 별표가 붙은 필수 항목을 다 채웁니다.
-   - 처음이면 "예시로 채우기" 를 눌러 어떤 값이 들어가는지 보고 실제 값으로 고칩니다.
-   - 입력칸의 회색 글씨는 예시이고, 칸을 누르면 사라집니다.
-   - 값을 고치면 표의 로컬 판정과 색이 바로 바뀝니다(빨강 오류, 노랑 경고, 초록 통과).
-4. "스니펫 생성" 을 누릅니다. 필수 항목이 비었으면 어떤 항목인지 알려 줍니다.
-   규제 경고가 나오면 문구를 고칩니다.
-5. "개별 복사" 또는 "전체 복사" 로 스니펫을 복사합니다.
-   파일로 남기려면 "파일 저장" 을 누릅니다.
-6. 고도몰 관리자 > 상품 관리 > 상품 수정 > 상품 상세설명 을 열고
-   에디터를 HTML 편집 모드로 바꾼 뒤 맨 아래에 붙여넣고 저장합니다.
-7. 상품 페이지를 열어 Ctrl+U(소스 보기)로 application/ld+json 이 있는지 봅니다.
-   또는 이 프로그램에서 "적용 확인" 을 누릅니다.
-8. "구글 일괄 테스트" 를 누릅니다. 이것이 최종 판정입니다.
-   - 상품마다 구글 리치 결과 테스트를 돌려 "유효한 항목 N개" 를 읽어 표에 색으로 표시합니다.
-   - 화면으로 직접 보려면 행을 고르고 "구글 테스트 창 열기" 를 누릅니다.
-   - 결과는 이력 탭에 남고 CSV 로 내보낼 수 있습니다.
-
-로컬 판정과 구글 테스트
-
-- 로컬 판정은 이 프로그램이 즉시 내는 참고 판정입니다. 구글 필수·권장 속성과
-  이 프로그램의 AEO 필수 항목이 채워졌는지만 봅니다.
-- 최종 판정은 구글 리치 결과 테스트입니다. 로컬 판정이 통과여도 구글 결과가
-  "미감지" 면 붙여넣기나 스킨 설정에 문제가 있다는 뜻입니다.
-
-설치할 것은 없습니다
-
-- 이 프로그램은 실행 파일 하나로 돌아갑니다. 파이썬 같은 것을 따로 깔지 않습니다.
-- 구글 자동 테스트만 이 PC 에 Edge 또는 Chrome 이 설치돼 있어야 합니다.
-  둘 중 하나가 있으면 프로그램이 알아서 찾아 쓰고, 창은 화면 밖에서 돌아 방해하지
-  않습니다. 둘 다 없으면 그 행을 "수동 확인 필요" 로 표시합니다.
-- "구글 테스트 창 열기" 는 프로그램이 직접 창을 띄워 결과 화면을 보여 줍니다.
-
-주의
-
-- JSON-LD 의 가격이 화면 가격과 다르면 표시광고 위반이 됩니다.
-  가격을 바꾸면 스니펫도 다시 만들어 붙입니다.
-- 화면에 없는 별점·후기 수를 넣지 않습니다. aggregateRating 은
-  페이지에 실제로 보이는 값이 있을 때만 켭니다.
-- 공통 헤더·푸터에 넣지 않습니다. 상품마다 상품 상세설명에만 넣습니다.
-  전 상품 한 번에 넣으려면 스킨 goods_view.htm 에 치환코드로 심는 방법을
-  따로 검토합니다(이 프로그램은 상품별 스니펫만 만듭니다).
-- 설명에 치료·완치·예방·교정·통증 완화·혈액순환 같은 표현을 쓰지 않습니다.
-  베개·마사지기는 의료기기 허가를 받지 않은 공산품이고, 이런 표현은
-  의료기기 오인 광고로 평가됩니다. 물리 사양과 사용 방법으로 씁니다.
-- 이 프로그램의 문구 검사는 사전 대조일 뿐이고 적법성을 보증하지 않습니다.
-  최종 판단은 담당자와 법률 검토의 몫입니다.
-
-개발자 메모
-
-- CLI: laformall-jsonld.exe --cli --out <폴더> <URL 또는 goodsNo ...>
-       설명 매핑은 --desc-file desc.csv (goodsNo,설명)
-- 자기검사: laformall-jsonld.exe --selftest --out <폴더>
-- 설정·이력 파일: %APPDATA%\\laformall-jsonld\\
-"""
-
 
 def build_history_tab(app, frame) -> None:
     ttk = app.ttk
@@ -435,50 +369,6 @@ def _reset_settings(app) -> None:
 # ---------------------------------------------------------------------- 도움말
 
 
-def build_help_tab(app, frame) -> None:
-    tk, ttk = app.tk, app.ttk
-    top = ttk.Frame(frame)
-    top.pack(fill="x", padx=6, pady=6)
-    ttk.Button(
-        top,
-        text="구글 리치 결과 테스트 열기",
-        command=lambda: webbrowser.open("https://search.google.com/test/rich-results"),
-    ).pack(side="left")
-    ttk.Button(
-        top,
-        text="schema.org 검사기 열기",
-        command=lambda: webbrowser.open("https://validator.schema.org/"),
-    ).pack(side="left", padx=4)
-    ttk.Button(
-        top,
-        text="라포르몰 열기",
-        command=lambda: webbrowser.open(app.cfg["domain"]),
-    ).pack(side="left")
-    text = tk.Text(frame, wrap="word", font=("Segoe UI", 9))
-    vsb = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
-    text.configure(yscrollcommand=vsb.set)
-    text.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=6)
-    vsb.pack(side="left", fill="y", pady=6)
-    text.tag_configure("h", font=("Segoe UI", 11, "bold"))
-    text.tag_configure("req", foreground="#c00000", font=("Segoe UI", 9, "bold"))
-    text.tag_configure("opt", foreground="#205080", font=("Segoe UI", 9, "bold"))
-    text.insert("end", "필수 항목 표\n", "h")
-    text.insert(
-        "end",
-        "아래 항목은 모두 채워야 스니펫이 생성됩니다. 정보가 많을수록 AI 답변에 인용될 여지가 커집니다.\n\n",
-    )
-    for label, example, hint in fields.required_table():
-        text.insert("end", f"  {label}\n", "req")
-        text.insert("end", f"    예시: {example}\n    이유: {hint}\n")
-    text.insert("end", "\n선택 항목 표\n", "h")
-    text.insert("end", "비워 두면 스니펫에서 빠집니다. 구글 권장 속성이 여기에 있습니다.\n\n")
-    for label, example, hint in fields.optional_table():
-        text.insert("end", f"  {label}\n", "opt")
-        text.insert("end", f"    예시: {example}\n    이유: {hint}\n")
-    text.insert("end", "\n" + HELP_TEXT)
-    text.configure(state="disabled")
-
-
 def rich_results_url(url: str) -> str:
     return "https://search.google.com/test/rich-results?url=" + urllib.parse.quote(url, safe="")
 
@@ -542,3 +432,145 @@ def build_output_panel(app, parent) -> None:
     osb.pack(side="left", fill="y", pady=6)
     app.out.tag_configure("bad", foreground="#c00000", underline=True)
     app.out.tag_configure("head", font=("Segoe UI", 10, "bold"))
+
+
+def build_input_panel(app, parent) -> None:
+    """1절 입력 영역. 정확한 순서대로 버튼을 둔다."""
+    tk, ttk = app.tk, app.ttk
+    top = ttk.LabelFrame(parent, text="1. 상품 불러오기 (위 버튼이 더 정확합니다)")
+    top.pack(fill="x", padx=4, pady=4)
+    row1 = ttk.Frame(top)
+    row1.pack(fill="x", padx=6, pady=(6, 0))
+    ttk.Button(row1, text="관리자 엑셀 가져오기 (가장 정확)", command=app.on_admin_excel).pack(
+        side="left", padx=2
+    )
+    ttk.Button(row1, text="판매 중 상품 불러오기 (권장)", command=app.on_discover).pack(
+        side="left", padx=2
+    )
+    ttk.Button(
+        row1, text="사이트맵(2020년 파일)에서 불러오기 (참고용)", command=app.on_sitemap
+    ).pack(side="left", padx=2)
+    tk.Label(
+        top,
+        text=(
+            "관리자 > 상품 관리 > 상품 목록 > 엑셀다운로드 파일을 넣으면 가장 정확합니다."
+            " 파일이 없으면 '판매 중 상품 불러오기' 를 쓰세요."
+            " 사이트맵 파일은 2020년에 만들어진 것이라 지금 진열과 다릅니다."
+        ),
+        fg="#707070",
+        justify="left",
+        wraplength=720,
+    ).pack(anchor="w", padx=8, pady=(2, 0))
+    app.input = tk.Text(top, height=4, wrap="none")
+    app.input.pack(fill="x", padx=6, pady=(4, 2))
+    app.input.insert("1.0", "https://cstpillow.com/goods/goods_view.php?goodsNo=11")
+    row2 = ttk.Frame(top)
+    row2.pack(fill="x", padx=6, pady=(0, 6))
+    for text, cmd in (
+        ("2. 가져오기(수집·파싱)", app.on_fetch),
+        ("입력 비우기", lambda: app.input.delete("1.0", "end")),
+        ("표 비우기", app.on_clear_rows),
+        ("사이트맵 만들기", app.on_make_sitemap),
+        ("llms.txt 만들기", app.on_make_llms),
+    ):
+        ttk.Button(row2, text=text, command=cmd).pack(side="left", padx=2)
+
+
+# ---------------------------------------------------------------------- 화면 꾸미기
+
+TAB_ACTIVE_BG = "#1f5fbf"
+TAB_ACTIVE_FG = "#ffffff"
+TAB_IDLE_BG = "#e6e6e6"
+TAB_IDLE_FG = "#202020"
+BASE_FONT = ("맑은 고딕", 11)
+
+
+def apply_style(app) -> None:
+    """탭을 크게 하고 기본 글꼴을 키운다. 어느 탭이 열려 있는지 색으로 보이게 한다."""
+    tk, ttk = app.tk, app.ttk
+    style = ttk.Style(app.root)
+    try:
+        style.theme_use("clam")  # 색을 마음대로 줄 수 있는 테마
+    except Exception:
+        pass
+    for name in (
+        "TkDefaultFont",
+        "TkTextFont",
+        "TkMenuFont",
+        "TkHeadingFont",
+        "TkTooltipFont",
+        "TkIconFont",
+    ):
+        try:
+            app.tkfont.nametofont(name).configure(family=BASE_FONT[0], size=BASE_FONT[1])
+        except Exception:
+            pass
+    style.configure("TNotebook", tabmargins=[4, 6, 4, 0], background="#f4f4f4")
+    style.configure(
+        "TNotebook.Tab",
+        font=(BASE_FONT[0], 15, "bold"),
+        padding=[22, 10],
+        background=TAB_IDLE_BG,
+        foreground=TAB_IDLE_FG,
+        borderwidth=1,
+    )
+    # 색만 다르고 크기는 같게 둔다. 기본 테마는 선택 탭을 키우므로 확장을 0 으로 고정한다.
+    style.map(
+        "TNotebook.Tab",
+        background=[("selected", TAB_ACTIVE_BG), ("active", "#cfe0f7")],
+        foreground=[("selected", TAB_ACTIVE_FG), ("active", TAB_IDLE_FG)],
+        padding=[("selected", [22, 10]), ("!selected", [22, 10])],
+        expand=[("selected", [0, 0, 0, 0]), ("!selected", [0, 0, 0, 0])],
+    )
+    # 버튼이 버튼처럼 보이게 테두리와 입체감을 준다.
+    style.configure(
+        "TButton",
+        font=(BASE_FONT[0], 11),
+        padding=[14, 7],
+        relief="raised",
+        borderwidth=2,
+    )
+    style.configure(
+        "Secondary.TButton",
+        font=(BASE_FONT[0], 11),
+        padding=[14, 7],
+        relief="raised",
+        borderwidth=2,
+        background="#fbfbfb",
+        foreground="#202020",
+        bordercolor="#9a9a9a",
+        lightcolor="#ffffff",
+        darkcolor="#c8c8c8",
+    )
+    style.map(
+        "Secondary.TButton",
+        background=[("disabled", "#f0f0f0"), ("pressed", "#dfe7f3"), ("active", "#eef3fb")],
+        foreground=[("disabled", "#a0a0a0")],
+        relief=[("pressed", "sunken")],
+    )
+    style.configure(
+        "Primary.TButton",
+        font=(BASE_FONT[0], 11, "bold"),
+        padding=[14, 7],
+        relief="raised",
+        borderwidth=2,
+        background=TAB_ACTIVE_BG,
+        foreground="#ffffff",
+        bordercolor="#17488f",
+        lightcolor="#4a84d8",
+        darkcolor="#17488f",
+    )
+    style.map(
+        "Primary.TButton",
+        background=[("disabled", "#a9bede"), ("pressed", "#17488f"), ("active", "#2a6fd4")],
+        foreground=[("disabled", "#eeeeee")],
+        relief=[("pressed", "sunken")],
+    )
+    style.configure("Tiny.TButton", font=(BASE_FONT[0], 8), padding=[4, 1], borderwidth=1)
+    style.configure("Card.TFrame", background="#f7f9fc", relief="solid", borderwidth=1)
+    style.configure("TProgressbar", thickness=16)
+    style.configure("TLabelframe.Label", font=(BASE_FONT[0], 11, "bold"))
+    style.configure("Treeview", font=(BASE_FONT[0], 10), rowheight=26)
+    style.configure("Treeview.Heading", font=(BASE_FONT[0], 10, "bold"))
+    style.configure("TCombobox", padding=[4, 3])
+    style.configure("TEntry", padding=[3, 3])
