@@ -1087,7 +1087,16 @@ function createTargetedOxlintCommand({
   return {
     name: targets.length === 1 ? `lint ${label} changed file` : `lint ${label} changed files`,
     bin: "node",
-    args: ["scripts/run-oxlint.mjs", "--tsconfig", tsconfig, ...targets],
+    // Changed paths come from git, so some may be excluded by `.oxlintrc.json`
+    // ignore patterns. Mirror the changed-file format lane and treat an empty
+    // selection as a pass instead of oxlint's default exit 1.
+    args: [
+      "scripts/run-oxlint.mjs",
+      "--no-error-on-unmatched-pattern",
+      "--tsconfig",
+      tsconfig,
+      ...targets,
+    ],
     env,
   };
 }

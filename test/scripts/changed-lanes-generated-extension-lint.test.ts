@@ -13,7 +13,13 @@ describe("generated extension asset lint planning", () => {
     expect(plan.commands).toContainEqual(
       expect.objectContaining({
         name: "lint extension changed file",
-        args: ["scripts/run-oxlint.mjs", "--tsconfig", "extensions/tsconfig.json", extensionTest],
+        args: [
+          "scripts/run-oxlint.mjs",
+          "--no-error-on-unmatched-pattern",
+          "--tsconfig",
+          "extensions/tsconfig.json",
+          extensionTest,
+        ],
       }),
     );
     expect(

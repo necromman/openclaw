@@ -661,7 +661,7 @@ describe("scripts/changed-lanes", () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toContain("[check:changed:dry-run] lanes=extensions, extensionTests");
     expect(result.stderr).toContain(
-      "[check:changed:dry-run] would run: node scripts/run-oxlint.mjs --tsconfig extensions/tsconfig.json extensions/lmstudio/src/model-reasoning.ts",
+      "[check:changed:dry-run] would run: node scripts/run-oxlint.mjs --no-error-on-unmatched-pattern --tsconfig extensions/tsconfig.json extensions/lmstudio/src/model-reasoning.ts",
     );
   });
 
@@ -1332,6 +1332,7 @@ describe("scripts/changed-lanes", () => {
       bin: "node",
       args: [
         "scripts/run-oxlint.mjs",
+        "--no-error-on-unmatched-pattern",
         "--tsconfig",
         "config/tsconfig/oxlint.core.json",
         "packages/normalization-core/src/string-normalization.ts",
@@ -1357,6 +1358,7 @@ describe("scripts/changed-lanes", () => {
           name: "lint core changed file",
           args: [
             "scripts/run-oxlint.mjs",
+            "--no-error-on-unmatched-pattern",
             "--tsconfig",
             "config/tsconfig/oxlint.core.json",
             "src/gateway/node-registry.ts",
@@ -1366,6 +1368,7 @@ describe("scripts/changed-lanes", () => {
           name: "lint extension changed file",
           args: [
             "scripts/run-oxlint.mjs",
+            "--no-error-on-unmatched-pattern",
             "--tsconfig",
             "extensions/tsconfig.json",
             "extensions/lmstudio/src/models.fetch.ts",
@@ -1375,6 +1378,7 @@ describe("scripts/changed-lanes", () => {
           name: "lint script changed file",
           args: [
             "scripts/run-oxlint.mjs",
+            "--no-error-on-unmatched-pattern",
             "--tsconfig",
             "config/tsconfig/oxlint.scripts.json",
             "scripts/check-changed.mjs",
@@ -1738,7 +1742,13 @@ describe("scripts/changed-lanes", () => {
     expect(create(targets, { PATH: "/usr/bin" }, { fileExists: () => true })).toEqual({
       name: expected.name,
       bin: "node",
-      args: ["scripts/run-oxlint.mjs", "--tsconfig", expected.tsconfig, expected.path],
+      args: [
+        "scripts/run-oxlint.mjs",
+        "--no-error-on-unmatched-pattern",
+        "--tsconfig",
+        expected.tsconfig,
+        expected.path,
+      ],
       env: { PATH: "/usr/bin" },
     });
   });
