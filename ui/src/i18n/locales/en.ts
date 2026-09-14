@@ -1424,6 +1424,12 @@ export const en: TranslationMap & {
     copyId: "Copy ID",
     default: "Default",
     setDefault: "Set Default",
+    setDefaultLocked:
+      "This deployment uses explicit agent ownership, so the default agent cannot be changed from this screen. The default agent is set by systemAgent in the config file.",
+    errors: {
+      explicitOwnershipDefault:
+        "The default agent cannot be changed from this screen while agents.ownership=explicit.",
+    },
     ...agentEn.pinning,
     selectTitle: "Select an agent",
     selectSubtitle: "Pick an agent to inspect its workspace and tools.",

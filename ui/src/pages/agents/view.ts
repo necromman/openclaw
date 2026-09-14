@@ -30,8 +30,9 @@ import {
 } from "../../lib/agents/display.ts";
 import "../../styles/agents.css";
 import "../../styles/sidebar-markdown.css";
-import "./memory/memory-panel.ts";
 import type { AgentsPanel } from "../../lib/agents/index.ts";
+import "./memory/memory-panel.ts";
+import { humanizeAgentConfigError, isExplicitAgentOwnership } from "./default-agent-lock.ts";
 import type { AgentIdentityDraft } from "./panels-overview.ts";
 import { renderAgentOverview } from "./panels-overview.ts";
 import { renderAgentFiles, renderAgentChannels, renderAgentCron } from "./panels-status-files.ts";
@@ -206,6 +207,7 @@ function buildAgentRosterTree(agents: AgentRosterRow[]) {
 export function renderAgents(props: AgentsProps) {
   const agents = props.agentsList?.agents ?? [];
   const defaultId = props.agentsList?.defaultId ?? null;
+  const defaultAgentLocked = isExplicitAgentOwnership(props.config.form);
   const selectedId = props.selectedAgentId ?? defaultId ?? agents[0]?.id ?? null;
   const selectedAgent = selectedId
     ? (agents.find((agent) => agent.id === selectedId) ?? null)
@@ -289,8 +291,10 @@ export function renderAgents(props: AgentsProps) {
                       class="btn btn--sm btn--ghost"
                       ?disabled=${
                         !props.access.canUpdateConfig ||
+                        defaultAgentLocked ||
                         Boolean(defaultId && selectedAgent.id === defaultId)
                       }
+                      title=${defaultAgentLocked ? t("agents.setDefaultLocked") : nothing}
                       @click=${() => props.onSetDefault(selectedAgent.id)}
                     >
                       ${
@@ -299,6 +303,13 @@ export function renderAgents(props: AgentsProps) {
                           : t("agents.setDefault")
                       }
                     </button>
+                    ${
+                      defaultAgentLocked
+                        ? html`<span class="muted" data-default-agent-locked
+                            >${t("agents.setDefaultLocked")}</span
+                          >`
+                        : nothing
+                    }
                     <button
                       type="button"
                       class="btn btn--sm btn--ghost"
@@ -324,7 +335,9 @@ export function renderAgents(props: AgentsProps) {
         </div>
         ${
           props.error
-            ? html`<div class="callout danger" style="margin-top: 8px;">${props.error}</div>`
+            ? html`<div class="callout danger" style="margin-top: 8px;">
+                ${humanizeAgentConfigError(props.error)}
+              </div>`
             : nothing
         }
       </section>
@@ -356,7 +369,9 @@ export function renderAgents(props: AgentsProps) {
                 >
                   ${
                     props.config.error
-                      ? html`<div class="callout danger" role="alert">${props.config.error}</div>`
+                      ? html`<div class="callout danger" role="alert">
+                          ${humanizeAgentConfigError(props.config.error)}
+                        </div>`
                       : nothing
                   }
                   ${
