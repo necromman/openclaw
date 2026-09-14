@@ -26,6 +26,11 @@
       ]
     },
     "trustedProxies": "__OPENCLAW_TRUSTED_PROXIES__",
+    "nodes": {
+      "browser": {
+        "mode": "off"
+      }
+    },
     "roles": {
       "default": "member",
       "definitions": {

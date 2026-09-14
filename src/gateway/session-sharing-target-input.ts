@@ -19,11 +19,22 @@ import { resolveUnifiedTalkSessionTarget } from "./talk-session-registry.js";
 
 export type { SessionMutationTarget } from "./session-mutation-authorization-error.js";
 
+// Methods whose `key`/`keys` params name something other than a session. The sniff below
+// is deliberately generic, so a preference read like `users.prefs.get { keys: ["ui.theme"] }`
+// would otherwise be handed to session-ownership resolution: on a deployment with more than
+// one agent and `agents.ownership: "explicit"` that resolution has no owner to pick and the
+// whole request fails for every caller whose role hides other people's sessions.
+const NON_SESSION_KEY_PARAM_METHODS = new Set(["users.prefs.get", "users.prefs.set"]);
+
 export function resolveDirectSessionTargets(
   method: string,
   params: unknown,
 ): SessionMutationTarget[] {
-  if (method === "sessions.create" || method === "sessions.list") {
+  if (
+    method === "sessions.create" ||
+    method === "sessions.list" ||
+    NON_SESSION_KEY_PARAM_METHODS.has(method)
+  ) {
     return [];
   }
   if (!params || typeof params !== "object" || Array.isArray(params)) {

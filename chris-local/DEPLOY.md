@@ -1010,6 +1010,52 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 - 주기 실행이 필요하면 **호스트 systemd 타이머**로 건다. 컨테이너 안의 `cron add` 는 쓰지 않는다
   (12절의 색인 갱신이 그 예다).
 
+### 9.2 에이전트의 `browser` 도구가 `unauthorized` 로 죽을 때
+
+증상은 이렇다. 에이전트(예: `aeo-geo`)가 `browser` 를 부르면 도구가 실패하고 게이트웨이 로그에
+아래 두 줄이 나란히 찍힌다. `web_fetch` 는 멀쩡하다.
+
+```
+[ws] unauthorized conn=... client=agent backend ... role=operator scopes=1 auth=none device=yes
+     reason=gateway_auth_required
+[tools] browser failed: ... unauthorized
+```
+
+막히는 지점은 **노드 라우팅 조회**다. `browser` 도구는 실행 직전에 "브라우저를 대신 돌려 줄
+노드 호스트가 붙어 있나" 를 묻는데(`node.list`), 이 물음만 프로세스 안에서 처리되지 않고
+게이트웨이 자신에게 WebSocket 으로 다시 접속한다. ix-auth 모드에는 공유 시크릿이 없으므로
+(9.1 과 같은 이유) 그 자기 호출이 `gateway_auth_required` 로 거절되고, 도구는 로컬 Chromium 을
+써 보기도 전에 끝난다.
+
+이 배치에는 노드 호스트가 하나도 없다. 그래서 물음 자체를 없앤다. 템플릿
+`chris-local/ixauth-gateway-config/openclaw.json` 의 `gateway` 아래에 다음이 들어가 있다.
+
+```json
+"nodes": { "browser": { "mode": "off" } }
+```
+
+이 값이면 `browser` 도구는 노드 목록을 묻지 않고 곧바로 컨테이너 안의 Chromium 을 쓴다. 화면
+(Control UI)의 브라우저 패널은 영향을 받지 않는다. 그쪽 경로는 노드 목록을 메모리에서 읽고
+게이트웨이 RPC 를 타지 않기 때문이다.
+
+**운영 반영 절차.** 설정 파일은 이미지에 들어 있지 않고 NAS 의 `ixauth-gateway-config/` 를
+바인드 마운트한 것이라(13.3), 이미지 재빌드나 cron 배포를 기다릴 일이 아니다. NAS 에서 root 로
+파일을 갈아 끼우고 게이트웨이만 다시 만든다.
+
+```sh
+cd /volume1/docker/openclaw
+# 새 openclaw.json 을 ixauth-gateway-config/ 에 덮어쓴 뒤
+docker-compose -p openclaw-ixauth --env-file ixauth.env -f docker-compose.nas.yml \
+  --profile tunnel up -d --force-recreate gateway
+```
+
+기동 스크립트가 매번 템플릿을 상태 볼륨으로 다시 렌더하므로(3절), 재기동 한 번이면 반영된다.\
+반영 확인은 컨테이너 안에서 `cat /home/node/.openclaw/openclaw.json | grep -A3 '"nodes"'`.
+
+노드 호스트를 나중에 붙이는 날에는 이 값을 `auto` 로 되돌린다. 그때는 `node.list` 자기 호출이
+다시 필요해지므로, 게이트웨이 안에서 도는 도구 호출이 루프백 WebSocket 을 열지 않도록 하는
+코드 수정이 함께 있어야 한다.
+
 ## 10. 확인된 제약
 
 | 제약                    | 내용                                                                                                                                                                                                                         |
