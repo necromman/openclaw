@@ -75,7 +75,7 @@ class App:
             (self.tab_help, "도움말"),
         ):
             self.nb.add(frame, text=label)
-        self.status = tk.StringVar(value="도움말 탭의 필수 항목 표를 먼저 보세요")
+        self.status = tk.StringVar(value="맨 위 파란 버튼을 눌러 상품을 불러오세요")
         self._build_main()
         ui_tabs.build_history_tab(self, self.tab_hist)
         ui_tabs.build_settings_tab(self, self.tab_set)
@@ -87,13 +87,14 @@ class App:
         self.status_label.pack(fill="x", side="bottom")
         ui_steps.build_progress_panel(self, self.root)
         ui_steps.set_step(self, 1, "먼저 상품을 불러오세요")
-        self.nb.select(self.tab_help)  # 첫 화면은 도움말
+        self.nb.select(self.tab_main)  # 첫 화면은 생성 탭(바로 시작할 수 있게)
         self.root.after(120, self._drain)
 
     # ---------------------------------------------------------------- 생성 탭
     def _build_main(self) -> None:
         tk, ttk = self.tk, self.ttk
         frame = self.tab_main
+        ui_steps.build_start_bar(self, frame)
         ui_steps.build_progress(self, frame)
         pane = ttk.Panedwindow(frame, orient="horizontal")
         pane.pack(fill="both", expand=True)

@@ -21,6 +21,55 @@ BADGE_BG = "#1f5fbf"
 CARD_NOTE = "#5a5a5a"
 
 
+def build_start_bar(app, parent) -> None:
+    """화면 맨 위에 두는 시작 띠. 처음 쓰는 사람이 여기만 누르면 된다."""
+    tk, ttk = app.tk, app.ttk
+    bar = tk.Frame(parent, bg="#1f5fbf")
+    bar.pack(fill="x", padx=6, pady=(6, 2))
+    tk.Label(
+        bar,
+        text="처음이면 여기를 누르세요",
+        bg="#1f5fbf",
+        fg="#ffffff",
+        font=("맑은 고딕", 12, "bold"),
+        padx=12,
+        pady=10,
+    ).pack(side="left")
+    start = tk.Button(
+        bar,
+        text="판매 중인 상품 모두 불러오기",
+        command=app.on_quick_start,
+        font=("맑은 고딕", 13, "bold"),
+        bg="#ffd54a",
+        fg="#202020",
+        activebackground="#ffe484",
+        relief="raised",
+        bd=3,
+        padx=18,
+        pady=6,
+        cursor="hand2",
+    )
+    start.pack(side="left", padx=8, pady=6)
+    app.start_button = start
+    tk.Label(
+        bar,
+        text="라포르몰에서 지금 판매 중인 상품을 찾아 정보까지 한 번에 가져옵니다(10초 정도).",
+        bg="#1f5fbf",
+        fg="#dce8fb",
+        font=("맑은 고딕", 10),
+    ).pack(side="left", padx=6)
+    tk.Button(
+        bar,
+        text="사용법 보기",
+        command=lambda: app.nb.select(app.tab_help),
+        font=("맑은 고딕", 10),
+        relief="raised",
+        bd=2,
+        padx=10,
+        cursor="hand2",
+    ).pack(side="right", padx=10, pady=6)
+
+
 # ---------------------------------------------------------------------- 진행 표시줄
 
 
@@ -337,6 +386,11 @@ def walk_buttons(widget, found=None):
 def set_buttons_enabled(app, enabled: bool) -> None:
     """작업 중에는 버튼을 잠그고 취소만 열어 둔다."""
     state = "normal" if enabled else "disabled"
+    if getattr(app, "start_button", None) is not None:
+        try:
+            app.start_button.configure(state=state)
+        except Exception:
+            pass
     for button in walk_buttons(app.tab_main):
         if button is getattr(app, "cancel_button", None):
             continue
