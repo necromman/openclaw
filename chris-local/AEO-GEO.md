@@ -1,6 +1,8 @@
-# AEO/GEO 전문 에이전트 (정본)
+# AGEO 에이전트 (AEO/GEO 전문, 정본)
 
-> 진바이오테크 납품 스택에 붙인 두 번째 에이전트 `aeo-geo` 의 설계·설치·검증 정본이다. 시간은 전부 KST.\
+> 이름 변경 이력: 2026-09-14 AEO/GEO 비서 -> AGEO 에이전트, id aeo-geo -> ageo.
+
+> 진바이오테크 납품 스택에 붙인 두 번째 에이전트 `ageo` 의 설계·설치·검증 정본이다. 시간은 전부 KST.\
 > 관련: [DEPLOY.md](DEPLOY.md) 3.3-1·3.4·13.4-1, [AUTH-DEPARTMENTS.md](AUTH-DEPARTMENTS.md) 0·3-1·9절, [DELIVERY-PLAN.md](DELIVERY-PLAN.md) 5절.
 
 ## 1. 목적
@@ -25,9 +27,9 @@
 
 | 항목 | 값 | 왜 |
 | --- | --- | --- |
-| 에이전트 id | `aeo-geo` | 부서 에이전트가 아니라 주제 에이전트다 |
-| 표시 이름 | AEO/GEO 비서 | 채팅 화면과 세션 목록에 이렇게 보인다 |
-| 워크스페이스 | `/home/node/.openclaw/workspace-aeo-geo` | 상태 볼륨의 별도 폴더. 마운트가 아니라 쓰기 가능한 자기 폴더다 |
+| 에이전트 id | `ageo` | 부서 에이전트가 아니라 주제 에이전트다 |
+| 표시 이름 | AGEO 에이전트 | 채팅 화면과 세션 목록에 이렇게 보인다. AGEO 는 AEO 와 GEO 를 합친 사내 명칭이다 |
+| 워크스페이스 | `/home/node/.openclaw/workspace-ageo` | 상태 볼륨의 별도 폴더. 마운트가 아니라 쓰기 가능한 자기 폴더다 |
 | 기본 모델 | `anthropic/claude-opus-5` | 감사·문안 작성이 길고 판단이 많다 |
 | 사고 수준 | `thinkingDefault: "medium"` | 체크리스트를 세는 일에 충분하고 응답이 지나치게 늦지 않는다 |
 | 고를 수 있는 모델 | opus-5, sonnet-5 | 이 에이전트만의 `modelPolicy.allow`. 공용의 아홉 개와 다르다 |
@@ -48,7 +50,7 @@
 
 ### 3-1. 페르소나와 스킬
 
-워크스페이스 시드는 `chris-local/ixauth-gateway-config/workspace-seed/aeo-geo/` 에 있고 기동마다 렌더된다(공용 워크스페이스와 같은 장치, DEPLOY.md 3.7-1).
+워크스페이스 시드는 `chris-local/ixauth-gateway-config/workspace-seed/ageo/` 에 있고 기동마다 렌더된다(공용 워크스페이스와 같은 장치, DEPLOY.md 3.7-1).
 
 | 파일 | 내용 |
 | --- | --- |
@@ -60,7 +62,7 @@
 | `skills/aeo-schema-jsonld/SKILL.md` | Product·FAQPage·BreadcrumbList·Organization 템플릿과 필수 속성 |
 | `skills/aeo-health-claims-guard/SKILL.md` | 건강기능식품 금칙 표현 사전 (가)~(아), 허용 문안 형식, 출력 형식 |
 
-**스킬 허용목록(`agents.entries.aeo-geo.skills`)은 두지 않았다.** 범위는 워크스페이스가 잡는다. 워크스페이스 스킬은 `<workspace>/skills/<이름>/SKILL.md` 에서 읽히고(`src/skills/loading/workspace-skill-loader.ts`), 이 에이전트의 워크스페이스에는 위 넷만 있다. 기동 스크립트가 매번 `skills/` 를 지우고 다시 복사하므로, 템플릿에서 뺀 스킬은 다음 기동에 사라진다.
+**스킬 허용목록(`agents.entries.ageo.skills`)은 두지 않았다.** 범위는 워크스페이스가 잡는다. 워크스페이스 스킬은 `<workspace>/skills/<이름>/SKILL.md` 에서 읽히고(`src/skills/loading/workspace-skill-loader.ts`), 이 에이전트의 워크스페이스에는 위 넷만 있다. 기동 스크립트가 매번 `skills/` 를 지우고 다시 복사하므로, 템플릿에서 뺀 스킬은 다음 기동에 사라진다.
 
 ## 4. 노출 제한 원리
 
@@ -68,11 +70,11 @@
 
 1. `tools.sessions.visibility` 를 `self` 에서 `department` 로 올린다. 이 값이 부서 게이트의 스위치다(`src/gateway/department-access.ts` 의 `isDepartmentScopeEnabled`: `gateway.auth.mode` 가 `ix-auth` 이고 이 값이 `department` 일 때만 경계가 선다).
 2. IX-Auth 에 그룹 `dept-ceo` 를 만든다. **사람은 넣지 않는다.**
-3. 컨테이너에서 `agents department --agent aeo-geo --set ceo` 로 묶는다.
+3. 컨테이너에서 `agents department --agent ageo --set ceo` 로 묶는다.
 
 그러면 판정이 이렇게 된다(`prepareDepartmentGate`).
 
-| 사람 | `aeo-geo` | 공용 `main` |
+| 사람 | `ageo` | 공용 `main` |
 | --- | --- | --- |
 | 시스템 관리자(superadmin) | 보인다 (게이트 자체를 통과) | 보인다 |
 | `dept-ceo` 구성원 | 보인다 | 보인다 |
@@ -89,7 +91,7 @@
 
 **(나) 관리자 우회가 꺼진다.** 역할이 주는 `sessions.others: write`(관리자)·`view`(임원)는 부서 게이트 위에 있지 않다. 게이트를 그냥 통과하는 것은 시스템 관리자뿐이다. 대책: 전사 세션 조회가 필요하면 시스템 관리자 계정으로 한다. 부서 경계를 켜면 따라오는 정상 동작이며 결함이 아니다.
 
-**(다) 모델이 쓰는 세션 도구의 범위가 넓어진다.** 이것이 가장 놓치기 쉽다. `visibility` 는 사람의 화면과 함께 **모델이 부르는 `sessions_*` 도구의 범위**도 정한다. `self` 에서는 현재 세션만 읽히지만 `department` 는 `self`·`tree` 제한 어디에도 걸리지 않아 **같은 에이전트의 다른 세션까지** 읽힌다(`src/plugin-sdk/session-visibility-internal.ts` 의 판정). 대책: `main`·`aeo-geo` 두 에이전트 모두에 `tools.deny` 로 `sessions_list`·`sessions_history`·`sessions_search`·`sessions_send` 를 막았다. 사람의 화면은 그대로고 모델만 못 읽는다.
+**(다) 모델이 쓰는 세션 도구의 범위가 넓어진다.** 이것이 가장 놓치기 쉽다. `visibility` 는 사람의 화면과 함께 **모델이 부르는 `sessions_*` 도구의 범위**도 정한다. `self` 에서는 현재 세션만 읽히지만 `department` 는 `self`·`tree` 제한 어디에도 걸리지 않아 **같은 에이전트의 다른 세션까지** 읽힌다(`src/plugin-sdk/session-visibility-internal.ts` 의 판정). 대책: `main`·`ageo` 두 에이전트 모두에 `tools.deny` 로 `sessions_list`·`sessions_history`·`sessions_search`·`sessions_send` 를 막았다. 사람의 화면은 그대로고 모델만 못 읽는다.
 
 **(라) 첨부 경계.** 첨부 접근 판정(`src/gateway/inbound-media-access.ts`, N 단계)도 세션 가시성을 읽는다. `department` 로 올라가면 같은 부서 안에서는 서로의 첨부가 열릴 수 있다. 지금은 `dept-ceo` 에 사람이 없고 다른 부서 사람들은 종전과 같은 범위이므로 실질 변화가 없다. **한 부서에 사람을 여럿 넣는 날 다시 본다.**
 
@@ -109,7 +111,7 @@
 `openai/gpt-5.6-sol` 은 **지금 넣으면 안 된다.** OpenAI 자격증명이 없어 선택 즉시 실패한다. 연결한 다음 순서로 한다.
 
 1. DEPLOY.md 3.4 대로 OpenAI 자격증명을 게이트웨이 컨테이너에 준다.
-2. `agents.entries["aeo-geo"].modelPolicy.allow` 에 `openai/gpt-5.6-sol` 을 더한다.
+2. `agents.entries["ageo"].modelPolicy.allow` 에 `openai/gpt-5.6-sol` 을 더한다.
 3. 채팅에서 그 모델로 한 번 실제 답을 받아 본다(DEPLOY.md 3.4 의 "모델을 새로 켤 때는 반드시 채팅에서 한 번 답을 받아 본다" 규칙).
 4. `thinkingDefault: "medium"` 은 모델을 바꿔도 그대로 적용되므로 손대지 않는다.
 5. 네이티브 `web_search` 는 `tools.web.search.provider` 가 비어 있으므로 자동으로 켜진다. 켜진 뒤에는 브라우저 관찰이 보조 수단이 된다.
@@ -121,7 +123,7 @@
 NAS 는 `/config` 를 **호스트 폴더로** 마운트한다. 저장소에 푸시하는 것만으로는 반영되지 않는다.
 
 ```bash
-# 1) 템플릿 폴더를 통째로 옮긴다. workspace-seed/aeo-geo/ 가 빠지면 set -eu 때문에
+# 1) 템플릿 폴더를 통째로 옮긴다. workspace-seed/ageo/ 가 빠지면 set -eu 때문에
 #    게이트웨이가 아예 뜨지 않는다 (DEPLOY.md 13.4-1).
 #    NAS sshd 에 sftp 서브시스템이 없으므로 tar 를 표준입력으로 넣는다.
 tar -C chris-local -cf - ixauth-gateway-config | ssh NAS주소 'cd /volume1/docker/openclaw && cp -a ixauth-gateway-config ixauth-gateway-config.bak-aeo && tar -xf -'
@@ -132,13 +134,32 @@ sudo /volume1/docker/openclaw/deploy.sh --force
 # 3) 부서 그룹을 만든다 (IX-Auth 콘솔 /admin/identity/, 코드 dept-ceo, 구성원 없음)
 
 # 4) 에이전트를 그 부서에 묶는다. --set 에는 접두사를 뗀 slug 를 넣는다.
-sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents department --agent aeo-geo --set ceo
+sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents department --agent ageo --set ceo
 
 # 5) 확인
 sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents department --json
 ```
 
-되돌리기는 `agents department --agent aeo-geo --clear` 와 `ixauth-gateway-config.bak-aeo` 복원이다. 부서 게이트만 되돌리려면 템플릿의 `tools.sessions.visibility` 를 `self` 로 내리고 재기동한다.
+되돌리기는 `agents department --agent ageo --clear` 와 `ixauth-gateway-config.bak-aeo` 복원이다. 부서 게이트만 되돌리려면 템플릿의 `tools.sessions.visibility` 를 `self` 로 내리고 재기동한다.
+
+### 7-1. 이름을 바꾼 뒤(2026-09-14) 운영에 반영하는 절차
+
+**id 가 `aeo-geo` 에서 `ageo` 로 바뀌었으므로 부서 바인딩을 다시 걸어야 한다.** 바인딩은 에이전트 id 를 키로 저장되므로 옛 id 로 걸어 둔 것이 새 id 에 따라오지 않는다. 새 템플릿을 올리고 재기동한 뒤(위 1~2번) 컨테이너에서 순서대로 실행한다.
+
+```bash
+# 1) 옛 id 의 바인딩을 푼다
+sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents department --agent aeo-geo --clear
+
+# 2) 새 id 로 다시 묶는다
+sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents department --agent ageo --set ceo
+
+# 3) 확인
+sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents department --json
+```
+
+**빠뜨리면 노출 제한이 풀린다.** 묶이지 않은 에이전트는 부서 경계 밖이라 부서가 있는 모두에게 보이므로, 재기동 직후 3번으로 반드시 확인한다.
+
+옛 워크스페이스 디렉터리 `/home/node/.openclaw/workspace-aeo-geo` 는 상태 볼륨에 그대로 남는다. **무해하다.** 기동 스크립트는 이제 `workspace-ageo` 만 시드하고 옛 폴더는 읽지 않으며, 어느 에이전트도 그 경로를 가리키지 않는다. 볼륨을 정리하고 싶을 때 지우면 되고 급하지 않다. 옛 id 로 쌓인 대화 기록도 세션 저장소에 남지만 새 에이전트 화면에는 나타나지 않는다.
 
 ## 8. 검증 항목
 
@@ -147,9 +168,9 @@ sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents de
 | 번호 | 확인할 것 | 통과 기준 |
 | --- | --- | --- |
 | 1 | 기동 로그 | `Config auto-restored from backup ... (missing-meta-vs-last-good)` 이 **없다** |
-| 2 | 워크스페이스 시드 | 컨테이너의 `/home/node/.openclaw/workspace-aeo-geo/` 에 `IDENTITY.md`·`SOUL.md`·`AGENTS.md` 와 `skills/` 아래 스킬 4개가 있다 |
+| 2 | 워크스페이스 시드 | 컨테이너의 `/home/node/.openclaw/workspace-ageo/` 에 `IDENTITY.md`·`SOUL.md`·`AGENTS.md` 와 `skills/` 아래 스킬 4개가 있다 |
 | 3 | 공용 워크스페이스 | 공용 비서가 여전히 `/home/node/.openclaw/workspace` 를 쓴다(`workspace-main` 으로 옮겨 가지 않았다) |
-| 4 | 에이전트 목록 | 시스템 관리자 계정에 `AEO/GEO 비서` 가 보인다 |
+| 4 | 에이전트 목록 | 시스템 관리자 계정에 `AGEO 에이전트` 가 보인다 |
 | 5 | 부서 경계 | 일반 직원 계정에는 보이지 않고, 세션 생성 시도는 `DEPARTMENT_ACCESS_DENIED` 로 막힌다 |
 | 6 | 공용 영향 | 일반 직원이 공용 비서를 종전대로 쓴다 |
 | 7 | 모델 | 채팅 모델 선택기에 opus-5·sonnet-5 둘만 보이고, 실제로 답이 온다 |

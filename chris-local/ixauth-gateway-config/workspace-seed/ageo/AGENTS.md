@@ -1,4 +1,4 @@
-# AGENTS.md - AEO/GEO 비서의 작업 절차
+# AGENTS.md - AGEO 에이전트의 작업 절차
 
 이 파일은 일하는 순서와 보고 형식을 정한다. 정체성은 `IDENTITY.md`, 태도는 `SOUL.md` 에 있다.
 

@@ -215,7 +215,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
   docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.ixauth.yml   exec -u node gateway node openclaw.mjs agents department --agent rnd-bot --set rnd
   ```
 
-**AEO/GEO 에이전트(`aeo-geo`)는 부서 에이전트가 아니다.** 마운트도 색인도 따로 쓰지 않고, 부서 바인딩은 노출을 좁히는 용도로만 쓴다. 설계·설치·검증은 [AEO-GEO.md](AEO-GEO.md) 를 참조한다.
+**AGEO 에이전트(`ageo`, AEO/GEO 전문)는 부서 에이전트가 아니다.** 마운트도 색인도 따로 쓰지 않고, 부서 바인딩은 노출을 좁히는 용도로만 쓴다. 설계·설치·검증은 [AEO-GEO.md](AEO-GEO.md) 를 참조한다.
 
 ### 3.4 모델 프로바이더
 
@@ -1012,7 +1012,7 @@ docker compose --env-file chris-local/ixauth.env -f chris-local/docker-compose.i
 
 ### 9.2 에이전트의 `browser` 도구가 `unauthorized` 로 죽을 때
 
-증상은 이렇다. 에이전트(예: `aeo-geo`)가 `browser` 를 부르면 도구가 실패하고 게이트웨이 로그에
+증상은 이렇다. 에이전트(예: `ageo`)가 `browser` 를 부르면 도구가 실패하고 게이트웨이 로그에
 아래 두 줄이 나란히 찍힌다. `web_fetch` 는 멀쩡하다.
 
 ```

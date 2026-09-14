@@ -173,12 +173,12 @@
           }
         }
       },
-      "aeo-geo": {
-        "name": "AEO/GEO 비서",
-        "description": "검색 답변엔진(네이버 AI 브리핑, ChatGPT, Gemini) 노출 최적화 전문 비서",
-        "workspace": "/home/node/.openclaw/workspace-aeo-geo",
+      "ageo": {
+        "name": "AGEO 에이전트",
+        "description": "진바이오테크 라포르몰 제품의 검색 답변엔진(네이버 AI 브리핑, ChatGPT, Gemini) 노출 최적화 전담 에이전트",
+        "workspace": "/home/node/.openclaw/workspace-ageo",
         "identity": {
-          "name": "AEO/GEO 비서"
+          "name": "AGEO 에이전트"
         },
         "model": {
           "primary": "anthropic/claude-opus-5"

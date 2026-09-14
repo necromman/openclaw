@@ -18,9 +18,9 @@
 # needs back, so taking it away would only make that day harder. Turning the agents back
 # on is DEPLOY.md 3.3-1.
 #
-# A second agent, "aeo-geo", was added later (AEO-GEO.md). It is not a department agent:
-# nothing is mounted for it and its workspace is an ordinary state directory seeded at the
-# bottom of this script, so it needs no placeholder either.
+# A second agent, "ageo" (the AGEO agent, AEO plus GEO), was added later (AEO-GEO.md).
+# It is not a department agent: nothing is mounted for it and its workspace is an ordinary
+# state directory seeded at the bottom of this script, so it needs no placeholder either.
 set -eu
 
 origin="${OPENCLAW_PUBLIC_ORIGIN:-http://127.0.0.1:18800}"
@@ -132,7 +132,7 @@ for workspace_dir in /home/node/.openclaw/workspace /home/node/.openclaw/workspa
   rm -f "$workspace_dir/BOOTSTRAP.md"
 done
 
-# The AEO/GEO agent keeps its own workspace, so it gets its own seed. Its identity, its
+# The AGEO agent keeps its own workspace, so it gets its own seed. Its identity, its
 # working procedure (AGENTS.md) and the four skills that scope it are all template files,
 # rendered here on every start for the same reason the shared workspace is: this is an
 # appliance and the role is decided once, in the repository, not in a chat.
@@ -145,16 +145,16 @@ done
 # Every file named here has to exist: "set -eu" is on, so a missing seed file stops the
 # Gateway from starting at all rather than starting it half configured. When this folder is
 # copied to the NAS it is copied whole (DEPLOY.md 13.4-1).
-aeo_workspace="/home/node/.openclaw/workspace-aeo-geo"
-mkdir -p "$aeo_workspace"
-cp /config/workspace-seed/aeo-geo/IDENTITY.md "$aeo_workspace/IDENTITY.md"
-cp /config/workspace-seed/aeo-geo/SOUL.md "$aeo_workspace/SOUL.md"
-cp /config/workspace-seed/aeo-geo/AGENTS.md "$aeo_workspace/AGENTS.md"
-chmod 644 "$aeo_workspace/IDENTITY.md" "$aeo_workspace/SOUL.md" "$aeo_workspace/AGENTS.md"
-rm -f "$aeo_workspace/BOOTSTRAP.md"
-rm -rf "$aeo_workspace/skills"
-cp -R /config/workspace-seed/aeo-geo/skills "$aeo_workspace/skills"
-find "$aeo_workspace/skills" -type d -exec chmod 755 {} +
-find "$aeo_workspace/skills" -type f -exec chmod 644 {} +
+ageo_workspace="/home/node/.openclaw/workspace-ageo"
+mkdir -p "$ageo_workspace"
+cp /config/workspace-seed/ageo/IDENTITY.md "$ageo_workspace/IDENTITY.md"
+cp /config/workspace-seed/ageo/SOUL.md "$ageo_workspace/SOUL.md"
+cp /config/workspace-seed/ageo/AGENTS.md "$ageo_workspace/AGENTS.md"
+chmod 644 "$ageo_workspace/IDENTITY.md" "$ageo_workspace/SOUL.md" "$ageo_workspace/AGENTS.md"
+rm -f "$ageo_workspace/BOOTSTRAP.md"
+rm -rf "$ageo_workspace/skills"
+cp -R /config/workspace-seed/ageo/skills "$ageo_workspace/skills"
+find "$ageo_workspace/skills" -type d -exec chmod 755 {} +
+find "$ageo_workspace/skills" -type f -exec chmod 644 {} +
 
 exec node dist/index.js gateway --bind lan --port 18789
