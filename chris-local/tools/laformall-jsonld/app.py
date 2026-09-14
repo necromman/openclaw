@@ -273,6 +273,9 @@ class App:
     def on_discover(self) -> None:
         actions.discover(self)
 
+    def on_quick_start(self) -> None:
+        actions.quick_start(self)
+
     def on_make_sitemap(self) -> None:
         actions.make_sitemap(self)
 

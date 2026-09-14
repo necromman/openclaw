@@ -172,3 +172,55 @@ def make_llms(app) -> None:
         "설명을 채운 상품은 설명까지 함께 들어갑니다.\n\n" + text
     )
     app.log(f"llms.txt 를 저장했습니다: {path}")
+
+
+def quick_start(app) -> None:
+    """한 번 눌러 1·2단계를 다 한다. 판매 중 상품을 찾아 정보까지 가져온다."""
+    client = app.fetch_client()
+
+    def work():
+        app.progress(0, None, "라포르몰에서 판매 중인 상품을 찾는 중")
+        live, evidence = client.discover_live_goods(
+            progress=lambda d, t, text: app.progress(d, t, text),
+            should_stop=app.cancelled,
+        )
+        rows = []
+        for index, code in enumerate(live, 1):
+            if app.cancelled():
+                break
+            app.progress(index, len(live), f"상품 정보 가져오기 goodsNo={code}")
+            rows.append(client.fetch_product(code))
+        return live, evidence, rows, list(client.discovered_categories)
+
+    def done(result, exc):
+        if exc:
+            app.warn("상품 불러오기", f"실패했습니다.\n{exc}")
+            app.log("상품을 불러오지 못했습니다", "error")
+            return
+        live, evidence, rows, categories = result
+        app.live_goods = list(live)
+        app.categories = categories
+        for row in rows:
+            row.exposed = "노출"
+            app.reverdict(row)
+        app.rows = rows
+        app.snippets, app.google = {}, {}
+        app.refresh_tree()
+        if rows:
+            app.tree.selection_set(rows[0].goods_no)
+            app.form.load(rows[0])
+        app.input.delete("1.0", "end")
+        app.input.insert("1.0", "\n".join(r.url for r in rows))
+        applied = [r for r in rows if str(r.applied).startswith("적용됨")]
+        filled = [r for r in rows if r.filled_from_page]
+        app.set_step(3, "목록에서 상품을 고르고 오른쪽 폼을 채우세요")
+        app.write_out(
+            f"판매 중 상품 {len(rows)}개를 불러와 정보까지 가져왔습니다.\n\n"
+            f"페이지에 정보표가 이미 있는 상품: {len(applied)}개"
+            + (f" (그중 {len(filled)}개는 그 값을 폼에 채웠습니다)" if filled else "")
+            + "\n\n다음으로 할 일: 왼쪽 목록에서 상품을 하나 고르면 오른쪽 폼에 뜹니다.\n"
+            "빨간 별표가 붙은 항목을 채우고 '스니펫 생성' 을 누르세요."
+        )
+        app.log(f"상품 {len(rows)}개를 불러왔습니다. 이제 목록에서 상품을 고르세요", "ok")
+
+    app.background(work, done, "상품 불러와서 정보 가져오는 중...")

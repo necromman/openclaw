@@ -161,19 +161,36 @@ def build_input_panel(app, parent) -> None:
         parent,
         "1단계",
         "상품 불러오기",
-        "관리자 엑셀이 가장 정확합니다. 사이트맵은 최근에 올린 것이면 그대로 써도 됩니다.",
+        "무엇을 눌러야 할지 모르면 아래 파란 버튼 하나만 누르세요. "
+        "라포르몰에서 지금 판매 중인 상품을 찾아 정보까지 가져옵니다.",
     )
+    big = ttk.Frame(body)
+    big.pack(fill="x", pady=(0, 6))
+    tk.Label(
+        big, text="여기부터", bg="#1f5fbf", fg="#ffffff",
+        font=("맑은 고딕", 10, "bold"), padx=8, pady=3,
+    ).pack(side="left", padx=(0, 6))
+    start = ttk.Button(
+        big,
+        text="판매 중인 상품 모두 불러오기 (1·2단계 한 번에)",
+        command=app.on_quick_start,
+        style="Primary.TButton",
+    )
+    start.pack(side="left")
+    app.step_buttons[1] = start
+    tk.Label(
+        body, text="따로 하고 싶을 때만 아래 버튼을 씁니다.", fg=CARD_NOTE, font=("맑은 고딕", 9)
+    ).pack(anchor="w")
     row = ttk.Frame(body)
     row.pack(fill="x")
-    button(app, row, "관리자 엑셀 가져오기", app.on_admin_excel, step=1)
-    button(app, row, "판매 중 상품 불러오기", app.on_discover)
+    button(app, row, "관리자 엑셀 파일로 불러오기", app.on_admin_excel)
+    button(app, row, "판매 중 상품 목록만 보기", app.on_discover)
     button(app, row, "사이트맵에서 불러오기", app.on_sitemap)
     app.input = tk.Text(body, height=3, wrap="none", font=("맑은 고딕", 10))
     app.input.pack(fill="x", pady=(6, 2))
-    app.input.insert("1.0", "https://cstpillow.com/goods/goods_view.php?goodsNo=11")
     tk.Label(
         body,
-        text="직접 넣어도 됩니다. 상품 주소나 숫자(goodsNo)를 줄마다 하나씩 넣으세요.",
+        text="이 칸은 직접 주소를 넣고 싶을 때만 씁니다. 상품 주소나 숫자(goodsNo)를 줄마다 하나씩.",
         fg=CARD_NOTE,
         font=("맑은 고딕", 9),
     ).pack(anchor="w")
@@ -183,7 +200,8 @@ def build_input_panel(app, parent) -> None:
         parent,
         "2단계",
         "정보 가져오기",
-        "상품명·판매가·정가·이미지·재고·제조사·원산지를 페이지에서 읽어 옵니다.",
+        "위 파란 버튼을 눌렀으면 이 단계는 이미 끝났습니다. "
+        "주소를 직접 넣었을 때만 누르세요.",
     )
     row2 = ttk.Frame(body2)
     row2.pack(fill="x")
