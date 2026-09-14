@@ -229,6 +229,16 @@ function createRootTestLintFixture() {
   };
 }
 
+// Reads the lint targets out of a planned `scripts/run-oxlint.mjs` command without
+// assuming where the wrapper flags sit: targets always follow the `--tsconfig` value.
+function oxlintTargetsOf(args: string[] | undefined) {
+  if (!args) {
+    return [];
+  }
+  const tsconfigIndex = args.indexOf("--tsconfig");
+  return tsconfigIndex === -1 ? [] : args.slice(tsconfigIndex + 2);
+}
+
 // Executes the exact "format changed files" plan command with the repo-pinned oxfmt,
 // reconstructing `pnpm format:check <plan args>`. Guards the runtime verdict, not just
 // plan construction: a misformatted added file must fail, deleted paths must not.
@@ -1430,7 +1440,7 @@ describe("scripts/changed-lanes", () => {
     if (testCase.oxlintTargets.length === 0) {
       expect(oxlint).toBeUndefined();
     } else {
-      expect(oxlint?.args.slice(3)).toEqual(testCase.oxlintTargets);
+      expect(oxlintTargetsOf(oxlint?.args)).toEqual(testCase.oxlintTargets);
     }
     expect(
       plan.commands.find((command) => command.name.startsWith("lint UI changed style")),
@@ -1483,8 +1493,8 @@ describe("scripts/changed-lanes", () => {
     );
 
     expect(commands).toHaveLength(2);
-    expect(commands.map((command) => command.args.slice(3).length)).toEqual([8, 1]);
-    expect(commands.flatMap((command) => command.args.slice(3)).toSorted()).toEqual(
+    expect(commands.map((command) => oxlintTargetsOf(command.args).length)).toEqual([8, 1]);
+    expect(commands.flatMap((command) => oxlintTargetsOf(command.args)).toSorted()).toEqual(
       testCase.paths.toSorted(),
     );
     expect(plan.commands.map((command) => command.args[0])).not.toContain(testCase.fullLane);
