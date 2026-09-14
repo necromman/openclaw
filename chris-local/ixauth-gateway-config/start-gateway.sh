@@ -133,7 +133,8 @@ for workspace_dir in /home/node/.openclaw/workspace /home/node/.openclaw/workspa
 done
 
 # The AGEO agent keeps its own workspace, so it gets its own seed. Its identity, its
-# working procedure (AGENTS.md), the company context it reads first (COMPANY.md) and the
+# working procedure (AGENTS.md), the company context it reads first (COMPANY.md), the
+# worked answer it copies its format from (PLAYBOOK.md) and the
 # four skills that scope it are all template files, rendered here on every start for the
 # same reason the shared workspace is: this is an appliance and the role is decided once,
 # in the repository, not in a chat.
@@ -152,7 +153,8 @@ cp /config/workspace-seed/ageo/IDENTITY.md "$ageo_workspace/IDENTITY.md"
 cp /config/workspace-seed/ageo/SOUL.md "$ageo_workspace/SOUL.md"
 cp /config/workspace-seed/ageo/AGENTS.md "$ageo_workspace/AGENTS.md"
 cp /config/workspace-seed/ageo/COMPANY.md "$ageo_workspace/COMPANY.md"
-chmod 644 "$ageo_workspace/IDENTITY.md" "$ageo_workspace/SOUL.md" "$ageo_workspace/AGENTS.md" "$ageo_workspace/COMPANY.md"
+cp /config/workspace-seed/ageo/PLAYBOOK.md "$ageo_workspace/PLAYBOOK.md"
+chmod 644 "$ageo_workspace/IDENTITY.md" "$ageo_workspace/SOUL.md" "$ageo_workspace/AGENTS.md" "$ageo_workspace/COMPANY.md" "$ageo_workspace/PLAYBOOK.md"
 rm -f "$ageo_workspace/BOOTSTRAP.md"
 rm -rf "$ageo_workspace/skills"
 cp -R /config/workspace-seed/ageo/skills "$ageo_workspace/skills"
