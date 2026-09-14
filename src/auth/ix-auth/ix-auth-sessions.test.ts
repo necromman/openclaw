@@ -79,9 +79,15 @@ function jwksResponse(): Response {
 }
 
 beforeEach(() => {
+  // The resolver carries its caller's clock forward by the real milliseconds each queued
+  // turn waited, so a wall clock that ticks mid-test lands a revoke one millisecond past
+  // the value the test computed. Freeze Date only: real timers still drive the fetch
+  // stubs and the AbortSignal.timeout guards inside the client.
+  vi.useFakeTimers({ toFake: ["Date"] });
   vi.stubEnv("OPENCLAW_STATE_DIR", tempDirs.make("ix-auth-session-race-"));
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   resetIxAuthJwksCache();
