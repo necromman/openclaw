@@ -1,0 +1,697 @@
+<title>라포르몰 AEO 안내</title>
+<meta name="description" content="라포르몰이 AI 검색 답변에 인용되게 만드는 일의 현재 상태와 다음 할 일">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #ffffff;
+    --surface: #f1f4f7;
+    --surface-2: #e5ebf0;
+    --ink: #17222e;
+    --ink-mid: #4b5865;
+    --ink-soft: #6e7b89;
+    --rule: #ccd4dc;
+    --rule-soft: #e2e8ee;
+    --accent: #1c3f63;
+    --accent-soft: #e6edf4;
+    --pass-fg: #105010;
+    --pass-bg: #e2f4e2;
+    --warn-fg: #8a5a00;
+    --warn-bg: #fff4d0;
+    --err-fg: #a00000;
+    --err-bg: #ffe0e0;
+    --sans: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", "Pretendard", "Segoe UI", Arial, sans-serif;
+    --mono: "Consolas", "D2Coding", "Courier New", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.78;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: 47rem;
+    margin: 0 auto;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-block: 40px 64px;
+  }
+
+  p { margin: 0; }
+  strong { font-weight: 700; }
+
+  /* 표지 */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 26px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(2rem, 7vw, 2.9rem);
+    line-height: 1.24;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .lead {
+    font-size: 1.06rem;
+    color: var(--ink-mid);
+    max-width: 34em;
+  }
+  .filed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .filed span { white-space: nowrap; }
+
+  /* 섹션 */
+  .sec {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0 1.4rem;
+    padding-top: 40px;
+  }
+  .sec + .sec { border-top: 1px solid var(--rule-soft); }
+  .sec > .n {
+    font-family: var(--sans);
+    font-size: 1.5rem;
+    line-height: 1.3;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    padding-top: 2px;
+  }
+  .sec > .c {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+  h2 {
+    font-family: var(--sans);
+    font-size: 1.44rem;
+    line-height: 1.35;
+    font-weight: 700;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--accent);
+  }
+
+  @media (max-width: 640px) {
+    .sec { grid-template-columns: 1fr; gap: 0; }
+    .sec > .n { font-size: 1.1rem; padding-top: 0; margin-bottom: 2px; }
+  }
+
+  /* 결론 세 줄 */
+  .verdict {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    counter-reset: v;
+  }
+  .verdict > li {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    gap: 0.6rem;
+    padding: 16px 18px;
+    font-size: 1.05rem;
+    line-height: 1.62;
+  }
+  .verdict > li + li { border-top: 1px solid var(--rule); }
+  .verdict > li::before {
+    counter-increment: v;
+    content: counter(v);
+    font-family: var(--sans);
+    font-size: 1.15rem;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .verdict b { font-weight: 700; }
+
+  /* 실측 숫자 */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .stats > div {
+    background: var(--paper);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stats .big {
+    font-family: var(--sans);
+    font-size: 1.6rem;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats .cap { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.5; }
+  @media (max-width: 560px) {
+    .stats { grid-template-columns: 1fr; }
+  }
+
+  /* 표 */
+  .tw { overflow-x: auto; border: 1px solid var(--rule); }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 30rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule-soft);
+    line-height: 1.6;
+  }
+  thead th {
+    background: var(--surface-2);
+    font-size: 0.76rem;
+    letter-spacing: 0.06em;
+    color: var(--ink-mid);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rowhead { font-weight: 700; white-space: nowrap; }
+
+  /* 판정 칩 */
+  .chip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 2px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .chip.pass { color: var(--pass-fg); background: var(--pass-bg); }
+  .chip.warn { color: var(--warn-fg); background: var(--warn-bg); }
+  .chip.err  { color: var(--err-fg);  background: var(--err-bg); }
+
+  /* 비유·주의 박스 */
+  .aside {
+    background: var(--accent-soft);
+    padding: 16px 18px;
+    font-size: 1rem;
+    line-height: 1.7;
+    border-radius: 2px;
+  }
+  .aside .tag {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .oneline {
+    font-family: var(--sans);
+    font-size: 1.18rem;
+    line-height: 1.55;
+    padding: 14px 0 14px 16px;
+    border-left: 3px solid var(--accent);
+    color: var(--ink);
+  }
+
+  /* 용어 풀이 */
+  .gloss {
+    font-size: 0.86rem;
+    color: var(--ink-mid);
+    padding-left: 14px;
+    border-left: 2px solid var(--rule);
+  }
+
+  /* 목록 */
+  ul.plain, ol.plain { margin: 0; padding-left: 1.25rem; }
+  ul.plain > li, ol.plain > li { margin-bottom: 6px; }
+  ul.plain > li:last-child, ol.plain > li:last-child { margin-bottom: 0; }
+
+  /* 5단계·6단계 */
+  .steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; }
+  .steps > li {
+    counter-increment: s;
+    display: grid;
+    grid-template-columns: 1.8rem 1fr;
+    gap: 0.8rem;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .steps > li:first-child { border-top: 1px solid var(--rule); }
+  .steps > li:last-child { border-bottom: 1px solid var(--rule); }
+  .steps > li::before {
+    content: counter(s);
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .steps .t { font-weight: 700; }
+  .steps .d { font-size: 0.92rem; color: var(--ink-mid); margin-top: 2px; }
+  .steps .who {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 6px;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+  .steps .who b { color: var(--ink-mid); font-weight: 700; }
+
+  /* 코드 */
+  .codewrap { border: 1px solid var(--rule); background: var(--surface); }
+  .codewrap .cap {
+    padding: 8px 14px;
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-mid);
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  pre {
+    margin: 0;
+    padding: 14px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.62;
+    color: var(--ink);
+    tab-size: 2;
+  }
+
+  /* 일정 */
+  .plan { display: flex; flex-direction: column; gap: 0; }
+  .plan > div {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: 1rem;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .plan > div:first-child { border-top: 1px solid var(--rule); }
+  .plan > div:last-child { border-bottom: 1px solid var(--rule); }
+  .plan .when { font-weight: 700; color: var(--accent); }
+  @media (max-width: 520px) {
+    .plan > div { grid-template-columns: 1fr; gap: 2px; }
+  }
+
+  /* 용어집 */
+  dl.terms { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  dl.terms > div { display: grid; grid-template-columns: 8.5rem 1fr; gap: 1rem; }
+  dl.terms dt { font-weight: 700; font-size: 0.9rem; }
+  dl.terms dd { margin: 0; font-size: 0.9rem; color: var(--ink-mid); }
+  @media (max-width: 560px) {
+    dl.terms > div { grid-template-columns: 1fr; gap: 0; }
+  }
+
+  footer {
+    margin-top: 44px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+
+  /* 인쇄 */
+  @page { size: A4; margin: 17mm 15mm; }
+  @media print {
+    :root {
+      --paper: #ffffff;
+      --surface: #f4f6f8;
+      --surface-2: #eceff2;
+      --ink: #111a22;
+      --ink-mid: #3f4a55;
+      --ink-soft: #5d6873;
+      --rule: #b9c2ca;
+      --rule-soft: #d8dee4;
+      --accent: #17395a;
+      --accent-soft: #eef2f6;
+      --pass-fg: #0d4a0d;
+      --pass-bg: #e6f4e6;
+      --warn-fg: #7a5000;
+      --warn-bg: #fdf3d4;
+      --err-fg: #900000;
+      --err-bg: #fce2e2;
+      color-scheme: light;
+    }
+    body { font-size: 10.4pt; line-height: 1.66; background: #fff; color: #111a22; }
+    .wrap { max-width: none; padding: 0; }
+    .sec { padding-top: 20px; break-inside: avoid-page; }
+    .tw, .codewrap, .aside, .verdict, .stats, .steps > li, .plan > div { break-inside: avoid; }
+    h1 { font-size: 24pt; }
+    h2 { font-size: 14pt; }
+    pre { font-size: 7.6pt; white-space: pre-wrap; }
+    table { min-width: 0; font-size: 8.6pt; }
+    .tw { overflow: visible; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="cover">
+    <div class="eyebrow">진바이오테크 내부 보고</div>
+    <h1>라포르몰 AEO 안내</h1>
+    <p class="lead">AI 가 만드는 검색 답변에 라포르몰 제품이 인용되게 만드는 일입니다. 지금 상태와 다음에 할 일을 정리했습니다.</p>
+    <div class="filed">
+      <span>수신: 이화정 대표님</span>
+      <span>작성일: 2026-09-14</span>
+      <span>근거: 같은 날 라포르몰(www.cstpillow.com) 실측</span>
+    </div>
+  </header>
+
+  <!-- 1 -->
+  <section class="sec">
+    <div class="n">1</div>
+    <div class="c">
+      <h2>한 장 요약</h2>
+      <ol class="verdict">
+        <li><span><b>라포르몰에는 AI 가 인용할 문장이 없습니다.</b> 봇이 막혀 있어서가 아닙니다. 제품 설명이 전부 이미지 안에 들어 있어서, 기계가 읽어 갈 글자가 없습니다.</span></li>
+        <li><span><b>우리가 할 일은 AEO 입니다. GEO 는 후순위로 둡니다.</b> 직접 손댈 수 있고 결과를 눈으로 확인할 수 있는 쪽은 AEO 하나입니다.</span></li>
+        <li><span><b>그래서 제품별 정보표를 자동으로 만드는 프로그램을 만들었습니다.</b> 상품 주소를 붙여넣고, 나온 코드를 고도몰에 붙이고, 프로그램에서 검증하면 끝납니다.</span></li>
+      </ol>
+      <div class="stats">
+        <div><span class="big">0건</span><span class="cap">제품 정보표(구조화 데이터). 12개 상품 전부 없습니다</span></div>
+        <div><span class="big">194 : 1</span><span class="cap">페이지 194개가 똑같은 제목 하나를 공유합니다</span></div>
+        <div><span class="big">통과</span><span class="cap">AI 봇 차단은 없습니다. 경쟁사는 막혀 있어 이것이 우위입니다</span></div>
+      </div>
+      <p class="gloss">AEO(Answer Engine Optimization, 답변엔진 최적화) - AI 가 답을 만드는 순간 우리 페이지를 가져가 인용하게 만드는 일. GEO(Generative Engine Optimization, 생성엔진 최적화) - AI 모델이 학습할 때 우리 브랜드를 배우게 만드는 일.</p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="sec">
+    <div class="n">2</div>
+    <div class="c">
+      <h2>AI 검색이 바꾼 것</h2>
+      <p>검색 화면의 모양이 바뀌었습니다. 예전에는 링크 열 개가 나왔고, 우리 일은 그 순위를 올리는 것이었습니다. 지금은 AI 가 쓴 답 한 덩어리가 맨 위에 먼저 나옵니다. 그 답 안에 어느 회사 문장이 실렸는지가 새 성적표입니다.</p>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>어디서</th><th>무엇이 생겼나</th><th class="num">시점</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowhead">네이버</td><td>AI 브리핑. 통합검색 맨 위에 AI 요약 답변 블록이 붙습니다</td><td class="num">2025-03 도입</td></tr>
+            <tr><td class="rowhead">네이버</td><td>대화형 AI 탭. 검색창 아래 탭에서 챗봇처럼 묻고 답을 받습니다</td><td class="num">2026-06-26 전체 공개</td></tr>
+            <tr><td class="rowhead">ChatGPT, Gemini</td><td>답을 만들 때 웹 페이지를 실시간으로 읽어 와 문장을 인용합니다</td><td class="num">상시</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>예시: 누가 "목 마사지기 추천" 이라고 물었을 때</h3>
+      <p>AI 는 웹에서 문장을 찾아 답을 만듭니다. "이 제품은 목과 어깨를 하루 10분 쓰도록 만들었고 무게는 1.2kg 입니다" 같은 문장이 있는 페이지를 가져갑니다. 라포르몰에서 건질 수 있는 문장은 사실상 "뭉친 목, 어께 하루 10분으로 속근육까지 시원하게" 한 줄입니다. 그리고 그 한 줄은 '어깨' 가 '어께' 로 잘못 적혀 있습니다. 경쟁사가 같은 내용을 글자로 200자 써 두었다면, 답에는 경쟁사가 실립니다.</p>
+      <p>조사에서 확인된 숫자 두 개가 방향을 정해 줍니다. AI 인용의 <strong>44.2%</strong> 가 페이지 맨 앞 도입부에서 뽑혀 나옵니다. 인용된 페이지의 <strong>53.4%</strong> 는 1,000단어가 안 됩니다. 분량을 늘리는 것보다 페이지 앞쪽에 결론을 글자로 적어 두는 것이 효과가 큽니다.</p>
+      <p class="gloss">인용 - AI 답변 안에 우리 페이지의 문장과 주소가 함께 실리는 것. 광고가 아니고 비용도 들지 않습니다.</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="sec">
+    <div class="n">3</div>
+    <div class="c">
+      <h2>GEO 와 AEO 는 무엇이 다른가</h2>
+      <p>이름이 비슷해 섞여 쓰이지만 하는 일이 다릅니다. 차이는 "AI 가 언제 우리 내용을 쓰는가" 입니다.</p>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th></th><th>GEO (생성엔진 최적화)</th><th>AEO (답변엔진 최적화)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowhead">언제 작용하나</td><td>모델이 <strong>학습할 때</strong>. 우리 내용을 미리 배워 두어야 답에 나옵니다</td><td>모델이 <strong>답할 때</strong>. 그 순간 검색하고 페이지를 읽어 인용합니다</td></tr>
+            <tr><td class="rowhead">우리가 통제하나</td><td>못 합니다. 무엇을 학습에 넣는지는 AI 회사가 정합니다</td><td>합니다. 우리 페이지를 고치는 일이 전부입니다</td></tr>
+            <tr><td class="rowhead">반영까지</td><td>수개월에서 수년</td><td>다음 크롤링부터. 보통 며칠</td></tr>
+            <tr><td class="rowhead">확인 방법</td><td>없습니다</td><td>구글 리치 결과 테스트와 검색 화면에서 눈으로 봅니다</td></tr>
+            <tr><td class="rowhead">우리 판단</td><td><span class="chip warn">후순위</span> 과제로 삼지 않습니다</td><td><span class="chip pass">본체</span> 여기에 집중합니다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="gloss">크롤링 - 검색엔진과 AI 서비스의 프로그램(봇)이 우리 페이지를 자동으로 읽어 가는 일.</p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="sec">
+    <div class="n">4</div>
+    <div class="c">
+      <h2>GEO 를 과제로 삼지 않는 이유</h2>
+      <p>GEO 를 팔거나 성과 지표로 쓰는 회사가 많습니다. 저희는 네 가지 이유로 이것을 대표님께 과제로 올리지 않습니다.</p>
+      <ul class="plain">
+        <li><strong>학습 컷오프가 있습니다.</strong> AI 모델은 특정 시점까지의 자료로만 배웁니다. 그 뒤에 생긴 것은 모릅니다. 오늘 페이지를 고쳐도 지금 쓰이는 모델은 그것을 모릅니다.</li>
+        <li><strong>포함될지 확인할 수 없습니다.</strong> 우리 사이트가 다음 학습에 들어갔는지 알려 주는 창구가 없습니다. 통제도, 확인도 안 됩니다.</li>
+        <li><strong>느립니다.</strong> 들어갔다고 해도 다음 모델이 나오기까지 수개월에서 수년입니다.</li>
+        <li><strong>측정이 안 됩니다.</strong> 무엇을 했더니 무엇이 좋아졌다고 말할 근거를 만들 수 없습니다. 비용만 확정되고 결과는 확인 불가인 일입니다.</li>
+      </ul>
+      <p>AEO 는 반대입니다. 페이지를 고치면 다음 크롤링부터 반영됩니다. 제품 정보표를 제대로 넣었는지는 구글이 무료로 제공하는 리치 결과 테스트 화면에서 바로 확인됩니다. 실제로 상품 한 개에 넣어 확인까지 마쳤습니다(7번 항목).</p>
+      <p class="oneline">AEO 를 갖추면 GEO 는 결과로 따라옵니다. 우리 글자가 웹에 남으면 그것이 다음 학습 자료가 됩니다.</p>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="sec">
+    <div class="n">5</div>
+    <div class="c">
+      <h2>라포르몰 현재 상태 (2026-09-14 실측)</h2>
+      <p>사이트를 실제로 받아서 세어 본 값입니다. 짐작이 아닙니다.</p>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>항목</th><th>실측값</th><th>판정</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowhead">AI 봇 차단</td><td>없습니다. robots.txt 가 전면 개방입니다. 경쟁사 가누다와 지누스는 AI 봇을 막고 있어, 이것이 우리의 유일한 구조적 우위입니다</td><td><span class="chip pass">통과</span></td></tr>
+            <tr><td class="rowhead">제품 정보표</td><td>0건. 가격, 재고, 브랜드를 기계에 알려 주는 데이터가 전 상품에 없습니다</td><td><span class="chip err">없음</span></td></tr>
+            <tr><td class="rowhead">페이지 제목, 설명</td><td>194개 페이지 전부 동일합니다. 제목은 "우리집 마사지 전문가, 라포르" 하나이고, 메인 페이지와 CST 스탠다드 마사지기 상세가 같은 문자열입니다</td><td><span class="chip err">동일</span></td></tr>
+            <tr><td class="rowhead">상세 설명 글자</td><td>상품 상세 페이지에서 기계가 읽을 수 있는 글자가 1,877자인데, 대부분이 배송비와 교환환불 안내입니다. 실제 제품 설명은 이미지 48장 안에 있습니다(상세 영역만 좁혀 세면 글자 1,262자, 이미지 28장)</td><td><span class="chip err">이미지</span></td></tr>
+            <tr><td class="rowhead">제목 구조</td><td>H1 태그 0개. H2 는 "장바구니 담기" 라는 팝업 문구뿐입니다</td><td><span class="chip err">없음</span></td></tr>
+            <tr><td class="rowhead">sitemap</td><td>2020년 5월에 만든 것이 그대로입니다. 194개 주소가 전부 옛 형식(http, www 없음)이고 로그인 페이지까지 들어 있습니다</td><td><span class="chip err">방치</span></td></tr>
+            <tr><td class="rowhead">대표 문구 오타</td><td>전 페이지 설명 문구의 '어깨' 가 '어께' 로 적혀 있습니다</td><td><span class="chip err">오타</span></td></tr>
+            <tr><td class="rowhead">후기</td><td>648건 있지만 나중에 따로 불러오는 방식이라 봇은 읽지 못합니다</td><td><span class="chip warn">안 읽힘</span></td></tr>
+            <tr><td class="rowhead">기본 위생</td><td>한국어 표시(html lang) 없음, 이미지 설명문(alt) 누락 6건, llms.txt 없음</td><td><span class="chip warn">보완</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="aside">
+        <span class="tag">한 문장으로</span>
+        가게 문은 열려 있는데, 안내문이 전부 그림이라 읽어 줄 글자가 없는 상태입니다. 손님(사람)은 그림을 보고 이해하지만, 대신 읽어 주는 AI 는 그림을 읽지 못합니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="sec">
+    <div class="n">6</div>
+    <div class="c">
+      <h2>라포르몰에 적용할 다섯 단계</h2>
+      <p>순서에 의미가 있습니다. 위에 있는 것이 효과가 크고, 아래로 갈수록 마무리 작업입니다. 1번이 전체 효과의 대부분을 차지합니다.</p>
+      <ol class="steps">
+        <li>
+          <div>
+            <div class="t">이미지 속 설명을 글자로 다시 쓰기</div>
+            <div class="d">이미지는 그대로 두고, 그 아래에 같은 내용을 글자로 한 번 더 깝니다. 재질, 크기, 무게, 전압, 소음도, 세척법, 사용 시간, 주의사항. 특히 숫자를 적습니다. AI 는 "편안합니다" 는 버리고 "높이 10cm, 무게 1.2kg, 1회 10분 권장" 은 가져갑니다.</div>
+            <div class="who"><span><b>누가</b> 상품 담당자가 쓰고 대표님이 문구 확인</span><span><b>어디서</b> 고도몰 관리자 &gt; 상품 관리 &gt; 상품 수정 &gt; 상품 상세설명</span><span><b>얼마나</b> 상품 1개당 반나절</span></div>
+          </div>
+        </li>
+        <li>
+          <div>
+            <div class="t">제품마다 제목과 설명을 따로 달기</div>
+            <div class="d">"CST 스탠다드 마사지기 - 목, 어깨 속근육 지압 | 라포르" 처럼 상품마다 다르게 적습니다. 제목은 15자 내외, 설명은 80자 내외가 적당합니다. 지금은 194개 페이지가 제목 하나를 나눠 쓰고 있습니다.</div>
+            <div class="who"><span><b>누가</b> 상품 담당자</span><span><b>어디서</b> 상품 등록 화면 아래쪽 SEO 항목, 공통값은 설정 &gt; 기본정책 &gt; 검색엔진 최적화</span><span><b>얼마나</b> 12개 상품에 하루</span></div>
+          </div>
+        </li>
+        <li>
+          <div>
+            <div class="t">제품 정보표(JSON-LD) 넣기</div>
+            <div class="d">가격, 재고, 브랜드, 재질을 기계가 읽는 형식으로 함께 적어 둡니다. 이 작업은 새로 만든 프로그램이 대신합니다(8번 항목). 사람은 붙여넣고 검증만 합니다.</div>
+            <div class="who"><span><b>누가</b> 상품 담당자</span><span><b>어디서</b> 프로그램에서 생성 후 상품 상세설명 HTML 모드에 붙여넣기</span><span><b>얼마나</b> 상품 1개 5분, 12개 전부 한 시간</span></div>
+          </div>
+        </li>
+        <li>
+          <div>
+            <div class="t">질문형 페이지 만들기</div>
+            <div class="d">AEO 의 본체입니다. 상품 페이지 대신 질문 페이지로 인용을 받습니다. 제목을 질문 그대로 쓰고, 첫 두 문장에 결론을 완결된 문장으로 적고, 그다음에 근거 숫자를 적고, 맨 끝에 우리 제품을 한 줄만 연결합니다. 후보 네 개입니다. "경추베개는 높이를 몇 cm로 해야 하나", "목 마사지기는 하루 몇 분이 적당한가", "라텍스 베개와 메모리폼 베개 차이", "마사지기를 쓰면 안 되는 경우는".</div>
+            <div class="who"><span><b>누가</b> 문안 작성자 한 명, 게시 전 규제 검사 필수</span><span><b>어디서</b> 고도몰 관리자 &gt; 디자인 &gt; 페이지 추가 또는 게시판</span><span><b>얼마나</b> 페이지 1개당 하루</span></div>
+          </div>
+        </li>
+        <li>
+          <div>
+            <div class="t">위생 정리</div>
+            <div class="d">sitemap 을 지금 주소(https, www)로 다시 만들어 올리고 로그인 페이지를 뺍니다. 한국어 표시를 넣고, 이미지 설명문 6건을 채우고, '어께' 오타를 고칩니다.</div>
+            <div class="who"><span><b>누가</b> 외부 개발 지원 또는 담당자</span><span><b>어디서</b> 설정 &gt; 검색엔진 최적화(sitemap 업로드), 디자인 &gt; 스킨 편집</span><span><b>얼마나</b> 반나절</span></div>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="sec">
+    <div class="n">7</div>
+    <div class="c">
+      <h2>제품 정보표(JSON-LD)란 무엇인가</h2>
+      <p>사람이 보는 상세페이지 옆에, 기계만 읽는 제품 정보표를 하나 더 붙여 두는 것입니다. 상품명, 브랜드, 가격, 통화, 재고, 대표 이미지, 판매자를 정해진 칸에 맞춰 적습니다. 사람이 보는 화면에는 <strong>아무 변화가 없습니다.</strong> 글자 한 자 늘지 않고 디자인도 그대로입니다. 오직 기계만 읽습니다.</p>
+      <p>말로만 드리지 않고 실제로 해 봤습니다. CST 스탠다드 마사지기(goodsNo=11, 판매가 96,000원)에 아래 코드를 넣고 구글 리치 결과 테스트로 검사했더니 <strong>"유효한 항목 2개 감지"</strong> 가 나왔습니다. 구글이 이 제품 정보를 정상으로 읽었다는 뜻입니다.</p>
+      <div class="codewrap">
+        <div class="cap">실제로 넣어 확인한 코드. 이것이 "보이지 않는 제품 정보표" 입니다</div>
+<pre>&lt;script type="application/ld+json"&gt;
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "CST 스탠다드 마사지기",
+  "brand": { "@type": "Brand", "name": "라포르" },
+  "description": "목·어깨 속근육까지 깊게 자극하는 지압 마사지기. 하루 10분 사용 권장. 7일 무료체험 제공.",
+  "image": "https://godomall.speedycdn.net/.../11_detail_046.jpg",
+  "sku": "11",
+  "offers": {
+    "@type": "Offer",
+    "url": "https://cstpillow.com/goods/goods_view.php?goodsNo=11",
+    "priceCurrency": "KRW",
+    "price": "96000",
+    "availability": "https://schema.org/InStock",
+    "seller": { "@type": "Organization", "name": "진바이오테크" }
+  }
+}
+&lt;/script&gt;</pre>
+      </div>
+      <p>읽는 법은 어렵지 않습니다. 왼쪽이 칸 이름이고 오른쪽이 값입니다. name 은 상품명, price 는 판매가 96,000원, availability 는 재고 있음, seller 는 판매자입니다. 이 표가 없으면 AI 는 우리 제품의 이름도 가격도 확실하게 알지 못합니다.</p>
+      <p class="gloss">구조화 데이터 - 페이지 내용을 기계가 오해 없이 읽도록 정해진 형식으로 함께 적어 두는 것. JSON-LD 는 그 형식 중 하나입니다. 리치 결과 - 구글 검색 결과에 가격이나 재고 같은 정보가 함께 표시되는 형태.</p>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="sec">
+    <div class="n">8</div>
+    <div class="c">
+      <h2>그래서 만든 프로그램: 라포르몰 JSON-LD 생성기</h2>
+      <p>정보표를 사람이 손으로 쓰면 상품마다 30분이 걸리고, 쉼표 하나만 틀려도 기계가 읽지 못합니다. 그래서 전용 프로그램을 만들었습니다. 윈도우에서 두 번 눌러 실행하는 exe 파일 하나이고, <strong>설치 과정이 없습니다.</strong> 인터넷에 아무것도 올라가지 않고 이 PC 안에서만 돕니다.</p>
+      <h3>하는 일</h3>
+      <ul class="plain">
+        <li>상품 주소를 여러 개 한꺼번에 받습니다. 숫자(goodsNo)만 붙여도 되고, 사이트맵에서 전체 상품을 한 번에 불러올 수도 있습니다.</li>
+        <li>사이트에서 상품명, 판매가, 정가, 이미지, 재고를 자동으로 수집합니다.</li>
+        <li>남은 칸을 입력받습니다. 필수 17칸과 선택 11칸이고, 필수 칸에는 빨간 별표가 붙고 칸마다 예시가 적혀 있습니다.</li>
+        <li>입력한 설명에 규제 문구가 있는지 검사합니다. 치료, 완치, 예방, 교정, 통증 완화, 혈액순환 같은 표현이 있으면 경고와 대체 문안을 보여 주고 생성을 멈춥니다.</li>
+        <li>정보표를 만들어 냅니다. 복사 버튼과 파일 저장 버튼이 있습니다.</li>
+        <li>프로그램 안에서 바로 판정합니다. 구글이 요구하는 필수 항목과 우리가 정한 AEO 필수 항목을 규칙표로 검사해 색으로 알려 줍니다. 상품 여러 개를 한 번에 검증할 수 있고, 구글 리치 결과 테스트 화면도 프로그램에서 열립니다.</li>
+        <li>생성 이력을 남깁니다. 언제 어느 상품을 어떤 가격으로 만들었는지, 같은 상품의 가격이 언제 바뀌었는지 볼 수 있습니다.</li>
+      </ul>
+      <h3>사용 순서</h3>
+      <ol class="steps">
+        <li><div><div class="t">프로그램을 실행합니다</div><div class="d">파일을 두 번 누르면 창이 열립니다. 탭은 생성, 이력, 설정, 도움말 네 개입니다.</div></div></li>
+        <li><div><div class="t">상품 주소를 붙여넣고 "가져오기" 를 누릅니다</div><div class="d">위쪽 큰 칸에 줄마다 하나씩 붙입니다. 상품명과 가격이 아래 표에 채워집니다.</div></div></li>
+        <li><div><div class="t">칸을 채웁니다</div><div class="d">필수 칸은 빨간 별표로 표시됩니다. 칸마다 예시 문구가 들어 있어 그 형식대로 쓰면 됩니다. 설명은 두세 문장, 60자에서 160자 사이를 권합니다.</div></div></li>
+        <li><div><div class="t">"생성" 을 누르고 복사합니다</div><div class="d">규제 경고가 나오면 문구를 먼저 고칩니다. 개별 복사와 전체 복사, 파일 저장이 있습니다.</div></div></li>
+        <li><div><div class="t">고도몰에 붙여넣고 저장합니다</div><div class="d">고도몰 관리자 &gt; 상품 관리 &gt; 상품 수정 &gt; 상품 상세설명 을 열고, 편집기를 HTML 편집 모드로 바꾼 뒤 맨 아래에 붙여넣고 저장합니다.</div></div></li>
+        <li><div><div class="t">프로그램에서 검증합니다</div><div class="d">색으로 판정이 나옵니다. <span class="chip pass">초록 통과</span> 그대로 두면 됩니다. <span class="chip warn">노랑 보완</span> 채우면 인용 기회가 늘어납니다. <span class="chip err">빨강 오류</span> 고치지 않으면 구글이 읽지 못합니다. 필요하면 "리치 결과 테스트 열기" 로 구글 검사 화면을 열어 최종 확인합니다.</div></div></li>
+      </ol>
+      <p>자세한 사용법은 프로그램의 도움말 탭에 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="sec">
+    <div class="n">9</div>
+    <div class="c">
+      <h2>반드시 지킬 것</h2>
+      <p>정보표를 넣는 일과 문구를 쓰는 일에는 규정이 걸려 있습니다. 아래 표는 예외 없이 지킵니다. 어기면 얻는 것보다 잃는 것이 큽니다.</p>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>지킬 것</th><th>이유</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowhead">정보표 가격과 화면 가격을 같게</td><td>다르면 표시광고 위반입니다. 가격을 바꾸면 정보표도 다시 만들어 붙입니다</td></tr>
+            <tr><td class="rowhead">없는 별점과 후기 수를 넣지 않기</td><td>화면에 실제로 보이는 값만 적습니다. 프로그램의 평점 항목은 기본이 꺼져 있습니다</td></tr>
+            <tr><td class="rowhead">공통 헤더와 푸터에 넣지 않기</td><td>모든 페이지에 같은 상품 정보가 붙어 전부 잘못된 데이터가 됩니다. 상품마다 상세설명에만 넣습니다</td></tr>
+            <tr><td class="rowhead">의료 효능 표현 금지</td><td>라포르몰 제품은 의료기기 허가를 받지 않은 공산품입니다. "거북목 교정", "통증 완화", "치료", "예방" 같은 표현은 의료기기법 제26조제7항의 오인 광고입니다. 2020년 6월 식약처가 공산품 베개 사이트 1,635건을 점검해 610건을 적발했고, 그중 거북목 교정 표현이 415건이었습니다. "의료기기 아님" 을 함께 적어도 면제되지 않습니다</td></tr>
+            <tr><td class="rowhead">대신 쓸 표현</td><td>물리 사양과 사용 경험으로 씁니다. "머리와 목을 받쳐 편안한 수면 자세를 돕습니다", "높이 10cm, 메모리폼 경도 2종" 처럼 적습니다</td></tr>
+            <tr><td class="rowhead">근거 없는 수치 금지</td><td>"고객만족도 99%" 같은 표현은 표시광고법 제3조와 제5조의 실증 대상입니다. 공정위가 요청하면 15일 안에 자료를 내야 합니다. 자료가 없으면 문구를 뺍니다</td></tr>
+            <tr><td class="rowhead">후기 규정 준수</td><td>전자상거래법 제21조의4 가 2026년 7월 21일 시행되었습니다. 후기 게시기간, 삭제 기준, 이의제기 절차를 미리 공개해야 하고 부정적 후기를 임의로 지울 수 없습니다</td></tr>
+            <tr><td class="rowhead">KC 인증번호를 임의로 적지 않기</td><td>상품정보제공고시 침구류 항목은 인증 정보를 이미지 대신 글자로 적도록 요구합니다. 다만 성인용 베개는 KC 대상이 아닙니다. 없는 번호를 적으면 그 자체가 위반입니다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="gloss">프로그램의 문구 검사는 정해 둔 표현 목록과 대조하는 기능입니다. 목록에 없는 새 표현은 걸러지지 않습니다. 적법성을 보증하지 않으며 최종 판단은 담당자와 법률 검토의 몫입니다.</p>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="sec">
+    <div class="n">10</div>
+    <div class="c">
+      <h2>앞으로의 일정 제안</h2>
+      <div class="plan">
+        <div>
+          <div class="when">이번 주</div>
+          <div>12개 상품 전부에 제품 정보표를 넣고 검증까지 마칩니다. 프로그램이 있으니 가장 빠르고 확실한 성과입니다. 끝나면 상품 12개가 구글과 AI 에게 가격과 재고를 정확히 말할 수 있게 됩니다.</div>
+        </div>
+        <div>
+          <div class="when">다음 주</div>
+          <div>상품 두 개를 골라 상세 설명을 글자로 옮겨 봅니다. 시범입니다. 같은 기간에 12개 상품의 제목과 설명을 각각 다르게 달고, '어께' 오타를 고칩니다.</div>
+        </div>
+        <div>
+          <div class="when">그 다음</div>
+          <div>질문형 페이지 네 개를 만듭니다. 상세 설명 글자화가 검증되면 스킨 편집으로 전 상품에 자동 적용하는 방식을 검토합니다. 그리고 월 1회, 네이버와 ChatGPT 에 같은 질문을 넣어 우리가 인용되는지 점검하고 기록을 남깁니다.</div>
+        </div>
+      </div>
+      <p>순서의 원칙은 하나입니다. 확인할 수 있는 것부터 합니다. 이번 주 작업은 끝나는 즉시 구글 화면에서 결과를 보여 드릴 수 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="sec">
+    <div class="n">11</div>
+    <div class="c">
+      <h2>용어 설명</h2>
+      <dl class="terms">
+        <div><dt>AEO</dt><dd>답변엔진 최적화. AI 가 답을 만드는 순간 우리 페이지를 읽어 인용하게 만드는 일. 우리가 직접 할 수 있는 쪽입니다.</dd></div>
+        <div><dt>GEO</dt><dd>생성엔진 최적화. AI 모델이 학습할 때 우리 브랜드를 배우게 만드는 일. 통제와 확인이 안 되어 후순위입니다.</dd></div>
+        <div><dt>크롤링</dt><dd>검색엔진과 AI 서비스의 프로그램(봇)이 우리 페이지를 자동으로 읽어 가는 일. 막혀 있으면 인용 대상이 아예 되지 않습니다.</dd></div>
+        <div><dt>JSON-LD</dt><dd>페이지 안에 기계가 읽는 정보표를 적어 두는 형식. 사람 눈에는 보이지 않습니다.</dd></div>
+        <div><dt>구조화 데이터</dt><dd>기계가 오해 없이 읽도록 정해진 칸에 맞춰 적은 데이터. JSON-LD 가 그 형식 중 하나입니다.</dd></div>
+        <div><dt>리치 결과</dt><dd>구글 검색 결과에 가격이나 재고 같은 정보가 함께 나오는 형태. 구조화 데이터가 그 근거입니다.</dd></div>
+        <div><dt>고도몰</dt><dd>라포르몰이 쓰는 쇼핑몰 솔루션(고도몰5 임대형). 화면 템플릿은 고칠 수 있지만 서버 설정은 건드릴 수 없습니다.</dd></div>
+        <div><dt>sitemap</dt><dd>우리 사이트에 어떤 주소가 있는지 적어 둔 파일. 검색엔진이 이것을 보고 페이지를 찾아갑니다.</dd></div>
+        <div><dt>학습 컷오프</dt><dd>AI 모델이 배운 자료의 마지막 시점. 그 뒤에 생긴 것은 모델이 모릅니다.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <footer>
+    근거 문서: chris-local/AEO-GEO.md, 에이전트 시드 COMPANY.md 및 PLAYBOOK.md, chris-local/tools/laformall-jsonld/README.md.
+    실측값은 2026-09-14 기준이며, 이후 사이트가 바뀌었을 수 있습니다. 중요한 판단 전에는 해당 항목을 다시 확인합니다.
+  </footer>
+
+</div>
