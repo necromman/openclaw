@@ -610,6 +610,7 @@ class App:
             lines = []
             for row, verdict, detail in result:
                 row.applied, row.applied_detail = verdict, detail
+                row.applied_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 lines.append(f"goodsNo={row.goods_no} {verdict} - {detail}")
             self.refresh_tree()
             self.write_out("적용 확인 결과\n\n" + "\n".join(lines))

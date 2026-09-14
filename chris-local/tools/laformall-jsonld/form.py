@@ -92,6 +92,7 @@ class ProductForm:
         bar.pack(side="left", fill="y")
         inner = ttk.Frame(canvas)
         window = canvas.create_window((0, 0), window=inner, anchor="nw")
+        self.canvas = canvas
 
         def resize(_event=None):
             canvas.configure(scrollregion=canvas.bbox("all"))

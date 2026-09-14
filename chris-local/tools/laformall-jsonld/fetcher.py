@@ -14,6 +14,7 @@ import json
 import re
 import urllib.parse
 from dataclasses import dataclass, field, asdict
+from datetime import datetime
 
 import requests
 from bs4 import BeautifulSoup
@@ -63,6 +64,8 @@ class Product:
     image_candidates: list = field(default_factory=list)
     applied: str = ""
     applied_detail: str = ""
+    applied_at: str = ""  # 페이지 적용을 마지막으로 확인한 시각
+    applied_new: bool = False  # 지난 회차에 미적용이었다가 이번에 적용된 상품
     local_status: str = ""
     google_status: str = ""
     google_at: str = ""
@@ -307,6 +310,7 @@ class Fetcher:
         blocks = soup.find_all("script", type="application/ld+json")
         prod.has_ldjson = bool(blocks)
         prod.applied, prod.applied_detail = _apply_existing(prod, blocks)
+        prod.applied_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prod.status = "수집됨"
         if not prod.name:
             prod.warnings.append("상품명을 찾지 못했습니다")

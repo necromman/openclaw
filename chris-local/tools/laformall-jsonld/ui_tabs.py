@@ -27,6 +27,70 @@ HIST_COLUMNS = [
     ("saved_path", "저장 파일", 200),
 ]
 
+ROUND_COLUMNS = [
+    ("round", "회차", 56),
+    ("at", "시각", 140),
+    ("total", "상품 수", 66),
+    ("applied", "적용됨", 66),
+    ("mismatch", "가격 불일치", 90),
+    ("not_applied", "미적용", 66),
+    ("new", "새로 적용", 200),
+]
+
+
+def build_rounds_box(app, frame) -> None:
+    """검증 회차 표. '다시 불러와 검증' 을 누를 때마다 한 줄 쌓인다."""
+    tk, ttk = app.tk, app.ttk
+    box = ttk.Labelframe(frame, text=" 검증 회차 (다시 불러와 검증한 기록) ", padding=4)
+    box.pack(side="bottom", fill="x", padx=6, pady=(0, 6))
+    tk.Label(
+        box,
+        text="회차마다 적용된 상품이 몇 개였는지 보여 줍니다. 적용됨이 늘고 미적용이 줄면"
+        " 붙여넣기가 잘 된 것입니다.",
+        fg="#5a5a5a",
+        font=("맑은 고딕", 9),
+        justify="left",
+    ).pack(anchor="w", pady=(0, 3))
+    app.round_tree = ttk.Treeview(
+        box, columns=[c[0] for c in ROUND_COLUMNS], show="headings", height=5
+    )
+    for key, label, width in ROUND_COLUMNS:
+        app.round_tree.heading(key, text=label)
+        app.round_tree.column(key, width=width, anchor="w")
+    app.round_tree.pack(fill="x")
+    app.round_tree.tag_configure("all", background="#e2f4e2", foreground="#105010")
+    app.round_tree.tag_configure("some", background="#fff6d6", foreground="#7a5200")
+    app.round_tree.tag_configure("none", background="#f0f0f0", foreground="#505050")
+    reload_rounds(app)
+
+
+def reload_rounds(app) -> None:
+    if not hasattr(app, "round_tree"):
+        return
+    records = history.load_rounds()
+    app.round_tree.delete(*app.round_tree.get_children())
+    for rec in reversed(records[-50:]):
+        total = int(rec.get("total", 0) or 0)
+        applied = int(rec.get("applied", 0) or 0)
+        newly = rec.get("new") or []
+        tag = "all" if total and applied >= total else ("some" if applied else "none")
+        app.round_tree.insert(
+            "",
+            "end",
+            iid=f"r{rec.get('round', 0)}",
+            values=(
+                f"{rec.get('round', '')}회차",
+                rec.get("at", ""),
+                total,
+                applied,
+                int(rec.get("mismatch", 0) or 0),
+                int(rec.get("not_applied", 0) or 0),
+                ", ".join(str(g) for g in newly) or "없음",
+            ),
+            tags=(tag,),
+        )
+
+
 def build_history_tab(app, frame) -> None:
     ttk = app.ttk
     tk = app.tk
@@ -46,6 +110,7 @@ def build_history_tab(app, frame) -> None:
     ]:
         ttk.Button(top, text=text, command=cmd).pack(side="left", padx=2)
 
+    build_rounds_box(app, frame)
     app.hist_tree = ttk.Treeview(
         frame, columns=[c[0] for c in HIST_COLUMNS], show="headings", selectmode="extended"
     )
@@ -67,6 +132,7 @@ def build_history_tab(app, frame) -> None:
 
 
 def reload_history(app) -> None:
+    reload_rounds(app)
     if not hasattr(app, "hist_tree"):
         return
     app.hist_records = history.load()

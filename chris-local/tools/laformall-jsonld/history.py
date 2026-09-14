@@ -120,6 +120,53 @@ def latest_google(goods_no: str) -> dict | None:
     return found[-1] if found else None
 
 
+# ------------------------------------------------------------------ 검증 회차
+# 재검증("붙여넣기 끝났으면 다시 불러와 검증")을 한 번 돌릴 때마다 한 줄 남긴다.
+
+
+def rounds_path() -> Path:
+    return settings.data_dir() / "verify-rounds.json"
+
+
+def load_rounds() -> list[dict]:
+    path = rounds_path()
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def add_round(
+    total: int,
+    applied: int,
+    not_applied: int,
+    mismatch: int,
+    newly: list[str] | None = None,
+    items: list[dict] | None = None,
+) -> dict:
+    """검증 회차 한 줄을 남기고 그 기록을 낸다. 회차 번호는 1부터 이어 붙인다."""
+    records = load_rounds()
+    record = {
+        "round": len(records) + 1,
+        "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total": int(total),
+        "applied": int(applied),
+        "not_applied": int(not_applied),
+        "mismatch": int(mismatch),
+        "new": list(newly or []),
+        "items": list(items or []),
+    }
+    records.append(record)
+    rounds_path().write_text(
+        json.dumps(records[-MAX_RECORDS:], ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return record
+
+
 def delete(indexes: list[int]) -> int:
     records = load()
     keep = [r for i, r in enumerate(records) if i not in set(indexes)]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import form as form_mod
+import verify_round
 
 STEPS = [
     ("1단계", "상품 불러오기"),
@@ -19,6 +20,13 @@ DONE_FG = "#ffffff"
 REST_FG = "#606060"
 BADGE_BG = "#1f5fbf"
 CARD_NOTE = "#5a5a5a"
+
+
+def plain_buttons(app) -> list:
+    """ttk 가 아닌 tk.Button 목록. 작업 중 잠그기에서 함께 다룬다."""
+    if not hasattr(app, "plain_button_list"):
+        app.plain_button_list = []
+    return app.plain_button_list
 
 
 def build_start_bar(app, parent) -> None:
@@ -51,12 +59,30 @@ def build_start_bar(app, parent) -> None:
     )
     start.pack(side="left", padx=8, pady=6)
     app.start_button = start
+    recheck = tk.Button(
+        bar,
+        text="적용 결과 다시 확인",
+        command=lambda: verify_round.run(app),
+        font=("맑은 고딕", 12, "bold"),
+        bg="#1e7a32",
+        fg="#ffffff",
+        activebackground="#2a9443",
+        activeforeground="#ffffff",
+        relief="raised",
+        bd=3,
+        padx=14,
+        pady=6,
+        cursor="hand2",
+    )
+    recheck.pack(side="left", padx=(0, 8), pady=6)
+    plain_buttons(app).append(recheck)
     tk.Label(
         bar,
-        text="라포르몰에서 지금 판매 중인 상품을 찾아 정보까지 한 번에 가져옵니다(10초 정도).",
+        text="처음이면 노란 버튼. 고도몰에 붙여넣기를 끝냈으면 초록 버튼을 누르세요.",
         bg="#1f5fbf",
         fg="#dce8fb",
         font=("맑은 고딕", 10),
+        justify="left",
     ).pack(side="left", padx=6)
     tk.Button(
         bar,
@@ -157,6 +183,7 @@ def scroll_area(app, parent):
         return None
 
     canvas.bind_all("<MouseWheel>", wheel, add="+")
+    app.left_canvas = canvas
     return inner
 
 
@@ -323,6 +350,35 @@ def build_output_panel(app, parent) -> None:
         "검증",
         "고도몰에 붙여넣은 뒤 확인합니다. 최종 판정은 구글 리치 결과 테스트입니다.",
     )
+    big5 = ttk.Frame(body2)
+    big5.pack(fill="x", pady=(0, 6))
+    recheck = tk.Button(
+        big5,
+        text="붙여넣기 끝났으면 다시 불러와 검증",
+        command=lambda: verify_round.run(app),
+        font=("맑은 고딕", 13, "bold"),
+        bg="#1e7a32",
+        fg="#ffffff",
+        activebackground="#2a9443",
+        activeforeground="#ffffff",
+        relief="raised",
+        bd=3,
+        padx=18,
+        pady=7,
+        cursor="hand2",
+    )
+    recheck.pack(side="left")
+    plain_buttons(app).append(recheck)
+    app.recheck_button = recheck
+    tk.Label(
+        body2,
+        text="상품을 다시 불러와 표의 '페이지 적용' 열을 갱신하고 결과를 알려 줍니다"
+        " (적용됨·미적용·가격 불일치 개수). 새로 적용된 행은 초록으로 강조됩니다.",
+        fg=CARD_NOTE,
+        font=("맑은 고딕", 9),
+        justify="left",
+        wraplength=760,
+    ).pack(anchor="w", pady=(0, 4))
     row2 = ttk.Frame(body2)
     row2.pack(fill="x")
     button(app, row2, "적용 확인", app.on_verify, step=5)
@@ -386,9 +442,11 @@ def walk_buttons(widget, found=None):
 def set_buttons_enabled(app, enabled: bool) -> None:
     """작업 중에는 버튼을 잠그고 취소만 열어 둔다."""
     state = "normal" if enabled else "disabled"
-    if getattr(app, "start_button", None) is not None:
+    for widget in [getattr(app, "start_button", None)] + plain_buttons(app):
+        if widget is None:
+            continue
         try:
-            app.start_button.configure(state=state)
+            widget.configure(state=state)
         except Exception:
             pass
     for button in walk_buttons(app.tab_main):
