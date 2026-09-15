@@ -634,6 +634,8 @@ def apply_style(app) -> None:
     )
     style.configure("Tiny.TButton", font=(BASE_FONT[0], 8), padding=[4, 1], borderwidth=1)
     style.configure("Card.TFrame", background="#f7f9fc", relief="solid", borderwidth=1)
+    # 단계가 아닌 부가 도구 카드는 더 옅게 해서 단계 카드와 구분한다.
+    style.configure("Muted.TFrame", background="#fafafa", relief="solid", borderwidth=1)
     style.configure("TProgressbar", thickness=16)
     style.configure("TLabelframe.Label", font=(BASE_FONT[0], 11, "bold"))
     style.configure("Treeview", font=(BASE_FONT[0], 10), rowheight=26)

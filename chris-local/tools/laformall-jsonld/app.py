@@ -151,9 +151,10 @@ class App:
             pass
         self.root.destroy()
 
-    def write_out(self, text: str, bad_terms: list[str] | None = None) -> None:
+    def write_out(self, text: str, bad_terms: list[str] | None = None, summary: str = "") -> None:
         self.out.delete("1.0", "end")
         self.out.insert("1.0", text)
+        ui_steps.set_result_summary(self, summary)
         for term in set(bad_terms or []):
             if not term:
                 continue
@@ -361,6 +362,7 @@ class App:
         row = self.current_row()
         if not row:
             return
+        ui_steps.refresh_copy_buttons(self)
         if self.form.goods_no == row.goods_no:
             return
         self.save_form(quiet=True)
@@ -515,10 +517,7 @@ class App:
             self.write_out("\n\n".join(blocks))
             ui_tabs.reload_history(self)
             self.set_step(5, "고도몰에 붙여넣고 검증하세요")
-            self.log(
-                f"생성 {len(result)}건, 검증 실패 {bad}건. 최종 판정은 구글 테스트입니다.",
-                "warn" if bad else "ok",
-            )
+            ui_steps.after_generate(self, result, bad)
 
         self.background(work, done, f"스니펫 {len(rows)}건 만드는 중...", total=len(rows))
 
@@ -529,7 +528,8 @@ class App:
             self.warn("복사", "행을 선택하고 먼저 스니펫을 생성하세요.")
             return
         self.clipboard(text)
-        self.log(f"goodsNo={row.goods_no} 스니펫을 복사했습니다")
+        ui_steps.flash_copied(self, self.copy_button, ui_steps.COPY_LABEL)
+        self.log(f"goodsNo={row.goods_no} 스니펫을 복사했습니다. 고도몰 상세설명에 붙여넣으세요", "ok")
 
     def on_copy_all(self) -> None:
         blocks = [self.snippets[r.goods_no] for r in self.selected_rows() if r.goods_no in self.snippets]
@@ -537,7 +537,8 @@ class App:
             self.warn("복사", "먼저 스니펫을 생성하세요.")
             return
         self.clipboard("\n\n".join(blocks))
-        self.log(f"{len(blocks)}건을 복사했습니다")
+        ui_steps.flash_copied(self, self.copy_all_button, "선택 상품 전체 복사")
+        self.log(f"{len(blocks)}건을 복사했습니다", "ok")
 
     def on_save_files(self) -> None:
         rows = [r for r in self.selected_rows() if r.goods_no in self.snippets]

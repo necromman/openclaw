@@ -20,6 +20,8 @@ DONE_FG = "#ffffff"
 REST_FG = "#606060"
 BADGE_BG = "#1f5fbf"
 CARD_NOTE = "#5a5a5a"
+COPY_LABEL = "이 결과 복사"
+EMPTY_SUMMARY = "결과 칸입니다. 스니펫을 만들면 여기에 요약이 나옵니다."
 
 
 def plain_buttons(app) -> list:
@@ -184,31 +186,38 @@ def scroll_area(app, parent):
 
     canvas.bind_all("<MouseWheel>", wheel, add="+")
     app.left_canvas = canvas
+    app.left_inner = inner
     return inner
 
 
 # ---------------------------------------------------------------------- 카드 골격
 
 
-def card(app, parent, number: str, title: str, note: str = ""):
-    """번호 배지가 붙은 카드 한 장."""
+def card(app, parent, number: str, title: str, note: str = "", tone: str = "step"):
+    """번호 배지가 붙은 카드 한 장. tone="muted" 는 단계가 아닌 부가 카드."""
     tk, ttk = app.tk, app.ttk
-    outer = ttk.Frame(parent, style="Card.TFrame", padding=0)
+    muted = tone == "muted"
+    head_bg = "#f3f3f3" if muted else "#f0f4fa"
+    outer = ttk.Frame(parent, style="Muted.TFrame" if muted else "Card.TFrame", padding=0)
     outer.pack(fill="x", padx=4, pady=4)
-    head = tk.Frame(outer, bg="#f0f4fa")
+    head = tk.Frame(outer, bg=head_bg)
     head.pack(fill="x")
     tk.Label(
         head,
         text=number,
         font=("맑은 고딕", 11, "bold"),
-        bg=BADGE_BG,
+        bg="#9a9a9a" if muted else BADGE_BG,
         fg="#ffffff",
         padx=10,
         pady=4,
     ).pack(side="left", padx=(6, 8), pady=5)
-    tk.Label(head, text=title, font=("맑은 고딕", 12, "bold"), bg="#f0f4fa").pack(
-        side="left", pady=5
-    )
+    tk.Label(
+        head,
+        text=title,
+        font=("맑은 고딕", 11 if muted else 12, "bold"),
+        bg=head_bg,
+        fg="#5a5a5a" if muted else "#202020",
+    ).pack(side="left", pady=5)
     body = ttk.Frame(outer)
     body.pack(fill="x", padx=8, pady=(3, 6))
     if note:
@@ -326,22 +335,56 @@ def build_output_panel(app, parent) -> None:
         parent,
         "4단계",
         "스니펫 생성·복사",
-        "필수 항목이 비면 어떤 항목인지 알려 주고 생성하지 않습니다.",
+        "필수 항목이 비면 어떤 항목인지 알려 주고 생성하지 않습니다."
+        " 만든 내용은 바로 아래 결과 칸에 나오고, 결과 위 파란 버튼으로 복사합니다.",
     )
+    app.out_box = body
     row = ttk.Frame(body)
     row.pack(fill="x")
     button(app, row, "스니펫 생성", app.on_generate, step=4)
-    button(app, row, "개별 복사", app.on_copy_one)
-    button(app, row, "전체 복사", app.on_copy_all)
-    button(app, row, "파일 저장", app.on_save_files)
-    opts = ttk.Frame(body)
-    opts.pack(fill="x", pady=(4, 0))
     app.opt_crumb = tk.BooleanVar(value=False)
-    ttk.Checkbutton(opts, text="BreadcrumbList 도 함께", variable=app.opt_crumb).pack(side="left")
+    ttk.Checkbutton(row, text="BreadcrumbList 도 함께", variable=app.opt_crumb).pack(
+        side="left", padx=(12, 0)
+    )
     app.opt_force = tk.BooleanVar(value=False)
-    ttk.Checkbutton(opts, text="규제 경고 무시하고 생성", variable=app.opt_force).pack(
+    ttk.Checkbutton(row, text="규제 경고 무시하고 생성", variable=app.opt_force).pack(
         side="left", padx=10
     )
+    summary_row = ttk.Frame(body)
+    summary_row.pack(fill="x", pady=(8, 2))
+    app.out_summary = tk.Label(
+        summary_row, text=EMPTY_SUMMARY, fg=CARD_NOTE, font=("맑은 고딕", 9),
+        anchor="w", justify="left", wraplength=740,
+    )
+    app.out_summary.pack(side="left", fill="x", expand=True)
+    for text, delta in (("칸 줄이기", -4), ("칸 늘리기", 4)):
+        ttk.Button(
+            summary_row, text=text, width=8, style="Tiny.TButton",
+            command=lambda d=delta: resize_out(app, d),
+        ).pack(side="right", padx=2)
+    head = ttk.Frame(body)
+    head.pack(fill="x", pady=(0, 3))
+    app.copy_button = ttk.Button(
+        head, text=COPY_LABEL, command=app.on_copy_one, style="Secondary.TButton"
+    )
+    app.copy_button.pack(side="left", padx=(0, 4))
+    ttk.Button(
+        head, text="파일 저장", command=app.on_save_files, style="Secondary.TButton"
+    ).pack(side="left", padx=4)
+    app.copy_all_button = ttk.Button(
+        head, text="선택 상품 전체 복사", command=app.on_copy_all,
+        style="Secondary.TButton", state="disabled",
+    )
+    app.copy_all_button.pack(side="left", padx=4)
+    out_wrap = ttk.Frame(body)
+    out_wrap.pack(fill="x", pady=(0, 2))
+    app.out = tk.Text(out_wrap, height=10, wrap="word", font=("맑은 고딕", 10))
+    osb = ttk.Scrollbar(out_wrap, orient="vertical", command=app.out.yview)
+    app.out.configure(yscrollcommand=osb.set)
+    app.out.pack(side="left", fill="x", expand=True)
+    osb.pack(side="left", fill="y")
+    app.out.tag_configure("bad", foreground="#c00000", underline=True)
+    app.out.tag_configure("head", font=("맑은 고딕", 11, "bold"))
 
     body2 = card(
         app,
@@ -386,7 +429,15 @@ def build_output_panel(app, parent) -> None:
     button(app, row2, "구글 일괄 테스트", lambda: app.on_google(True))
     button(app, row2, "구글 테스트 창 열기", app.on_google_window)
 
-    tools = card(app, parent, "도구", "그때그때 쓰는 것", "")
+    tools = card(
+        app,
+        parent,
+        "부가",
+        "부가 도구(자주 쓰지 않음)",
+        "1~5단계와 상관없이 필요할 때만 쓰는 것들입니다.",
+        tone="muted",
+    )
+    app.tools_box = tools
     row3 = ttk.Frame(tools)
     row3.pack(fill="x")
     for text, cmd in (
@@ -399,15 +450,96 @@ def build_output_panel(app, parent) -> None:
             side="left", padx=3, pady=2
         )
 
-    out_box = ttk.Labelframe(parent, text=" 결과 ", padding=4)
-    out_box.pack(fill="x", padx=4, pady=4)
-    app.out = tk.Text(out_box, height=6, wrap="word", font=("맑은 고딕", 10))
-    osb = ttk.Scrollbar(out_box, orient="vertical", command=app.out.yview)
-    app.out.configure(yscrollcommand=osb.set)
-    app.out.pack(side="left", fill="x", expand=True)
-    osb.pack(side="left", fill="y")
-    app.out.tag_configure("bad", foreground="#c00000", underline=True)
-    app.out.tag_configure("head", font=("맑은 고딕", 11, "bold"))
+
+# ---------------------------------------------------------------------- 결과 칸
+
+
+def resize_out(app, delta: int) -> None:
+    height = max(5, min(40, int(app.out.cget("height")) + delta))
+    app.out.configure(height=height)
+
+
+def set_result_summary(app, text: str = "") -> None:
+    """결과 칸 위 한 줄 요약(무엇을 언제 만들었는지)."""
+    if hasattr(app, "out_summary"):
+        app.out_summary.configure(text=text or EMPTY_SUMMARY)
+
+
+def refresh_copy_buttons(app) -> None:
+    """결과가 있으면 '이 결과 복사' 를 파랑으로, 여러 상품을 골랐을 때만 전체 복사를 연다."""
+    row = app.current_row() if hasattr(app, "tree") else None
+    has_one = bool(row and row.goods_no in app.snippets)
+    try:
+        app.copy_button.configure(style="Primary.TButton" if has_one else "Secondary.TButton")
+        picked = [r for r in app.selected_rows() if r.goods_no in app.snippets]
+        many = len(app.tree.selection()) > 1 and len(picked) >= 1
+        app.copy_all_button.configure(state="normal" if many else "disabled")
+    except Exception:
+        pass
+
+
+def flash_copied(app, widget, label: str) -> None:
+    """복사한 것을 눈으로 알 수 있게 버튼 글자를 2초간 바꾼다."""
+    try:
+        widget.configure(text="복사됨 ✔")
+        app.root.after(2000, lambda: widget.configure(text=label))
+    except Exception:
+        pass
+
+
+def scroll_to_result(app) -> None:
+    """생성 직후 결과 칸이 보이게 왼쪽 열을 내린다."""
+    canvas = getattr(app, "left_canvas", None)
+    inner = getattr(app, "left_inner", None)
+    box = getattr(app, "out_box", None)
+    if canvas is None or inner is None or box is None:
+        return
+    try:
+        canvas.update_idletasks()
+        total = max(1, inner.winfo_height())
+        offset = box.winfo_rooty() - inner.winfo_rooty() - 30
+        canvas.yview_moveto(max(0.0, min(1.0, offset / total)))
+    except Exception:
+        pass
+
+
+def block_kinds(text: str) -> list[str]:
+    kinds = []
+    for key, label in (('"@type": "Product"', "Product"), ("FAQPage", "FAQPage"),
+                       ("BreadcrumbList", "BreadcrumbList")):
+        if key in text:
+            kinds.append(label)
+    return kinds
+
+
+def after_generate(app, result, bad: int) -> None:
+    """생성 직후: 요약 한 줄, 결과 전체 선택, 결과로 스크롤, 상태줄 안내."""
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%H:%M")
+    whole = "\n".join(text for _row, text, _e, _v in result)
+    blocks = whole.count("<script type=")
+    if len(result) == 1:
+        row, text = result[0][0], result[0][1]
+        kinds = ", ".join(block_kinds(text)) or "없음"
+        summary = (
+            f"goodsNo={row.goods_no} {row.name} · 블록 {text.count('<script type=')}개"
+            f"({kinds}) · 생성 {stamp}"
+        )
+    else:
+        summary = f"상품 {len(result)}개 · 블록 {blocks}개 · 생성 {stamp}"
+    set_result_summary(app, summary)
+    try:
+        app.out.tag_add("sel", "1.0", "end-1c")
+        app.out.focus_set()
+        app.out.see("1.0")
+    except Exception:
+        pass
+    scroll_to_result(app)
+    refresh_copy_buttons(app)
+    note = f"생성됨, 복사 버튼을 누르세요 ({len(result)}건" + (f", 검증 실패 {bad}건)" if bad else ")")
+    # 폼에서 포커스가 빠지며 도는 자동 저장 문구에 덮이지 않게 조금 뒤에 남긴다.
+    app.root.after(220, lambda: app.log(note, "warn" if bad else "ok"))
 
 
 # ---------------------------------------------------------------------- 진행 패널
@@ -460,6 +592,8 @@ def set_buttons_enabled(app, enabled: bool) -> None:
         app.cancel_button.configure(state="disabled" if enabled else "normal")
     except Exception:
         pass
+    if enabled:
+        refresh_copy_buttons(app)  # 전체 복사는 여러 상품을 골랐을 때만 열어 둔다
 
 
 def progress_start(app, label: str, total: int | None) -> None:
