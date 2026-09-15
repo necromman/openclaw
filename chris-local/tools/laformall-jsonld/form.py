@@ -27,6 +27,13 @@ class Placeholder:
             return self.widget.get("1.0", "end").strip()
         return self.widget.get().strip()
 
+    def _has_focus(self) -> bool:
+        """지금 이 칸에 커서가 있는가. 입력 중인 칸에 예시를 다시 넣지 않기 위한 확인."""
+        try:
+            return self.widget.focus_get() is self.widget
+        except Exception:
+            return False
+
     def _write(self, value: str, colour: str) -> None:
         if self.kind == "area":
             self.widget.delete("1.0", "end")
@@ -38,6 +45,12 @@ class Placeholder:
 
     def show(self) -> None:
         if not self.text:
+            return
+        if self._has_focus():
+            # 커서가 있는 칸에는 회색 예시를 넣지 않는다. 넣으면 사람이 이어서 치는
+            # 글자 뒤에 예시가 붙어 버린다(FAQ 답변칸에서 실제로 났던 일).
+            self._write("", "black")
+            self.active = False
             return
         self._write(self.text, GREY)
         self.active = True
@@ -63,6 +76,42 @@ class Placeholder:
             self.active = False
         else:
             self.show()
+
+
+def row_of(app):
+    """폼이 잡고 있는 행. 표 선택이 아니라 폼에 실린 상품을 기준으로 본다."""
+    formy = getattr(app, "form", None)
+    if formy is None or not formy.goods_no:
+        return None
+    return app.find_row(formy.goods_no)
+
+
+def reload_into(app, goods_no: str = "") -> None:
+    """행 자료를 새로 받은 뒤 폼을 다시 그린다."""
+    row = app.find_row(goods_no) if goods_no else (row_of(app) or app.current_row())
+    if row is None:
+        row = app.rows[0] if app.rows else None
+    if row is not None:
+        app.form.load(row)
+
+
+def save_into(app, quiet: bool = True):
+    """폼 값을 그 행에 담고 판정·표·상태줄을 갱신한다(자동 저장의 본체)."""
+    row = row_of(app)
+    if row is None:
+        return None
+    app.form.collect(row)
+    verdict = app.reverdict(row)
+    app.refresh_tree()
+    full, half = app.form.faq_counts()
+    note = f", FAQ {full}쌍" if full else ""
+    if half:
+        note += f" (한쪽만 채운 쌍 {half}개는 생성에서 빠집니다)"
+    app.log(
+        f"goodsNo={row.goods_no} 저장됨 - {verdict.summary()}{note}",
+        "warn" if verdict.errors else "ok",
+    )
+    return row
 
 
 class ProductForm:
@@ -197,7 +246,7 @@ class ProductForm:
                 self.holders[spec.key] = Placeholder(widget, spec.placeholder, "area")
                 if spec.key == "description":
                     widget.bind("<KeyRelease>", self._count, add="+")
-                widget.bind("<FocusOut>", self._changed, add="+")
+                widget.bind("<FocusOut>", self._on_blur, add="+")
             elif spec.kind == "combo":
                 var = tk.StringVar(value=spec.options[0] if spec.options else "")
                 combo = ttk.Combobox(
@@ -216,28 +265,54 @@ class ProductForm:
                 entry.pack(anchor="w", fill="x", expand=True)
                 self.widgets[spec.key] = entry
                 self.holders[spec.key] = Placeholder(entry, spec.placeholder, "entry")
-                entry.bind("<FocusOut>", self._changed, add="+")
+                entry.bind("<FocusOut>", self._on_blur, add="+")
                 if spec.key == "image":
                     self._build_image_tools(box)
             self._hint_row(box, spec)
+        self._build_bottom_bar()
+
+    def _build_bottom_bar(self) -> None:
+        """폼 맨 아래에도 저장 버튼을 둔다. FAQ 는 폼의 끝이라 위 버튼이 화면 밖이다."""
+        tk, ttk = self.tk, self.ttk
+        box = ttk.Frame(self.body)
+        box.pack(fill="x", padx=6, pady=(10, 14))
+        tk.Label(
+            box,
+            text="값을 고치면 칸을 벗어날 때 자동으로 행에 저장됩니다. 아래 버튼은 확인용입니다.",
+            fg=HINT, font=("맑은 고딕", 9), anchor="w", justify="left", wraplength=560,
+        ).pack(anchor="w", pady=(0, 3))
+        self.save_button_bottom = ttk.Button(
+            box, text="행에 저장", command=self.app.on_save_row, style="Primary.TButton"
+        )
+        self.save_button_bottom.pack(anchor="w")
 
     def _build_faq(self, parent, spec: fields.FieldSpec) -> None:
         tk, ttk = self.tk, self.ttk
         example = fields.EXAMPLE["faq"]
+        tk.Label(
+            parent,
+            text="FAQ 는 선택이지만 있으면 별도 FAQPage 정보표가 함께 생성됩니다."
+            " 질문과 답변을 한 쌍으로 채우세요(한쪽만 채운 쌍은 입력은 남지만 생성에서 빠집니다).",
+            bg="#f0f4fa", fg="#205080", font=("맑은 고딕", 9), justify="left",
+            wraplength=560, padx=6, pady=3, anchor="w",
+        ).pack(fill="x", pady=(0, 4))
         for index in range(fields.FAQ_ROWS):
             row = ttk.Frame(parent)
-            row.pack(fill="x", pady=1)
+            row.pack(fill="x", pady=(0, 6))
+            tk.Label(
+                row, text=f"{index + 1}번 쌍  질문 / 답변", fg=HINT, font=("맑은 고딕", 9), anchor="w"
+            ).pack(anchor="w")
             question = ttk.Entry(row, font=("맑은 고딕", 11))
             question.pack(fill="x")
             answer = tk.Text(row, height=2, wrap="word", font=("맑은 고딕", 11))
-            answer.pack(fill="x", pady=(2, 4))
-            sample = example[index] if index < len(example) else ("", "")
-            hq = Placeholder(question, sample[0] or "하루 몇 분 사용하나요?", "entry")
-            ha = Placeholder(answer, sample[1] or "1회 10분, 하루 2회를 권장합니다.", "area")
+            answer.pack(fill="x", pady=(2, 0))
+            sample = example[index] if index < len(example) else example[0]
+            hq = Placeholder(question, f"질문 예시: {sample[0]}", "entry")
+            ha = Placeholder(answer, f"답변 예시: {sample[1]}", "area")
             hq.show()
             ha.show()
-            question.bind("<FocusOut>", self._changed, add="+")
-            answer.bind("<FocusOut>", self._changed, add="+")
+            question.bind("<FocusOut>", self._on_blur, add="+")
+            answer.bind("<FocusOut>", self._on_blur, add="+")
             self.faq_rows.append((hq, ha))
 
 
@@ -255,7 +330,7 @@ class ProductForm:
         self.image_preview.pack(anchor="w", pady=(2, 0))
 
     def _pick_image(self) -> None:
-        row = self.app.current_row()
+        row = self.app.form_row() or self.app.current_row()
         if not row:
             self.app.warn("이미지 고르기", "표에서 상품을 먼저 선택하세요.")
             return
@@ -313,6 +388,19 @@ class ProductForm:
         if self.on_change:
             self.on_change()
 
+    def _on_blur(self, _event=None) -> None:
+        """칸을 벗어나면 바로 행에 저장한다.
+
+        한 번 더 늦게 저장하는 이유: 윈도우 한글 IME 는 조합 중인 글자를 포커스가
+        떠날 때 확정한다. 그 글자가 FocusOut 처리보다 늦게 칸에 들어오는 경우가
+        있어 마지막 글자가 사라진다. 잠시 뒤 한 번 더 읽어 그 글자까지 담는다.
+        """
+        self._changed()
+        try:
+            self.app.root.after(90, self._changed)
+        except Exception:
+            pass
+
     def show_placeholders(self) -> None:
         for holder in self.holders.values():
             holder.show()
@@ -358,11 +446,13 @@ class ProductForm:
         self.widgets["availability_label"].set(prod.stock_label)
         for key, holder in self.holders.items():
             holder.set(str(getattr(prod, key, "") or ""))
-        pairs = prod.faq_pairs()
+        # 완성되지 않은 쌍(질문만·답변만)도 그대로 되돌려 놓는다.
+        # faq_pairs() 는 생성용으로 완성된 쌍만 내주므로 여기서 쓰면 입력이 지워진다.
+        slots = prod.faq_slots() if hasattr(prod, "faq_slots") else prod.faq_pairs()
         for index, (hq, ha) in enumerate(self.faq_rows):
-            if index < len(pairs):
-                hq.set(pairs[index][0])
-                ha.set(pairs[index][1])
+            if index < len(slots):
+                hq.set(slots[index][0])
+                ha.set(slots[index][1])
             else:
                 hq.set("")
                 ha.set("")
@@ -375,9 +465,22 @@ class ProductForm:
             setattr(prod, key, holder.value())
         label = self.widgets["availability_label"].get()
         prod.availability = fields.AVAILABILITY.get(label, fields.IN_STOCK)
+        # 한쪽만 채운 쌍도 칸 자리를 지켜 담는다. 생성할 때 faq_pairs() 가 완성된 쌍만
+        # 골라 내보내므로, 여기서 버리면 사람이 치던 글자가 사라진다.
         faq: list[tuple[str, str]] = []
+        for hq, ha in self.faq_rows:
+            faq.append((hq.value(), ha.value()))
+        while faq and not (faq[-1][0] or faq[-1][1]):
+            faq.pop()
+        prod.faq = faq
+
+    def faq_counts(self) -> tuple[int, int]:
+        """(완성된 쌍 수, 한쪽만 채운 쌍 수)."""
+        full = half = 0
         for hq, ha in self.faq_rows:
             question, answer = hq.value(), ha.value()
             if question and answer:
-                faq.append((question, answer))
-        prod.faq = faq
+                full += 1
+            elif question or answer:
+                half += 1
+        return full, half

@@ -100,6 +100,7 @@ def run(app) -> None:
         app.rows = fresh
         keep = app.rows[0].goods_no
         app.refresh_tree(keep=keep)
+        app.reload_form()  # 행 객체가 새로 바뀌었으니 폼도 그 행으로 다시 그린다
         applied, not_applied, mismatch = counts(app.rows)
         record = history.add_round(
             len(app.rows),

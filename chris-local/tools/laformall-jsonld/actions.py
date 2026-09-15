@@ -224,3 +224,39 @@ def quick_start(app) -> None:
         app.log(f"상품 {len(rows)}개를 불러왔습니다. 이제 목록에서 상품을 고르세요", "ok")
 
     app.background(work, done, "상품 불러와서 정보 가져오는 중...")
+
+
+def sitemap_load(app) -> None:
+    """사이트맵 파일을 받아 기준 날짜와 상품 수를 보여 주고 입력칸을 채운다."""
+    client = app.fetch_client()
+
+    def work():
+        import re as _re
+
+        text = client.get(app.cfg.get("sitemap_url", "")).text
+        goods = sorted(set(_re.findall(r"goodsNo=(\d+)", text)), key=int)
+        dates = sorted(_re.findall(r"<lastmod>\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", text))
+        locs = len(_re.findall(r"<loc>", text))
+        return goods, dates[-1] if dates else "", locs
+
+    def done(result, exc):
+        if exc:
+            app.warn("사이트맵", f"불러오지 못했습니다.\n{exc}")
+            app.log("사이트맵을 불러오지 못했습니다", "error")
+            return
+        goods, lastmod, locs = result
+        urls = [fetcher.product_url(g, app.cfg["domain"]) for g in goods]
+        app.input.delete("1.0", "end")
+        app.input.insert("1.0", "\n".join(urls))
+        stamp = f"{lastmod} 기준" if lastmod else "날짜 표기 없음"
+        app.write_out(
+            f"사이트맵을 읽었습니다 ({app.cfg.get('sitemap_url')})\n\n"
+            f"{stamp}, URL {locs}개, 상품 {len(goods)}개\n"
+            f"상품 goodsNo: {', '.join(goods)}\n\n"
+            "오래된 파일이면 지금 진열과 다를 수 있습니다. 그때는 "
+            "'판매 중 상품 불러오기' 나 '관리자 엑셀 가져오기' 를 쓰세요."
+        )
+        app.set_step(2, "가져오기를 누르세요")
+        app.log(f"사이트맵 {stamp}, 상품 {len(goods)}개", "ok")
+
+    app.background(work, done, "사이트맵을 받는 중...")

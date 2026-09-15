@@ -21,6 +21,7 @@ import browser
 import claims
 import fetcher
 import fields
+import form as form_mod
 import google_test
 import history
 import images
@@ -264,6 +265,7 @@ class App:
     # ---------------------------------------------------------------- 동작
     def on_clear_rows(self) -> None:
         self.rows, self.snippets, self.verdicts, self.google = [], {}, {}, {}
+        self.form.goods_no = ""
         self.refresh_tree()
         self.write_out("")
         self.log("표를 비웠습니다")
@@ -284,39 +286,7 @@ class App:
         actions.make_llms(self)
 
     def on_sitemap(self) -> None:
-        """사이트맵 파일을 받아 기준 날짜와 상품 수를 보여 주고 입력칸을 채운다."""
-        client = self.fetch_client()
-
-        def work():
-            import re as _re
-
-            text = client.get(self.cfg.get("sitemap_url", "")).text
-            goods = sorted(set(_re.findall(r"goodsNo=(\d+)", text)), key=int)
-            dates = sorted(_re.findall(r"<lastmod>\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", text))
-            locs = len(_re.findall(r"<loc>", text))
-            return goods, dates[-1] if dates else "", locs
-
-        def done(result, exc):
-            if exc:
-                self.warn("사이트맵", f"불러오지 못했습니다.\n{exc}")
-                self.log("사이트맵을 불러오지 못했습니다", "error")
-                return
-            goods, lastmod, locs = result
-            urls = [fetcher.product_url(g, self.cfg["domain"]) for g in goods]
-            self.input.delete("1.0", "end")
-            self.input.insert("1.0", "\n".join(urls))
-            stamp = f"{lastmod} 기준" if lastmod else "날짜 표기 없음"
-            self.write_out(
-                f"사이트맵을 읽었습니다 ({self.cfg.get('sitemap_url')})\n\n"
-                f"{stamp}, URL {locs}개, 상품 {len(goods)}개\n"
-                f"상품 goodsNo: {', '.join(goods)}\n\n"
-                "오래된 파일이면 지금 진열과 다를 수 있습니다. 그때는 "
-                "'판매 중 상품 불러오기' 나 '관리자 엑셀 가져오기' 를 쓰세요."
-            )
-            self.set_step(2, "가져오기를 누르세요")
-            self.log(f"사이트맵 {stamp}, 상품 {len(goods)}개", "ok")
-
-        self.background(work, done, "사이트맵을 받는 중...")
+        actions.sitemap_load(self)
 
     def on_fetch(self) -> None:
         goods, bad = fetcher.parse_input(self.input.get("1.0", "end"))
@@ -360,6 +330,7 @@ class App:
             self.refresh_tree()
             if self.rows:
                 self.tree.selection_set(self.rows[0].goods_no)
+                self.reload_form(self.rows[0].goods_no)
             failed = [r for r in result if r.error]
             filled = [r for r in result if r.filled_from_page]
             applied = [r for r in result if str(r.applied).startswith("적용됨")]
@@ -381,9 +352,31 @@ class App:
         self.background(work, done, f"상품 {len(goods)}개 가져오는 중...", total=len(goods))
 
     def on_pick_row(self, _event=None) -> None:
+        """표에서 행을 고르면 폼을 그 행으로 바꾼다.
+
+        같은 행이면 다시 그리지 않는다. 표를 새로 그릴 때마다 tkinter 가
+        <<TreeviewSelect>> 를 다시 보내는데 그때 폼을 덮어쓰면 방금 치던 값이
+        지워진다(FAQ 가 안 들어가던 원인). 옮겨 갈 때는 먼저 자동 저장한다.
+        """
         row = self.current_row()
-        if row:
-            self.form.load(row)
+        if not row:
+            return
+        if self.form.goods_no == row.goods_no:
+            return
+        self.save_form(quiet=True)
+        self.form.load(row)
+
+    def form_row(self) -> fetcher.Product | None:
+        """지금 폼이 잡고 있는 행(표 선택이 아니라 폼에 실린 상품)."""
+        return form_mod.row_of(self)
+
+    def reload_form(self, goods_no: str = "") -> None:
+        """행 자료를 새로 받은 뒤 폼을 다시 그린다."""
+        form_mod.reload_into(self, goods_no)
+
+    def save_form(self, quiet: bool = True) -> fetcher.Product | None:
+        """폼 값을 폼이 잡고 있는 행에 담고 상태줄에 저장됨을 남긴다."""
+        return form_mod.save_into(self, quiet)
 
     def on_row_detail(self, _event=None) -> None:
         row = self.current_row()
@@ -405,22 +398,16 @@ class App:
         self.write_out("\n".join(parts))
 
     def on_form_change(self) -> None:
-        row = self.current_row()
-        if not row:
-            return
-        self.form.collect(row)
-        self.reverdict(row)
-        self.refresh_tree(keep=row.goods_no)
+        """폼에서 값이 바뀔 때마다 자동으로 행에 저장한다."""
+        self.save_form(quiet=True)
 
     def on_save_row(self) -> None:
-        row = self.current_row()
-        if not row:
+        row = self.save_form(quiet=False)
+        if row is None:
             self.warn("편집", "표에서 행을 먼저 선택하세요.")
             return
-        self.on_form_change()
         verdict = self.verdicts.get(row.goods_no)
         self.write_out(verdict.report() if verdict else "")
-        self.log(f"goodsNo={row.goods_no} 저장. 로컬 판정 {verdict.status if verdict else ''}")
 
     def on_fill_example(self) -> None:
         self.form.fill_example()
@@ -455,9 +442,7 @@ class App:
         if not rows:
             self.warn("생성", "표에 행이 없습니다. 먼저 가져오기를 하세요.")
             return
-        current = self.current_row()
-        if current:
-            self.form.collect(current)
+        self.save_form(quiet=True)  # 폼에 치던 값까지 담고 생성한다
         blocked: list[str] = []
         for row in rows:
             missing = fields.missing_required(row)

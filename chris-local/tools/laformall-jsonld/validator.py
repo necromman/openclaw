@@ -225,7 +225,7 @@ def check(prod, image_ok: bool | None = None, image_size: tuple | None = None) -
     if not _val(prod, "extra_props"):
         warnings.append("추가 속성이 없습니다. 사용 시간·전압 같은 수치가 있으면 인용 기회가 늘어납니다")
         missing.append("추가 속성")
-    if not getattr(prod, "faq", None):
+    if not (prod.faq_pairs() if hasattr(prod, "faq_pairs") else getattr(prod, "faq", None)):
         warnings.append("FAQ 가 없습니다. 질문 그대로의 질의에서 인용받는 가장 강한 포맷입니다")
         missing.append("FAQ")
 

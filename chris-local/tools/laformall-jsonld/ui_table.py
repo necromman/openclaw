@@ -100,7 +100,8 @@ def build(app, parent) -> None:
 
 
 def refresh(app, keep: str = "") -> None:
-    selection = keep or (list(app.tree.selection()) or [""])[0]
+    # 여러 줄을 고른 상태에서 폼을 고쳐도 선택이 한 줄로 줄어들지 않게 다 살린다.
+    chosen = [keep] if keep else list(app.tree.selection())
     app.tree.delete(*app.tree.get_children())
     for row in app.rows:
         verdict = app.verdicts.get(row.goods_no)
@@ -131,8 +132,9 @@ def refresh(app, keep: str = "") -> None:
             ),
             tags=tuple(tags),
         )
-    if selection and app.tree.exists(selection):
-        app.tree.selection_set(selection)
+    alive = [key for key in chosen if key and app.tree.exists(key)]
+    if alive:
+        app.tree.selection_set(*alive)
 
 
 def cell_text(app, goods_no: str, column: str) -> str:

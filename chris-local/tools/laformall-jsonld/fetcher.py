@@ -98,6 +98,17 @@ class Product:
             pairs.append(("특허·인증", self.certs.strip()))
         return pairs
 
+    def faq_slots(self) -> list[tuple[str, str]]:
+        """폼에 돌려줄 FAQ 칸 그대로(한쪽만 채운 쌍도 남긴다)."""
+        out: list[tuple[str, str]] = []
+        for item in self.faq or []:
+            try:
+                question, answer = item[0], item[1]
+            except Exception:
+                continue
+            out.append((str(question or "").strip(), str(answer or "").strip()))
+        return out
+
     def faq_pairs(self) -> list[tuple[str, str]]:
         out: list[tuple[str, str]] = []
         for item in self.faq or []:
