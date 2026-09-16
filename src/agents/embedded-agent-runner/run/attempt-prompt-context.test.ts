@@ -303,9 +303,7 @@ describe("prepareEmbeddedAttemptPromptContext", () => {
       expect(result.systemPromptForHook).toContain("OpenClaw runtime event.");
       expect(result.promptSubmission.runtimeOnly).toBe(true);
       expect(result.promptForSession).toBe(
-        "Room conversation data
-
-Continue the OpenClaw runtime event.",
+        "Room conversation data\n\nContinue the OpenClaw runtime event.",
       );
       expect(result.promptForModel).toBe(result.promptForSession);
       expect(result.systemPromptForHook).not.toContain("Room conversation data");

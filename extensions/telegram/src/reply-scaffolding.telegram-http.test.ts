@@ -143,7 +143,7 @@ describe("reply scaffolding through final preparation and Telegram HTTP", () => 
       }
       expect(errors).toEqual([]);
     } finally {
-      await preview?.discard();
+      await preview?.discard?.();
     }
   }
 

@@ -1025,9 +1025,7 @@ function resolveEmbeddedRunProgressState(
   const handleInProgress =
     isEmbeddedRunHandleInProgress(handle) &&
     (scope === "operational" ||
-      (registration &&
-        registration.projectSessionActive !== false &&
-        matchesSessionProgressOwner(scope, registration)));
+      (registration && matchesSessionProgressOwner(scope, registration)));
   // Reply operations and embedded handles are independent lifecycle owners.
   // A retained terminal owner must not hide a newer live owner for the session.
   if (

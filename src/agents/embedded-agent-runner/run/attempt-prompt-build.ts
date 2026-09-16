@@ -605,9 +605,7 @@ export function prepareEmbeddedAttemptPromptContext(input: {
     contextFragments
       .map((fragment) => fragment.text)
       .filter(Boolean)
-      .join("
-
-") || undefined;
+      .join("\n\n") || undefined;
   const runtimeContextMessageForCurrentTurn = buildRuntimeContextCustomMessage(
     runtimeContextForHook,
     contextFragments,

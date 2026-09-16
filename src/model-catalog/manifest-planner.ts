@@ -221,9 +221,8 @@ function planManifestModelCatalogPluginEntries(params: {
           : models;
       const manifestModels = selectModels(providerCatalog.models);
       const remoteModels = remoteProvider ? selectModels(remoteProvider.models) : [];
-      const remoteModelIds = remoteModels.length
-        ? new Set(remoteModels.map((model) => model.id))
-        : undefined;
+      const remoteModelIds = new Set(remoteModels.map((model) => model.id));
+      const manifestModelsById = new Map(manifestModels.map((model) => [model.id, model]));
       const providerDefaults = remoteProvider
         ? {
             ...providerCatalog,

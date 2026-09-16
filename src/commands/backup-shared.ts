@@ -189,12 +189,7 @@ async function resolveBackupPlanFromPaths(params: {
   const onlyConfig = params.onlyConfig ?? false;
   const stateDir = params.stateDir;
   const configPath = params.configPath;
-  for (const sourcePath of [
-    configPath,
-    ...(params.configCapture?.files ?? []).map((file) => file.canonicalPath),
-  ]) {
-    assertNotUpdateCapturePath(sourcePath, stateDir);
-  }
+  assertNotUpdateCapturePath(configPath, stateDir);
   const oauthDir = params.oauthDir;
   const archiveRoot = buildBackupArchiveRoot(params.nowMs);
   const requestedWorkspaceDirs = params.workspaceDirs ?? [];

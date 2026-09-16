@@ -428,7 +428,6 @@ async function removeAgentPath(
   try {
     // fs-safe pins traversal and identity for validation; Trash has no fd-relative move API, so
     // replacement after this check and before its rename is the accepted residual race bound.
-    assertCurrent();
     // statAgentCleanupPath verified the declared parent; fs-safe's default roots (home/tmp)
     // alone refuse every path of a volume-backed state dir. Keep those defaults so the
     // directory behind a workspace symlink stays fenced exactly as shipped, while the link

@@ -647,6 +647,22 @@ export async function prepareSimpleCompletionModelForAgent(params: {
   );
 }
 
+export type AcquiredSimpleCompletionModelForAgent =
+  | (Extract<PreparedSimpleCompletionModelForAgent, { model: Model }> & { release: () => void })
+  | Extract<PreparedSimpleCompletionModelForAgent, { error: string }>;
+
+/**
+ * Fork port of the upstream acquire API (#143308). The fork's prepare path holds no
+ * runtime lease of its own, so release is a no-op that keeps call sites identical.
+ */
+export async function acquireSimpleCompletionModelForAgent(
+  params: Parameters<typeof prepareSimpleCompletionModelForAgent>[0],
+): Promise<AcquiredSimpleCompletionModelForAgent> {
+  const prepared = await prepareSimpleCompletionModelForAgent(params);
+  return "error" in prepared ? prepared : { ...prepared, release: () => {} };
+}
+
+
 export async function completeWithPreparedSimpleCompletionModel(params: {
   assertCurrent?: () => void;
   model: Model;
