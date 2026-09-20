@@ -1,9 +1,0 @@
-# PyInstaller 중간물만 무시한다. 배포 exe 는 dist 에 두고 추적한다.
-build/
-__pycache__/
-*.pyc
-*.spec
-dist/*
-!dist/
-!dist/laformall-jsonld.exe
-release/

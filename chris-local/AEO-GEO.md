@@ -259,6 +259,10 @@ sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents de
 - 식약처 2020-06 공산품 베개 점검(정부 재게시본): https://www.khidi.or.kr/board/view?linkId=48773096
 - 고도몰 SEO 설정 가이드: https://marketing-help.nhn-commerce.com/traffic-growth-strategies/godomall-seo-setting
 
+## 9-1. 라포르몰 JSON-LD 생성기 (별도 저장소)
+
+대표 전달용 데스크톱 도구(상품 JSON-LD 생성·검증, exe)는 2026-09-20 에 이 저장소의 `chris-local/tools/laformall-jsonld/` 에서 떼어 내 별도 비공개 저장소 `necromman/rapportmall-jsonld` 로 옮겼다(원래 PC 경로 `D:\PROJECT\rapportmall-jsonld`). 브랜드 영문 철자가 Rapport(교감)라 이름을 바로잡았다. `ageo-brief-for-ceo.html/.pdf` 의 근거 문서 줄에 적힌 구 경로는 전달 당시 기록이라 그대로 둔다.
+
 ## 10. 아직 아닌 것
 
 - **주기 모니터링·알림이 없다.** 프롬프트 세트를 주 1회 자동으로 돌려 노출 변화를 알리는 기능은 넣지 않았다. 이 에이전트는 요청받을 때 도는 대화형이다.
@@ -274,6 +278,7 @@ sudo docker exec -u node 게이트웨이컨테이너 node openclaw.mjs agents de
 - **에이전트** - 사용자와 대화하며 도구를 골라 쓰는 AI 비서 하나. 이름·모델·권한·작업 폴더를 따로 가진다.
 - **워크스페이스** - 에이전트가 파일을 읽고 쓰는 자기 작업 폴더. 정체성 파일과 스킬이 여기에 놓인다.
 - **스킬** - 특정 작업의 절차를 적어 둔 문서. 에이전트가 해당 작업을 만나면 이 문서를 열어 그대로 따른다.
+- **컨텍스트** - 모델이 한 번에 볼 수 있는 입력과 출력 토큰의 총량. 32k 는 약 3만 2천 토큰을 뜻한다.
 - **크롤러** - 웹 페이지를 자동으로 읽어 가는 프로그램. 검색엔진과 AI 서비스가 각자의 크롤러를 운영한다.
 - **robots.txt** - 사이트 최상위에 두는 텍스트 파일. 어느 크롤러가 어느 경로를 읽어도 되는지 적는다.
 - **JSON-LD** - 페이지의 내용을 기계가 읽을 수 있는 형식으로 함께 적어 두는 방식. 제품명·가격·질문과 답 같은 것을 오해 없이 전달한다.
